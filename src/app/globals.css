@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+@theme {
+  /* Palet: hangat seperti kayu_roti + matcha + stroberi */
+  --color-cream-50: #fdfaf4;
+  --color-cream-100: #f8f2e6;
+  --color-cream-200: #efe5d1;
+  --color-cream-300: #e2d2b5;
+
+  --color-cocoa-50: #f7f3ef;
+  --color-cocoa-100: #ece2d8;
+  --color-cocoa-200: #d7c5b3;
+  --color-cocoa-300: #b99b7d;
+  --color-cocoa-400: #9c7a58;
+  --color-cocoa-500: #7d5c3c;
+  --color-cocoa-600: #5f432a;
+  --color-cocoa-700: #45301e;
+  --color-cocoa-800: #2c1e12;
+  --color-cocoa-900: #1a110a;
+  --color-cocoa-950: #0f0a06;
+
+  --color-matcha-50: #f2f7ee;
+  --color-matcha-100: #e2eddb;
+  --color-matcha-200: #c5dcb4;
+  --color-matcha-300: #a0c486;
+  --color-matcha-400: #7faa5e;
+  --color-matcha-500: #628c43;
+  --color-matcha-600: #4b6d33;
+  --color-matcha-700: #3d562c;
+
+  --color-berry-400: #f2657a;
+  --color-berry-500: #e1445c;
+  --color-berry-600: #c22b45;
+
+  --color-honey-300: #f2c46b;
+  --color-honey-400: #e8ab3c;
+  --color-honey-500: #d18d1c;
+
+  --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-xs: 0.375rem;
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.5s ease-out both;
+  --animate-marquee: marquee 28s linear infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-cream-50);
+    color: var(--color-cocoa-800);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  /* Fokus keyboard yang jelas */
+  :focus-visible {
+    outline: 2px solid var(--color-matcha-500);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: var(--color-matcha-200);
+    color: var(--color-cocoa-900);
+  }
+}
+
+/* `btn` harus jadi utility sungguhan supaya bisa dipakai ulang
+   oleh .btn-primary, .btn-ghost, dst lewat @apply (didukung sejak v4). */
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  transition: all 0.15s ease;
+}
+
+@utility card {
+  border-radius: 1rem;
+  border-width: 1px;
+  border-color: color-mix(in oklab, var(--color-cocoa-200) 60%, transparent);
+  background-color: #fff;
+  box-shadow:
+    0 1px 2px rgba(26, 17, 10, 0.04),
+    0 8px 24px -12px rgba(26, 17, 10, 0.12);
+}
+
+@utility label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-cocoa-700);
+}
+
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+@layer components {
+  /* Pola Jepang subtle untuk latar gelap */
+  .bg-seigaiha {
+    background-image:
+      radial-gradient(circle at 100% 50%, transparent 20%, rgba(255, 255, 255, 0.045) 21%, rgba(255, 255, 255, 0.045) 34%, transparent 35%, transparent),
+      radial-gradient(circle at 0% 50%, transparent 20%, rgba(255, 255, 255, 0.045) 21%, rgba(255, 255, 255, 0.045) 34%, transparent 35%, transparent);
+    background-size: 56px 28px;
+  }
+
+  .bg-grain {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-cocoa-200 bg-white px-4 py-3 text-[15px] text-cocoa-800
+           placeholder:text-cocoa-300 transition
+           focus:border-matcha-500 focus:ring-2 focus:ring-matcha-200 focus:outline-none
+           disabled:bg-cocoa-50 disabled:text-cocoa-400;
+  }
+
+  .input-error {
+    @apply border-berry-500 focus:border-berry-500 focus:ring-berry-400/30;
+  }
+
+  .btn-primary {
+    @apply btn bg-cocoa-800 text-cream-50 shadow-lg shadow-cocoa-900/15
+           hover:bg-cocoa-700 hover:shadow-xl hover:shadow-cocoa-900/20
+           active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-matcha {
+    @apply btn bg-matcha-500 text-white shadow-lg shadow-matcha-700/20
+           hover:bg-matcha-600 hover:shadow-xl hover:shadow-matcha-700/25
+           active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-outline {
+    @apply btn border-2 border-cocoa-800 text-cocoa-800
+           hover:bg-cocoa-800 hover:text-cream-50
+           active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply btn text-cocoa-600 hover:bg-cocoa-100 hover:text-cocoa-800
+           active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-danger {
+    @apply btn bg-berry-500 text-white hover:bg-berry-600
+           active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+}
+
+/* Sembunyikan scrollbar tapi tetap bisa di-scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Angka tabel rata-rata */
+.tabular { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

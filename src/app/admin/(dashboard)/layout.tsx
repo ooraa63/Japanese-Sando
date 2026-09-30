@@ -1,0 +1,31 @@
+import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
+import { getCurrentAdmin, getIsAdmin } from "@/lib/supabase/server";
+import { getI18nDict } from "@/lib/i18n-server";
+import { AdminShell } from "@/components/admin/AdminShell";
+
+export const dynamic = "force-dynamic";
+
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  const isAdmin = await getIsAdmin();
+  if (!isAdmin) redirect("/admin/login");
+
+  const [admin, dicts] = await Promise.all([getCurrentAdmin(), getI18nDict()]);
+
+  return (
+    <AdminShell
+      email={admin?.email ?? ""}
+      fullName={admin?.full_name ?? ""}
+      labels={{
+        dashboard: dicts.admin.nav.dashboard,
+        orders: dicts.admin.nav.orders,
+        menu: dicts.admin.nav.menu,
+        settings: dicts.admin.nav.settings,
+        viewSite: dicts.admin.nav.viewSite,
+        signOut: dicts.admin.login.signOut,
+      }}
+    >
+      {children}
+    </AdminShell>
+  );
+}
