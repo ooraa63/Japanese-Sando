@@ -54,25 +54,6 @@ async function asUser(role, claims, sql, params = [], persist = false) {
   }
 }
 
-/** Koneksi terpisah Ã¢â‚¬â€ dipakai untuk uji konkurensi sungguhan. */
-async function asUserOn(conn, role, claims, sql, params = []) {
-  await conn.query("begin");
-  try {
-    await conn.query(
-      `select set_config('request.jwt.claims', $1, true),
-              set_config('request.jwt.claim.sub', $2, true)`,
-      [JSON.stringify(claims), claims.sub ?? ""]
-    );
-    await conn.query(`set local role ${role}`);
-    const res = await conn.query(sql, params);
-    await conn.query("commit");
-    return { ok: true, rows: res.rows, count: res.rowCount };
-  } catch (e) {
-    await conn.query("rollback");
-    return { ok: false, error: e.message };
-  }
-}
-
 
 // ---------------------------------------------------------------- anon
 console.log("\n=== 1. Perilaku anon (pembeli, tanpa login) ===");
