@@ -30,10 +30,15 @@ if (!url) {
 }
 
 const schemaPath = path.resolve(process.cwd(), "supabase/schema.sql");
-const migrationPath = path.resolve(process.cwd(), "supabase/migration-2.sql");
 const schemaSql = readFileSync(schemaPath, "utf8");
-const migrationSql = existsSync(migrationPath) ? readFileSync(migrationPath, "utf8") : "";
-const sql = schemaSql + "\n\n" + migrationSql;
+const migration2Path = path.resolve(process.cwd(), "supabase/migration-2.sql");
+const migration3Path = path.resolve(process.cwd(), "supabase/migration-3.sql");
+const sql =
+  schemaSql +
+  "\n\n" +
+  (existsSync(migration2Path) ? readFileSync(migration2Path, "utf8") : "") +
+  "\n\n" +
+  (existsSync(migration3Path) ? readFileSync(migration3Path, "utf8") : "");
 
 const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
 

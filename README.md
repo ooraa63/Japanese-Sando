@@ -42,7 +42,30 @@ project Next.js:
   tombol buka/tutup pre-order
 - Dua bahasa
 
-#### Cara pengambilan
+#### Harga paket
+
+Setiap **2 pcs** menjadi satu paket dengan harga tetap **Rp35.000** —
+berapa pun rasa yang dipilih. Sisa pcs di luar paket dihitung harga biasa.
+
+| Jumlah | Cara hitung | Total |
+| --- | --- | --- |
+| 1 | 1 × satuan | Rp18.000 |
+| **2** | 1 paket | **Rp35.000** (hemat Rp1.000) |
+| **3** | 1 paket + 1 satuan | **Rp53.000** (hemat Rp1.000) |
+| **4** | 2 paket | **Rp70.000** (hemat Rp2.000) |
+| **5** | 2 paket + 1 satuan | **Rp88.000** (hemat Rp2.000) |
+
+Rumusnya: `paket = jumlah ÷ 2 (bulat ke bawah)`, lalu tambah sisanya
+dengan harga satuan.
+
+Paket bisa **campur rasa** — beli 1 Choco Matcha + 1 Cookies & Cream
+masih Rp35.000.zr Václav Havel — detail reviewer earlier
+
+Semua dihitung ulang di server, jadi harga tidak bisa dimanipulasi dari
+browser. Di **Pengaturan → Harga paket** bisa diubah jumlah pcs per
+paket, harga paketnya, atau dimatikan sama sekali.
+
+### Cara pengambilan
 
 Pembeli memilih sendiri di langkah pembayaran:
 
@@ -95,16 +118,6 @@ karena tiap rasa punya bahan berbeda.
 
 Kelola lewat **Menu & Stok**. Matikan **Batasi stok** kalau mau
 menjual tanpa batas.
-
-### Batch pre-order
-
-Semua pesanan otomatis masuk ke **batch** yang sedang dibuka. Ini berguna
-untuk produksi bertahap: buka **Batch** di dashboard untuk melihat
-"berapa pcs tiap rasa yang harus dimasak" dalam satu daftar.
-
-- Batch baru dibuat otomatis setiap kali batch lama ditutup
-- Nomor batch = tanggal pembuatannya
-- Tombol **Cetak** untuk dipakai sebagai daftar belanja produksi
 
 ### Mengganti foto halaman depan
 

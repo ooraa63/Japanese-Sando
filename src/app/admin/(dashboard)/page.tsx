@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { getSettings } from "@/lib/data";
-import {
-  getBatchesAction,
-  getDashboardStatsAction,
-  getOrdersAction,
-} from "@/app/admin/actions";
+import { getDashboardStatsAction, getOrdersAction } from "@/app/admin/actions";
 import { DashboardClient } from "@/components/admin/DashboardClient";
 import type { DashboardStats } from "@/lib/types";
 
@@ -26,14 +22,16 @@ const EMPTY_STATS: DashboardStats = {
   stock_enabled: true,
   total_stock: 0,
   stock_used: 0,
+  bundle_enabled: true,
+  bundle_size: 2,
+  bundle_price: 0,
   sales_by_flavor: [],
 };
 
 export default async function AdminDashboardPage() {
-  const [statsRes, ordersRes, batchesRes, settings] = await Promise.all([
+  const [statsRes, ordersRes, settings] = await Promise.all([
     getDashboardStatsAction(),
     getOrdersAction(null, "", 8, 0),
-    getBatchesAction(),
     getSettings(),
   ]);
 
@@ -41,7 +39,6 @@ export default async function AdminDashboardPage() {
     <DashboardClient
       initialStats={statsRes.data ?? EMPTY_STATS}
       initialOrders={ordersRes.data?.orders ?? []}
-      initialBatches={batchesRes.data ?? []}
       isPreorderOpen={settings?.is_preorder_open ?? true}
     />
   );

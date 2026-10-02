@@ -81,12 +81,6 @@ export function OrderRow({ order }: { order: Order }) {
             {formatFullDateTime(order.created_at, lang)}
           </dd>
         </div>
-        {order.batch_label ? (
-          <div className="flex justify-between gap-3">
-            <dt>{t.admin.nav.batch}</dt>
-            <dd className="font-semibold text-matcha-600">{order.batch_label}</dd>
-          </div>
-        ) : null}
       </dl>
     </div>
   );

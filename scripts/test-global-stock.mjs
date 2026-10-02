@@ -1,5 +1,5 @@
 /**
- * Uji aturan stok GLOBAL (bukan per rasa) + batch pre-order.
+ * Uji aturan stok GLOBAL (satu angka untuk semua rasa).
  *
  *   node scripts/test-global-stock.mjs
  */
@@ -50,7 +50,6 @@ const anon = { role: "anon" };
 
 // Bersihkan & siapkan
 await client.query(`delete from public.orders;`);
-await client.query(`delete from public.batches where label <> 'Arsip';`);
 await client.query(`update public.store_settings set is_preorder_open = true, stock_enabled = true, total_stock = 10, delivery_fee = 5000 where id = 1;`);
 
 const totalStock = async () =>
@@ -107,42 +106,6 @@ check("selesai", (await setStatus(a.id, "delivered")).ok);
 check("stok tetap 8 (barang sudah dibuat)", (await totalStock()).total_stock === 8);
 
 // ---------------------------------------------------------------- 5
-console.log("\n=== 5. Batch otomatis ===");
-const batches = await asUser("authenticated", admin, `select public.admin_list_batches();`);
-const open = batches.rows[0].admin_list_batches.find((x) => x.is_open);
-check("ada batch terbuka", Boolean(open), JSON.stringify(batches.rows[0]?.admin_list_batches?.slice(0,2)));
-console.log(`  batch: ${open?.label} | ${open?.order_count} pesanan | ${open?.item_count} pcs | ${open?.revenue} revenue`);
-
-const { rows: withBatch } = await client.query(
-  `select o.order_code, o.batch_id, bt.label from public.orders o
-   left join public.batches bt on bt.id = o.batch_id order by o.id;`);
-check("pesanan punya batch", withBatch.every((x) => x.label !== null),
-  JSON.stringify(withBatch));
-
-const summary = await asUser("authenticated", admin, `select public.admin_batch_summary($1);`, [String(open.id)]);
-const s = summary.rows[0].admin_batch_summary;
-console.log(`  ringkasan batch: ${s.total_orders} pesanan, ${s.total_items} pcs, ${s.revenue} revenue`);
-console.log(`  per rasa: ${JSON.stringify(s.by_flavor)}`);
-console.log(`  ambil/diantar: ${JSON.stringify(s.by_delivery)}`);
-check("daftar produksi per rasa ada", s.by_flavor.length > 0, JSON.stringify(s));
-check("total item batch benar (2 + 1 = 3)", s.total_items === 3, `total_items=${s.total_items}`);
-check("semua pesanan ambil di tempat", s.by_delivery.pickup === 2, JSON.stringify(s.by_delivery));
-
-// ---------------------------------------------------------------- 6
-console.log("\n=== 6. Tutup batch ===");
-check("batch bisa ditutup", (await asUser("authenticated", admin,
-  `select public.admin_close_batch($1);`, [String(open.id)])).ok);
-const afterClose = await asUser("authenticated", admin, `select public.admin_list_batches();`);
-const newOpen = afterClose.rows[0].admin_list_batches.find((x) => x.is_open);
-check("batch baru otomatis dibuat setelah ditutup", Boolean(newOpen) && newOpen.id !== open.id,
-  JSON.stringify(afterClose.rows[0].admin_list_batches.map(x => ({ l: x.label, o: x.is_open }))));
-
-const c = await order("Dewi", "081111000004", "pickup", null, [[2, 1]]);
-const { rows: batchOfC } = await client.query(
-  `select bt.label from public.orders o join public.batches bt on bt.id=o.batch_id where o.id=$1;`, [c.id]);
-check("pesanan baru masuk ke batch baru", batchOfC[0]?.label === newOpen?.label,
-  `${batchOfC[0]?.label} vs ${newOpen?.label}`);
-
 // ---------------------------------------------------------------- 7
 console.log("\n=== 7. Kirim (delivery) ===");
 await client.query(`update public.store_settings set total_stock = 20 where id=1;`);
@@ -165,7 +128,6 @@ await client.query(`update public.store_settings set max_per_order = 20 where id
 // Bersihkan
 await client.query(`update public.store_settings set stock_enabled = true, total_stock = 20, delivery_fee = 0, is_preorder_open = true where id=1;`);
 await client.query(`delete from public.orders;`);
-await client.query(`delete from public.batches where label <> 'Arsip';`);
 
 await client.end();
 console.log(`\n${"=".repeat(50)}`);

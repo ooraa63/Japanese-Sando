@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ChefHat,
   Clock,
-  Layers,
   PackageCheck,
   Power,
   RefreshCw,
@@ -16,13 +15,12 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import type { Batch, DashboardStats, Order } from "@/lib/types";
+import type { DashboardStats, Order } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { formatFullDateTime, formatIDR, formatRelative, statusLabel } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/Toast";
 import {
-  getBatchesAction,
   getDashboardStatsAction,
   getOrdersAction,
   saveSettingsAction,
@@ -31,35 +29,28 @@ import {
 export function DashboardClient({
   initialStats,
   initialOrders,
-  initialBatches,
   isPreorderOpen,
 }: {
   initialStats: DashboardStats;
   initialOrders: Order[];
-  initialBatches: Batch[];
   isPreorderOpen: boolean;
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const [stats, setStats] = useState(initialStats);
   const [orders, setOrders] = useState(initialOrders);
-  const [batches, setBatches] = useState(initialBatches);
   const [open, setOpen] = useState(isPreorderOpen);
   const [refreshing, startRefresh] = useTransition();
   const [toggling, startToggle] = useTransition();
 
-  const openBatch = batches.find((b) => b.is_open) ?? null;
-
   function refresh() {
     startRefresh(async () => {
-      const [statsRes, ordersRes, batchesRes] = await Promise.all([
+      const [statsRes, ordersRes] = await Promise.all([
         getDashboardStatsAction(),
         getOrdersAction(null, "", 8, 0),
-        getBatchesAction(),
       ]);
       if (statsRes.ok && statsRes.data) setStats(statsRes.data);
       if (ordersRes.ok && ordersRes.data) setOrders(ordersRes.data.orders);
-      if (batchesRes.ok && batchesRes.data) setBatches(batchesRes.data);
     });
   }
 
@@ -244,9 +235,9 @@ export function DashboardClient({
                         ) : null}
                       </div>
                       <p className="mt-0.5 truncate text-[13px] text-cocoa-600">
-                        {o.customer_name} ·{" "}
+                        {o.customer_name} Â·{" "}
                         {o.items
-                          .map((it) => `${it.quantity}× ${it.flavor_name}`)
+                          .map((it) => `${it.quantity}Ã— ${it.flavor_name}`)
                           .join(", ")}
                       </p>
                       <p className="mt-0.5 text-[11px] text-cocoa-400">
@@ -278,65 +269,6 @@ export function DashboardClient({
 
         {/* ---------- Sisi kanan ---------- */}
         <div className="space-y-6">
-          {/* Batch pre-order */}
-          <div className="card">
-            <div className="flex items-center gap-2 border-b border-cocoa-100 px-5 py-4">
-              <h2 className="flex items-center gap-2 text-base font-bold text-cocoa-800">
-                <Layers className="size-4.5 text-matcha-600" />
-                {t.admin.dash.batchTitle}
-              </h2>
-            </div>
-
-            {openBatch ? (
-              <div className="px-5 py-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-display text-lg font-extrabold text-cocoa-900">
-                    {openBatch.label}
-                  </p>
-                  <span className="chip bg-matcha-100 text-matcha-700">
-                    {t.admin.dash.batchOpen}
-                  </span>
-                </div>
-                <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-xl bg-cocoa-50 p-2.5">
-                    <dt className="text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
-                      {t.admin.dash.orders}
-                    </dt>
-                    <dd className="mt-0.5 text-lg font-extrabold text-cocoa-900 tabular">
-                      {openBatch.order_count}
-                    </dd>
-                  </div>
-                  <div className="rounded-xl bg-cocoa-50 p-2.5">
-                    <dt className="text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
-                      {t.common.qty}
-                    </dt>
-                    <dd className="mt-0.5 text-lg font-extrabold text-cocoa-900 tabular">
-                      {openBatch.item_count}
-                    </dd>
-                  </div>
-                  <div className="rounded-xl bg-cocoa-50 p-2.5">
-                    <dt className="text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
-                      {t.common.total}
-                    </dt>
-                    <dd className="mt-0.5 text-sm font-extrabold text-cocoa-900 tabular">
-                      {formatIDR(openBatch.revenue, lang)}
-                    </dd>
-                  </div>
-                </dl>
-                <Link
-                  href="/admin/batch"
-                  className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-matcha-600 transition hover:text-matcha-700"
-                >
-                  {t.admin.dash.viewBatch}
-                  <ArrowRight className="size-3.5" />
-                </Link>
-              </div>
-            ) : (
-              <p className="px-5 py-8 text-center text-sm text-cocoa-400">
-                {t.admin.dash.noBatch}
-              </p>
-            )}
-          </div>
 
           {/* Stok global */}
           <div className="card">
@@ -366,7 +298,7 @@ export function DashboardClient({
                       href="/admin/menu"
                       className="text-xs font-bold text-matcha-600 transition hover:text-matcha-700"
                     >
-                      {t.admin.dash.manageStock} →
+                      {t.admin.dash.manageStock} â†’
                     </Link>
                   </div>
                 </>

@@ -13,6 +13,7 @@ import {
   Minus,
   Plus,
   ShoppingBag,
+  Sparkles,
   Store,
   Trash2,
   Truck,
@@ -26,7 +27,7 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { FlavorCard } from "@/components/customer/FlavorCard";
-import { formatIDR, formatPhone } from "@/lib/utils";
+import { calcBundle, formatIDR, formatPhone } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
 export type Step = (typeof STEPS)[number];
@@ -98,10 +99,18 @@ export function OrderFlow({
     [quantities, flavorById]
   );
 
-  const subtotal = cartLines.reduce(
-    (sum, l) => sum + l.flavor.price * l.qty,
-    0
-  );
+  const rawTotal = cartLines.reduce((sum, l) => sum + l.flavor.price * l.qty, 0);
+  // Harga satuan rata-rata, dipakai untuk sisa pcs di luar paket.
+  const avgUnitPrice =
+    totalItems > 0 ? Math.round(rawTotal / totalItems) : (flavors[0]?.price ?? 0);
+
+  const bundle = calcBundle(totalItems, avgUnitPrice, {
+    enabled: settings.bundle_enabled,
+    size: settings.bundle_size,
+    price: settings.bundle_price,
+  });
+  const subtotal = bundle.total;
+
   // Ongkir hanya untuk pengiriman; ambil di tempat gratis.
   const deliveryFee =
     draft.deliveryMethod === "delivery" ? settings.delivery_fee : 0;
@@ -109,6 +118,12 @@ export function OrderFlow({
 
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
   const deliveryNote = lang === "en" ? settings.delivery_note_en : settings.delivery_note_id;
+
+  // Contoh: "Beli 2 = Rp35.000" — dibuat dari pengaturan supaya tidak perlu
+  // diubah manual kalau harga paket-nya diganti.
+  const bundleOffer = t.order.review.bundleOffer
+    .replace("{n}", String(settings.bundle_size))
+    .replace("{price}", formatIDR(settings.bundle_price, lang));
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -351,6 +366,14 @@ export function OrderFlow({
                     {stockLeft > 0
                       ? t.order.menu.stockLeft.replace("{n}", String(stockLeft))
                       : t.menu.soldOut}
+                  </p>
+                ) : null}
+
+                {/* Info harga paket */}
+                {settings.bundle_enabled ? (
+                  <p className="mt-2 inline-flex items-center gap-2 rounded-xl bg-berry-500/10 px-3.5 py-2 text-sm font-bold text-berry-600">
+                    <Sparkles className="size-4" />
+                    {bundleOffer}
                   </p>
                 ) : null}
               </div>
@@ -668,10 +691,41 @@ export function OrderFlow({
 
               {/* Ringkasan biaya */}
               <div className="mt-6 rounded-2xl bg-cocoa-50 p-4">
-                <div className="flex justify-between text-sm text-cocoa-600">
-                  <span>{t.common.subtotal}</span>
-                  <span className="tabular">{formatIDR(subtotal, lang)}</span>
-                </div>
+                {bundle.bundles > 0 ? (
+                  <>
+                    <div className="flex justify-between text-sm text-cocoa-600">
+                      <span>
+                        {bundle.bundles} {t.order.review.bundle}
+                      </span>
+                      <span className="tabular">
+                        {formatIDR(bundle.bundles * settings.bundle_price, lang)}
+                      </span>
+                    </div>
+                    {bundle.leftover > 0 ? (
+                      <div className="mt-2 flex justify-between text-sm text-cocoa-600">
+                        <span>
+                          {bundle.leftover} {t.common.qty.toLowerCase()}
+                        </span>
+                        <span className="tabular">
+                          {formatIDR(bundle.leftover * avgUnitPrice, lang)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="flex justify-between text-sm text-cocoa-600">
+                    <span>{t.common.subtotal}</span>
+                    <span className="tabular">{formatIDR(subtotal, lang)}</span>
+                  </div>
+                )}
+
+                {bundle.saving > 0 ? (
+                  <div className="mt-2 flex justify-between text-sm font-bold text-matcha-600">
+                    <span>{t.order.review.saving}</span>
+                    <span className="tabular">-{formatIDR(bundle.saving, lang)}</span>
+                  </div>
+                ) : null}
+
                 {draft.deliveryMethod === "delivery" ? (
                   <div className="mt-2 flex justify-between text-sm text-cocoa-600">
                     <span>{t.order.review.deliveryFee}</span>
@@ -758,10 +812,42 @@ export function OrderFlow({
             )}
 
             <div className="space-y-2 border-t border-cocoa-100 bg-cocoa-50 px-4 py-3.5 text-sm">
-              <div className="flex justify-between text-cocoa-600">
-                <span>{t.common.subtotal}</span>
-                <span className="tabular">{formatIDR(subtotal, lang)}</span>
-              </div>
+              {/* Rincian paket */}
+              {bundle.bundles > 0 ? (
+                <>
+                  <div className="flex justify-between text-cocoa-600">
+                    <span>
+                      {bundle.bundles} {t.order.review.bundle}
+                    </span>
+                    <span className="tabular">
+                      {formatIDR(bundle.bundles * settings.bundle_price, lang)}
+                    </span>
+                  </div>
+                  {bundle.leftover > 0 ? (
+                    <div className="flex justify-between text-cocoa-600">
+                      <span>
+                        {bundle.leftover} {t.common.qty.toLowerCase()}
+                      </span>
+                      <span className="tabular">
+                        {formatIDR(bundle.leftover * avgUnitPrice, lang)}
+                      </span>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="flex justify-between text-cocoa-600">
+                  <span>{t.common.subtotal}</span>
+                  <span className="tabular">{formatIDR(subtotal, lang)}</span>
+                </div>
+              )}
+
+              {bundle.saving > 0 ? (
+                <div className="flex justify-between text-matcha-600">
+                  <span>{t.order.review.saving}</span>
+                <span className="tabular">-{formatIDR(bundle.saving, lang)}</span>
+                </div>
+              ) : null}
+
               {draft.deliveryMethod === "delivery" ? (
                 <div className="flex justify-between text-cocoa-600">
                   <span>{t.order.review.deliveryFee}</span>

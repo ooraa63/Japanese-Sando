@@ -74,30 +74,22 @@ export interface StoreSettings {
   pickup_note_en: string;
   delivery_note_id: string;
   delivery_note_en: string;
+  /** Harga paket */
+  bundle_enabled: boolean;
+  bundle_size: number;
+  bundle_price: number;
   updated_at: string;
 }
 
-/** Batch pre-order: sekumpulan pesanan yangdiproduksi bersama. */
-export interface Batch {
-  id: number;
-  label: string;
-  note: string;
-  status: "open" | "closed";
-  created_at: string;
-  closed_at: string | null;
-  order_count: number;
-  item_count: number;
-  revenue: number;
-  is_open: boolean;
-}
-
-export interface BatchSummary {
-  batch: Pick<Batch, "id" | "label" | "note" | "status" | "created_at"> | null;
-  total_orders: number;
-  total_items: number;
-  revenue: number;
-  by_flavor: Array<{ flavor_name: string; qty: number }>;
-  by_delivery: Record<string, number>;
+/** Harga paket: setiap `bundle_size` pcs jadi satu paket harga tetap. */
+export interface BundleInfo {
+  bundles: number;
+  leftover: number;
+  bundle_price: number | null;
+  bundle_size?: number;
+  unit_price: number;
+  total: number;
+  saving: number;
 }
 
 export interface OrderItem {
@@ -125,8 +117,6 @@ export interface Order {
   item_count: number;
   status: OrderStatus;
   language: Language;
-  batch_id: number | null;
-  batch_label?: string | null;
   created_at: string;
   updated_at: string;
   items: OrderItem[];
@@ -169,6 +159,10 @@ export interface DashboardStats {
   stock_enabled: boolean;
   total_stock: number;
   stock_used: number;
+  /** Harga paket */
+  bundle_enabled: boolean;
+  bundle_size: number;
+  bundle_price: number;
   sales_by_flavor: Array<{ flavor_name: string; qty: number }>;
 }
 

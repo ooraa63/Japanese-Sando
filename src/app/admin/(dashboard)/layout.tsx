@@ -25,7 +25,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       labels={{
         dashboard: dicts.admin.nav.dashboard,
         orders: dicts.admin.nav.orders,
-        batch: dicts.admin.nav.batch,
         menu: dicts.admin.nav.menu,
         settings: dicts.admin.nav.settings,
         viewSite: dicts.admin.nav.viewSite,

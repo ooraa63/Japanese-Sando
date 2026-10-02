@@ -158,6 +158,9 @@ export const id: Dict = {
       deliveryFee: "Ongkos kirim",
       freeShipping: "Gratis ongkir",
       totalLabel: "Total yang dibayar",
+      bundle: "paket",
+      bundleOffer: "Beli {n} pcs = {price} (lebih hemat!)",
+      saving: "Hemat paket",
       submit: "Kirim Pre-order",
       submitting: "Mengirim...",
       consent:
@@ -453,6 +456,15 @@ export const id: Dict = {
       maxPerOrder: "Maksimal item per rasa",
       deliveryFee: "Ongkos kirim (Rp)",
       totalStock: "Total stok (semua rasa)",
+      bundleTitle: "Harga paket",
+      bundleEnabled: "Gunakan harga paket",
+      bundleHint:
+        "Setiap beberapa pcs jadi satu paket dengan harga tetap, berapa pun rasa yang dipilih.",
+      bundleSize: "Jumlah pcs per paket",
+      bundleSizeHint: "Contoh 2 = setiap 2 pcs jadi satu paket.",
+      bundlePrice: "Harga per paket",
+      bundlePreview: "Contoh perhitungan",
+      pcs: "pcs",
       pickupNote: "Catatan ambil di tempat",
       pickupDeliveryTitle: "Catatan pengambilan & pengiriman",
       pickupNoteHint:

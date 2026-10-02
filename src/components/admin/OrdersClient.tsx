@@ -366,14 +366,6 @@ export function OrdersClient({
                       <span className={o.delivery_method === "delivery" ? "text-honey-500" : ""}>
                         {deliveryLabel(o.delivery_method, lang)}
                       </span>
-                      {o.batch_label ? (
-                        <>
-                          <span>·</span>
-                          <span className="font-semibold text-matcha-600">
-                            {o.batch_label}
-                          </span>
-                        </>
-                      ) : null}
                       {o.payment_proof_path ? (
                         <>
                           <span>·</span>
@@ -538,9 +530,6 @@ export function OrdersClient({
                 label={t.order.review.deliveryLabel}
                 value={deliveryLabel(selected.delivery_method, lang)}
               />
-              {selected.batch_label ? (
-                <Field label={t.admin.nav.batch} value={selected.batch_label} />
-              ) : null}
               {selected.address ? (
                 <Field label={t.order.payment.address} value={selected.address} full />
               ) : null}

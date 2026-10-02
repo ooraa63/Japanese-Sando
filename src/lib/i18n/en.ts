@@ -160,6 +160,9 @@ export const en = {
       deliveryFee: "Delivery fee",
       freeShipping: "Free delivery",
       totalLabel: "Total to pay",
+      bundle: "bundle(s)",
+      bundleOffer: "Buy {n} pcs = {price} (you save!)",
+      saving: "Bundle savings",
       submit: "Send pre-order",
       submitting: "Sending...",
       consent:
@@ -456,6 +459,15 @@ export const en = {
       maxPerOrder: "Maximum items per flavor",
       deliveryFee: "Delivery fee (Rp)",
       totalStock: "Total stock (all flavors)",
+      bundleTitle: "Bundle pricing",
+      bundleEnabled: "Use bundle pricing",
+      bundleHint:
+        "Every few pcs become one bundle at a fixed price, no matter which flavors you pick.",
+      bundleSize: "Pcs per bundle",
+      bundleSizeHint: "Example 2 = every 2 pcs form one bundle.",
+      bundlePrice: "Price per bundle",
+      bundlePreview: "Price examples",
+      pcs: "pcs",
       pickupNote: "Pickup note",
       pickupDeliveryTitle: "Pickup & delivery notes",
       pickupNoteHint:

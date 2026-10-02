@@ -6,6 +6,7 @@ import {
   Building2,
   Clock,
   CreditCard,
+  Gift,
   ImagePlus,
   Info,
   Loader2,
@@ -19,7 +20,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
-import type { BankAccount, StoreSettings } from "@/lib/types";
+import type { BankAccount, Flavor, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
@@ -64,14 +65,25 @@ function toDraft(s: StoreSettings | null): Draft {
     pickup_note_en: s?.pickup_note_en ?? "",
     delivery_note_id: s?.delivery_note_id ?? "",
     delivery_note_en: s?.delivery_note_en ?? "",
+    bundle_enabled: s?.bundle_enabled ?? true,
+    bundle_size: s?.bundle_size ?? 2,
+    bundle_price: s?.bundle_price ?? 35000,
   };
 }
 
-export function SettingsClient({ initialSettings }: { initialSettings: StoreSettings | null }) {
+export function SettingsClient({
+  initialSettings,
+  initialFlavors = [],
+}: {
+  initialSettings: StoreSettings | null;
+  initialFlavors?: Flavor[];
+}) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const [form, setForm] = useState<Draft>(() => toDraft(initialSettings));
   const [saving, startSaving] = useTransition();
+
+  const flavors = initialFlavors;
 
   function patch(next: Partial<Draft>) {
     setForm((prev) => ({ ...prev, ...next }));
@@ -454,6 +466,107 @@ export function SettingsClient({ initialSettings }: { initialSettings: StoreSett
           />
         </div>
         <p className="mt-2 text-xs text-cocoa-400">{t.admin.dash.stockAllFlavors}</p>
+      </Section>
+
+      {/* ============ Harga paket ============ */}
+      <Section icon={<Gift className="size-4.5" />} title={t.admin.settings.bundleTitle}>
+        <div className="rounded-2xl border border-cocoa-200 p-4">
+          <label className="flex cursor-pointer items-center justify-between gap-3">
+            <span>
+              <span className="block text-sm font-bold text-cocoa-800">
+                {t.admin.settings.bundleEnabled}
+              </span>
+              <span className="mt-0.5 block text-xs text-cocoa-400">
+                {t.admin.settings.bundleHint}
+              </span>
+            </span>
+            <span className="relative inline-flex shrink-0">
+              <input
+                type="checkbox"
+                checked={form.bundle_enabled}
+                onChange={(e) => patch({ bundle_enabled: e.target.checked })}
+                className="peer sr-only"
+              />
+              <span className="h-6 w-11 rounded-full bg-cocoa-200 transition peer-checked:bg-matcha-500" />
+              <span className="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+            </span>
+          </label>
+
+          {form.bundle_enabled ? (
+            <>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <span className="label">{t.admin.settings.bundleSize}</span>
+                  <input
+                    inputMode="numeric"
+                    min={2}
+                    className="input tabular"
+                    value={form.bundle_size}
+                    onChange={(e) =>
+                      patch({
+                        bundle_size: Math.max(
+                          2,
+                          Number(e.target.value.replace(/\D/g, "")) || 2
+                        ),
+                      })
+                    }
+                  />
+                  <p className="mt-1.5 text-xs text-cocoa-400">
+                    {t.admin.settings.bundleSizeHint}
+                  </p>
+                </div>
+                <div>
+                  <span className="label">{t.admin.settings.bundlePrice}</span>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
+                      Rp
+                    </span>
+                    <input
+                      inputMode="numeric"
+                      className="input pl-11 tabular"
+                      value={form.bundle_price}
+                      onChange={(e) =>
+                        patch({
+                          bundle_price: Number(e.target.value.replace(/\D/g, "")) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contoh hasil hitungan */}
+              <div className="mt-4 rounded-xl bg-cocoa-50 p-3.5">
+                <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                  {t.admin.settings.bundlePreview}
+                </p>
+                <ul className="mt-2 space-y-1 text-[13px] text-cocoa-600 tabular">
+                  {[1, 2, 3, 4, 5].map((n) => {
+                    const bundles = Math.floor(n / form.bundle_size);
+                    const leftover = n - bundles * form.bundle_size;
+                    const unit = flavors[0]?.price ?? 0;
+                    const total = bundles * form.bundle_price + leftover * unit;
+                    return (
+                      <li key={n} className="flex justify-between gap-3">
+                        <span>
+                          {n} {t.admin.settings.pcs}
+                        </span>
+                        <span className="font-bold">
+                          {formatIDR(total, lang)}
+                          {total < n * unit ? (
+                            <span className="ml-1.5 text-[11px] font-semibold text-matcha-600">
+                              ({formatIDR(n * unit - total, lang)})
+                            </span>
+                          ) : null}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </>
+          ) : null}
+        </div>
       </Section>
 
       {/* ============ Catatan cara pengambilan ============ */}

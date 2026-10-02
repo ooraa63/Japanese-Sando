@@ -45,13 +45,8 @@ export function SiteHeader({ storeName = "Rumakomugi" }: { storeName?: string })
           <span className="grid size-9 place-items-center rounded-xl bg-cocoa-800 text-cream-50 shadow-md transition group-hover:rotate-[-6deg]">
             <span className="font-display text-base font-bold">日</span>
           </span>
-          <span className="flex flex-col leading-none">
-            <span className="font-display text-[17px] font-bold text-cocoa-900">
-              {storeName}
-            </span>
-            <span className="text-[10px] font-bold tracking-[0.22em] text-berry-500 uppercase">
-              Sando
-            </span>
+          <span className="font-display text-[17px] font-bold text-cocoa-900">
+            {storeName}
           </span>
         </Link>
 

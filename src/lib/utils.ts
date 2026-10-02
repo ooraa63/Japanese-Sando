@@ -133,6 +133,42 @@ export function waOrderLink(phone: string, order: Order, lang: Language): string
   return waLink(phone, lines.join("\n"));
 }
 
+/**
+ * Hitung harga akhir dari jumlah pcs, memakai aturan paket.
+ *
+ * Setiap `bundleSize` pcs menjadi satu paket dengan harga tetap, berapa pun
+ * rasa yang dipilih. Sisa pcs di luar paket memakai harga satuan biasa.
+ *
+ *   1 pcs  -> 0 paket + 1 biasa  = Rp18.000
+ *   2 pcs  -> 1 paket           = Rp35.000
+ *   3 pcs  -> 1 paket + 1 biasa = Rp53.000
+ *
+ * Mengembalikan rinciannya supaya bisa ditampilkan ke pembeli.
+ */
+export function calcBundle(
+  totalItems: number,
+  avgUnitPrice: number,
+  opts: { enabled: boolean; size: number; price: number }
+): { bundles: number; leftover: number; total: number; saving: number; base: number } {
+  const base = totalItems * avgUnitPrice;
+  const size = Math.max(2, opts.size);
+
+  if (!opts.enabled || totalItems < size) {
+    return { bundles: 0, leftover: totalItems, total: base, saving: 0, base };
+  }
+
+  // Harga paket harus lebih murah daripada bel satuan, kalau tidak dilewati.
+  if (opts.price >= size * avgUnitPrice) {
+    return { bundles: 0, leftover: totalItems, total: base, saving: 0, base };
+  }
+
+  const bundles = Math.floor(totalItems / size);
+  const leftover = totalItems - bundles * size;
+  const total = bundles * opts.price + leftover * avgUnitPrice;
+
+  return { bundles, leftover, total, saving: Math.max(0, base - total), base };
+}
+
 const STATUS_KEY: Record<OrderStatus, { id: string; en: string; color: string }> = {
   pending: { id: "Menunggu", en: "Pending", color: "amber" },
   accepted: { id: "Diterima", en: "Accepted", color: "blue" },

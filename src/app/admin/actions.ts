@@ -6,8 +6,6 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdminUser,
-  Batch,
-  BatchSummary,
   DashboardStats,
   Order,
   OrderStatus,
@@ -339,46 +337,10 @@ export async function setStockAction(
 }
 
 /* =============================================================================
- *  BATCH PRE-ORDER
+ *  BATCH PRE-ORDER — SUDAH DIHAPUS
+ *  Fitur batch tidak dipakai, jadi tabel & RPC-nya sudah di-drop
+ *  (lihat supabase/migration-3.sql).
  * ========================================================================== */
-
-export async function getBatchesAction(): Promise<ActionResult<Batch[]>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_list_batches");
-  if (error) return { ok: false, error: humanize(error.message) };
-  return { ok: true, data: (data as Batch[]) ?? [] };
-}
-
-export async function getBatchSummaryAction(
-  batchId: number
-): Promise<ActionResult<BatchSummary>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_batch_summary", {
-    p_batch_id: batchId,
-  });
-  if (error) return { ok: false, error: humanize(error.message) };
-  return { ok: true, data: data as BatchSummary };
-}
-
-export async function closeBatchAction(batchId: number): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_close_batch", { p_batch_id: batchId });
-  if (error) return { ok: false, error: humanize(error.message) };
-
-  revalidatePath("/admin");
-  revalidatePath("/admin/orders");
-  return { ok: true };
-}
-
-export async function reopenBatchAction(batchId: number): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_reopen_batch", { p_batch_id: batchId });
-  if (error) return { ok: false, error: humanize(error.message) };
-
-  revalidatePath("/admin");
-  revalidatePath("/admin/orders");
-  return { ok: true };
-}
 
 export async function saveSettingsAction(
   payload: Record<string, unknown>

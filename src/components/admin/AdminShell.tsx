@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   ClipboardList,
   ExternalLink,
-  Layers,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -21,7 +20,6 @@ import { signOutAction } from "@/app/admin/actions";
 const NAV = [
   { href: "/admin", key: "dashboard" as const, icon: LayoutDashboard, exact: true },
   { href: "/admin/orders", key: "orders" as const, icon: ClipboardList, exact: false },
-  { href: "/admin/batch", key: "batch" as const, icon: Layers, exact: false },
   { href: "/admin/menu", key: "menu" as const, icon: UtensilsCrossed, exact: false },
   { href: "/admin/settings", key: "settings" as const, icon: Settings, exact: false },
 ];
@@ -40,7 +38,6 @@ export function AdminShell({
   labels: {
     dashboard: string;
     orders: string;
-    batch: string;
     menu: string;
     settings: string;
     viewSite: string;
@@ -104,13 +101,8 @@ export function AdminShell({
       <span className="grid size-9 place-items-center rounded-xl bg-cocoa-800 text-cream-50">
         <span className="font-display text-base font-bold">日</span>
       </span>
-      <span className="flex flex-col leading-none">
-        <span className="font-display text-[15px] font-bold text-cocoa-900">
-          {storeName}
-        </span>
-        <span className="text-[9px] font-bold tracking-[0.2em] text-berry-500 uppercase">
-          Sando
-        </span>
+      <span className="font-display text-[15px] font-bold text-cocoa-900">
+        {storeName}
       </span>
     </div>
   );
