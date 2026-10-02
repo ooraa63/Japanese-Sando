@@ -45,11 +45,31 @@ project Next.js:
 ### Alur status pesanan
 
 ```
-Menunggu ──terima──▶ Diterima ──siap──▶ Siap diambil ──selesai──▶ Selesai
+Pre-order masuk ──▶ stok langsung berkurang
    │
-   ├──tolak──▶ Ditolak     (stok kembali)
-   └──batal──▶ Dibatalkan  (stok kembali)
+   ├──terima──▶ Diterima ──siap──▶ Siap diambil ──selesai──▶ Selesai
+   │              (stok tetap berkurang)
+   └──tolak───▶ Ditolak  (stok kembali ke rak)
 ```
+
+Tidak ada tombol "Batalkan" dari sisi penjual — untuk membatalkan cukup
+pakai **Tolak**, yang sama-sama mengembalikan stok.
+
+### Cara kerja stok
+
+Stok dikurangi **saat pembeli mengirim pre-order**, bukan saat Anda
+menerima. Ini supaya produk tidak terjual habis padahal pesanan sudah
+masuk. Kalau pesanan ternyata ditolak, stok otomatis bertambah lagi.
+
+| Kejadian | Efek ke stok |
+| --- | --- |
+| Pembeli pre-order | **−N** (langsung, tidak tunggu approval) |
+| Anda terima | tidak berubah |
+| Anda tandai siap / selesai | tidak berubah (barang sudah dibuat) |
+| Anda **tolak** | **+N** kembali ke rak |
+| Anda kembalikan ke Menunggu | −N lagi (stok dipesan ulang) |
+
+Produk dengan "Batasi stok" mati tidak terpengaruh.
 
 ---
 

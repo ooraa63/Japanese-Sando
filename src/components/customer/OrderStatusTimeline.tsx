@@ -21,7 +21,9 @@ export function OrderStatusTimeline({ status }: { status: OrderStatus }) {
         </span>
         <div>
           <p className="text-sm font-bold text-berry-600">{t.status[status]}</p>
-          <p className="text-xs text-cocoa-500">{t.errors.generic}</p>
+          <p className="text-xs text-cocoa-500">
+            {status === "rejected" ? t.status.rejectedHint : t.status.cancelledHint}
+          </p>
         </div>
       </div>
     );

@@ -22,7 +22,8 @@
     "test:admin": "node scripts/test-admin.mjs",
     "test:pages": "node scripts/test-pages.mjs",
     "test:ui": "node scripts/test-reset.mjs",
-    "test": "node scripts/test-flow.mjs && node scripts/test-rls.mjs && node scripts/test-reset.mjs"
+    "test:stock": "node scripts/test-stock.mjs",
+    "test": "node scripts/test-flow.mjs && node scripts/test-rls.mjs && node scripts/test-stock.mjs && node scripts/test-reset.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

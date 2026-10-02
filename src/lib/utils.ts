@@ -134,15 +134,31 @@ export function statusLabel(status: OrderStatus, lang: Language): string {
 
 /** Urutan status untuk timeline progress pembeli */
 export const CUSTOMER_FLOW: OrderStatus[] = ["pending", "accepted", "ready", "delivered"];
-/** Status yang boleh dipilih admin dari status sekarang */
+
+/**
+ * Status yang boleh dipilih admin.
+ *
+ * Tidak ada "Batalkan" dari sisi penjual — untuk membatalkan cukup pakai
+ * "Tolak", yang sama-sama mengembalikan stok ke rak.
+ */
 export const ADMIN_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ["accepted", "rejected", "cancelled"],
-  accepted: ["ready", "cancelled"],
-  ready: ["delivered", "cancelled"],
-  delivered: ["pending"],
+  pending: ["accepted", "rejected"],
+  accepted: ["ready", "rejected"],
+  ready: ["delivered", "rejected"],
+  delivered: [],
   rejected: ["pending"],
+  // Status lama (dibatalkan sebelum perubahan ini) masih bisa dikembalikan.
   cancelled: ["pending"],
 };
+
+/** Daftar status yang ditampilkan di filter dashboard. */
+export const ADMIN_STATUS_FILTERS: OrderStatus[] = [
+  "pending",
+  "accepted",
+  "ready",
+  "delivered",
+  "rejected",
+];
 
 export function paymentLabel(method: PaymentMethod, lang: Language): string {
   if (method === "cash") return lang === "en" ? "Pay in cash" : "Bayar tunai";

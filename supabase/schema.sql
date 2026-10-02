@@ -390,7 +390,15 @@ begin
     );
   end loop;
 
-  -- ---------- kurangi stok (reservasi) ----------
+  -- ---------- kurangi stok ----------
+  -- Stok langsung berkurang begitu pembeli mengirim pre-order, tanpa menunggu
+  -- keputusan admin. Ini mencegah produk terjual habis padahal pesanan sudah
+  -- masuk.
+  --
+  -- Kalau nanti admin MENOLAK pesanan ini, stok dikembalikan lagi oleh
+  -- admin_update_order_status() (lihat blok "tolak => stok dikembalikan").
+  --
+  -- Produk dengan stock_enabled = false (stok tak terbatas) tidak terpengaruh.
   for v_item in select * from jsonb_array_elements(p_items) loop
     v_flavor_id := (v_item ->> 'flavor_id')::bigint;
     v_qty       := (v_item ->> 'quantity')::integer;
@@ -569,7 +577,9 @@ begin
     raise exception 'status_unchanged' using errcode = '22023';
   end if;
 
-  -- tolak / batalkan => stok dikembalikan
+  -- MENOLAK => stok dikembalikan ke rak.
+  -- (Status "cancelled" tidak lagi dipakai penjual, tapi pesanan lama
+  --  berstatus itu tetap bisa dikembalikan agar tidak menggantung.)
   if p_new_status in ('rejected', 'cancelled') and v_order.stock_restored = false then
     update public.flavors f
     set stock = f.stock + it.qty
@@ -584,7 +594,8 @@ begin
     update public.orders set stock_restored = true where id = p_order_id;
   end if;
 
-  -- batalkan pembatalan => stok dikurangi lagi (bisa gagal bila stok kurang)
+  -- Kembalikan pesanan yang ditolak ke status menunggu => stok dipesan lagi
+  -- (gagal kalau stok meantime sudah habis dipakai pesanan lain).
   if v_order.status in ('rejected', 'cancelled') and p_new_status = 'pending' and v_order.stock_restored = true then
     update public.flavors f
     set stock = f.stock - it.qty

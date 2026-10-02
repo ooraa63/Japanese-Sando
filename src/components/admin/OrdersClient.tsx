@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";import {
-  Ban,
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
   Check,
   CheckCheck,
   ChevronDown,
@@ -44,7 +44,6 @@ const FILTERS: Array<{ key: OrderStatus | "all"; labelId: string; labelEn: strin
   { key: "ready", labelId: "Siap", labelEn: "Ready" },
   { key: "delivered", labelId: "Selesai", labelEn: "Done" },
   { key: "rejected", labelId: "Ditolak", labelEn: "Rejected" },
-  { key: "cancelled", labelId: "Dibatalkan", labelEn: "Cancelled" },
 ];
 
 export function OrdersClient({
@@ -213,12 +212,6 @@ export function OrdersClient({
       icon: <X className="size-4" />,
       tone: "btn-danger",
       confirm: t.admin.orders.rejectConfirm,
-    },
-    cancelled: {
-      key: "cancel",
-      icon: <Ban className="size-4" />,
-      tone: "btn-ghost",
-      confirm: t.admin.orders.cancelConfirm,
     },
     pending: {
       key: "undo",

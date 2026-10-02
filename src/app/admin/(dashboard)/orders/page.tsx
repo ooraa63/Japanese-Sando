@@ -15,6 +15,8 @@ export default async function AdminOrdersPage({
 }) {
   const { status: rawStatus, focus } = await searchParams;
 
+  // "cancelled" tidak lagi dipakai penjual, tapi pesanan lama berstatus itu
+  // masih bisa dibuka lewat URL supaya tidak hilang jejaknya.
   const validStatuses = [
     "pending",
     "accepted",
