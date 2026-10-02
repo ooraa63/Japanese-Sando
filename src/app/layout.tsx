@@ -21,15 +21,16 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const DEFAULT_STORE = "Rumakomugi";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Japanese Sando — Pre-order Sando Sandwich",
-    template: "%s | Japanese Sando",
+    default: `${DEFAULT_STORE} — Pre-order Sando Sandwich`,
+    template: `%s | ${DEFAULT_STORE}`,
   },
   description:
-    "Japanese sando dibuat fresh khusus pre-order. Pilih rasa favoritmu, bayar transfer atau cash on delivery. Roti sederhana, rasa luar biasa.",
+    "Japanese sando dibuat fresh khusus pre-order. Pilih rasa favoritmu, bayar transfer atau cash on delivery.",
   keywords: [
     "japanese sando",
     "sando sandwich",
@@ -38,22 +39,22 @@ export const metadata: Metadata = {
     "roti lapis",
     "cash on delivery",
   ],
-  authors: [{ name: "Japanese Sando" }],
+  authors: [{ name: DEFAULT_STORE }],
   openGraph: {
     type: "website",
     locale: "id_ID",
     url: SITE_URL,
-    siteName: "Japanese Sando",
-    title: "Japanese Sando — Pre-order Sando Sandwich",
+    siteName: DEFAULT_STORE,
+    title: `${DEFAULT_STORE} — Pre-order Sando Sandwich`,
     description:
       "Japanese sando dibuat fresh khusus pre-order. Roti sederhana, rasa luar biasa.",
-    images: [{ url: "/foto-awal.jpeg", width: 1242, height: 1242, alt: "Japanese Sando" }],
+    images: [{ url: "/hero-sando.jpg", width: 1242, height: 1242, alt: DEFAULT_STORE }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Japanese Sando — Pre-order Sando Sandwich",
+    title: `${DEFAULT_STORE} — Pre-order Sando Sandwich`,
     description: "Japanese sando dibuat fresh khusus pre-order.",
-    images: ["/foto-awal.jpeg"],
+    images: ["/hero-sando.jpg"],
   },
   robots: { index: true, follow: true },
   icons: { icon: "/favicon.ico" },

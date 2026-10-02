@@ -21,14 +21,13 @@ import { OrderNowLink } from "@/components/customer/OrderNowLink";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
+  const store = settings?.store_name || "Rumakomugi";
   const desc =
     settings?.description_id ||
     "Japanese sando dibuat fresh khusus pre-order. Pilih rasa favoritmu, bayar transfer atau cash on delivery.";
 
   return {
-    title: settings?.store_name
-      ? `${settings.store_name} — Pre-order Sando Sandwich`
-      : "Japanese Sando — Pre-order Sando Sandwich",
+    title: `${store} — Pre-order Sando Sandwich`,
     description: desc,
     alternates: { canonical: "/" },
   };
@@ -60,8 +59,7 @@ export default async function HomePage() {
           <div className="absolute inset-0">
             <Image
               src={settings?.hero_image_url || "/hero-sando.jpg"}
-              alt="Aralam Japanese Sando"
-              fill
+              alt="Aralam Japanese Sando"              fill
               priority
               sizes="100vw"
               className="object-cover object-[center_60%]"
