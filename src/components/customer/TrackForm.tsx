@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Loader2, Search, XCircle } from "lucide-react";
 import type { StoreSettings, TrackedOrder } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -17,12 +16,17 @@ import {
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { OrderStatusTimeline } from "@/components/customer/OrderStatusTimeline";
 
-export function TrackForm({ settings }: { settings: StoreSettings | null }) {
+export function TrackForm({
+  settings,
+  initialCode = "",
+}: {
+  settings: StoreSettings | null;
+  initialCode?: string;
+}) {
   const { t, lang } = useI18n();
-  const params = useSearchParams();
 
-  const [code, setCode] = useState(params.get("code") ?? "");
-  const [phone, setPhone] = useState(params.get("phone") ?? "");
+  const [code, setCode] = useState(initialCode);
+  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [error, setError] = useState<"notFound" | "code" | "phone" | null>(null);

@@ -29,20 +29,26 @@ import { FlavorCard } from "@/components/customer/FlavorCard";
 import { formatIDR, formatPhone } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
-type Step = (typeof STEPS)[number];
+export type Step = (typeof STEPS)[number];
 
-export function OrderFlow({ flavors, settings }: { flavors: Flavor[]; settings: StoreSettings }) {
+export function OrderFlow({
+  flavors,
+  settings,
+  initialStep = "identity",
+}: {
+  flavors: Flavor[];
+  settings: StoreSettings;
+  initialStep?: Step;
+}) {
   const { t, lang } = useI18n();
   const router = useRouter();
   const toast = useToast();
   const { quantities, draft, add, setQuantity, remove, totalItems, updateDraft, clear } =
     useCart();
 
-  const [step, setStep] = useState<Step>(() => {
-    // "?step=menu" dipakai tombol "Pesan sekarang" di halaman depan.
-    const s = new URLSearchParams(window.location.search).get("step");
-    return s === "menu" || s === "payment" || s === "review" ? s : "identity";
-  });
+  // Langkah awal diberikan oleh Server Component (dari ?step=), supaya
+  // halaman ini tetap bisa di-render di server tanpa membaca `window`.
+  const [step, setStep] = useState<Step>(initialStep);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 

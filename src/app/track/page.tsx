@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import { PackageSearch } from "lucide-react";
 import { getSettings } from "@/lib/data";
@@ -12,8 +11,20 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: dicts.track.title, description: dicts.track.subtitle };
 }
 
-export default async function TrackPage() {
-  const [settings, dicts] = await Promise.all([getSettings(), getI18nDict()]);
+export default async function TrackPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  const [settings, dicts, query] = await Promise.all([
+    getSettings(),
+    getI18nDict(),
+    searchParams,
+  ]);
+
+  // Halaman sukses menautkan ke /track?code=... supaya kode pesanan
+  // sudah terisi otomatis.
+  const initialCode = (query.code ?? "").slice(0, 40);
 
   return (
     <>
@@ -29,9 +40,7 @@ export default async function TrackPage() {
           </p>
         </div>
 
-        <Suspense fallback={<div className="card h-96 animate-pulse bg-cocoa-100/50" />}>
-          <TrackForm settings={settings} />
-        </Suspense>
+        <TrackForm settings={settings} initialCode={initialCode} />
       </main>
       <SiteFooter settings={settings} />
     </>

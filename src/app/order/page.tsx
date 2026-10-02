@@ -1,10 +1,9 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getActiveFlavors, getSettings } from "@/lib/data";
 import { getI18nDict } from "@/lib/i18n-server";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
-import { OrderFlow } from "@/components/customer/OrderFlow";
+import { OrderFlow, type Step } from "@/components/customer/OrderFlow";
 import type { StoreSettings } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,12 +15,25 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function OrderPage() {
-  const [settings, flavors, dicts] = await Promise.all([
+export default async function OrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ step?: string }>;
+}) {
+  const [settings, flavors, dicts, query] = await Promise.all([
     getSettings(),
     getActiveFlavors(),
     getI18nDict(),
+    searchParams,
   ]);
+
+  // Tombol "Pesan sekarang" di beranda mengarahkan ke ?step=menu supaya
+  // pembeli langsung bisa memilih rasa.
+  const requested = query.step;
+  const initialStep: Step =
+    requested === "menu" || requested === "payment" || requested === "review"
+      ? requested
+      : "identity";
 
   // Pengaturan belum dibuat di database — jangan sampai pembeli melihat form rusak
   if (!settings) {
@@ -47,20 +59,13 @@ export default async function OrderPage() {
           <p className="mt-2 text-[15px] text-cocoa-500">{dicts.order.subtitle}</p>
         </div>
 
-        <Suspense fallback={<OrderSkeleton />}>
-          <OrderFlow flavors={flavors} settings={settings as StoreSettings} />
-        </Suspense>
+        <OrderFlow
+          flavors={flavors}
+          settings={settings as StoreSettings}
+          initialStep={initialStep}
+        />
       </main>
       <SiteFooter settings={settings} />
     </>
-  );
-}
-
-function OrderSkeleton() {
-  return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-      <div className="card h-80 animate-pulse bg-cocoa-100/50" />
-      <div className="card h-56 animate-pulse bg-cocoa-100/50" />
-    </div>
   );
 }

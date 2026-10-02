@@ -149,10 +149,6 @@ check("daftar pesanan terbaca", list.ok && Array.isArray(list.body?.orders),
   JSON.stringify(list.body).slice(0, 200));
 console.log(`       total pesanan: ${list.body?.total}`);
 
-const search = await rpcAuth("admin_list_orders", { p_search: "Budi", p_limit: 10, p_offset: 0 });
-check("pencarian pesanan bekerja", search.ok && (search.body?.orders?.length ?? 0) > 0,
-  JSON.stringify(search.body).slice(0, 160));
-
 console.log("\n=== 4. Terima / tolak pesanan + pengembalian stok ===");
 const created = await rpc("create_order", {
   p_customer_name: "Siti Aminah",
@@ -164,6 +160,34 @@ const created = await rpc("create_order", {
 check("pesanan uji dibuat", created.ok && Boolean(created.body?.order_code),
   JSON.stringify(created.body));
 const orderId = created.body?.id;
+
+const searchByName = await rpcAuth("admin_list_orders", { p_search: "Siti", p_limit: 10, p_offset: 0 });
+check("pencarian pesanan berdasarkan nama",
+  searchByName.ok && (searchByName.body?.orders?.length ?? 0) >= 1
+    && searchByName.body.orders.every((o) => o.customer_name.includes("Siti")),
+  JSON.stringify(searchByName.body).slice(0, 160));
+
+const searchByCode = await rpcAuth("admin_list_orders", {
+  p_search: created.body?.order_code,
+  p_limit: 10,
+  p_offset: 0,
+});
+check("pencarian pesanan berdasarkan kode", searchByCode.ok && (searchByCode.body?.orders?.length ?? 0) === 1,
+  JSON.stringify(searchByCode.body).slice(0, 160));
+
+const searchNone = await rpcAuth("admin_list_orders", { p_search: "zzzTidakAda", p_limit: 10, p_offset: 0 });
+check("pencarian tanpa hasil mengembalikan array kosong",
+  searchNone.ok && Array.isArray(searchNone.body?.orders) && searchNone.body.orders.length === 0);
+
+const filterPending = await rpcAuth("admin_list_orders", {
+  p_status: "pending",
+  p_search: null,
+  p_limit: 50,
+  p_offset: 0,
+});
+check("filter status berjalan",
+  filterPending.ok && filterPending.body.orders.every((o) => o.status === "pending"),
+  JSON.stringify(filterPending.body?.orders?.map((o) => o.status)).slice(0, 120));
 
 const stockOf = async (id) =>
   (await rest("flavors", `select=stock&id=eq.${id}&limit=1`)).body[0].stock;
