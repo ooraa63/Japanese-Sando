@@ -2,8 +2,7 @@
  * Bersihkan semua data uji: pesanan, item, log stok, dan user auth.
  * Stok produk dikembalikan ke 20 (nilai seed awal).
  *   node scripts/cleanup.mjs
- */
-import { Client } from "pg";
+ */import { Client } from "pg";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 
