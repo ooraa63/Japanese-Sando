@@ -30,7 +30,7 @@ function check(name, ok, extra = "") {
   else { fail++; console.log(`  GAGAL ${name} ${extra}`); }
 }
 
-async function asUser(role, claims, sql, params = [], persist = true) {
+async function asUser(role, claims, sql, params = []) {
   await client.query("begin");
   try {
     await client.query(

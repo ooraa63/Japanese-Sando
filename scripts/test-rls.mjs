@@ -30,9 +30,9 @@ function check(name, ok, extra = "") {
 
 /**
  * Jalankan query sebagai role Postgres tertentu dengan JWT Claims seperti
- * PostgREST. secara default di-rollback; set persist=true untuk menyimpan.
+ * PostgREST. Default di-rollback; set persist=true untuk menyimpan.
  */
-async function asUser(role, claims, sql, params = [], persist = false) {
+async function asUser(role, claims, sql, params = [], persist = true) {
   if (!["anon", "authenticated"].includes(role)) throw new Error("role tidak diizinkan");
   await client.query("begin");
   try {
