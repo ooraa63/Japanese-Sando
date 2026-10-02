@@ -42,7 +42,22 @@ project Next.js:
   tombol buka/tutup pre-order
 - Dua bahasa
 
-### Alur status pesanan
+#### Cara pengambilan
+
+Pembeli memilih sendiri di langkah pembayaran:
+
+| Pilihan | Yang terjadi |
+| --- | --- |
+| **Ambil di toko** | Ongkir Rp0. Alamat toko + jam buka ditampilkan. |
+| **Diantar** | Wajib isi alamat. Ongkir ditambahkan ke total. |
+
+Teks catatan untuk keduanya bisa diganti di **Pengaturan → Catatan
+pengambilan & pengiriman** (mis. lokasi khusus, jam ambil, siapa yang
+tanggung ongkir).
+
+---
+
+## Alur status pesanan
 
 ```
 Pre-order masuk ──▶ stok langsung berkurang
@@ -56,6 +71,56 @@ Tidak ada tombol "Batalkan" dari sisi penjual — untuk membatalkan cukup
 pakai **Tolak**, yang sama-sama mengembalikan stok.
 
 ### Cara kerja stok
+
+Stok **satu angka untuk semua rasa**, bukan per rasa. Kalau stok 20, itu
+berarti 20 pcs untuk seluruh toko — berapa pun jumlah rasa yang
+Anda jual.
+
+```
+Stok 20
+Pembeli order 1 pcs Cheese   ->  stok jadi 19 (untuk semua rasa)
+Anda tolak pesanan itu       ->  stok kembali 20
+```
+
+Beralih ke mode ini karena bahan baku dan waktu produksi terbatas, bukan
+karena tiap rasa punya bahan berbeda.
+
+| Kejadian | Efek ke stok |
+| --- | --- |
+| Pembeli pre-order | **−N** (langsung, tidak tunggu approval) |
+| Anda terima | tidak berubah |
+| Anda tandai siap / selesai | tidak berubah (barang sudah dibuat) |
+| Anda **tolak** | **+N** kembali ke rak |
+| Anda kembalikan ke Menunggu | −N lagi (stok dipesan ulang) |
+
+Kelola lewat **Menu & Stok**. Matikan **Batasi stok** kalau mau
+menjual tanpa batas.
+
+### Batch pre-order
+
+Semua pesanan otomatis masuk ke **batch** yang sedang dibuka. Ini berguna
+untuk produksi bertahap: buka **Batch** di dashboard untuk melihat
+"berapa pcs tiap rasa yang harus dimasak" dalam satu daftar.
+
+- Batch baru dibuat otomatis setiap kali batch lama ditutup
+- Nomor batch = tanggal pembuatannya
+- Tombol **Cetak** untuk dipakai sebagai daftar belanja produksi
+
+### Mengganti foto halaman depan
+
+Di **Pengaturan → Identitas toko** ada dua slot foto:
+
+| Slot | Ukuran ideal | Untuk |
+| --- | --- | --- |
+| Desktop | **1920 × 1080 px** (16:9) | layar lebar |
+| Mobile | **1080 × 1350 px** (4:5) | HP |
+
+Syaratnya: JPG/PNG/WEBP, di bawah 5 MB, minimal 1200 px sisi panjang.
+Kalau dikosongkan, dipakai foto bawaan (`public/hero-sando.jpg`).
+
+**Tips:** foto lanskap (16:9) paling aman untuk desktop, karena foto
+potret akan terpotong saat layar lebar.
+
 
 Stok dikurangi **saat pembeli mengirim pre-order**, bukan saat Anda
 menerima. Ini supaya produk tidak terjual habis padahal pesanan sudah

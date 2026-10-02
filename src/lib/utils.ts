@@ -39,6 +39,25 @@ export function formatDate(iso: string, lang: Language = "id"): string {
   }).format(d);
 }
 
+/**
+ * Tanggal lengkap dengan nama hari + jam, misal:
+ *   "Jum'at, 2 Oktober 2026, 19.24"
+ * Dipakai di dashboard admin supaya jelas kapan pesanan masuk.
+ */
+export function formatFullDateTime(iso: string, lang: Language = "id"): string {
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  }).format(d);
+}
+
 export function formatTime(iso: string, lang: Language = "id"): string {
   const d = new Date(iso);
   return new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "id-ID", {

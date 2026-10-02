@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Eye,
   EyeOff,
@@ -17,7 +18,7 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import type { Flavor } from "@/lib/types";
+import type { Flavor, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatIDR } from "@/lib/utils";
@@ -35,8 +36,6 @@ type Draft = {
   image_url: string;
   is_active: boolean;
   is_featured: boolean;
-  stock_enabled: boolean;
-  stock: string;
   sort_order: string;
 };
 
@@ -50,40 +49,63 @@ const EMPTY: Draft = {
   image_url: "",
   is_active: true,
   is_featured: false,
-  stock_enabled: true,
-  stock: "0",
   sort_order: "0",
 };
 
 export function MenuClient({
   initialFlavors,
+  initialSettings,
 }: {
   initialFlavors: Flavor[];
-  labels: { title: string };
+  initialSettings: StoreSettings | null;
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const router = useRouter();
 
   const [flavors, setFlavors] = useState(initialFlavors);
+  const [stock, setStock] = useState(initialSettings?.total_stock ?? 0);
+  const [stockEnabled, setStockEnabled] = useState(
+    initialSettings?.stock_enabled ?? true
+  );
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Draft | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [stockBusy, setStockBusy] = useState(false);
   const [saving, startSaving] = useTransition();
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return flavors;
-    return flavors.filter(
-      (f) =>
-        f.name_id.toLowerCase().includes(q) ||
-        f.name_en.toLowerCase().includes(q) ||
-        f.slug.toLowerCase().includes(q)
-    );
-  }, [flavors, search]);
+  // Stok.global diambil ulang tiap kali halaman dibuka.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("store_settings")
+        .select("total_stock, stock_enabled")
+        .eq("id", 1)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setStock(data.total_stock);
+      setStockEnabled(data.stock_enabled);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = search.trim()
+    ? flavors.filter(
+        (f) =>
+          f.name_id.toLowerCase().includes(search.trim().toLowerCase()) ||
+          f.name_en.toLowerCase().includes(search.trim().toLowerCase())
+      )
+    : flavors;
 
   function openNew() {
-    const nextOrder = (flavors.at(-1)?.sort_order ?? 0) + 1;
-    setEditing({ ...EMPTY, sort_order: String(nextOrder) });
+    setEditing({
+      ...EMPTY,
+      sort_order: String((flavors.at(-1)?.sort_order ?? 0) + 1),
+    });
   }
 
   function openEdit(f: Flavor) {
@@ -97,8 +119,6 @@ export function MenuClient({
       image_url: f.image_url ?? "",
       is_active: f.is_active,
       is_featured: f.is_featured,
-      stock_enabled: f.stock_enabled,
-      stock: String(f.stock),
       sort_order: String(f.sort_order),
     });
   }
@@ -130,8 +150,8 @@ export function MenuClient({
         image_url: editing.image_url.trim(),
         is_active: editing.is_active,
         is_featured: editing.is_featured,
-        stock_enabled: editing.stock_enabled,
-        stock: Number(editing.stock.replace(/\D/g, "")) || 0,
+        stock_enabled: true,
+        stock: 0,
         sort_order: Number(editing.sort_order) || 0,
       });
 
@@ -140,7 +160,6 @@ export function MenuClient({
         return;
       }
 
-      // Perbarui state lokal supaya daftar langsung berubah
       setFlavors((prev) => {
         const payload: Flavor = {
           id: res.data!.id,
@@ -156,20 +175,21 @@ export function MenuClient({
           image_url: editing.image_url.trim() || null,
           is_active: editing.is_active,
           is_featured: editing.is_featured,
-          stock_enabled: editing.stock_enabled,
-          stock: Number(editing.stock.replace(/\D/g, "")) || 0,
+          stock_enabled: true,
+          stock: 0,
           sort_order: Number(editing.sort_order) || 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-
         const exists = prev.some((f) => f.id === payload.id);
-        if (!exists) return [...prev, payload].sort((a, b) => a.sort_order - b.sort_order);
-        return prev.map((f) => (f.id === payload.id ? { ...f, ...payload } : f));
+        return exists
+          ? prev.map((f) => (f.id === payload.id ? { ...f, ...payload } : f))
+          : [...prev, payload].sort((a, b) => a.sort_order - b.sort_order);
       });
 
       toast.success(t.admin.menu.saved);
       setEditing(null);
+      router.refresh();
     });
   }
 
@@ -204,30 +224,44 @@ export function MenuClient({
       image_url: f.image_url ?? "",
       is_active: !f.is_active,
       is_featured: f.is_featured,
-      stock_enabled: f.stock_enabled,
-      stock: f.stock,
+      stock_enabled: true,
+      stock: 0,
       sort_order: f.sort_order,
     });
     setBusyId(null);
 
     if (res.ok) {
-      setFlavors((prev) => prev.map((x) => (x.id === f.id ? { ...x, is_active: !f.is_active } : x)));
+      setFlavors((prev) =>
+        prev.map((x) => (x.id === f.id ? { ...x, is_active: !f.is_active } : x))
+      );
       toast.success(!f.is_active ? t.admin.menu.showToast : t.admin.menu.hideToast);
     } else {
       toast.error(t.errors.generic);
     }
   }
 
-  async function quickStock(f: Flavor, next: number) {
+  async function changeStock(next: number) {
     const target = Math.max(0, next);
-    setBusyId(f.id);
-    const res = await setStockAction(f.id, target);
-    setBusyId(null);
+    setStockBusy(true);
+    const res = await setStockAction(target);
+    setStockBusy(false);
 
-    if (res.ok) {
-      setFlavors((prev) => prev.map((x) => (x.id === f.id ? { ...x, stock: target } : x)));
+    if (res.ok && res.data) {
+      setStock(res.data.total_stock);
+      router.refresh();
     } else {
       toast.error(t.errors.generic);
+    }
+  }
+
+  async function toggleStockEnabled(next: boolean) {
+    setStockEnabled(next);
+    const res = await setStockAction(stock);
+    if (!res.ok) {
+      setStockEnabled(!next);
+      toast.error(t.errors.generic);
+    } else {
+      router.refresh();
     }
   }
 
@@ -246,6 +280,111 @@ export function MenuClient({
         </button>
       </div>
 
+      {/* ---------- Stok global ---------- */}
+      <div className="card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span
+              className={`grid size-11 shrink-0 place-items-center rounded-2xl ${
+                stockEnabled
+                  ? "bg-matcha-100 text-matcha-700"
+                  : "bg-cocoa-100 text-cocoa-400"
+              }`}
+            >
+              <Package className="size-5" />
+            </span>
+            <div>
+              <h2 className="text-base font-bold text-cocoa-800">
+                {t.admin.dash.stockTitle}
+              </h2>
+              <p className="mt-0.5 text-xs text-cocoa-500">
+                {t.admin.dash.stockAllFlavors}
+              </p>
+            </div>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2.5">
+            <span className="text-sm font-semibold text-cocoa-600">
+              {t.admin.menu.stockEnabled}
+            </span>
+            <span className="relative inline-flex">
+              <input
+                type="checkbox"
+                checked={stockEnabled}
+                onChange={(e) => void toggleStockEnabled(e.target.checked)}
+                className="peer sr-only"
+              />
+              <span className="h-6 w-11 rounded-full bg-cocoa-200 transition peer-checked:bg-matcha-500" />
+              <span className="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+            </span>
+          </label>
+        </div>
+
+        {stockEnabled ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cocoa-100 pt-4">
+            <button
+              type="button"
+              onClick={() => void changeStock(stock - 1)}
+              disabled={stockBusy || stock === 0}
+              className="grid size-10 place-items-center rounded-xl border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50 disabled:opacity-40"
+              aria-label="-1"
+            >
+              <Minus className="size-4" />
+            </button>
+
+            <div className="min-w-24 text-center">
+              <p className="font-display text-4xl font-extrabold text-cocoa-900 tabular">
+                {stock}
+              </p>
+              <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                {t.admin.dash.pcsLeft}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void changeStock(stock + 1)}
+              disabled={stockBusy}
+              className="grid size-10 place-items-center rounded-xl border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50 disabled:opacity-40"
+              aria-label="+1"
+            >
+              {stockBusy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+            </button>
+
+            <div className="ml-auto flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                defaultValue={stock}
+                onBlur={(e) => {
+                  const v = Number(e.target.value.replace(/\D/g, ""));
+                  if (Number.isFinite(v) && v !== stock) void changeStock(v);
+                }}
+                className="input tabular !w-24 !py-2 text-center"
+                aria-label={t.admin.menu.stockAdjust}
+              />
+              <button
+                type="button"
+                onClick={() => void changeStock(stock + 10)}
+                disabled={stockBusy}
+                className="rounded-xl border border-cocoa-200 px-3 py-2 text-xs font-bold text-cocoa-600 transition hover:bg-cocoa-50 disabled:opacity-40"
+              >
+                +10
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 border-t border-cocoa-100 pt-4 text-sm font-semibold text-cocoa-500">
+            {t.admin.dash.stockUnlimited}
+          </p>
+        )}
+      </div>
+
+      {/* ---------- Daftar rasa ---------- */}
       <div className="relative sm:max-w-sm">
         <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-300" />
         <input
@@ -267,8 +406,6 @@ export function MenuClient({
           {filtered.map((f) => {
             const busy = busyId === f.id;
             const name = lang === "en" ? f.name_en : f.name_id;
-            const low = f.stock_enabled && f.stock > 0 && f.stock <= 5;
-            const out = f.stock_enabled && f.stock === 0;
 
             return (
               <li key={f.id} className="card overflow-hidden">
@@ -316,48 +453,6 @@ export function MenuClient({
                     <p className="mt-0.5 truncate font-mono text-[10px] text-cocoa-300">
                       {f.slug}
                     </p>
-
-                    {/* Stok */}
-                    {f.stock_enabled ? (
-                      <div className="mt-2.5 flex items-center justify-between gap-2">
-                        <span
-                          className={`chip tabular ${
-                            out
-                              ? "bg-berry-500/10 text-berry-600"
-                              : low
-                                ? "bg-honey-300/25 text-honey-500"
-                                : "bg-matcha-100 text-matcha-700"
-                          }`}
-                        >
-                          <Package className="size-3" />
-                          {f.stock}
-                        </span>
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() => quickStock(f, f.stock - 1)}
-                            disabled={busy || f.stock === 0}
-                            className="grid size-7 place-items-center rounded-lg border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50 disabled:opacity-40"
-                            aria-label="-1"
-                          >
-                            <Minus className="size-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => quickStock(f, f.stock + 1)}
-                            disabled={busy}
-                            className="grid size-7 place-items-center rounded-lg border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50 disabled:opacity-40"
-                            aria-label="+1"
-                          >
-                            <Plus className="size-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="chip mt-2.5 bg-cocoa-100 text-cocoa-500">
-                        {t.admin.menu.noStock}
-                      </span>
-                    )}
                   </div>
                 </div>
 
@@ -426,7 +521,6 @@ export function MenuClient({
       >
         {editing ? (
           <div className="space-y-5">
-            {/* Nama & harga */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="f-name-id" className="label">
@@ -473,7 +567,6 @@ export function MenuClient({
               </div>
             </div>
 
-            {/* Deskripsi */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="f-desc-id" className="label">
@@ -501,7 +594,6 @@ export function MenuClient({
               </div>
             </div>
 
-            {/* Foto */}
             <div>
               <span className="label">{t.admin.menu.image}</span>
               <ImageField
@@ -516,42 +608,6 @@ export function MenuClient({
               />
             </div>
 
-            {/* Stok */}
-            <div className="rounded-2xl border border-cocoa-200 p-4">
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={editing.stock_enabled}
-                  onChange={(e) => patch({ stock_enabled: e.target.checked })}
-                  className="mt-0.5 size-4.5 shrink-0 accent-cocoa-800"
-                />
-                <span>
-                  <span className="block text-sm font-bold text-cocoa-800">
-                    {t.admin.menu.stockEnabled}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-cocoa-400">
-                    {t.admin.menu.stockEnabledHint}
-                  </span>
-                </span>
-              </label>
-
-              {editing.stock_enabled ? (
-                <div className="mt-4">
-                  <label htmlFor="f-stock" className="label">
-                    {t.admin.menu.stockLabel}
-                  </label>
-                  <input
-                    id="f-stock"
-                    inputMode="numeric"
-                    className="input tabular"
-                    value={editing.stock}
-                    onChange={(e) => patch({ stock: e.target.value.replace(/\D/g, "") })}
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            {/* Tampilan */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="f-sort" className="label">
@@ -645,7 +701,6 @@ function ImageField({
       const { error } = await supabase.storage
         .from("flavor-images")
         .upload(path, file, { contentType: file.type, upsert: false });
-
       if (error) throw error;
       const { data } = supabase.storage.from("flavor-images").getPublicUrl(path);
       onChange(data.publicUrl);

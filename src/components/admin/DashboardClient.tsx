@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   ChefHat,
   Clock,
-  Flame,
+  Layers,
   PackageCheck,
   Power,
   RefreshCw,
@@ -16,44 +16,56 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import type { DashboardStats, Order } from "@/lib/types";
+import type { Batch, DashboardStats, Order } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { formatIDR, formatRelative, statusLabel } from "@/lib/utils";
+import { formatFullDateTime, formatIDR, formatRelative, statusLabel } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/ui/Toast";
-import { getDashboardStatsAction, getOrdersAction, saveSettingsAction } from "@/app/admin/actions";
+import {
+  getBatchesAction,
+  getDashboardStatsAction,
+  getOrdersAction,
+  saveSettingsAction,
+} from "@/app/admin/actions";
 
 export function DashboardClient({
   initialStats,
   initialOrders,
+  initialBatches,
   isPreorderOpen,
 }: {
   initialStats: DashboardStats;
   initialOrders: Order[];
+  initialBatches: Batch[];
   isPreorderOpen: boolean;
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const [stats, setStats] = useState(initialStats);
   const [orders, setOrders] = useState(initialOrders);
+  const [batches, setBatches] = useState(initialBatches);
   const [open, setOpen] = useState(isPreorderOpen);
   const [refreshing, startRefresh] = useTransition();
   const [toggling, startToggle] = useTransition();
 
+  const openBatch = batches.find((b) => b.is_open) ?? null;
+
   function refresh() {
     startRefresh(async () => {
-      const [statsRes, ordersRes] = await Promise.all([
+      const [statsRes, ordersRes, batchesRes] = await Promise.all([
         getDashboardStatsAction(),
         getOrdersAction(null, "", 8, 0),
+        getBatchesAction(),
       ]);
       if (statsRes.ok && statsRes.data) setStats(statsRes.data);
       if (ordersRes.ok && ordersRes.data) setOrders(ordersRes.data.orders);
+      if (batchesRes.ok && batchesRes.data) setBatches(batchesRes.data);
     });
   }
 
   function toggleOpen() {
     const next = !open;
-    setOpen(next); // optimistis, dikembalikan kalau gagal
+    setOpen(next);
     startToggle(async () => {
       const res = await saveSettingsAction({ is_preorder_open: next });
       if (res.ok) {
@@ -221,7 +233,7 @@ export function DashboardClient({
                     className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-cocoa-50"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-[13px] font-bold text-cocoa-800">
                           {o.order_code}
                         </span>
@@ -236,6 +248,10 @@ export function DashboardClient({
                         {o.items
                           .map((it) => `${it.quantity}× ${it.flavor_name}`)
                           .join(", ")}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-cocoa-400">
+                        {/* Tanggal, hari, dan jam lengkap */}
+                        {formatFullDateTime(o.created_at, lang)}
                       </p>
                     </div>
 
@@ -262,45 +278,108 @@ export function DashboardClient({
 
         {/* ---------- Sisi kanan ---------- */}
         <div className="space-y-6">
-          {/* Stok menipis */}
+          {/* Batch pre-order */}
           <div className="card">
             <div className="flex items-center gap-2 border-b border-cocoa-100 px-5 py-4">
               <h2 className="flex items-center gap-2 text-base font-bold text-cocoa-800">
-                <Flame className="size-4.5 text-honey-500" />
-                {t.admin.dash.lowStock}
+                <Layers className="size-4.5 text-matcha-600" />
+                {t.admin.dash.batchTitle}
               </h2>
             </div>
-            {stats.low_stock.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-cocoa-400">
-                {t.admin.dash.lowStockEmpty}
-              </p>
+
+            {openBatch ? (
+              <div className="px-5 py-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-display text-lg font-extrabold text-cocoa-900">
+                    {openBatch.label}
+                  </p>
+                  <span className="chip bg-matcha-100 text-matcha-700">
+                    {t.admin.dash.batchOpen}
+                  </span>
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-xl bg-cocoa-50 p-2.5">
+                    <dt className="text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
+                      {t.admin.dash.orders}
+                    </dt>
+                    <dd className="mt-0.5 text-lg font-extrabold text-cocoa-900 tabular">
+                      {openBatch.order_count}
+                    </dd>
+                  </div>
+                  <div className="rounded-xl bg-cocoa-50 p-2.5">
+                    <dt className="text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
+                      {t.common.qty}
+                    </dt>
+                    <dd className="mt-0.5 text-lg font-extrabold text-cocoa-900 tabular">
+                      {openBatch.item_count}
+                    </dd>
+                  </div>
+                  <div className="rounded-xl bg-cocoa-50 p-2.5">
+                    <dt className="text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
+                      {t.common.total}
+                    </dt>
+                    <dd className="mt-0.5 text-sm font-extrabold text-cocoa-900 tabular">
+                      {formatIDR(openBatch.revenue, lang)}
+                    </dd>
+                  </div>
+                </dl>
+                <Link
+                  href="/admin/batch"
+                  className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-matcha-600 transition hover:text-matcha-700"
+                >
+                  {t.admin.dash.viewBatch}
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </div>
             ) : (
-              <ul className="divide-y divide-cocoa-100">
-                {stats.low_stock.map((f) => (
-                  <li key={f.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                    <span className="min-w-0 truncate text-sm font-semibold text-cocoa-700">
-                      {lang === "en" ? f.name_en : f.name_id}
-                    </span>
-                    <span
-                      className={`chip shrink-0 tabular ${
-                        f.stock === 0
-                          ? "bg-berry-500/10 text-berry-600"
-                          : "bg-honey-300/25 text-honey-500"
-                      }`}
-                    >
-                      {f.stock}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <p className="px-5 py-8 text-center text-sm text-cocoa-400">
+                {t.admin.dash.noBatch}
+              </p>
             )}
-            <div className="border-t border-cocoa-100 px-5 py-3">
-              <Link
-                href="/admin/menu"
-                className="text-xs font-bold text-matcha-600 transition hover:text-matcha-700"
-              >
-                {t.admin.menu.title} →
-              </Link>
+          </div>
+
+          {/* Stok global */}
+          <div className="card">
+            <div className="flex items-center gap-2 border-b border-cocoa-100 px-5 py-4">
+              <h2 className="flex items-center gap-2 text-base font-bold text-cocoa-800">
+                <PackageCheck className="size-4.5 text-cocoa-400" />
+                {t.admin.dash.stockTitle}
+              </h2>
+            </div>
+            <div className="px-5 py-4">
+              {stats.stock_enabled ? (
+                <>
+                  <p className="font-display text-3xl font-extrabold text-cocoa-900 tabular">
+                    {stats.total_stock}
+                    <span className="ml-1.5 text-sm font-bold text-cocoa-400">
+                      {t.admin.dash.pcsLeft}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs text-cocoa-400">
+                    {t.admin.dash.stockUsed.replace("{n}", String(stats.stock_used))}
+                  </p>
+                  <p className="mt-2 text-xs text-cocoa-500">
+                    {t.admin.dash.stockAllFlavors}
+                  </p>
+                  <div className="mt-3">
+                    <Link
+                      href="/admin/menu"
+                      className="text-xs font-bold text-matcha-600 transition hover:text-matcha-700"
+                    >
+                      {t.admin.dash.manageStock} →
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-bold text-matcha-700">
+                    {t.admin.menu.noStock}
+                  </p>
+                  <p className="mt-1 text-xs text-cocoa-400">
+                    {t.admin.dash.stockUnlimited}
+                  </p>
+                </>
+              )}
             </div>
           </div>
 

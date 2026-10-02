@@ -43,7 +43,9 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {  
                 <span className="font-display text-lg font-bold">日</span>
               </span>
               <span className="flex flex-col leading-none">
-                <span className="font-display text-xl font-bold text-cream-50">Japanese</span>
+                <span className="font-display text-xl font-bold text-cream-50">
+                  {settings?.store_name || "Rumakomugi"}
+                </span>
                 <span className="text-[10px] font-bold tracking-[0.22em] text-berry-400 uppercase">
                   Sando
                 </span>

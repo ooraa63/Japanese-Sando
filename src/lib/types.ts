@@ -63,7 +63,41 @@ export interface StoreSettings {
   announcement_id: string;
   announcement_en: string;
   is_preorder_open: boolean;
+  /** Stok keseluruhan (bukan per rasa) */
+  stock_enabled: boolean;
+  total_stock: number;
+  /** Foto background halaman depan */
+  hero_image_url: string | null;
+  hero_image_mobile_url: string | null;
+  /** Catatan cara pengambilan */
+  pickup_note_id: string;
+  pickup_note_en: string;
+  delivery_note_id: string;
+  delivery_note_en: string;
   updated_at: string;
+}
+
+/** Batch pre-order: sekumpulan pesanan yangdiproduksi bersama. */
+export interface Batch {
+  id: number;
+  label: string;
+  note: string;
+  status: "open" | "closed";
+  created_at: string;
+  closed_at: string | null;
+  order_count: number;
+  item_count: number;
+  revenue: number;
+  is_open: boolean;
+}
+
+export interface BatchSummary {
+  batch: Pick<Batch, "id" | "label" | "note" | "status" | "created_at"> | null;
+  total_orders: number;
+  total_items: number;
+  revenue: number;
+  by_flavor: Array<{ flavor_name: string; qty: number }>;
+  by_delivery: Record<string, number>;
 }
 
 export interface OrderItem {
@@ -91,6 +125,8 @@ export interface Order {
   item_count: number;
   status: OrderStatus;
   language: Language;
+  batch_id: number | null;
+  batch_label?: string | null;
   created_at: string;
   updated_at: string;
   items: OrderItem[];
@@ -129,7 +165,10 @@ export interface DashboardStats {
   orders_today: number;
   revenue_month: number;
   flavor_count: number;
-  low_stock: Array<{ id: number; name_id: string; name_en: string; stock: number }>;
+  /** Stok global */
+  stock_enabled: boolean;
+  total_stock: number;
+  stock_used: number;
   sales_by_flavor: Array<{ flavor_name: string; qty: number }>;
 }
 

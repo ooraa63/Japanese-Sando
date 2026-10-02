@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import type { Flavor, PaymentMethod } from "@/lib/types";
+import type { DeliveryMethod, Flavor, PaymentMethod } from "@/lib/types";
 
 /**
  * Keranjang pre-order disimpan di localStorage supaya pembeli tidak
@@ -17,6 +17,8 @@ export interface CartDraft {
   name: string;
   phone: string;
   note: string;
+  address: string;
+  deliveryMethod: DeliveryMethod;
   paymentMethod: PaymentMethod | null;
   transferMethod: string;
   proofPath: string | null;
@@ -50,6 +52,8 @@ const EMPTY_DRAFT: CartDraft = {
   name: "",
   phone: "",
   note: "",
+  address: "",
+  deliveryMethod: "pickup",
   paymentMethod: null,
   transferMethod: "",
   proofPath: null,
@@ -122,8 +126,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const add = useCallback((flavor: Flavor) => {
     const key = String(flavor.id);
-    const max = flavor.stock_enabled ? Math.max(1, flavor.stock) : 99;
-    const next = Math.min((store.quantities[key] ?? 0) + 1, max);
+    const next = (store.quantities[key] ?? 0) + 1;
     if (next === store.quantities[key]) return;
     write({ ...store, quantities: { ...store.quantities, [key]: next } });
   }, []);

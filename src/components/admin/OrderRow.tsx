@@ -2,7 +2,7 @@
 
 import type { Order } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { deliveryLabel, formatDateTime, formatIDR, formatPhone, paymentLabel } from "@/lib/utils";
+import { deliveryLabel, formatFullDateTime, formatIDR, formatPhone, paymentLabel } from "@/lib/utils";
 
 /** Rincian ringkas pesanan yang bisa dibuka-tutup di daftar. */
 export function OrderRow({ order }: { order: Order }) {
@@ -78,9 +78,15 @@ export function OrderRow({ order }: { order: Order }) {
         <div className="flex justify-between gap-3">
           <dt>{t.common.date}</dt>
           <dd className="font-semibold text-cocoa-700">
-            {formatDateTime(order.created_at, lang)}
+            {formatFullDateTime(order.created_at, lang)}
           </dd>
         </div>
+        {order.batch_label ? (
+          <div className="flex justify-between gap-3">
+            <dt>{t.admin.nav.batch}</dt>
+            <dd className="font-semibold text-matcha-600">{order.batch_label}</dd>
+          </div>
+        ) : null}
       </dl>
     </div>
   );

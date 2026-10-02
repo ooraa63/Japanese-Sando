@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Flame, PackageX, ShoppingBag, Star } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { formatIDR, isSoldOut } from "@/lib/utils";
+import { formatIDR } from "@/lib/utils";
 import type { Flavor } from "@/lib/types";
 
 /** Warna fallback per rasa, dipakai kalau produk belum punya foto. */
@@ -26,17 +26,22 @@ export function FlavorCard({
   onAdd,
   inCart = 0,
   compact = false,
+  remainingStock = null,
 }: {
   flavor: Flavor;
   onAdd?: (flavor: Flavor) => void;
   inCart?: number;
   compact?: boolean;
+  /** Stok keseluruhan toko (bukan per rasa). null = tak terbatas. */
+  remainingStock?: number | null;
 }) {
   const { t, lang } = useI18n();
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
   const desc = lang === "en" ? flavor.desc_en : flavor.desc_id;
-  const soldOut = isSoldOut(flavor);
-  const low = flavor.stock_enabled && flavor.stock > 0 && flavor.stock <= 5;
+  const stockEnabled = remainingStock !== null;
+  const left = remainingStock ?? 0;
+  const soldOut = !flavor.is_active || (stockEnabled && left <= 0);
+  const low = stockEnabled && left > 0 && left <= 5;
 
   return (
     <article
@@ -115,12 +120,12 @@ export function FlavorCard({
               <PackageX className="mr-1 inline size-3" />
               {t.menu.soldOut}
             </span>
-          ) : flavor.stock_enabled ? (
+          ) : stockEnabled ? (
             <span className={low ? "text-honey-500" : "text-matcha-600"}>
               <Flame className="mr-1 inline size-3" />
               {low
-                ? t.menu.lowStock.replace("{n}", String(flavor.stock))
-                : t.menu.inStock.replace("{n}", String(flavor.stock))}
+                ? t.menu.lowStock.replace("{n}", String(left))
+                : t.menu.inStock.replace("{n}", String(left))}
             </span>
           ) : (
             <span className="text-matcha-600">

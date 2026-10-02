@@ -64,13 +64,14 @@ const menuHtml = await menuPage.text();
 check("?step=menu membuka langkah pilih rasa",
   menuHtml.includes("Mau pesan apa") && !menuHtml.includes("Siapa yang memesan"));
 
-console.log("\n=== 4. Tidak ada pilihan terima di langkah pembayaran ===");
+console.log("\n=== 4. Pilihan pengambilan di langkah pembayaran ===");
 const payPage = await fetch(`${APP}/order?step=payment`);
 const payHtml = await payPage.text();
 check("cara bayar tetap ada", payHtml.includes("Transfer bank") && payHtml.includes("Bayar tunai"));
-check("tidak ada pilihan 'Diantar'", !payHtml.includes(">Diantar<"));
-check("tidak ada input alamat pengiriman", !payHtml.includes("Alamat pengiriman"));
-check("ada keterangan ambil di toko", payHtml.includes("Ambil di toko"));
+check("pilihan ambil di toko ada", payHtml.includes("Ambil di toko"));
+check("pilihan diantar ada kembali", payHtml.includes("Diantar"));
+check("catatan pengambilan tampil", payHtml.includes("Vihara Tian En") || payHtml.includes("gratis ongkir"));
+check("tidak ada input alamat saat ambil di tempat", !payHtml.includes("Alamat pengiriman"));
 
 console.log("\n=== 5. Beranda tidak bisa menambah ke keranjang ===");
 const home = await fetch(APP);
@@ -80,10 +81,12 @@ check("tidak ada tombol 'Tambah ke keranjang' di beranda",
 check("ada tombol 'Pesan rasa ini' menuju /order",
   homeHtml.includes("Pesan rasa ini") && homeHtml.includes("/order?step=menu"));
 
-console.log("\n=== 6. Hero tidak menampilkan baris 5 rasa / harga / COD ===");
-check("tidak ada 'BISA COD' di hero", !homeHtml.includes("BISA COD"));
-check("foto hero memakai rasio 1:1 (tidak terpotong)",
-  homeHtml.includes("aspect-square"));
+console.log("\n=== 6. Hero memakai foto sebagai background penuh ===");
+check("foto hero jadi background (bukan kartu 1:1)",
+  !homeHtml.includes("aspect-square") && homeHtml.includes("hero-sando.jpg"));
+check("tidak ada baris COD di hero", !homeHtml.includes("BISA COD"));
+check("nama toko di pojok kiri bukan 'Japanese Sando'",
+  !homeHtml.includes(">Japanese</span>") && !homeHtml.includes("Rumakomugi"));
 
 console.log(`\n${"=".repeat(46)}`);
 console.log(`  LULUS: ${pass}   GAGAL: ${fail}`);

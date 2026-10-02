@@ -124,7 +124,7 @@ check("harga palsu diabaikan server (harga asli dipakai)",
   JSON.stringify(fakePrice.body));
 
 console.log("\n=== 3. Pesanan COD berhasil dibuat ===");
-const stockBefore = (await rest("flavors", "select=id,stock&id=eq.1&limit=1")).body[0].stock;
+const stockBefore = (await rest("store_settings", "select=total_stock&id=eq.1&limit=1")).body[0].total_stock;
 const created = await rpc("create_order", {
   p_customer_name: "Budi Santoso",
   p_phone: "081234567890",
@@ -139,8 +139,12 @@ check("pesanan COD berhasil dibuat", created.ok && Boolean(created.body?.order_c
 console.log(`       kode pesanan: ${created.body?.order_code}`);
 console.log(`       total: Rp${created.body?.total_price}`);
 
-const stockAfter = (await rest("flavors", "select=id,stock&id=eq.1&limit=1")).body[0].stock;
-check(`stok berkurang 2 (${stockBefore} -> ${stockAfter})`, stockAfter === stockBefore - 2);
+const settingsAfter = (await rest("store_settings", "select=total_stock&id=eq.1&limit=1")).body[0];
+check(`stok global berkurang 2 (${stockBefore} -> ${settingsAfter.total_stock})`,
+  settingsAfter.total_stock === stockBefore - 2);
+check("sisa stok dikembalikan di respons",
+  created.body?.remaining_stock === settingsAfter.total_stock,
+  `respon=${created.body?.remaining_stock} db=${settingsAfter.total_stock}`);
 
 console.log("\n=== 4. Lacak pesanan (kode + telepon) ===");
 const tracked = await rpc("track_order", {

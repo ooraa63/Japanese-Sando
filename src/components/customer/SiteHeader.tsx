@@ -5,9 +5,8 @@ import Link from "next/link";
 import { Menu, X, ShoppingBag } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
-import { SITE_NAME } from "@/lib/utils";
 
-export function SiteHeader() {
+export function SiteHeader({ storeName = "Rumakomugi" }: { storeName?: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -42,12 +41,14 @@ export function SiteHeader() {
       }`}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="group flex items-center gap-2.5" aria-label={SITE_NAME}>
+        <Link href="/" className="group flex items-center gap-2.5" aria-label={storeName}>
           <span className="grid size-9 place-items-center rounded-xl bg-cocoa-800 text-cream-50 shadow-md transition group-hover:rotate-[-6deg]">
             <span className="font-display text-base font-bold">日</span>
           </span>
           <span className="flex flex-col leading-none">
-            <span className="font-display text-[17px] font-bold text-cocoa-900">Japanese</span>
+            <span className="font-display text-[17px] font-bold text-cocoa-900">
+              {storeName}
+            </span>
             <span className="text-[10px] font-bold tracking-[0.22em] text-berry-500 uppercase">
               Sando
             </span>

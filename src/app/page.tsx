@@ -48,7 +48,7 @@ export default async function HomePage() {
         deadlineId={settings?.deadline_id}
         deadlineEn={settings?.deadline_en}
       />
-      <SiteHeader />
+      <SiteHeader storeName={settings?.store_name ?? "Rumakomugi"} />
 
       <main id="main">
         {/* ===================== HERO =====================
@@ -59,13 +59,26 @@ export default async function HomePage() {
         <section className="relative overflow-hidden bg-cocoa-950 text-cream-50">
           <div className="absolute inset-0">
             <Image
-              src="/hero-sando.jpg"
+              src={settings?.hero_image_url || "/hero-sando.jpg"}
               alt="Aralam Japanese Sando"
               fill
               priority
               sizes="100vw"
               className="object-cover object-[center_60%]"
             />
+            {/* Foto khusus mobile, dipakai hanya di layar kecil */}
+            {settings?.hero_image_mobile_url ? (
+              <div className="absolute inset-0 md:hidden">
+                <Image
+                  src={settings.hero_image_mobile_url}
+                  alt=""
+                  fill
+                  priority
+                  sizes="100vw"
+                  className="object-cover"
+                />
+              </div>
+            ) : null}
             <div className="absolute inset-0 bg-gradient-to-b from-cocoa-950/85 via-cocoa-950/55 to-cocoa-950/90" />
             <div className="absolute inset-0 bg-gradient-to-r from-cocoa-950/90 via-cocoa-950/40 to-transparent" />
             <div className="absolute inset-0 bg-seigaha opacity-30" />
@@ -135,7 +148,10 @@ export default async function HomePage() {
             <p className="card mt-10 p-10 text-center text-cocoa-400">{dicts.menu.empty}</p>
           ) : (
             <div className="mt-10">
-              <FlavorGrid flavors={flavors} />
+              <FlavorGrid
+                flavors={flavors}
+                remainingStock={settings?.stock_enabled ? settings.total_stock : null}
+              />
             </div>
           )}
         </section>

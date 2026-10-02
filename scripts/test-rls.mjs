@@ -54,7 +54,7 @@ async function asUser(role, claims, sql, params = [], persist = false) {
   }
 }
 
-/** Koneksi terpisah â€” dipakai untuk uji konkurensi sungguhan. */
+/** Koneksi terpisah Ã¢â‚¬â€ dipakai untuk uji konkurensi sungguhan. */
 async function asUserOn(conn, role, claims, sql, params = []) {
   await conn.query("begin");
   try {
@@ -132,6 +132,13 @@ const adminClaims = { sub: adminId, role: "authenticated", aud: "authenticated" 
 const isAdmin = await asUser("authenticated", adminClaims, `select public.is_admin();`);
 check("is_admin() = true untuk admin", isAdmin.ok && isAdmin.rows[0].is_admin === true);
 
+// Buat satu pesanan dulu supaya pemeriksaan tidak bergantung pada data sisa.
+const seedOrder = await asUser("anon", { role: "anon" },
+  `select public.create_order('Cek RLS','081200000000','cash','pickup',null,null,null,null,'id',
+     jsonb_build_array(jsonb_build_object('flavor_id',1,'quantity',1)));`, [], true);
+check("pesanan uji berhasil dibuat", Boolean(seedOrder.rows?.[0]?.create_order?.order_code),
+  JSON.stringify(seedOrder).slice(0, 160));
+
 const adminOrders = await asUser("authenticated", adminClaims, `select count(*)::int as n from public.orders;`);
 check("admin boleh membaca pesanan", adminOrders.ok && adminOrders.rows[0].n > 0,
   `n=${adminOrders.rows?.[0]?.n}`);
@@ -143,7 +150,7 @@ if (stats.ok) {
   const s = stats.rows[0].admin_dashboard_stats;
   console.log(`  -> pending=${s.pending_orders} accepted=${s.accepted_orders} total=${s.total_orders}`);
   console.log(`  -> pendapatan hari ini=${s.revenue_today} bulan ini=${s.revenue_month}`);
-  console.log(`  -> rasa aktif=${s.flavor_count} stok menipis=${s.low_stock.length} terlaris=${s.sales_by_flavor.length}`);
+  console.log(`  -> rasa aktif=${s.flavor_count} stok tersisa=${s.total_stock} terlaris=${s.sales_by_flavor.length}`);
 }
 
 const list = await asUser("authenticated", adminClaims, `select public.admin_list_orders(null, null, 10, 0);`);
@@ -189,128 +196,6 @@ if (strangerFlavor.ok && strangerFlavor.count > 0) {
   await client.query(`delete from public.flavors where slug = 'jejak-test';`);
 }
 
-// ------------------------------------------- alur status pesanan
-console.log("\n=== 4. Alur status pesanan & gerakan stok ===");
-
-const setStatus = (id, status, note = null) =>
-  asUser("authenticated", adminClaims, `select public.admin_update_order_status($1, $2, $3);`, [
-    String(id),
-    status,
-    note,
-  ], true);
-
-const stockOf = async (flavorId) => {
-  const r = await client.query(`select stock from public.flavors where id = $1;`, [flavorId]);
-  return r.rows[0].stock;
-};
-
-const before = await stockOf(3);
-const created = await asUser(
-  "anon",
-  { role: "anon" },
-  `select public.create_order(
-     'Dewi Lestari', '081299887766', 'cash', 'pickup', null, null, null, 'catatan uji', 'id',
-     jsonb_build_array(jsonb_build_object('flavor_id', 3, 'quantity', 3))
-   );`,
-  [],
-  true
-);
-const newOrder = created.ok ? created.rows[0].create_order : null;
-check("pesanan baru dibuat oleh anon", Boolean(newOrder?.order_code),
-  JSON.stringify(created).slice(0, 200));
-console.log(`  kode: ${newOrder?.order_code}  total: ${newOrder?.total_price}`);
-
-const afterCreate = await stockOf(3);
-check(`stok berkurang 3 (${before} -> ${afterCreate})`, afterCreate === before - 3);
-
-check("admin bisa menerima pesanan", (await setStatus(newOrder.id, "accepted", "Diterima")).ok);
-check("admin bisa menandai siap", (await setStatus(newOrder.id, "ready")).ok);
-check("admin bisa menandai selesai", (await setStatus(newOrder.id, "delivered")).ok);
-
-const statsAfter = await asUser("authenticated", adminClaims, `select public.admin_dashboard_stats();`);
-const s2 = statsAfter.rows[0].admin_dashboard_stats;
-check("pendapatan terhitung setelah pesanan selesai",
-  Number(s2.revenue_today) === Number(newOrder.total_price),
-  `pendapatan=${s2.revenue_today} total_pesanan=${newOrder.total_price}`);
-check("daftar terlaris terisi", s2.sales_by_flavor.length > 0, JSON.stringify(s2.sales_by_flavor));
-console.log(`  terlaris: ${JSON.stringify(s2.sales_by_flavor)}`);
-
-const created2 = await asUser(
-  "anon",
-  { role: "anon" },
-  `select public.create_order(
-     'Andi Wijaya', '081377665544', 'cash', 'pickup', null, null, null, null, 'id',
-     jsonb_build_array(jsonb_build_object('flavor_id', 3, 'quantity', 4))
-   );`,
-  [],
-  true
-);
-const o2 = created2.rows[0].create_order;
-const beforeReject = await stockOf(3);
-
-check("admin bisa menolak pesanan", (await setStatus(o2.id, "rejected")).ok);
-const afterReject = await stockOf(3);
-check(`stok kembali +4 setelah ditolak (${beforeReject} -> ${afterReject})`,
-  afterReject === beforeReject + 4);
-
-check("pesanan bisa dikembalikan ke menunggu", (await setStatus(o2.id, "pending")).ok);
-const afterUndo = await stockOf(3);
-check(`stok dipesan ulang (${afterReject} -> ${afterUndo})`, afterUndo === beforeReject);
-
-const bogus = await setStatus(o2.id, "entah");
-check("status tidak valid ditolak", !bogus.ok, bogus.error ?? "");
-const ghost = await setStatus(99999999, "accepted");
-check("pesanan tidak ada ditolak", !ghost.ok, ghost.error ?? "");
-
-// Bersihkan: lepaskan semua reservasi stok lewat RPC yang sama seperti aplikasi.
-await setStatus(o2.id, "rejected");   // sudah dilepas sebelumnya, tidak ada efek
-const rejectedAgain = await setStatus(o2.id, "rejected");
-check("menolak dua kali tidak mengembalikan stok dua kali", !rejectedAgain.ok,
-  rejectedAgain.error ?? "");
-await setStatus(newOrder.id, "cancelled");
-const finalStock = await stockOf(3);
-check(`semua reservasi dilepas, stok kembali (${before})`, finalStock === before, `stok=${finalStock}`);
-
-// Tandai pesanan uji selesai supaya tidak mengotori dashboard
-await client.query(`update public.orders set status = 'cancelled' where id in ($1, $2);`, [
-  newOrder.id,
-  o2.id,
-]);
-
-console.log("\n=== 5. Stok tidak boleh minus saat order bersamaan ===");
-await client.query(`update public.flavors set stock = 1, stock_enabled = true where id = 4;`);
-
-// Dua koneksi terpisah supaya benar-benar konkuren (satu koneksi pg
-// hanya bisa menjalankan satu query pada satu waktu).
-const connA = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-const connB = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-await connA.connect();
-await connB.connect();
-
-const orderSql = (name, phone) =>
-  `select public.create_order('${name}','${phone}','cash','pickup',null,null,null,null,'id',
-     jsonb_build_array(jsonb_build_object('flavor_id',4,'quantity',1)));`;
-
-const [raceA, raceB] = await Promise.all([
-  asUserOn(connA, "anon", { role: "anon" }, orderSql("Racing A", "081111111111")),
-  asUserOn(connB, "anon", { role: "anon" }, orderSql("Racing B", "082222222222")),
-]);
-await connA.end();
-await connB.end();
-
-const succeeded = [raceA, raceB].filter((r) => r.ok).length;
-check("hanya 1 dari 2 pesanan bersamaan yang berhasil (stok=1)", succeeded === 1, `berhasil=${succeeded}`);
-const loser = [raceA, raceB].find((r) => !r.ok);
-check("pesanan yang kalah ditolak dengan pesan stok habis",
-  Boolean(loser?.error?.includes("insufficient_stock")), loser?.error ?? "-");
-
-const stockNow = await client.query(`select stock from public.flavors where id = 4;`);
-check("stok tidak menjadi minus", stockNow.rows[0].stock === 0, `stok=${stockNow.rows[0].stock}`);
-
-await client.query(`update public.flavors set stock = 20 where id = 4;`);
-await client.query(
-  `update public.orders set status='cancelled' where customer_name in ('Racing A','Racing B');`
-);
 
 await client.end();
 console.log(`\n${"=".repeat(46)}`);

@@ -16,6 +16,7 @@ import {
   Save,
   Store,
   Trash2,
+  Truck,
   X,
 } from "lucide-react";
 import type { BankAccount, StoreSettings } from "@/lib/types";
@@ -55,6 +56,14 @@ function toDraft(s: StoreSettings | null): Draft {
     announcement_id: s?.announcement_id ?? "",
     announcement_en: s?.announcement_en ?? "",
     is_preorder_open: s?.is_preorder_open ?? true,
+    stock_enabled: s?.stock_enabled ?? true,
+    total_stock: s?.total_stock ?? 20,
+    hero_image_url: s?.hero_image_url ?? null,
+    hero_image_mobile_url: s?.hero_image_mobile_url ?? null,
+    pickup_note_id: s?.pickup_note_id ?? "",
+    pickup_note_en: s?.pickup_note_en ?? "",
+    delivery_note_id: s?.delivery_note_id ?? "",
+    delivery_note_en: s?.delivery_note_en ?? "",
   };
 }
 
@@ -155,6 +164,42 @@ export function SettingsClient({ initialSettings }: { initialSettings: StoreSett
               onChange={(e) => patch({ announcement_en: e.target.value })}
               placeholder="Holiday special: 15k!"
             />
+          </Field>
+
+          {/* Foto background halaman depan */}
+          <Field
+            label={t.admin.settings.heroImage}
+            hint={t.admin.settings.heroImageHint}
+            className="sm:col-span-2"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="mb-1.5 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                  Desktop
+                </p>
+                <HeroImageField
+                  url={form.hero_image_url}
+                  onChange={(url) => patch({ hero_image_url: url })}
+                  labels={{
+                    upload: t.admin.menu.uploadImage,
+                    remove: t.admin.menu.removeImage,
+                  }}
+                />
+              </div>
+              <div>
+                <p className="mb-1.5 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                  Mobile
+                </p>
+                <HeroImageField
+                  url={form.hero_image_mobile_url}
+                  onChange={(url) => patch({ hero_image_mobile_url: url })}
+                  labels={{
+                    upload: t.admin.menu.uploadImage,
+                    remove: t.admin.menu.removeImage,
+                  }}
+                />
+              </div>
+            </div>
           </Field>
         </div>
       </Section>
@@ -402,12 +447,59 @@ export function SettingsClient({ initialSettings }: { initialSettings: StoreSett
             prefix={formatIDR(0, lang)}
           />
           <NumberField
-            label={t.admin.settings.freeShippingMin}
-            value={form.free_shipping_min}
+            label={t.admin.settings.totalStock}
+            value={form.total_stock}
             min={0}
-            onChange={(v) => patch({ free_shipping_min: v })}
-            prefix={formatIDR(0, lang)}
+            onChange={(v) => patch({ total_stock: v })}
           />
+        </div>
+        <p className="mt-2 text-xs text-cocoa-400">{t.admin.dash.stockAllFlavors}</p>
+      </Section>
+
+      {/* ============ Catatan cara pengambilan ============ */}
+      <Section icon={<Truck className="size-4.5" />} title={t.admin.settings.pickupDeliveryTitle}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <span className="label">{t.order.payment.pickup}</span>
+            <textarea
+              rows={3}
+              className="input resize-none"
+              value={form.pickup_note_id}
+              onChange={(e) => patch({ pickup_note_id: e.target.value })}
+              placeholder="Hanya untuk Vihara Tian En dan UVERS, gratis ongkir. Pengambilan jam 18.00 - 20.00."
+            />
+            <p className="mt-1.5 text-xs text-cocoa-400">
+              {t.admin.settings.pickupNoteHint}
+            </p>
+            <textarea
+              rows={2}
+              className="input mt-2 resize-none"
+              value={form.pickup_note_en}
+              onChange={(e) => patch({ pickup_note_en: e.target.value })}
+              placeholder="English version (optional)"
+            />
+          </div>
+
+          <div>
+            <span className="label">{t.order.payment.delivery}</span>
+            <textarea
+              rows={3}
+              className="input resize-none"
+              value={form.delivery_note_id}
+              onChange={(e) => patch({ delivery_note_id: e.target.value })}
+              placeholder="Ongkir ditanggung sendiri oleh pembeli."
+            />
+            <p className="mt-1.5 text-xs text-cocoa-400">
+              {t.admin.settings.deliveryNoteHint}
+            </p>
+            <textarea
+              rows={2}
+              className="input mt-2 resize-none"
+              value={form.delivery_note_en}
+              onChange={(e) => patch({ delivery_note_en: e.target.value })}
+              placeholder="English version (optional)"
+            />
+          </div>
         </div>
       </Section>
 
@@ -546,8 +638,99 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
-function QrisField({
+/** Unggah foto background halaman depan ke bucket publik `flavor-images`. */
+function HeroImageField({
   url,
+  onChange,
+  labels,
+}: {
+  url: string | null;
+  onChange: (url: string | null) => void;
+  labels: { upload: string; remove: string };
+}) {
+  const toast = useToast();
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const fail = t.errors.proof_upload_failed;
+
+  async function upload(file: File) {
+    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+      toast.error(fail);
+      return;
+    }
+    setBusy(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `hero/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+      const { error } = await supabase.storage
+        .from("flavor-images")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw error;
+      const { data } = supabase.storage.from("flavor-images").getPublicUrl(path);
+      onChange(data.publicUrl);
+    } catch {
+      toast.error(fail);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      {url ? (
+        <div className="flex items-center gap-3">
+          <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-cocoa-100">
+            <Image src={url} alt="" fill sizes="96px" className="object-cover" />
+          </div>
+          <div className="flex gap-1.5">
+            <label className="cursor-pointer rounded-lg border border-cocoa-200 px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-50">
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {labels.upload}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void upload(f);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10"
+            >
+              <X className="size-3.5" />
+              {labels.remove}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-cocoa-200 bg-cocoa-50/50 px-4 py-6 text-center transition hover:border-matcha-400">
+          {busy ? (
+            <Loader2 className="size-5 animate-spin text-matcha-500" />
+          ) : (
+            <ImagePlus className="size-5 text-cocoa-400" />
+          )}
+          <span className="text-xs font-bold text-cocoa-700">{labels.upload}</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f);
+            }}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
+function QrisField({  url,
   onChange,
   labels,
 }: {

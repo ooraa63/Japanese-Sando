@@ -22,10 +22,9 @@ import { useI18n } from "@/lib/i18n";
 import {
   ADMIN_TRANSITIONS,
   deliveryLabel,
-  formatDateTime,
+  formatFullDateTime,
   formatIDR,
   formatPhone,
-  formatRelative,
   paymentLabel,
   statusLabel,
   waOrderLink,
@@ -357,13 +356,24 @@ export function OrdersClient({
                     </p>
 
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-cocoa-400">
-                      <span title={formatDateTime(o.created_at, lang)}>
-                        {formatRelative(o.created_at, lang)}
+                      {/* Hari, tanggal, dan jam lengkap */}
+                      <span className="font-semibold text-cocoa-500" title={t.admin.orders.createdFull}>
+                        {formatFullDateTime(o.created_at, lang)}
                       </span>
                       <span>·</span>
                       <span>{paymentLabel(o.payment_method, lang)}</span>
                       <span>·</span>
-                      <span>{deliveryLabel(o.delivery_method, lang)}</span>
+                      <span className={o.delivery_method === "delivery" ? "text-honey-500" : ""}>
+                        {deliveryLabel(o.delivery_method, lang)}
+                      </span>
+                      {o.batch_label ? (
+                        <>
+                          <span>·</span>
+                          <span className="font-semibold text-matcha-600">
+                            {o.batch_label}
+                          </span>
+                        </>
+                      ) : null}
                       {o.payment_proof_path ? (
                         <>
                           <span>·</span>
@@ -507,7 +517,7 @@ export function OrdersClient({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <StatusBadge status={selected.status} label={statusLabel(selected.status, lang)} />
               <p className="text-[11px] text-cocoa-400">
-                {t.track.placedOn} {formatDateTime(selected.created_at, lang)}
+                {t.track.placedOn} {formatFullDateTime(selected.created_at, lang)}
               </p>
             </div>
 
@@ -528,6 +538,9 @@ export function OrdersClient({
                 label={t.order.review.deliveryLabel}
                 value={deliveryLabel(selected.delivery_method, lang)}
               />
+              {selected.batch_label ? (
+                <Field label={t.admin.nav.batch} value={selected.batch_label} />
+              ) : null}
               {selected.address ? (
                 <Field label={t.order.payment.address} value={selected.address} full />
               ) : null}

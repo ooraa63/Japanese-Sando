@@ -6,6 +6,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdminUser,
+  Batch,
+  BatchSummary,
   DashboardStats,
   Order,
   OrderStatus,
@@ -315,23 +317,66 @@ export async function deleteFlavorAction(
 }
 
 export async function setStockAction(
-  flavorId: number,
-  stock: number
-): Promise<ActionResult> {
-  if (!Number.isInteger(stock) || stock < 0) return { ok: false, error: "invalid_stock" };
+  totalStock: number
+): Promise<ActionResult<{ total_stock: number; previous: number }>> {
+  if (!Number.isInteger(totalStock) || totalStock < 0) {
+    return { ok: false, error: "invalid_stock" };
+  }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_set_stock", {
-    p_flavor_id: flavorId,
-    p_stock: stock,
+  const { data, error } = await supabase.rpc("admin_set_stock", {
+    p_stock: totalStock,
     p_note: null,
   });
 
   if (error) return { ok: false, error: humanize(error.message) };
 
   revalidatePath("/admin/menu");
+  revalidatePath("/admin");
   revalidatePath("/");
   revalidatePath("/order");
+  return { ok: true, data: data as { total_stock: number; previous: number } };
+}
+
+/* =============================================================================
+ *  BATCH PRE-ORDER
+ * ========================================================================== */
+
+export async function getBatchesAction(): Promise<ActionResult<Batch[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_batches");
+  if (error) return { ok: false, error: humanize(error.message) };
+  return { ok: true, data: (data as Batch[]) ?? [] };
+}
+
+export async function getBatchSummaryAction(
+  batchId: number
+): Promise<ActionResult<BatchSummary>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_batch_summary", {
+    p_batch_id: batchId,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+  return { ok: true, data: data as BatchSummary };
+}
+
+export async function closeBatchAction(batchId: number): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_close_batch", { p_batch_id: batchId });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/orders");
+  return { ok: true };
+}
+
+export async function reopenBatchAction(batchId: number): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_reopen_batch", { p_batch_id: batchId });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/orders");
   return { ok: true };
 }
 

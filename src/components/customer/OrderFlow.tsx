@@ -15,10 +15,11 @@ import {
   ShoppingBag,
   Store,
   Trash2,
+  Truck,
   User,
   Wallet,
 } from "lucide-react";
-import type { Flavor, PaymentMethod, StoreSettings } from "@/lib/types";
+import type { DeliveryMethod, Flavor, PaymentMethod, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/components/customer/CartProvider";
@@ -85,6 +86,8 @@ export function OrderFlow({
   const [submitting, setSubmitting] = useState(false);
 
   const maxQty = Math.max(1, settings.max_per_order);
+  const stockEnabled = settings.stock_enabled;
+  const stockLeft = settings.total_stock;
   const flavorById = useMemo(() => new Map(flavors.map((f) => [f.id, f])), [flavors]);
 
   const cartLines = useMemo(
@@ -99,8 +102,13 @@ export function OrderFlow({
     (sum, l) => sum + l.flavor.price * l.qty,
     0
   );
-  // Semua pesanan diambil sendiri di toko, jadi tidak ada ongkir.
-  const total = subtotal;
+  // Ongkir hanya untuk pengiriman; ambil di tempat gratis.
+  const deliveryFee =
+    draft.deliveryMethod === "delivery" ? settings.delivery_fee : 0;
+  const total = subtotal + deliveryFee;
+
+  const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
+  const deliveryNote = lang === "en" ? settings.delivery_note_en : settings.delivery_note_id;
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -127,12 +135,21 @@ export function OrderFlow({
       );
       return false;
     }
+    // Stok global: total pesanan tidak boleh melebihi sisa stok.
+    if (settings.stock_enabled && totalItems > settings.total_stock) {
+      toast.error(t.errors.insufficient_stock);
+      return false;
+    }
     return true;
   }
 
   function validatePayment(): boolean {
     if (!draft.paymentMethod) {
       toast.warning(t.order.payment.title);
+      return false;
+    }
+    if (draft.deliveryMethod === "delivery" && draft.address.trim().length < 5) {
+      toast.warning(t.order.payment.addressError);
       return false;
     }
     if (draft.paymentMethod === "transfer" && !draft.proofPath) {
@@ -163,9 +180,8 @@ export function OrderFlow({
         p_customer_name: draft.name.trim(),
         p_phone: draft.phone.trim(),
         p_payment_method: draft.paymentMethod,
-        // Selalu ambil di tempat — pembeli tidak memilih.
-        p_delivery_method: "pickup",
-        p_address: null,
+        p_delivery_method: draft.deliveryMethod,
+        p_address: draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
         p_transfer_method: draft.transferMethod || null,
         p_payment_proof: draft.proofPath,
         p_note: draft.note.trim(),
@@ -322,6 +338,21 @@ export function OrderFlow({
                   title={t.order.menu.title}
                   subtitle={t.order.menu.subtitle}
                 />
+                {settings.stock_enabled ? (
+                  <p
+                    className={`mt-4 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold ${
+                      stockLeft > 0
+                        ? stockLeft <= 5
+                          ? "bg-honey-300/20 text-honey-500"
+                          : "bg-matcha-50 text-matcha-700"
+                        : "bg-berry-500/10 text-berry-600"
+                    }`}
+                  >
+                    {stockLeft > 0
+                      ? t.order.menu.stockLeft.replace("{n}", String(stockLeft))
+                      : t.menu.soldOut}
+                  </p>
+                ) : null}
               </div>
 
               {flavors.length === 0 ? (
@@ -330,14 +361,18 @@ export function OrderFlow({
                 <div className="grid gap-4 sm:grid-cols-2">
                   {flavors.map((f) => {
                     const inCart = quantities[f.id] ?? 0;
-                    const limit = f.stock_enabled ? Math.min(maxQty, f.stock) : maxQty;
+                    // Batas per rasa: maksimum pesanan, atau sisa stok global.
+                    const limit = stockEnabled
+                      ? Math.max(0, Math.min(maxQty, stockLeft))
+                      : maxQty;
                     return (
                       <div key={f.id} className="flex flex-col gap-3">
                         <FlavorCard
                           flavor={f}
                           compact
                           inCart={inCart}
-                          onAdd={inCart >= limit ? undefined : add}
+                          remainingStock={stockEnabled ? stockLeft : null}
+                          onAdd={inCart >= limit || limit === 0 ? undefined : add}
                         />
                         {inCart > 0 ? (
                           <div className="flex items-center justify-between rounded-2xl border border-cocoa-200 bg-white p-2.5 shadow-sm">
@@ -415,27 +450,65 @@ export function OrderFlow({
                 />
               </div>
 
-              {/* Pesanan selalu diambil sendiri di toko. Alamat toko akan
-                  tampil di sini setelah diisi di dashboard Pengaturan. */}
-              <div className="mt-6 flex items-start gap-3 rounded-2xl border border-cocoa-200 bg-cocoa-50 p-4">
-                <Store className="mt-0.5 size-5 shrink-0 text-cocoa-400" />
-                <div>
-                  <p className="text-sm font-bold text-cocoa-800">
-                    {t.order.payment.pickup}
-                  </p>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-cocoa-500">
-                    {t.order.payment.pickupDesc}
-                  </p>
-                  {settings.address ? (
-                    <p className="mt-1.5 text-[13px] text-cocoa-600">{settings.address}</p>
-                  ) : null}
-                  {settings.hours_id ? (
-                    <p className="mt-1.5 text-xs text-cocoa-400">
-                      {t.contact.hours}: {settings.hours_id}
+              {/* Cara pengambilan — dengan catatan yang bisa diatur di dashboard */}
+              <h3 className="mt-8 text-base font-bold text-cocoa-800">
+                {t.order.payment.deliveryTitle}
+              </h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <ChoiceCard
+                  selected={draft.deliveryMethod === "pickup"}
+                  onClick={() => updateDraft({ deliveryMethod: "pickup" as DeliveryMethod })}
+                  icon={<Store className="size-5" />}
+                  title={t.order.payment.pickup}
+                  desc={t.order.payment.pickupDesc}
+                  note={pickupNote}
+                />
+                <ChoiceCard
+                  selected={draft.deliveryMethod === "delivery"}
+                  onClick={() => updateDraft({ deliveryMethod: "delivery" as DeliveryMethod })}
+                  icon={<Truck className="size-5" />}
+                  title={t.order.payment.delivery}
+                  desc={t.order.payment.deliveryDesc}
+                  note={deliveryNote}
+                />
+              </div>
+
+              {/* Alamat hanya diminta kalau dikirim */}
+              {draft.deliveryMethod === "delivery" ? (
+                <div className="mt-4">
+                  <label htmlFor="address" className="label">
+                    {t.order.payment.address}
+                  </label>
+                  <textarea
+                    id="address"
+                    rows={3}
+                    className="input resize-none"
+                    placeholder={t.order.payment.addressPlaceholder}
+                    value={draft.address}
+                    onChange={(e) => updateDraft({ address: e.target.value })}
+                  />
+                  {settings.delivery_fee > 0 ? (
+                    <p className="mt-1.5 text-xs text-cocoa-400 tabular">
+                      {t.order.review.deliveryFee}: {formatIDR(settings.delivery_fee, lang)}
                     </p>
                   ) : null}
                 </div>
-              </div>
+              ) : settings.address ? (
+                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-cocoa-200 bg-cocoa-50 p-4">
+                  <Store className="mt-0.5 size-5 shrink-0 text-cocoa-400" />
+                  <div>
+                    <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                      {t.order.payment.address}
+                    </p>
+                    <p className="mt-0.5 text-[13px] text-cocoa-600">{settings.address}</p>
+                    {settings.hours_id ? (
+                      <p className="mt-1 text-xs text-cocoa-400">
+                        {t.contact.hours}: {settings.hours_id}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               {/* Detail transfer */}
               {draft.paymentMethod === "transfer" ? (
@@ -551,9 +624,10 @@ export function OrderFlow({
                         draft.transferMethod ? ` · ${draft.transferMethod}` : ""
                       }`}
                 </ReviewRow>
-                <ReviewRow label={t.order.review.deliveryLabel}>
-                  {t.order.payment.pickup}
-                  {settings.address ? ` — ${settings.address}` : ""}
+                <ReviewRow label={t.order.review.deliveryLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
+                  {draft.deliveryMethod === "delivery"
+                    ? `${t.order.payment.delivery} — ${draft.address}`
+                    : `${t.order.payment.pickup}${settings.address ? ` — ${settings.address}` : ""}`}
                 </ReviewRow>
                 <ReviewRow
                   label={t.order.review.itemsLabel}
@@ -598,6 +672,16 @@ export function OrderFlow({
                   <span>{t.common.subtotal}</span>
                   <span className="tabular">{formatIDR(subtotal, lang)}</span>
                 </div>
+                {draft.deliveryMethod === "delivery" ? (
+                  <div className="mt-2 flex justify-between text-sm text-cocoa-600">
+                    <span>{t.order.review.deliveryFee}</span>
+                    <span className="tabular">
+                      {deliveryFee === 0
+                        ? t.order.review.freeShipping
+                        : formatIDR(deliveryFee, lang)}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="mt-3 flex justify-between border-t border-cocoa-200 pt-3 text-lg font-extrabold text-cocoa-900">
                   <span>{t.order.review.totalLabel}</span>
                   <span className="tabular">{formatIDR(total, lang)}</span>
@@ -678,6 +762,16 @@ export function OrderFlow({
                 <span>{t.common.subtotal}</span>
                 <span className="tabular">{formatIDR(subtotal, lang)}</span>
               </div>
+              {draft.deliveryMethod === "delivery" ? (
+                <div className="flex justify-between text-cocoa-600">
+                  <span>{t.order.review.deliveryFee}</span>
+                  <span className="tabular">
+                    {deliveryFee === 0
+                      ? t.order.review.freeShipping
+                      : formatIDR(deliveryFee, lang)}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex justify-between border-t border-cocoa-200 pt-2 text-base font-extrabold text-cocoa-900">
                 <span>{t.common.total}</span>
                 <span className="tabular">{formatIDR(total, lang)}</span>
@@ -811,38 +905,57 @@ function ChoiceCard({
   icon,
   title,
   desc,
+  note,
 }: {
   selected: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   title: string;
   desc: string;
+  note?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition ${
+      className={`flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition ${
         selected
           ? "border-matcha-500 bg-matcha-50"
           : "border-cocoa-200 bg-white hover:border-cocoa-300 hover:bg-cocoa-50/50"
       }`}
     >
-      <span
-        className={`grid size-10 shrink-0 place-items-center rounded-xl transition ${
-          selected ? "bg-matcha-500 text-white" : "bg-cocoa-100 text-cocoa-600"
-        }`}
-      >
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5 text-sm font-bold text-cocoa-900">
-          {title}
-          {selected ? <Check className="size-4 shrink-0 text-matcha-600" /> : null}
+      <span className="flex w-full items-start gap-3">
+        <span
+          className={`grid size-10 shrink-0 place-items-center rounded-xl transition ${
+            selected ? "bg-matcha-500 text-white" : "bg-cocoa-100 text-cocoa-600"
+          }`}
+        >
+          {icon}
         </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-cocoa-500">{desc}</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 text-sm font-bold text-cocoa-900">
+            {title}
+            {selected ? <Check className="size-4 shrink-0 text-matcha-600" /> : null}
+          </span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-cocoa-500">
+            {desc}
+          </span>
+        </span>
       </span>
+
+      {/* Catatan dari pengaturan dashboard */}
+      {note ? (
+        <span
+          className={`block w-full rounded-xl px-3 py-2 text-[12px] leading-relaxed font-semibold ${
+            selected
+              ? "bg-white/70 text-cocoa-700"
+              : "bg-cocoa-50 text-cocoa-500"
+          }`}
+        >
+          {note}
+        </span>
+      ) : null}
     </button>
   );
 }
