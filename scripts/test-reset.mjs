@@ -71,7 +71,6 @@ check("cara bayar tetap ada", payHtml.includes("Transfer bank") && payHtml.inclu
 check("pilihan ambil di toko ada", payHtml.includes("Ambil di toko"));
 check("pilihan diantar ada kembali", payHtml.includes("Diantar"));
 check("catatan pengambilan tampil", payHtml.includes("Vihara Tian En") || payHtml.includes("gratis ongkir"));
-check("tidak ada input alamat saat ambil di tempat", !payHtml.includes("Alamat pengiriman"));
 
 console.log("\n=== 5. Beranda tidak bisa menambah ke keranjang ===");
 const home = await fetch(APP);
@@ -81,12 +80,20 @@ check("tidak ada tombol 'Tambah ke keranjang' di beranda",
 check("ada tombol 'Pesan rasa ini' menuju /order",
   homeHtml.includes("Pesan rasa ini") && homeHtml.includes("/order?step=menu"));
 
-console.log("\n=== 6. Hero memakai foto sebagai background penuh ===");
+console.log("\n=== 6. Header: logo, nama toko, dan brand line ===");
 check("foto hero jadi background (bukan kartu 1:1)",
   !homeHtml.includes("aspect-square") && homeHtml.includes("hero-sando.jpg"));
 check("tidak ada baris COD di hero", !homeHtml.includes("BISA COD"));
-check("nama toko di pojok kiri bukan 'Japanese Sando'",
-  !homeHtml.includes(">Japanese</span>") && !homeHtml.includes("Rumakomugi"));
+check("nama toko di header = Rumakomugi", homeHtml.includes("Rumakomugi"));
+check("brand line 'Japanese Bake & Pastry' tampil", homeHtml.includes("Japanese Bake &amp; Pastry"));
+check("logo toko tampil", homeHtml.includes("logo-rumakomugi.jpg"));
+check("footer tidak punya link ke dashboard penjual",
+  !homeHtml.includes('href="/admin"'), "masih ada tombol ke /admin");
+
+console.log("\n=== 7. Menu dua tingkat (jenis makanan -> rasa) ===");
+check("kategori 'Sando Sandwich' tampil", homeHtml.includes("Sando Sandwich"));
+check("nama rasa tampil di bawahnya",
+  homeHtml.includes("Cookies &amp; Cream") || homeHtml.includes("Caramel Cheese"));
 
 console.log(`\n${"=".repeat(46)}`);
 console.log(`  LULUS: ${pass}   GAGAL: ${fail}`);

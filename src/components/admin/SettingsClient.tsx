@@ -20,7 +20,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
-import type { BankAccount, Flavor, StoreSettings } from "@/lib/types";
+import type { BankAccount, BundleTier, Flavor, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
@@ -66,8 +66,9 @@ function toDraft(s: StoreSettings | null): Draft {
     delivery_note_id: s?.delivery_note_id ?? "",
     delivery_note_en: s?.delivery_note_en ?? "",
     bundle_enabled: s?.bundle_enabled ?? true,
-    bundle_size: s?.bundle_size ?? 2,
-    bundle_price: s?.bundle_price ?? 35000,
+    bundle_tiers: s?.bundle_tiers ?? [{ qty: 2, price: 35000 }],
+    logo_url: s?.logo_url ?? null,
+    brand_line: s?.brand_line ?? "Japanese Bake & Pastry",
   };
 }
 
@@ -177,6 +178,41 @@ export function SettingsClient({
               placeholder="Holiday special: 15k!"
             />
           </Field>
+
+          {/* Logo & tagline di bawah nama toko */}
+          <div className="sm:col-span-2">
+            <span className="label">{t.admin.settings.brandIdentity}</span>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="mb-1.5 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                  {t.admin.settings.logo}
+                </p>
+                <HeroImageField
+                  url={form.logo_url}
+                  onChange={(url) => patch({ logo_url: url })}
+                  labels={{
+                    upload: t.admin.menu.uploadImage,
+                    remove: t.admin.menu.removeImage,
+                  }}
+                  round
+                />
+              </div>
+              <div>
+                <p className="mb-1.5 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                  {t.admin.settings.brandLine}
+                </p>
+                <input
+                  className="input"
+                  value={form.brand_line}
+                  onChange={(e) => patch({ brand_line: e.target.value })}
+                  placeholder="Japanese Bake &amp; Pastry"
+                />
+                <p className="mt-1.5 text-xs text-cocoa-400">
+                  {t.admin.settings.brandLineHint}
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Foto background halaman depan */}
           <Field
@@ -493,78 +529,11 @@ export function SettingsClient({
           </label>
 
           {form.bundle_enabled ? (
-            <>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <span className="label">{t.admin.settings.bundleSize}</span>
-                  <input
-                    inputMode="numeric"
-                    min={2}
-                    className="input tabular"
-                    value={form.bundle_size}
-                    onChange={(e) =>
-                      patch({
-                        bundle_size: Math.max(
-                          2,
-                          Number(e.target.value.replace(/\D/g, "")) || 2
-                        ),
-                      })
-                    }
-                  />
-                  <p className="mt-1.5 text-xs text-cocoa-400">
-                    {t.admin.settings.bundleSizeHint}
-                  </p>
-                </div>
-                <div>
-                  <span className="label">{t.admin.settings.bundlePrice}</span>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
-                      Rp
-                    </span>
-                    <input
-                      inputMode="numeric"
-                      className="input pl-11 tabular"
-                      value={form.bundle_price}
-                      onChange={(e) =>
-                        patch({
-                          bundle_price: Number(e.target.value.replace(/\D/g, "")) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Contoh hasil hitungan */}
-              <div className="mt-4 rounded-xl bg-cocoa-50 p-3.5">
-                <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
-                  {t.admin.settings.bundlePreview}
-                </p>
-                <ul className="mt-2 space-y-1 text-[13px] text-cocoa-600 tabular">
-                  {[1, 2, 3, 4, 5].map((n) => {
-                    const bundles = Math.floor(n / form.bundle_size);
-                    const leftover = n - bundles * form.bundle_size;
-                    const unit = flavors[0]?.price ?? 0;
-                    const total = bundles * form.bundle_price + leftover * unit;
-                    return (
-                      <li key={n} className="flex justify-between gap-3">
-                        <span>
-                          {n} {t.admin.settings.pcs}
-                        </span>
-                        <span className="font-bold">
-                          {formatIDR(total, lang)}
-                          {total < n * unit ? (
-                            <span className="ml-1.5 text-[11px] font-semibold text-matcha-600">
-                              ({formatIDR(n * unit - total, lang)})
-                            </span>
-                          ) : null}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </>
+            <BundleTierEditor
+              tiers={form.bundle_tiers}
+              onChange={(tiers) => patch({ bundle_tiers: tiers })}
+              unitPrice={flavors[0]?.price ?? 0}
+            />
           ) : null}
         </div>
       </Section>
@@ -751,15 +720,181 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
-/** Unggah foto background halaman depan ke bucket publik `flavor-images`. */
-function HeroImageField({
+/**
+ * Daftar harga paket. Seller bebas menambah sebanyak apa pun,
+ * mis. beli 2 = 35.000 dan beli 4 = 65.000.
+ *
+ * Sistem memakai paket dengan qty terbesar yang tidak melebihi jumlah
+ * pesanan; sisanya dibayar harga satuan.
+ */
+function BundleTierEditor({
+  tiers,
+  onChange,
+  unitPrice,
+}: {
+  tiers: BundleTier[];
+  onChange: (tiers: BundleTier[]) => void;
+  unitPrice: number;
+}) {
+  const { t, lang } = useI18n();
+
+  const sorted = [...tiers].sort((a, b) => a.qty - b.qty);
+  const maxQty = Math.max(5, ...sorted.map((x) => x.qty)) + 1;
+
+  function update(i: number, next: Partial<BundleTier>) {
+    onChange(tiers.map((tier, idx) => (idx === i ? { ...tier, ...next } : tier)));
+  }
+
+  function remove(i: number) {
+    onChange(tiers.filter((_, idx) => idx !== i));
+  }
+
+  // Pratinjau 1..5 pcs memakai aturan yang sama dengan server: paket dengan
+  // qty terbesar yang tidak melebihi jumlah, sisanya harga satuan.
+  const preview = Array.from({ length: Math.min(5, maxQty) }, (_, k) => {
+    const n = k + 1;
+    const tier = [...sorted].filter((x) => x.qty <= n).sort((a, b) => b.qty - a.qty)[0];
+    if (!tier) return { n, total: n * unitPrice, saving: 0 };
+    const total = tier.price + (n - tier.qty) * unitPrice;
+    return { n, total, saving: Math.max(0, n * unitPrice - total) };
+  });
+
+  return (
+    <div className="mt-4 space-y-4">
+      {sorted.length === 0 ? (
+        <p className="rounded-xl bg-cocoa-50 p-4 text-sm text-cocoa-500">
+          {t.admin.settings.bundleEmpty}
+        </p>
+      ) : (
+        <ul className="space-y-2.5">
+          {sorted.map((tier, i) => {
+            const regular = tier.qty * unitPrice;
+            return (
+              <li
+                key={i}
+                className="rounded-xl border border-cocoa-200 p-3"
+              >
+                <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                  <div>
+                    <span className="label">{t.admin.settings.bundleSize}</span>
+                    <div className="relative">
+                      <input
+                        inputMode="numeric"
+                        min={2}
+                        className="input tabular"
+                        value={tier.qty}
+                        onChange={(e) =>
+                          update(i, {
+                            qty: Math.max(2, Number(e.target.value.replace(/\D/g, "")) || 2),
+                          })
+                        }
+                      />
+                      <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-xs font-bold text-cocoa-400">
+                        pcs
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="label">{t.admin.settings.bundlePrice}</span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
+                        Rp
+                      </span>
+                      <input
+                        inputMode="numeric"
+                        className="input pl-11 tabular"
+                        value={tier.price}
+                        onChange={(e) =>
+                          update(i, {
+                            price: Number(e.target.value.replace(/\D/g, "")) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => remove(i)}
+                    className="self-end rounded-lg p-2.5 text-berry-500 transition hover:bg-berry-500/10"
+                    aria-label={t.common.delete}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+
+                <p className="mt-1.5 text-xs text-cocoa-400">
+                  {tier.qty} × {formatIDR(unitPrice, lang)} ={" "}
+                  {formatIDR(regular, lang)}
+                  {tier.price < regular ? (
+                    <span className="ml-1.5 font-bold text-matcha-600">
+                      {t.admin.settings.bundleSave}{" "}
+                      {formatIDR(regular - tier.price, lang)}
+                    </span>
+                  ) : (
+                    <span className="ml-1.5 font-bold text-honey-500">
+                      {t.admin.settings.bundleNotCheaper}
+                    </span>
+                  )}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <button
+        type="button"
+        onClick={() =>
+          onChange([
+            ...tiers,
+            { qty: (sorted.at(-1)?.qty ?? 1) + 1, price: (sorted.at(-1)?.price ?? 0) + 1000 },
+          ])
+        }
+        className="btn-outline w-full !py-2.5 !text-[13px]"
+      >
+        <Plus className="size-4" />
+        {t.admin.settings.bundleAdd}
+      </button>
+
+      {/* Contoh hasil hitungan */}
+      <div className="rounded-xl bg-cocoa-50 p-3.5">
+        <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+          {t.admin.settings.bundlePreview}
+        </p>
+        <ul className="mt-2 space-y-1 text-[13px] text-cocoa-600 tabular">
+          {preview.map((p) => (
+            <li key={p.n} className="flex justify-between gap-3">
+              <span>
+                {p.n} {t.admin.settings.pcs}
+              </span>
+              <span className="font-bold">
+                {formatIDR(p.total, lang)}
+                {p.saving > 0 ? (
+                  <span className="ml-1.5 text-[11px] font-semibold text-matcha-600">
+                    (−{formatIDR(p.saving, lang)})
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/** Unggah foto background halaman depan ke bucket publik `flavor-images`. */function HeroImageField({
   url,
   onChange,
   labels,
+  round = false,
 }: {
   url: string | null;
   onChange: (url: string | null) => void;
   labels: { upload: string; remove: string };
+  round?: boolean;
 }) {
   const toast = useToast();
   const { t } = useI18n();
@@ -775,7 +910,8 @@ function HeroImageField({
     try {
       const supabase = createClient();
       const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `hero/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+      const folder = round ? "logo" : "hero";
+      const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
       const { error } = await supabase.storage
         .from("flavor-images")
         .upload(path, file, { contentType: file.type, upsert: false });
@@ -793,10 +929,13 @@ function HeroImageField({
     <div>
       {url ? (
         <div className="flex items-center gap-3">
-          <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-cocoa-100">
+          <div
+            className={`relative h-16 w-24 shrink-0 overflow-hidden bg-cocoa-100 ${
+              round ? "rounded-full" : "rounded-lg"
+            }`}
+          >
             <Image src={url} alt="" fill sizes="96px" className="object-cover" />
-          </div>
-          <div className="flex gap-1.5">
+          </div>          <div className="flex gap-1.5">
             <label className="cursor-pointer rounded-lg border border-cocoa-200 px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-50">
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {labels.upload}

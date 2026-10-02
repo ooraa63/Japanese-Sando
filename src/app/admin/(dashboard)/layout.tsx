@@ -22,6 +22,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       email={admin?.email ?? ""}
       fullName={admin?.full_name ?? ""}
       storeName={settings?.store_name || "Rumakomugi"}
+      logoUrl={settings?.logo_url ?? null}
       labels={{
         dashboard: dicts.admin.nav.dashboard,
         orders: dicts.admin.nav.orders,

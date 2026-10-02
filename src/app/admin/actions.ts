@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdminUser,
+  Category,
   DashboardStats,
   Order,
   OrderStatus,
@@ -52,6 +53,7 @@ function humanize(error: string | undefined): string {
     "invalid_price",
     "invalid_payload",
     "invalid_stock",
+    "slug_taken",
   ];
   return known.includes(code) ? code : "generic";
 }
@@ -343,6 +345,47 @@ export async function togglePreorderAction(open: boolean): Promise<ActionResult>
 
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/* =============================================================================
+ *  KATEGORI MAKANAN
+ * ========================================================================== */
+
+export async function getCategoriesAction(): Promise<ActionResult<Category[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_categories");
+  if (error) return { ok: false, error: humanize(error.message) };
+  return { ok: true, data: (data as Category[]) ?? [] };
+}
+
+export async function saveCategoryAction(
+  payload: Record<string, unknown>
+): Promise<ActionResult<{ id: number }>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_save_category", {
+    p_payload: payload,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+  revalidatePath("/order");
+  return { ok: true, data: { id: (data as { id: number }).id } };
+}
+
+export async function deleteCategoryAction(
+  categoryId: number
+): Promise<ActionResult<{ deactivated: boolean }>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_delete_category", {
+    p_category_id: categoryId,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/admin/menu");
+  revalidatePath("/");
+  revalidatePath("/order");
+  return { ok: true, data: data as { deactivated: boolean } };
 }
 
 /* =============================================================================

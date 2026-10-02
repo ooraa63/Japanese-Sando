@@ -1,4 +1,6 @@
 import type {
+  BundleBreakdown,
+  BundleTier,
   DeliveryMethod,
   Language,
   Order,
@@ -134,39 +136,65 @@ export function waOrderLink(phone: string, order: Order, lang: Language): string
 }
 
 /**
- * Hitung harga akhir dari jumlah pcs, memakai aturan paket.
+ * Hitung harga akhir dari jumlah pcs memakai daftar paket milik seller.
  *
- * Setiap `bundleSize` pcs menjadi satu paket dengan harga tetap, berapa pun
- * rasa yang dipilih. Sisa pcs di luar paket memakai harga satuan biasa.
+ * Seller bebas menentukan paketnya, misal:
+ *   [{ qty: 2, price: 35000 }, { qty: 4, price: 65000 }]
  *
- *   1 pcs  -> 0 paket + 1 biasa  = Rp18.000
- *   2 pcs  -> 1 paket           = Rp35.000
- *   3 pcs  -> 1 paket + 1 biasa = Rp53.000
+ * Aturannya: paket DI TUMPUK — pakai paket dengan qty terbesar yang masih
+ * muat, sebanyak mungkin, lalu sisanya dibayar harga satuan.
  *
- * Mengembalikan rinciannya supaya bisa ditampilkan ke pembeli.
+ *   1 pcs -> satuan              = 18.000
+ *   2 pcs -> paket 2             = 35.000
+ *   3 pcs -> paket 2 + 1 satuan  = 53.000
+ *   4 pcs -> paket 4             = 65.000
+ *   5 pcs -> paket 4 + 1 satuan  = 83.000
+ *   6 pcs -> paket 4 + paket 2   = 100.000
+ *   8 pcs -> paket 4 x2          = 130.000
  */
 export function calcBundle(
   totalItems: number,
   avgUnitPrice: number,
-  opts: { enabled: boolean; size: number; price: number }
-): { bundles: number; leftover: number; total: number; saving: number; base: number } {
+  tiers: BundleTier[],
+  enabled = true
+): BundleBreakdown {
   const base = totalItems * avgUnitPrice;
-  const size = Math.max(2, opts.size);
+  const plain: BundleBreakdown = {
+    tiers: [],
+    leftover: totalItems,
+    bundleTotal: 0,
+    leftoverTotal: base,
+    base,
+    total: base,
+    saving: 0,
+  };
+  if (!enabled || totalItems < 2) return plain;
 
-  if (!opts.enabled || totalItems < size) {
-    return { bundles: 0, leftover: totalItems, total: base, saving: 0, base };
+  const valid = tiers
+    .filter((t) => t.qty >= 2 && t.price >= 0)
+    .sort((a, b) => b.qty - a.qty);
+  if (valid.length === 0) return plain;
+
+  // Paket ditumpuk: ambil yang qty-nya terbesar selama masih muat.
+  const used: BundleTier[] = [];
+  let left = totalItems;
+  while (left >= 2) {
+    const tier = valid.find((t) => t.qty <= left);
+    if (!tier) break;
+    used.push(tier);
+    left -= tier.qty;
   }
 
-  // Harga paket harus lebih murah daripada bel satuan, kalau tidak dilewati.
-  if (opts.price >= size * avgUnitPrice) {
-    return { bundles: 0, leftover: totalItems, total: base, saving: 0, base };
-  }
+  const bundleTotal = used.reduce((sum, t) => sum + t.price, 0);
+  const coveredQty = used.reduce((sum, t) => sum + t.qty, 0);
+  const leftover = totalItems - coveredQty;
+  const leftoverTotal = leftover * avgUnitPrice;
+  const total = bundleTotal + leftoverTotal;
 
-  const bundles = Math.floor(totalItems / size);
-  const leftover = totalItems - bundles * size;
-  const total = bundles * opts.price + leftover * avgUnitPrice;
+  // Kalau paketnya ternyata tidak lebih murah dari beli satuan, pakai satuan.
+  if (total >= base) return plain;
 
-  return { bundles, leftover, total, saving: Math.max(0, base - total), base };
+  return { tiers: used, leftover, bundleTotal, leftoverTotal, base, total, saving: base - total };
 }
 
 const STATUS_KEY: Record<OrderStatus, { id: string; en: string; color: string }> = {

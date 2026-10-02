@@ -28,7 +28,11 @@ export default async function TrackPage({
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader
+        storeName={settings?.store_name ?? "Rumakomugi"}
+        logoUrl={settings?.logo_url ?? null}
+        brandLine={settings?.brand_line ?? ""}
+      />
       <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
         <div className="mb-8 text-center">
           <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-cocoa-800 text-cream-50">

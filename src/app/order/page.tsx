@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getActiveFlavors, getSettings } from "@/lib/data";
+import { getPublicMenu, getSettings } from "@/lib/data";
 import { getI18nDict } from "@/lib/i18n-server";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
@@ -20,9 +20,9 @@ export default async function OrderPage({
 }: {
   searchParams: Promise<{ step?: string }>;
 }) {
-  const [settings, flavors, dicts, query] = await Promise.all([
+  const [settings, categories, dicts, query] = await Promise.all([
     getSettings(),
-    getActiveFlavors(),
+    getPublicMenu(),
     getI18nDict(),
     searchParams,
   ]);
@@ -35,11 +35,15 @@ export default async function OrderPage({
       ? requested
       : "identity";
 
+  const storeName = settings?.store_name ?? "Rumakomugi";
+  const logoUrl = settings?.logo_url ?? null;
+  const brandLine = settings?.brand_line ?? "";
+
   // Pengaturan belum dibuat di database — jangan sampai pembeli melihat form rusak
   if (!settings) {
     return (
       <>
-        <SiteHeader />
+        <SiteHeader storeName={storeName} logoUrl={logoUrl} brandLine={brandLine} />
         <main className="mx-auto max-w-lg px-4 py-20 text-center">
           <p className="card p-10 text-cocoa-500">{dicts.errors.settings_missing}</p>
         </main>
@@ -50,7 +54,7 @@ export default async function OrderPage({
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader storeName={storeName} logoUrl={logoUrl} brandLine={brandLine} />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold text-cocoa-900 sm:text-4xl">
@@ -60,7 +64,7 @@ export default async function OrderPage({
         </div>
 
         <OrderFlow
-          flavors={flavors}
+          categories={categories}
           settings={settings as StoreSettings}
           initialStep={initialStep}
         />

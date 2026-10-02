@@ -85,7 +85,7 @@ if (dash.status === 200) {
 
 console.log("\n=== 3. Halaman lain di dashboard ===");
 await openPage("/admin/orders", { mustContain: ["Pesanan", "Semua"] });
-await openPage("/admin/menu", { mustContain: ["Menu", "Stok", "Tambah rasa"] });
+await openPage("/admin/menu", { mustContain: ["Menu", "Stok", "jenis makanan"] });
 await openPage("/admin/settings", { mustContain: ["Pengaturan", "Nomor WhatsApp", "Rekening"] });
 
 console.log("\n=== 4. Halaman publik tetap terbuka ===");

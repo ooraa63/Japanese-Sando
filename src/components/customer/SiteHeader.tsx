@@ -1,12 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Menu, X, ShoppingBag } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 
-export function SiteHeader({ storeName = "Rumakomugi" }: { storeName?: string }) {
+export function SiteHeader({
+  storeName = "Rumakomugi",
+  logoUrl = null,
+  brandLine = "",
+}: {
+  storeName?: string;
+  logoUrl?: string | null;
+  brandLine?: string;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -42,11 +51,31 @@ export function SiteHeader({ storeName = "Rumakomugi" }: { storeName?: string })
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="group flex items-center gap-2.5" aria-label={storeName}>
-          <span className="grid size-9 place-items-center rounded-xl bg-cocoa-800 text-cream-50 shadow-md transition group-hover:rotate-[-6deg]">
-            <span className="font-display text-base font-bold">日</span>
-          </span>
-          <span className="font-display text-[17px] font-bold text-cocoa-900">
-            {storeName}
+          {logoUrl ? (
+            <span className="relative size-10 shrink-0 overflow-hidden rounded-full bg-cocoa-900 ring-1 ring-cocoa-200 transition group-hover:scale-105">
+              <Image
+                src={logoUrl}
+                alt=""
+                fill
+                sizes="40px"
+                className="object-cover"
+                priority
+              />
+            </span>
+          ) : (
+            <span className="grid size-9 place-items-center rounded-xl bg-cocoa-800 text-cream-50 shadow-md transition group-hover:rotate-[-6deg]">
+              <span className="font-display text-base font-bold">日</span>
+            </span>
+          )}
+          <span className="flex flex-col leading-none">
+            <span className="font-display text-[17px] font-bold text-cocoa-900">
+              {storeName}
+            </span>
+            {brandLine ? (
+              <span className="mt-0.5 text-[9px] font-bold tracking-[0.12em] text-cocoa-400 uppercase">
+                {brandLine}
+              </span>
+            ) : null}
           </span>
         </Link>
 

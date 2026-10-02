@@ -49,7 +49,7 @@ const anon = { role: "anon" };
 
 const FIELDS = [
   "store_name", "whatsapp", "address", "total_stock", "delivery_fee",
-  "bundle_price", "bundle_size", "pickup_note_id", "delivery_note_id",
+  "bundle_tiers", "pickup_note_id", "delivery_note_id",
   "min_order", "max_per_order", "hours_id", "is_preorder_open",
 ];
 
@@ -83,6 +83,7 @@ console.log("\n=== 1. Simpan sebagian field (tombol toggle pre-order) ===");
 await setFixture();
 const before = await readAll();
 console.log(`  sebelum: nama="${before.store_name}" wa="${before.whatsapp}" stok=${before.total_stock} ongkir=${before.delivery_fee}`);
+console.log(`  paket   : ${JSON.stringify(before.bundle_tiers)}`);
 
 const toggled = await asUser("authenticated", admin,
   `select public.admin_save_settings(jsonb_build_object('is_preorder_open', false));`);
@@ -124,9 +125,9 @@ const many = await asUser("authenticated", admin, `select public.admin_save_sett
     'whatsapp', '081999888777',
     'total_stock', 40,
     'delivery_fee', 7500,
-    'bundle_size', 3,
-    'bundle_price', 50000,
-    'pickup_note_id', 'Ambil di gerai A',
+    'bundle_tiers', '[{"qty": 3, "price": 50000}]'::jsonb,
+    'logo_url', 'https://contoh.com/logo.png',
+    'brand_line', 'Japanese Bake & Pastry',
     'is_preorder_open', true
   ));`);
 check("banyak field sekaligus", many.ok, many.error ?? "");
@@ -135,8 +136,8 @@ check("nama toko berubah", after4.store_name === "Toko Baru", `"${after4.store_n
 check("WhatsApp berubah", after4.whatsapp === "081999888777", `"${after4.whatsapp}"`);
 check("stok berubah", after4.total_stock === 40, `${after4.total_stock}`);
 check("ongkir berubah", after4.delivery_fee === 7500, `${after4.delivery_fee}`);
-check("ukuran paket berubah", after4.bundle_size === 3, `${after4.bundle_size}`);
-check("harga paket berubah", after4.bundle_price === 50000, `${after4.bundle_price}`);
+check("daftar paket berubah", after4.bundle_tiers?.[0]?.qty === 3 && after4.bundle_tiers?.[0]?.price === 50000,
+  JSON.stringify(after4.bundle_tiers));
 check("alamat lama tetap (tidak dikirim)", after4.address === before.address, `"${after4.address}"`);
 
 // ---------------------------------------------------------------- 5
@@ -157,17 +158,21 @@ await client.query(`
     whatsapp = '',
     total_stock = 20,
     delivery_fee = 0,
-    bundle_enabled = true, bundle_size = 2, bundle_price = 35000,
+    bundle_enabled = true, bundle_tiers = '[{"qty": 2, "price": 35000}]'::jsonb,
     min_order = 1, max_per_order = 20,
     pickup_note_id = 'Hanya untuk Vihara Tian En dan UVERS, gratis ongkir. Pengambilan jam 18.00 - 20.00.',
     pickup_note_en = 'Only at Vihara Tian En and UVERS, free delivery. Pickup hours 18:00 - 20:00.',
     delivery_note_id = 'Ongkir ditanggung sendiri oleh pembeli.',
     delivery_note_en = 'Shipping costs are paid by the customer.',
+    logo_url = '/logo-rumakomugi.jpg',
+    brand_line = 'Japanese Bake & Pastry',
     is_preorder_open = true,
     stock_enabled = true
   where id = 1;`);
 const final = await readAll();
-console.log(`  nama toko: ${final.store_name} | paket: ${final.bundle_size} pcs = Rp${final.bundle_price} | stok: ${final.total_stock}`);
+console.log(
+  `  nama toko: ${final.store_name} | paket: ${JSON.stringify(final.bundle_tiers)} | stok: ${final.total_stock}`
+);
 
 await client.end();
 console.log(`\n${"=".repeat(50)}`);

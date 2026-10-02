@@ -44,26 +44,40 @@ project Next.js:
 
 #### Harga paket
 
-Setiap **2 pcs** menjadi satu paket dengan harga tetap **Rp35.000** —
-berapa pun rasa yang dipilih. Sisa pcs di luar paket dihitung harga biasa.
+Seller **bebas menentukan** paketnya di **Pengaturan → Harga paket**,
+seanyak apa pun. Contoh: beli 2 = Rp35.000 dan beli 4 = Rp65.000.
 
-| Jumlah | Cara hitung | Total |
-| --- | --- | --- |
-| 1 | 1 × satuan | Rp18.000 |
-| **2** | 1 paket | **Rp35.000** (hemat Rp1.000) |
-| **3** | 1 paket + 1 satuan | **Rp53.000** (hemat Rp1.000) |
-| **4** | 2 paket | **Rp70.000** (hemat Rp2.000) |
-| **5** | 2 paket + 1 satuan | **Rp88.000** (hemat Rp2.000) |
+Aturannya: paket **ditumpuk** — pakai paket dengan qty terbesar yang
+masih muat, sebanyak mungkin, lalu sisanya harga satuan.
 
-Rumusnya: `paket = jumlah ÷ 2 (bulat ke bawah)`, lalu tambah sisanya
-dengan harga satuan.
+| Beli | Paket yang dipakai | Total | Hemat |
+| --- | --- | --- | --- |
+| 1 | — | Rp18.000 | — |
+| **2** | paket 2 | **Rp35.000** | Rp1.000 |
+| **3** | paket 2 + 1 biasa | **Rp53.000** | Rp1.000 |
+| **4** | paket 4 | **Rp65.000** | Rp7.000 |
+| **5** | paket 4 + 1 biasa | **Rp83.000** | Rp7.000 |
+| **6** | paket 4 + paket 2 | **Rp100.000** | Rp8.000 |
+| **8** | paket 4 × 2 | **Rp130.000** | Rp14.000 |
 
-Paket bisa **campur rasa** — beli 1 Choco Matcha + 1 Cookies & Cream
-masih Rp35.000.zr Václav Havel — detail reviewer earlier
+Paket boleh **campur rasa**. Semua dihitung ulang di server, jadi harga
+tidak bisa dimanipulasi dari browser. Kalau satu paket ternyata tidak
+lebih murah dari beli satuan, sistem otomatis mengabaikannya.
 
-Semua dihitung ulang di server, jadi harga tidak bisa dimanipulasi dari
-browser. Di **Pengaturan → Harga paket** bisa diubah jumlah pcs per
-paket, harga paketnya, atau dimatikan sama sekali.
+#### Menu dua tingkat: jenis makanan → rasa
+
+Toko bisa menjual beberapa jenis makanan, masing-masing punya rasa
+sendiri. Contoh: **Sando Sandwich** (5 rasa), lalu nanti **Croissant**,
+**Kue Ultah**, dan seterusnya.
+
+- Di **dashboard → Menu** layar pertama adalah daftar jenis makanan.
+  Klik satu jenis → baru muncul daftar rasanya, di situ Anda tambah /
+  ubah / hapus rasa seperti biasa.
+- Di website pembeli, pembeli memilih jenis makanan dulu, baru melihat
+  rasanya. Kalau hanya ada satu jenis, rasa-rasanya langsung tampil.
+- Hapus jenis makanan → rasa-rasanya dipindahkan ke jenis lain, tidak
+  ikut hilang. Kalau masih ada pesanan aktif, jenisnya disembunyikan
+  saja dari website.
 
 ### Cara pengambilan
 
@@ -220,37 +234,47 @@ baris terakhir `NOTIFY pgrst, 'reload schema';` supaya RPC terbaca.)
 | `npm start` | Jalankan hasil build |
 | `npm run lint` | Cek kode |
 | `npm run typecheck` | Cek tipe TypeScript |
-| `npm run db:push` | Terapkan `supabase/schema.sql` (aman diulang) |
-| `npm run db:cleanup` | Hapus semua pesanan uji, reset stok ke 20 |
-| `npm run test:order` | Uji alur pesanan lewat API (21 pemeriksaan) |
-| `npm run test:db` | Uji RLS, hak akses admin, dan logika stok (35 pemeriksaan) |
+| `npm run db:push` | Terapkan seluruh migrasi database (aman diulang) |
+| `npm run db:cleanup` | Hapus pesanan uji, buang duplikat, reset pengaturan |
+| `npm test` | Jalankan semua pengujian (sekitar 130 pemeriksaan) |
+| `npm run test:order` | Alur pesanan lewat API (22 pemeriksaan) |
+| `npm run test:db` | RLS & hak akses admin (19 pemeriksaan) |
+| `npm run test:menu` | Kategori makanan & harga paket custom (27 pemeriksaan) |
+| `npm run test:stock` | Stok global & alur status pesanan (19 pemeriksaan) |
+| `npm run test:settings` | Pengaturan toko tidak hilang sebagian (26 pemeriksaan) |
+| `npm run test:ui` | Halaman publik & alur pre-order (13 pemeriksaan) |
 
 ---
 
 ## Struktur folder
 
 ```
-├── Gambar/Foto Awal.jpeg     # foto menu (dipakai sebagai hero)
-├── public/foto-awal.jpeg    # salinannya untuk website
-├── supabase/schema.sql      # seluruh definisi database (idempotent)
-├── scripts/                 # migrasi & skrip pengujian
+├── Gambar/                    # aset asli (logo, foto menu, foto produk)
+├── public/                    # berkas statik untuk website
+├── supabase/
+│   ├── schema.sql             # definisi database awal
+│   ├── migration-2.sql        # stok global, catatan pengambilan
+│   ├── migration-3.sql        # hapus batch, harga paket
+│   ├── migration-4.sql        # perbaiki kehilangan data pengaturan
+│   └── migration-5.sql        # kategori makanan, paket custom, logo
+├── scripts/                   # migrasi & pengujian otomatis
 └── src/
-    ├── proxy.ts             # penyegaran session + pengaman /admin
+    ├── proxy.ts               # penyegaran session + pengaman /admin
     ├── app/
-    │   ├── page.tsx         # landing page pembeli
-    │   ├── order/           # alur pre-order + halaman sukses
-    │   ├── track/           # cek status pesanan
-    │   └── admin/           # login + dashboard penjual
+    │   ├── page.tsx           # landing page pembeli
+    │   ├── order/             # alur pre-order + halaman sukses
+    │   ├── track/             # cek status pesanan
+    │   └── admin/             # login + dashboard penjual
     ├── components/
-    │   ├── customer/        # komponen sisi pembeli
-    │   ├── admin/           # komponen sisi penjual
-    │   └── ui/              # komponen umum
+    │   ├── customer/          # komponen sisi pembeli
+    │   ├── admin/             # komponen sisi penjual
+    │   └── ui/                # komponen umum
     └── lib/
-        ├── i18n/            # kamus ID & EN
-        ├── supabase/        # klien Supabase (browser & server)
-        ├── data.ts          # pembacaan data sisi server
-        ├── types.ts         # tipe TypeScript
-        └── utils.ts         # format rupiah, tanggal, link wa.me
+        ├── i18n/              # kamus ID & EN
+        ├── supabase/          # klien Supabase (browser & server)
+        ├── data.ts            # pembacaan data sisi server
+        ├── types.ts           # tipe TypeScript
+        └── utils.ts           # format rupiah, tanggal, kalkulasi paket
 ```
 
 ---

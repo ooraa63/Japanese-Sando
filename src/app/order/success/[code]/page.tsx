@@ -23,7 +23,11 @@ export default async function SuccessPage({
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader
+        storeName={settings?.store_name ?? "Rumakomugi"}
+        logoUrl={settings?.logo_url ?? null}
+        brandLine={settings?.brand_line ?? ""}
+      />
       <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
         <div className="card overflow-hidden">
           <div className="relative bg-matcha-500 px-6 py-10 text-center text-white">

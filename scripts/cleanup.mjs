@@ -24,6 +24,23 @@ const { rows: beforeFlavors } = await c.query(`select slug, stock from public.fl
 await c.query(`delete from public.order_items;`);
 await c.query(`delete from public.orders;`);
 await c.query(`delete from public.stock_logs;`);
+
+// Buang rasa & kategori kembar (sisanya dari test yang gagal di tengah jalan).
+// Yang sudah dipakai pesanan tidak dihapus, hanya yang benar-benar duplikat.
+await c.query(`
+  delete from public.flavors f
+  using public.flavors d
+  where f.name_id = d.name_id
+    and f.id > d.id
+    and not exists (select 1 from public.order_items oi where oi.flavor_id = f.id);`);
+
+await c.query(`
+  delete from public.categories c
+  using public.categories d
+  where c.name_id = d.name_id
+    and c.id > d.id
+    and not exists (select 1 from public.flavors f where f.category_id = c.id);`);
+
 await c.query(`update public.flavors set stock = 20;`);
 await c.query(`alter sequence public.order_code_seq restart with 1;`);
 
@@ -37,8 +54,7 @@ await c.query(`
     max_per_order   = 20,
     min_order       = 1,
     bundle_enabled  = true,
-    bundle_size     = 2,
-    bundle_price    = 35000
+    bundle_tiers    = '[{"qty": 2, "price": 35000}]'::jsonb
   where id = 1;`);
 
 console.log(`Pesanan dihapus: ${beforeOrders[0].n}`);
@@ -47,8 +63,8 @@ for (const f of beforeFlavors) console.log(`  ${f.slug.padEnd(20)} ${f.stock} ->
 
 const { rows: afterOrders } = await c.query(`select count(*)::int as n from public.orders;`);
 const { rows: cfg } = await c.query(`
-  select store_name, stock_enabled, total_stock, bundle_enabled, bundle_size,
-         bundle_price, is_preorder_open
+  select store_name, stock_enabled, total_stock, bundle_enabled, bundle_tiers,
+         is_preorder_open, brand_line
   from public.store_settings where id = 1;`);
 const c0 = cfg[0];
 console.log(`\nSisa pesanan: ${afterOrders[0].n}`);
@@ -57,8 +73,15 @@ console.log(`  nama toko    : ${c0.store_name}`);
 console.log(`  pre-order    : ${c0.is_preorder_open ? "dibuka" : "ditutup"}`);
 console.log(`  stok         : ${c0.stock_enabled ? `${c0.total_stock} pcs` : "tak terbatas"}`);
 console.log(
-  `  harga paket  : ${c0.bundle_enabled ? `${c0.bundle_size} pcs = Rp${Number(c0.bundle_price).toLocaleString("id-ID")}` : "dimatikan"}`
+  `  paket        : ${
+    c0.bundle_enabled
+      ? (c0.bundle_tiers || [])
+          .map((t) => `${t.qty} pcs = Rp${Number(t.price).toLocaleString("id-ID")}`)
+          .join(", ") || "tidak ada"
+      : "dimatikan"
+  }`
 );
+console.log(`  brand line   : ${c0.brand_line || "-"}`);
 console.log("\nCatatan: user auth TIDAK dihapus.");
 
 await c.end();

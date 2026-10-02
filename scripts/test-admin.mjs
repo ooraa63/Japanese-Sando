@@ -149,13 +149,24 @@ check("daftar pesanan terbaca", list.ok && Array.isArray(list.body?.orders),
   JSON.stringify(list.body).slice(0, 200));
 console.log(`       total pesanan: ${list.body?.total}`);
 
+/** Baca id rasa yang aktif & tersedia (id bisa berubah karena ada test yang menambah/menghapus). */
+async function activeFlavorId() {
+  const res = await rest(
+    "flavors",
+    "select=id&is_active=eq.true&order=sort_order&limit=1"
+  );
+  return res.body?.[0]?.id ?? 1;
+}
+
 console.log("\n=== 4. Terima / tolak pesanan + pengembalian stok ===");
+const FLAVOR = await activeFlavorId();
+console.log(`  rasa untuk tes: id=${FLAVOR}`);
 const created = await rpc("create_order", {
   p_customer_name: "Siti Aminah",
   p_phone: "085711223344",
   p_payment_method: "cash",
   p_delivery_method: "pickup",
-  p_items: [{ flavor_id: 2, quantity: 3 }],
+  p_items: [{ flavor_id: FLAVOR, quantity: 3 }],
 });
 check("pesanan uji dibuat", created.ok && Boolean(created.body?.order_code),
   JSON.stringify(created.body));
@@ -189,10 +200,10 @@ check("filter status berjalan",
   filterPending.ok && filterPending.body.orders.every((o) => o.status === "pending"),
   JSON.stringify(filterPending.body?.orders?.map((o) => o.status)).slice(0, 120));
 
-const stockOf = async (id) =>
-  (await rest("flavors", `select=stock&id=eq.${id}&limit=1`)).body[0].stock;
+const globalStock = async () =>
+  (await rest("store_settings", "select=total_stock&id=eq.1&limit=1")).body[0].total_stock;
 
-const stockAfterOrder = await stockOf(2);
+const stockAfterOrder = await globalStock();
 check("stok berkurang 3 setelah pesanan dibuat", stockAfterOrder <= 17, `stok=${stockAfterOrder}`);
 
 const accepted = await rpcAuth("admin_update_order_status", {
@@ -220,10 +231,10 @@ const created2 = await rpc("create_order", {
   p_phone: "081377889900",
   p_payment_method: "cash",
   p_delivery_method: "pickup",
-  p_items: [{ flavor_id: 2, quantity: 4 }],
+  p_items: [{ flavor_id: FLAVOR, quantity: 4 }],
 });
 const orderId2 = created2.body?.id;
-const stockBeforeReject = await stockOf(2);
+const stockBeforeReject = await globalStock();
 
 const rejected = await rpcAuth("admin_update_order_status", {
   p_order_id: orderId2,
@@ -231,7 +242,7 @@ const rejected = await rpcAuth("admin_update_order_status", {
 });
 check("pesanan bisa DITOLAK", rejected.ok, JSON.stringify(rejected.body));
 
-const stockAfterReject = await stockOf(2);
+const stockAfterReject = await globalStock();
 check(
   `stok kembali +4 setelah ditolak (${stockBeforeReject} -> ${stockAfterReject})`,
   stockAfterReject === stockBeforeReject + 4
@@ -243,7 +254,7 @@ const backToPending = await rpcAuth("admin_update_order_status", {
 });
 check("pesanan bisa dikembalikan ke menunggu", backToPending.ok, JSON.stringify(backToPending.body));
 
-const stockAfterUndo = await stockOf(2);
+const stockAfterUndo = await globalStock();
 check(
   `stok dipesan ulang saat dikembalikan (${stockAfterReject} -> ${stockAfterUndo})`,
   stockAfterUndo === stockBeforeReject
@@ -299,8 +310,9 @@ const updated = await rpcAuth("admin_save_flavor", {
 });
 check("produk bisa diperbarui", updated.ok, JSON.stringify(updated.body));
 
-const restocked = await rpcAuth("admin_set_stock", { p_flavor_id: newFlavorId, p_stock: 9 });
-check("stok bisa diatur manual", restocked.ok, JSON.stringify(restocked.body));
+const restocked = await rpcAuth("admin_set_stock", { p_stock: 9 });
+check("stok global bisa diatur manual", restocked.ok, JSON.stringify(restocked.body));
+check("stok global benar-benar berubah", (await globalStock()) === 9, `stok=${await globalStock()}`);
 
 const deleted = await rpcAuth("admin_delete_flavor", { p_flavor_id: newFlavorId });
 check("produk bisa dihapus", deleted.ok, JSON.stringify(deleted.body));

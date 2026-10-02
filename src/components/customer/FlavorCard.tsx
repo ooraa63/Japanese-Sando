@@ -27,6 +27,7 @@ export function FlavorCard({
   inCart = 0,
   compact = false,
   remainingStock = null,
+  categoryName,
 }: {
   flavor: Flavor;
   onAdd?: (flavor: Flavor) => void;
@@ -34,6 +35,8 @@ export function FlavorCard({
   compact?: boolean;
   /** Stok keseluruhan toko (bukan per rasa). null = tak terbatas. */
   remainingStock?: number | null;
+  /** Nama kategori, ditampilkan sebagai label kecil di atas nama rasa. */
+  categoryName?: string;
 }) {
   const { t, lang } = useI18n();
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
@@ -96,6 +99,11 @@ export function FlavorCard({
       </div>
 
       <div className="flex flex-1 flex-col p-4">
+        {categoryName && !compact ? (
+          <p className="mb-1 text-[10px] font-bold tracking-wide text-cocoa-300 uppercase">
+            {categoryName}
+          </p>
+        ) : null}
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-display text-lg leading-tight font-bold text-cocoa-900">
             {name}

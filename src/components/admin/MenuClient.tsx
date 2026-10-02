@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Eye,
   EyeOff,
   ImagePlus,
+  LayoutGrid,
   Loader2,
   Minus,
   Package,
@@ -18,63 +20,71 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import type { Flavor, StoreSettings } from "@/lib/types";
+import type { Category, Flavor, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatIDR } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { deleteFlavorAction, saveFlavorAction, setStockAction } from "@/app/admin/actions";
+import {
+  deleteCategoryAction,
+  deleteFlavorAction,
+  saveCategoryAction,
+  saveFlavorAction,
+  setStockAction,
+} from "@/app/admin/actions";
 
-type Draft = {
-  id: number | null;
-  name_id: string;
-  name_en: string;
-  desc_id: string;
-  desc_en: string;
+/**
+ * Bentuk form saat mengedit: price & sort_order diubah jadi string supaya
+ * enak diketik di input (mis. "18000" tanpa langsung jadi angka).
+ */
+interface FlavorDraft extends Omit<Flavor, "price" | "sort_order"> {
   price: string;
-  image_url: string;
-  is_active: boolean;
-  is_featured: boolean;
   sort_order: string;
-};
+}
 
-const EMPTY: Draft = {
-  id: null,
-  name_id: "",
-  name_en: "",
-  desc_id: "",
-  desc_en: "",
-  price: "",
-  image_url: "",
-  is_active: true,
-  is_featured: false,
-  sort_order: "0",
-};
+function toFlavorDraft(f: Flavor): FlavorDraft {
+  return {
+    ...f,
+    price: String(f.price),
+    sort_order: String(f.sort_order),
+  };
+}
 
+/**
+ * Menu admin dua tingkat: daftar jenis makanan -> daftar rasa di dalamnya.
+ * Tampilan default menunjukkan kategori; klik kategori untuk mengelola rasa.
+ */
 export function MenuClient({
   initialFlavors,
+  initialCategories,
   initialSettings,
 }: {
   initialFlavors: Flavor[];
+  initialCategories: Category[];
   initialSettings: StoreSettings | null;
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const router = useRouter();
 
+  const [categories, setCategories] = useState(initialCategories);
   const [flavors, setFlavors] = useState(initialFlavors);
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+
   const [stock, setStock] = useState(initialSettings?.total_stock ?? 0);
   const [stockEnabled, setStockEnabled] = useState(
     initialSettings?.stock_enabled ?? true
   );
-  const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<Draft | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
   const [stockBusy, setStockBusy] = useState(false);
   const [saving, startSaving] = useTransition();
 
-  // Stok.global diambil ulang tiap kali halaman dibuka.
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingFlavor, setEditingFlavor] = useState<FlavorDraft | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  // Stok global diambil ulang tiap halaman dibuka.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -93,152 +103,28 @@ export function MenuClient({
     };
   }, []);
 
-  const filtered = search.trim()
-    ? flavors.filter(
+  const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? null;
+
+  const flavorsInCategory = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return flavors
+      .filter((f) => f.category_id === activeCategoryId)
+      .filter(
         (f) =>
-          f.name_id.toLowerCase().includes(search.trim().toLowerCase()) ||
-          f.name_en.toLowerCase().includes(search.trim().toLowerCase())
-      )
-    : flavors;
-
-  function openNew() {
-    setEditing({
-      ...EMPTY,
-      sort_order: String((flavors.at(-1)?.sort_order ?? 0) + 1),
-    });
-  }
-
-  function openEdit(f: Flavor) {
-    setEditing({
-      id: f.id,
-      name_id: f.name_id,
-      name_en: f.name_en,
-      desc_id: f.desc_id,
-      desc_en: f.desc_en,
-      price: String(f.price),
-      image_url: f.image_url ?? "",
-      is_active: f.is_active,
-      is_featured: f.is_featured,
-      sort_order: String(f.sort_order),
-    });
-  }
-
-  function patch(next: Partial<Draft>) {
-    setEditing((prev) => (prev ? { ...prev, ...next } : prev));
-  }
-
-  function save() {
-    if (!editing) return;
-    if (editing.name_id.trim().length < 2) {
-      toast.warning(t.admin.menu.nameId);
-      return;
-    }
-    const price = Number(editing.price.replace(/\D/g, ""));
-    if (!Number.isFinite(price) || price < 0) {
-      toast.warning(t.admin.menu.priceLabel);
-      return;
-    }
-
-    startSaving(async () => {
-      const res = await saveFlavorAction({
-        id: editing.id,
-        name_id: editing.name_id.trim(),
-        name_en: editing.name_en.trim(),
-        desc_id: editing.desc_id.trim(),
-        desc_en: editing.desc_en.trim(),
-        price,
-        image_url: editing.image_url.trim(),
-        is_active: editing.is_active,
-        is_featured: editing.is_featured,
-        stock_enabled: true,
-        stock: 0,
-        sort_order: Number(editing.sort_order) || 0,
-      });
-
-      if (!res.ok) {
-        toast.error(t.errors.generic);
-        return;
-      }
-
-      setFlavors((prev) => {
-        const payload: Flavor = {
-          id: res.data!.id,
-          slug: editing.name_id
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, ""),
-          name_id: editing.name_id.trim(),
-          name_en: editing.name_en.trim() || editing.name_id.trim(),
-          desc_id: editing.desc_id.trim(),
-          desc_en: editing.desc_en.trim(),
-          price,
-          image_url: editing.image_url.trim() || null,
-          is_active: editing.is_active,
-          is_featured: editing.is_featured,
-          stock_enabled: true,
-          stock: 0,
-          sort_order: Number(editing.sort_order) || 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        const exists = prev.some((f) => f.id === payload.id);
-        return exists
-          ? prev.map((f) => (f.id === payload.id ? { ...f, ...payload } : f))
-          : [...prev, payload].sort((a, b) => a.sort_order - b.sort_order);
-      });
-
-      toast.success(t.admin.menu.saved);
-      setEditing(null);
-      router.refresh();
-    });
-  }
-
-  async function remove(f: Flavor) {
-    if (!window.confirm(t.admin.menu.deleteConfirm)) return;
-    setBusyId(f.id);
-    const res = await deleteFlavorAction(f.id);
-    setBusyId(null);
-
-    if (!res.ok) {
-      toast.error(t.errors.generic);
-      return;
-    }
-    if (res.data?.deactivated) {
-      setFlavors((prev) => prev.map((x) => (x.id === f.id ? { ...x, is_active: false } : x)));
-      toast.warning(t.admin.menu.deactivated);
-    } else {
-      setFlavors((prev) => prev.filter((x) => x.id !== f.id));
-      toast.success(t.admin.menu.deleted);
-    }
-  }
-
-  async function toggleActive(f: Flavor) {
-    setBusyId(f.id);
-    const res = await saveFlavorAction({
-      id: f.id,
-      name_id: f.name_id,
-      name_en: f.name_en,
-      desc_id: f.desc_id,
-      desc_en: f.desc_en,
-      price: f.price,
-      image_url: f.image_url ?? "",
-      is_active: !f.is_active,
-      is_featured: f.is_featured,
-      stock_enabled: true,
-      stock: 0,
-      sort_order: f.sort_order,
-    });
-    setBusyId(null);
-
-    if (res.ok) {
-      setFlavors((prev) =>
-        prev.map((x) => (x.id === f.id ? { ...x, is_active: !f.is_active } : x))
+          !q ||
+          f.name_id.toLowerCase().includes(q) ||
+          f.name_en.toLowerCase().includes(q)
       );
-      toast.success(!f.is_active ? t.admin.menu.showToast : t.admin.menu.hideToast);
-    } else {
-      toast.error(t.errors.generic);
-    }
-  }
+  }, [flavors, activeCategoryId, search]);
+
+  const sortedCategories = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return [...categories]
+      .filter((c) => !q || c.name_id.toLowerCase().includes(q) || c.name_en.toLowerCase().includes(q))
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }, [categories, search]);
+
+  /* ---------------- Stok global ---------------- */
 
   async function changeStock(next: number) {
     const target = Math.max(0, next);
@@ -265,8 +151,258 @@ export function MenuClient({
     }
   }
 
+  /* ---------------- Kategori ---------------- */
+
+  function openNewCategory() {
+    const nextOrder = (categories.at(-1)?.sort_order ?? 0) + 1;
+    setEditingCategory({
+      id: 0,
+      slug: "",
+      name_id: "",
+      name_en: "",
+      desc_id: "",
+      desc_en: "",
+      image_url: null,
+      is_active: true,
+      is_featured: false,
+      sort_order: nextOrder,
+    });
+  }
+
+  function openEditCategory(c: Category) {
+    setEditingCategory({ ...c });
+  }
+
+  function saveCategory() {
+    if (!editingCategory) return;
+    if (editingCategory.name_id.trim().length < 2) {
+      toast.warning(t.admin.menu.nameId);
+      return;
+    }
+
+    startSaving(async () => {
+      const res = await saveCategoryAction({
+        id: editingCategory.id || null,
+        name_id: editingCategory.name_id.trim(),
+        name_en: editingCategory.name_en.trim(),
+        desc_id: editingCategory.desc_id.trim(),
+        desc_en: editingCategory.desc_en.trim(),
+        image_url: editingCategory.image_url ?? "",
+        is_active: editingCategory.is_active,
+        is_featured: editingCategory.is_featured,
+        sort_order: editingCategory.sort_order,
+      });
+
+      if (!res.ok) {
+        toast.error(
+          res.error === "slug_taken" ? t.admin.menu.slugTaken : t.errors.generic
+        );
+        return;
+      }
+
+      setCategories((prev) => {
+        const id = res.data!.id;
+        const next: Category = {
+          ...editingCategory,
+          id,
+          slug:
+            editingCategory.name_id
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, ""),
+        };
+        const exists = prev.some((c) => c.id === id);
+        return exists
+          ? prev.map((c) => (c.id === id ? { ...c, ...next } : c))
+          : [...prev, next];
+      });
+
+      toast.success(t.admin.menu.categorySaved);
+      setEditingCategory(null);
+      router.refresh();
+    });
+  }
+
+  async function removeCategory(c: Category) {
+    if (!window.confirm(t.admin.menu.deleteCategoryConfirm)) return;
+    setBusyId(c.id);
+    const res = await deleteCategoryAction(c.id);
+    setBusyId(null);
+
+    if (!res.ok) {
+      toast.error(t.errors.generic);
+      return;
+    }
+    if (res.data?.deactivated) {
+      setCategories((prev) =>
+        prev.map((x) => (x.id === c.id ? { ...x, is_active: false } : x))
+      );
+      toast.warning(t.admin.menu.categoryDeactivated);
+    } else {
+      setCategories((prev) => prev.filter((x) => x.id !== c.id));
+      toast.success(t.admin.menu.categoryDeleted);
+    }
+    router.refresh();
+  }
+
+  /* ---------------- Rasa ---------------- */
+
+  function openNewFlavor() {
+    const nextOrder = (flavorsInCategory.at(-1)?.sort_order ?? 0) + 1;
+    setEditingFlavor({
+      id: 0,
+      slug: "",
+      name_id: "",
+      name_en: "",
+      desc_id: "",
+      desc_en: "",
+      price: "",
+      image_url: null,
+      is_active: true,
+      is_featured: false,
+      stock_enabled: true,
+      stock: 0,
+      sort_order: String(nextOrder),
+      category_id: activeCategoryId,
+      created_at: "",
+      updated_at: "",
+    });
+  }
+
+  function openEditFlavor(f: Flavor) {
+    setEditingFlavor(toFlavorDraft(f));
+  }
+
+  function saveFlavor() {
+    if (!editingFlavor) return;
+    if (editingFlavor.name_id.trim().length < 2) {
+      toast.warning(t.admin.menu.nameId);
+      return;
+    }
+    const price = Number(editingFlavor.price.replace(/\D/g, ""));
+    if (!Number.isFinite(price) || price < 0) {
+      toast.warning(t.admin.menu.priceLabel);
+      return;
+    }
+
+    startSaving(async () => {
+      const res = await saveFlavorAction({
+        id: editingFlavor.id || null,
+        name_id: editingFlavor.name_id.trim(),
+        name_en: editingFlavor.name_en.trim(),
+        desc_id: editingFlavor.desc_id.trim(),
+        desc_en: editingFlavor.desc_en.trim(),
+        price,
+        image_url: editingFlavor.image_url ?? "",
+        is_active: editingFlavor.is_active,
+        is_featured: editingFlavor.is_featured,
+        stock_enabled: true,
+        stock: 0,
+        sort_order: editingFlavor.sort_order,
+        category_id: editingFlavor.category_id ?? activeCategoryId,
+      });
+
+      if (!res.ok) {
+        toast.error(
+          res.error === "slug_taken" ? t.admin.menu.slugTaken : t.errors.generic
+        );
+        return;
+      }
+
+      setFlavors((prev) => {
+        const id = res.data!.id;
+        const next: Flavor = {
+          ...editingFlavor,
+          id,
+          slug:
+            editingFlavor.name_id
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, ""),
+          price,
+          sort_order: Number(editingFlavor.sort_order) || 0,
+          category_id: editingFlavor.category_id ?? activeCategoryId,
+          created_at: editingFlavor.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const exists = prev.some((f) => f.id === id);
+        return exists
+          ? prev.map((f) => (f.id === id ? { ...f, ...next } : f))
+          : [...prev, next].sort((a, b) => a.sort_order - b.sort_order);
+      });
+
+      // Perbarui jumlah rasa di kategori
+      setCategories((prev) =>
+        prev.map((c) => {
+          if (c.id !== (editingFlavor.category_id ?? activeCategoryId)) return c;
+          const count = flavors.filter(
+            (f) =>
+              f.category_id === c.id &&
+              f.is_active &&
+              !(editingFlavor.id === 0 && f.id === res.data!.id)
+          ).length;
+          return { ...c, flavor_count: (c.flavor_count ?? 0) + (editingFlavor.id === 0 ? 1 : 0) || count };
+        })
+      );
+
+      toast.success(t.admin.menu.saved);
+      setEditingFlavor(null);
+      router.refresh();
+    });
+  }
+
+  async function removeFlavor(f: Flavor) {
+    if (!window.confirm(t.admin.menu.deleteConfirm)) return;
+    setBusyId(f.id);
+    const res = await deleteFlavorAction(f.id);
+    setBusyId(null);
+
+    if (!res.ok) {
+      toast.error(t.errors.generic);
+      return;
+    }
+    if (res.data?.deactivated) {
+      setFlavors((prev) => prev.map((x) => (x.id === f.id ? { ...x, is_active: false } : x)));
+      toast.warning(t.admin.menu.deactivated);
+    } else {
+      setFlavors((prev) => prev.filter((x) => x.id !== f.id));
+      toast.success(t.admin.menu.deleted);
+    }
+    router.refresh();
+  }
+
+  async function toggleFlavorActive(f: Flavor) {
+    setBusyId(f.id);
+    const res = await saveFlavorAction({
+      id: f.id,
+      name_id: f.name_id,
+      name_en: f.name_en,
+      desc_id: f.desc_id,
+      desc_en: f.desc_en,
+      price: f.price,
+      image_url: f.image_url ?? "",
+      is_active: !f.is_active,
+      is_featured: f.is_featured,
+      stock_enabled: true,
+      stock: 0,
+      sort_order: f.sort_order,
+      category_id: f.category_id,
+    });
+    setBusyId(null);
+
+    if (res.ok) {
+      setFlavors((prev) => prev.map((x) => (x.id === f.id ? { ...x, is_active: !f.is_active } : x)));
+      toast.success(!f.is_active ? t.admin.menu.showToast : t.admin.menu.hideToast);
+    } else {
+      toast.error(t.errors.generic);
+    }
+  }
+
+  /* ---------------- Tampilan ---------------- */
+
   return (
     <div className="space-y-5">
+      {/* ---------- Header ---------- */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-cocoa-900 sm:text-3xl">
@@ -274,10 +410,27 @@ export function MenuClient({
           </h1>
           <p className="mt-1 text-sm text-cocoa-500">{t.admin.menu.subtitle}</p>
         </div>
-        <button type="button" onClick={openNew} className="btn-primary shrink-0">
-          <Plus className="size-4" />
-          {t.admin.menu.addNew}
-        </button>
+        {activeCategory ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveCategoryId(null)}
+              className="btn-ghost !px-4 !py-2.5"
+            >
+              <ArrowLeft className="size-4" />
+              {t.admin.menu.backToCategories}
+            </button>
+            <button type="button" onClick={openNewFlavor} className="btn-primary shrink-0">
+              <Plus className="size-4" />
+              {t.admin.menu.addFlavor}
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={openNewCategory} className="btn-primary shrink-0">
+            <Plus className="size-4" />
+            {t.admin.menu.addCategory}
+          </button>
+        )}
       </div>
 
       {/* ---------- Stok global ---------- */}
@@ -286,9 +439,7 @@ export function MenuClient({
           <div className="flex items-start gap-3">
             <span
               className={`grid size-11 shrink-0 place-items-center rounded-2xl ${
-                stockEnabled
-                  ? "bg-matcha-100 text-matcha-700"
-                  : "bg-cocoa-100 text-cocoa-400"
+                stockEnabled ? "bg-matcha-100 text-matcha-700" : "bg-cocoa-100 text-cocoa-400"
               }`}
             >
               <Package className="size-5" />
@@ -384,142 +535,410 @@ export function MenuClient({
         )}
       </div>
 
-      {/* ---------- Daftar rasa ---------- */}
+      {/* ---------- Pencarian ---------- */}
       <div className="relative sm:max-w-sm">
         <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-300" />
         <input
           className="input !py-2.5 pl-10"
-          placeholder={t.admin.menu.searchPlaceholder}
+          placeholder={activeCategory ? t.admin.menu.searchPlaceholder : t.admin.menu.searchCategory}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           type="search"
         />
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="card p-14 text-center">
-          <UtensilsCrossed className="mx-auto size-8 text-cocoa-300" />
-          <p className="mt-3 text-sm text-cocoa-400">{t.common.empty}</p>
-        </div>
-      ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((f) => {
-            const busy = busyId === f.id;
-            const name = lang === "en" ? f.name_en : f.name_id;
+      {/* ---------- Tingkat 1: KATEGORI ---------- */}
+      {!activeCategory ? (
+        sortedCategories.length === 0 ? (
+          <div className="card p-14 text-center">
+            <LayoutGrid className="mx-auto size-8 text-cocoa-300" />
+            <p className="mt-3 text-sm text-cocoa-400">{t.admin.menu.noCategory}</p>
+            <button type="button" onClick={openNewCategory} className="btn-primary mt-5">
+              <Plus className="size-4" />
+              {t.admin.menu.addCategory}
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-cocoa-500">{t.admin.menu.categoryHint}</p>
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {sortedCategories.map((c) => {
+                const name = lang === "en" ? c.name_en : c.name_id;
+                const count = flavors.filter(
+                  (f) => f.category_id === c.id && f.is_active
+                ).length;
 
-            return (
-              <li key={f.id} className="card overflow-hidden">
-                <div className="flex gap-3.5 p-4">
-                  <div
-                    className={`relative size-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${
-                      f.image_url ? "bg-cocoa-100" : "from-cocoa-300 to-cocoa-500"
-                    }`}
-                  >
-                    {f.image_url ? (
-                      <Image
-                        src={f.image_url}
-                        alt={name}
-                        fill
-                        sizes="80px"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <span className="absolute inset-0 grid place-items-center font-display text-2xl font-bold text-white/60">
-                        {f.name_id.charAt(0)}
+                return (
+                  <li key={c.id} className="card overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCategoryId(c.id);
+                        setSearch("");
+                      }}
+                      className="group flex w-full items-center gap-3.5 p-4 text-left transition hover:bg-cocoa-50"
+                    >
+                      <span
+                        className={`relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl ${
+                          c.image_url
+                            ? "bg-cocoa-100"
+                            : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
+                        }`}
+                      >
+                        {c.image_url ? (
+                          <Image
+                            src={c.image_url}
+                            alt=""
+                            fill
+                            sizes="56px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <LayoutGrid className="size-6 text-white/70" />
+                        )}
+                        {!c.is_active ? (
+                          <span className="absolute inset-0 grid place-items-center bg-cocoa-950/65 text-[9px] font-bold tracking-wider text-white uppercase">
+                            off
+                          </span>
+                        ) : null}
                       </span>
-                    )}
-                    {!f.is_active ? (
-                      <span className="absolute inset-0 grid place-items-center bg-cocoa-950/60 text-[10px] font-bold tracking-wider text-white uppercase">
-                        {t.admin.menu.hideToast}
-                      </span>
-                    ) : null}
-                  </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-display text-base leading-tight font-bold text-cocoa-900">
-                        {name}
-                      </h3>
-                      {f.is_featured ? (
-                        <Star
-                          className="size-3.5 shrink-0 fill-honey-400 text-honey-400"
-                          aria-label={t.menu.featured}
-                        />
-                      ) : null}
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate font-display text-base font-bold text-cocoa-900">
+                            {name}
+                          </span>
+                          {c.is_featured ? (
+                            <Star className="size-3.5 shrink-0 fill-honey-400 text-honey-400" />
+                          ) : null}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-cocoa-400">
+                          {count} {t.menu.flavors}
+                        </span>
+                      </span>
+
+                      <ArrowLeft className="size-4 shrink-0 rotate-180 text-cocoa-300 transition group-hover:translate-x-0.5" />
+                    </button>
+
+                    <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditCategory(c)}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100"
+                      >
+                        <Pencil className="size-3.5" />
+                        {t.common.edit}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeCategory(c)}
+                        disabled={busyId === c.id}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
+                      >
+                        {busyId === c.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-3.5" />
+                        )}
+                        {t.common.delete}
+                      </button>
                     </div>
-                    <p className="mt-0.5 text-sm font-bold text-cocoa-600 tabular">
-                      {formatIDR(f.price, lang)}
-                    </p>
-                    <p className="mt-0.5 truncate font-mono text-[10px] text-cocoa-300">
-                      {f.slug}
-                    </p>
-                  </div>
-                </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )
+      ) : (
+        /* ---------- Tingkat 2: RASA ---------- */
+        <>
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-cocoa-300 to-cocoa-500 text-white">
+              <LayoutGrid className="size-4" />
+            </span>
+            <div>
+              <h2 className="font-display text-lg font-bold text-cocoa-900">
+                {lang === "en" ? activeCategory.name_en : activeCategory.name_id}
+              </h2>
+              <p className="text-xs text-cocoa-400">
+                {flavorsInCategory.length} {t.menu.flavors}
+              </p>
+            </div>
+          </div>
 
-                <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(f)}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100"
-                  >
-                    <Pencil className="size-3.5" />
-                    {t.common.edit}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleActive(f)}
-                    disabled={busy}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
-                  >
-                    {busy ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : f.is_active ? (
-                      <Eye className="size-3.5" />
-                    ) : (
-                      <EyeOff className="size-3.5" />
-                    )}
-                    {f.is_active ? t.admin.menu.active : t.admin.menu.hideToast}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => remove(f)}
-                    disabled={busy}
-                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
-                  >
-                    <Trash2 className="size-3.5" />
-                    {t.common.delete}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+          {flavorsInCategory.length === 0 ? (
+            <div className="card p-14 text-center">
+              <UtensilsCrossed className="mx-auto size-8 text-cocoa-300" />
+              <p className="mt-3 text-sm text-cocoa-400">{t.common.empty}</p>
+              <button type="button" onClick={openNewFlavor} className="btn-primary mt-5">
+                <Plus className="size-4" />
+                {t.admin.menu.addFlavor}
+              </button>
+            </div>
+          ) : (
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {flavorsInCategory.map((f) => {
+                const busy = busyId === f.id;
+                const name = lang === "en" ? f.name_en : f.name_id;
+
+                return (
+                  <li key={f.id} className="card overflow-hidden">
+                    <div className="flex gap-3.5 p-4">
+                      <div
+                        className={`relative size-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${
+                          f.image_url ? "bg-cocoa-100" : "from-cocoa-300 to-cocoa-500"
+                        }`}
+                      >
+                        {f.image_url ? (
+                          <Image
+                            src={f.image_url}
+                            alt={name}
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <span className="absolute inset-0 grid place-items-center font-display text-2xl font-bold text-white/60">
+                            {f.name_id.charAt(0)}
+                          </span>
+                        )}
+                        {!f.is_active ? (
+                          <span className="absolute inset-0 grid place-items-center bg-cocoa-950/65 text-[10px] font-bold tracking-wider text-white uppercase">
+                            off
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-display text-base leading-tight font-bold text-cocoa-900">
+                            {name}
+                          </h3>
+                          {f.is_featured ? (
+                            <Star className="size-3.5 shrink-0 fill-honey-400 text-honey-400" />
+                          ) : null}
+                        </div>
+                        <p className="mt-0.5 text-sm font-bold text-cocoa-600 tabular">
+                          {formatIDR(f.price, lang)}
+                        </p>
+                        <p className="mt-0.5 truncate font-mono text-[10px] text-cocoa-300">
+                          {f.slug}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditFlavor(f)}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100"
+                      >
+                        <Pencil className="size-3.5" />
+                        {t.common.edit}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleFlavorActive(f)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
+                      >
+                        {busy ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : f.is_active ? (
+                          <Eye className="size-3.5" />
+                        ) : (
+                          <EyeOff className="size-3.5" />
+                        )}
+                        {f.is_active ? t.admin.menu.active : t.admin.menu.hideToast}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeFlavor(f)}
+                        disabled={busy}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
+                      >
+                        <Trash2 className="size-3.5" />
+                        {t.common.delete}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
 
-      {/* ---------- Form tambah/ubah ---------- */}
+      {/* ---------- Modal kategori ---------- */}
       <Modal
-        open={Boolean(editing)}
-        onClose={() => setEditing(null)}
-        title={editing?.id ? t.admin.menu.editFlavor : t.admin.menu.newFlavor}
+        open={Boolean(editingCategory)}
+        onClose={() => setEditingCategory(null)}
+        title={
+          editingCategory?.id
+            ? t.admin.menu.editCategory
+            : t.admin.menu.newCategory
+        }
         size="lg"
         footer={
           <>
             <button
               type="button"
-              onClick={() => setEditing(null)}
+              onClick={() => setEditingCategory(null)}
               className="btn-ghost"
               disabled={saving}
             >
               {t.common.cancel}
             </button>
-            <button type="button" onClick={save} disabled={saving} className="btn-primary">
+            <button
+              type="button"
+              onClick={saveCategory}
+              disabled={saving}
+              className="btn-primary"
+            >
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               {saving ? t.common.saving : t.common.save}
             </button>
           </>
         }
       >
-        {editing ? (
+        {editingCategory ? (
+          <div className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="c-name-id" className="label">
+                  {t.admin.menu.nameId}
+                </label>
+                <input
+                  id="c-name-id"
+                  className="input"
+                  value={editingCategory.name_id}
+                  onChange={(e) =>
+                    setEditingCategory({ ...editingCategory, name_id: e.target.value })
+                  }
+                  placeholder="Sando Sandwich"
+                />
+              </div>
+              <div>
+                <label htmlFor="c-name-en" className="label">
+                  {t.admin.menu.nameEn}
+                </label>
+                <input
+                  id="c-name-en"
+                  className="input"
+                  value={editingCategory.name_en}
+                  onChange={(e) =>
+                    setEditingCategory({ ...editingCategory, name_en: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="c-desc-id" className="label">
+                  {t.admin.menu.descId}
+                </label>
+                <textarea
+                  id="c-desc-id"
+                  rows={2}
+                  className="input resize-none"
+                  value={editingCategory.desc_id}
+                  onChange={(e) =>
+                    setEditingCategory({ ...editingCategory, desc_id: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label htmlFor="c-desc-en" className="label">
+                  {t.admin.menu.descEn}
+                </label>
+                <textarea
+                  id="c-desc-en"
+                  rows={2}
+                  className="input resize-none"
+                  value={editingCategory.desc_en}
+                  onChange={(e) =>
+                    setEditingCategory({ ...editingCategory, desc_en: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div>
+              <span className="label">{t.admin.menu.image}</span>
+              <ImageField
+                url={editingCategory.image_url ?? ""}
+                onChange={(url) =>
+                  setEditingCategory({ ...editingCategory, image_url: url || null })
+                }
+                labels={{
+                  upload: t.admin.menu.uploadImage,
+                  change: t.admin.menu.changeImage,
+                  remove: t.admin.menu.removeImage,
+                  hint: t.admin.menu.imageHint,
+                }}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="c-sort" className="label">
+                  {t.admin.menu.sortOrder}
+                </label>
+                <input
+                  id="c-sort"
+                  inputMode="numeric"
+                  className="input tabular"
+                  value={editingCategory.sort_order}
+                  onChange={(e) =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      sort_order: Number(e.target.value.replace(/\D/g, "")) || 0,
+                    })
+                  }
+                />
+              </div>
+              <div className="flex flex-col justify-end gap-3 pb-1">
+                <Toggle
+                  checked={editingCategory.is_active}
+                  onChange={(v) => setEditingCategory({ ...editingCategory, is_active: v })}
+                  label={t.admin.menu.active}
+                />
+                <Toggle
+                  checked={editingCategory.is_featured}
+                  onChange={(v) => setEditingCategory({ ...editingCategory, is_featured: v })}
+                  label={t.admin.menu.featured}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      {/* ---------- Modal rasa ---------- */}
+      <Modal
+        open={Boolean(editingFlavor)}
+        onClose={() => setEditingFlavor(null)}
+        title={editingFlavor?.id ? t.admin.menu.editFlavor : t.admin.menu.newFlavor}
+        size="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingFlavor(null)}
+              className="btn-ghost"
+              disabled={saving}
+            >
+              {t.common.cancel}
+            </button>
+            <button type="button" onClick={saveFlavor} disabled={saving} className="btn-primary">
+              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+              {saving ? t.common.saving : t.common.save}
+            </button>
+          </>
+        }
+      >
+        {editingFlavor ? (
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -529,8 +948,10 @@ export function MenuClient({
                 <input
                   id="f-name-id"
                   className="input"
-                  value={editing.name_id}
-                  onChange={(e) => patch({ name_id: e.target.value })}
+                  value={editingFlavor.name_id}
+                  onChange={(e) =>
+                    setEditingFlavor({ ...editingFlavor, name_id: e.target.value })
+                  }
                   placeholder="Caramel Cheese"
                 />
               </div>
@@ -541,8 +962,10 @@ export function MenuClient({
                 <input
                   id="f-name-en"
                   className="input"
-                  value={editing.name_en}
-                  onChange={(e) => patch({ name_en: e.target.value })}
+                  value={editingFlavor.name_en}
+                  onChange={(e) =>
+                    setEditingFlavor({ ...editingFlavor, name_en: e.target.value })
+                  }
                   placeholder={t.admin.menu.nameEnHint}
                 />
               </div>
@@ -560,8 +983,13 @@ export function MenuClient({
                   id="f-price"
                   inputMode="numeric"
                   className="input pl-11 tabular"
-                  value={editing.price}
-                  onChange={(e) => patch({ price: e.target.value.replace(/\D/g, "") })}
+                  value={editingFlavor.price}
+                  onChange={(e) =>
+                    setEditingFlavor({
+                      ...editingFlavor,
+                      price: e.target.value.replace(/\D/g, ""),
+                    })
+                  }
                   placeholder="18000"
                 />
               </div>
@@ -576,8 +1004,10 @@ export function MenuClient({
                   id="f-desc-id"
                   rows={2}
                   className="input resize-none"
-                  value={editing.desc_id}
-                  onChange={(e) => patch({ desc_id: e.target.value })}
+                  value={editingFlavor.desc_id}
+                  onChange={(e) =>
+                    setEditingFlavor({ ...editingFlavor, desc_id: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -588,8 +1018,10 @@ export function MenuClient({
                   id="f-desc-en"
                   rows={2}
                   className="input resize-none"
-                  value={editing.desc_en}
-                  onChange={(e) => patch({ desc_en: e.target.value })}
+                  value={editingFlavor.desc_en}
+                  onChange={(e) =>
+                    setEditingFlavor({ ...editingFlavor, desc_en: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -597,8 +1029,8 @@ export function MenuClient({
             <div>
               <span className="label">{t.admin.menu.image}</span>
               <ImageField
-                url={editing.image_url}
-                onChange={(url) => patch({ image_url: url })}
+                url={editingFlavor.image_url ?? ""}
+                onChange={(url) => setEditingFlavor({ ...editingFlavor, image_url: url || null })}
                 labels={{
                   upload: t.admin.menu.uploadImage,
                   change: t.admin.menu.changeImage,
@@ -617,21 +1049,24 @@ export function MenuClient({
                   id="f-sort"
                   inputMode="numeric"
                   className="input tabular"
-                  value={editing.sort_order}
-                  onChange={(e) => patch({ sort_order: e.target.value.replace(/\D/g, "") })}
+                  value={editingFlavor.sort_order}
+                  onChange={(e) =>
+                    setEditingFlavor({
+                      ...editingFlavor,
+                      sort_order: e.target.value.replace(/\D/g, ""),
+                    })
+                  }
                 />
-                <p className="mt-1.5 text-xs text-cocoa-400">{t.admin.menu.sortHint}</p>
               </div>
-
               <div className="flex flex-col justify-end gap-3 pb-1">
                 <Toggle
-                  checked={editing.is_active}
-                  onChange={(v) => patch({ is_active: v })}
+                  checked={editingFlavor.is_active}
+                  onChange={(v) => setEditingFlavor({ ...editingFlavor, is_active: v })}
                   label={t.admin.menu.active}
                 />
                 <Toggle
-                  checked={editing.is_featured}
-                  onChange={(v) => patch({ is_featured: v })}
+                  checked={editingFlavor.is_featured}
+                  onChange={(v) => setEditingFlavor({ ...editingFlavor, is_featured: v })}
                   label={t.admin.menu.featured}
                 />
               </div>
@@ -642,6 +1077,8 @@ export function MenuClient({
     </div>
   );
 }
+
+/* ---------- komponen kecil ---------- */
 
 function Toggle({
   checked,
@@ -669,7 +1106,7 @@ function Toggle({
   );
 }
 
-/** Unggah foto produk ke bucket publik `flavor-images`. */
+/** Unggah foto ke bucket publik `flavor-images`. */
 function ImageField({
   url,
   onChange,
@@ -684,15 +1121,10 @@ function ImageField({
   const [inputKey, setInputKey] = useState(0);
 
   async function upload(file: File) {
-    if (!file.type.startsWith("image/")) {
+    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
       toast.error(labels.hint);
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error(labels.hint);
-      return;
-    }
-
     setBusy(true);
     try {
       const supabase = createClient();

@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { Flavor, StoreSettings } from "@/lib/types";
+import type { Category, Flavor, StoreSettings } from "@/lib/types";
 
 /** Ambil pengaturan toko. Aman dipanggil tanpa login. */
 export const getSettings = cache(async (): Promise<StoreSettings | null> => {
@@ -19,7 +19,7 @@ export const getSettings = cache(async (): Promise<StoreSettings | null> => {
   return (data as StoreSettings) ?? null;
 });
 
-/** Ambil daftar rasa yang tampil di etalase. */
+/** Ambil semua rasa yang tampil di etalase. */
 export const getActiveFlavors = cache(async (): Promise<Flavor[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -34,6 +34,21 @@ export const getActiveFlavors = cache(async (): Promise<Flavor[]> => {
     return [];
   }
   return (data as Flavor[]) ?? [];
+});
+
+/**
+ * Menu dua tingkat: kategori -> rasa.
+ * Satu panggilan RPC supaya tidak perlu join di client.
+ */
+export const getPublicMenu = cache(async (): Promise<Category[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("public_menu");
+
+  if (error) {
+    console.error("Gagal memuat menu:", error.message);
+    return [];
+  }
+  return (data as Category[]) ?? [];
 });
 
 /** Ambil semua rasa termasuk yang nonaktif (khusus dashboard). */

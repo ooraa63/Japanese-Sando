@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { signOutAction } from "@/app/admin/actions";
 
@@ -29,12 +30,14 @@ export function AdminShell({
   email,
   fullName,
   storeName,
+  logoUrl,
   labels,
 }: {
   children: ReactNode;
   email: string;
   fullName: string;
   storeName: string;
+  logoUrl?: string | null;
   labels: {
     dashboard: string;
     orders: string;
@@ -98,9 +101,15 @@ export function AdminShell({
 
   const brand = (
     <div className="flex items-center gap-2.5">
-      <span className="grid size-9 place-items-center rounded-xl bg-cocoa-800 text-cream-50">
-        <span className="font-display text-base font-bold">日</span>
-      </span>
+      {logoUrl ? (
+        <span className="relative size-9 shrink-0 overflow-hidden rounded-full bg-cream-100">
+          <Image src={logoUrl} alt="" fill sizes="36px" className="object-cover" />
+        </span>
+      ) : (
+        <span className="grid size-9 place-items-center rounded-xl bg-cocoa-800 text-cream-50">
+          <span className="font-display text-base font-bold">日</span>
+        </span>
+      )}
       <span className="font-display text-[15px] font-bold text-cocoa-900">
         {storeName}
       </span>

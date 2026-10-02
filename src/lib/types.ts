@@ -13,6 +13,23 @@ export type OrderStatus =
 export type PaymentMethod = "transfer" | "cash";
 export type DeliveryMethod = "pickup" | "delivery";
 
+export interface Category {
+  id: number;
+  slug: string;
+  name_id: string;
+  name_en: string;
+  desc_id: string;
+  desc_en: string;
+  image_url: string | null;
+  is_active: boolean;
+  is_featured: boolean;
+  sort_order: number;
+  /** Hanya diisi di listing admin */
+  flavor_count?: number;
+  /** Hanya diisi di public_menu() */
+  flavors?: Flavor[];
+}
+
 export interface Flavor {
   id: number;
   slug: string;
@@ -27,6 +44,7 @@ export interface Flavor {
   stock_enabled: boolean;
   stock: number;
   sort_order: number;
+  category_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -74,21 +92,36 @@ export interface StoreSettings {
   pickup_note_en: string;
   delivery_note_id: string;
   delivery_note_en: string;
-  /** Harga paket */
+  /** Harga paket: daftar paket bebas dari seller */
   bundle_enabled: boolean;
-  bundle_size: number;
-  bundle_price: number;
+  bundle_tiers: BundleTier[];
+  /** Logo & tagline di bawah nama toko */
+  logo_url: string | null;
+  brand_line: string;
   updated_at: string;
 }
 
-/** Harga paket: setiap `bundle_size` pcs jadi satu paket harga tetap. */
-export interface BundleInfo {
-  bundles: number;
+/** Satu paket: beli `{qty}` pcs dengan harga `{price}`. */
+export interface BundleTier {
+  qty: number;
+  price: number;
+}
+
+/** Hasil kalkulasi harga paket untuk ditampilkan ke pembeli. */
+export interface BundleBreakdown {
+  /** Paket-paket yang dipakai (bisa lebih dari satu) */
+  tiers: BundleTier[];
+  /** PCS di luar paket, dibayar harga satuan */
   leftover: number;
-  bundle_price: number | null;
-  bundle_size?: number;
-  unit_price: number;
+  /** Total harga dari semua paket */
+  bundleTotal: number;
+  /** Harga PCS di luar paket */
+  leftoverTotal: number;
+  /** Total kalau semua dibeli satuan */
+  base: number;
+  /** Total akhir */
   total: number;
+  /** Berapa hemat dibanding beli satuan semua */
   saving: number;
 }
 

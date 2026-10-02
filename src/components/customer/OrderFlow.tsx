@@ -10,34 +10,37 @@ import {
   Check,
   Copy,
   Loader2,
-  Minus,
-  Plus,
   ShoppingBag,
   Sparkles,
   Store,
-  Trash2,
   Truck,
   User,
   Wallet,
 } from "lucide-react";
-import type { DeliveryMethod, Flavor, PaymentMethod, StoreSettings } from "@/lib/types";
+import type {
+  Category,
+  DeliveryMethod,
+  Flavor,
+  PaymentMethod,
+  StoreSettings,
+} from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
-import { FlavorCard } from "@/components/customer/FlavorCard";
+import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
 import { calcBundle, formatIDR, formatPhone } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
 export type Step = (typeof STEPS)[number];
 
 export function OrderFlow({
-  flavors,
+  categories,
   settings,
   initialStep = "identity",
 }: {
-  flavors: Flavor[];
+  categories: Category[];
   settings: StoreSettings;
   initialStep?: Step;
 }) {
@@ -47,9 +50,6 @@ export function OrderFlow({
   const {
     quantities,
     draft,
-    add,
-    setQuantity,
-    remove,
     totalItems,
     updateDraft,
     reset,
@@ -57,7 +57,7 @@ export function OrderFlow({
   } = useCart();
 
   // Jangan biarkan nama & nomor telepon tertinggal di browser kalau pembeli
-  // meninggalkan halaman ini — baik lewat navigasi dalam aplikasi (komponen
+  // meninggalkan halaman ini Ã¢â‚¬â€ baik lewat navigasi dalam aplikasi (komponen
   // di-unmount) maupun menutup / memuat ulang tab.
   //
   // `clearIdentity` disimpan di ref supaya listener tidak dibuat ulang tiap
@@ -86,9 +86,14 @@ export function OrderFlow({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const maxQty = Math.max(1, settings.max_per_order);
   const stockEnabled = settings.stock_enabled;
   const stockLeft = settings.total_stock;
+
+  // Semua rasa dikumpulkan dari kategori yang tampil.
+  const flavors = useMemo(
+    () => categories.flatMap((c) => c.flavors ?? []),
+    [categories]
+  );
   const flavorById = useMemo(() => new Map(flavors.map((f) => [f.id, f])), [flavors]);
 
   const cartLines = useMemo(
@@ -104,11 +109,12 @@ export function OrderFlow({
   const avgUnitPrice =
     totalItems > 0 ? Math.round(rawTotal / totalItems) : (flavors[0]?.price ?? 0);
 
-  const bundle = calcBundle(totalItems, avgUnitPrice, {
-    enabled: settings.bundle_enabled,
-    size: settings.bundle_size,
-    price: settings.bundle_price,
-  });
+  const bundle = calcBundle(
+    totalItems,
+    avgUnitPrice,
+    settings.bundle_tiers,
+    settings.bundle_enabled
+  );
   const subtotal = bundle.total;
 
   // Ongkir hanya untuk pengiriman; ambil di tempat gratis.
@@ -119,11 +125,16 @@ export function OrderFlow({
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
   const deliveryNote = lang === "en" ? settings.delivery_note_en : settings.delivery_note_id;
 
-  // Contoh: "Beli 2 = Rp35.000" — dibuat dari pengaturan supaya tidak perlu
-  // diubah manual kalau harga paket-nya diganti.
-  const bundleOffer = t.order.review.bundleOffer
-    .replace("{n}", String(settings.bundle_size))
-    .replace("{price}", formatIDR(settings.bundle_price, lang));
+  // Ringkasan paket diambil dari daftar paket yang paling murah di
+  // pengaturan seller, jadi otomatis ikut berubah kalau diganti.
+  const cheapestTier = [...settings.bundle_tiers]
+    .filter((tier) => tier.qty >= 2 && tier.price >= 0)
+    .sort((a, b) => a.price - b.price)[0];
+  const bundleOffer = cheapestTier
+    ? t.order.review.bundleOffer
+        .replace("{n}", String(cheapestTier.qty))
+        .replace("{price}", formatIDR(cheapestTier.price, lang))
+    : "";
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -278,7 +289,7 @@ export function OrderFlow({
           {t.order.stepOf
             .replace("{n}", String(stepIndex + 1))
             .replace("{total}", String(STEPS.length))}{" "}
-          · {stepTitles[step]}
+          Ã‚Â· {stepTitles[step]}
         </p>
       </div>
 
@@ -370,7 +381,7 @@ export function OrderFlow({
                 ) : null}
 
                 {/* Info harga paket */}
-                {settings.bundle_enabled ? (
+                {bundleOffer ? (
                   <p className="mt-2 inline-flex items-center gap-2 rounded-xl bg-berry-500/10 px-3.5 py-2 text-sm font-bold text-berry-600">
                     <Sparkles className="size-4" />
                     {bundleOffer}
@@ -378,62 +389,14 @@ export function OrderFlow({
                 ) : null}
               </div>
 
-              {flavors.length === 0 ? (
+              {/* Rincian item: klik kategori dulu, lalu rasa-rasanya */}
+              {categories.length === 0 ? (
                 <p className="card p-10 text-center text-cocoa-400">{t.menu.empty}</p>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {flavors.map((f) => {
-                    const inCart = quantities[f.id] ?? 0;
-                    // Batas per rasa: maksimum pesanan, atau sisa stok global.
-                    const limit = stockEnabled
-                      ? Math.max(0, Math.min(maxQty, stockLeft))
-                      : maxQty;
-                    return (
-                      <div key={f.id} className="flex flex-col gap-3">
-                        <FlavorCard
-                          flavor={f}
-                          compact
-                          inCart={inCart}
-                          remainingStock={stockEnabled ? stockLeft : null}
-                          onAdd={inCart >= limit || limit === 0 ? undefined : add}
-                        />
-                        {inCart > 0 ? (
-                          <div className="flex items-center justify-between rounded-2xl border border-cocoa-200 bg-white p-2.5 shadow-sm">
-                            <span className="min-w-0 flex-1 truncate pl-1 text-sm font-bold text-cocoa-800">
-                              {lang === "en" ? f.name_en : f.name_id}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <QtyButton
-                                onClick={() => setQuantity(f.id, inCart - 1)}
-                                label={`- ${lang === "en" ? f.name_en : f.name_id}`}
-                              >
-                                <Minus className="size-4" />
-                              </QtyButton>
-                              <span className="w-9 text-center text-sm font-extrabold tabular text-cocoa-900">
-                                {inCart}
-                              </span>
-                              <QtyButton
-                                onClick={() => setQuantity(f.id, inCart + 1)}
-                                disabled={inCart >= limit}
-                                label={`+ ${lang === "en" ? f.name_en : f.name_id}`}
-                              >
-                                <Plus className="size-4" />
-                              </QtyButton>
-                              <button
-                                type="button"
-                                onClick={() => remove(f.id)}
-                                className="ml-0.5 rounded-lg p-2 text-cocoa-300 transition hover:bg-berry-500/10 hover:text-berry-500"
-                                aria-label={t.order.menu.remove}
-                              >
-                                <Trash2 className="size-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
+                <OrderMenuBrowser
+                  categories={categories}
+                  remainingStock={stockEnabled ? stockLeft : null}
+                />
               )}
 
               <StepNav
@@ -455,7 +418,7 @@ export function OrderFlow({
                 subtitle={t.order.payment.subtitle}
               />
 
-              {/* Metode pembayaran — hanya cara bayar, tanpa pilihan terima */}
+              {/* Metode pembayaran Ã¢â‚¬â€ hanya cara bayar, tanpa pilihan terima */}
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <ChoiceCard
                   selected={draft.paymentMethod === "transfer"}
@@ -473,7 +436,7 @@ export function OrderFlow({
                 />
               </div>
 
-              {/* Cara pengambilan — dengan catatan yang bisa diatur di dashboard */}
+              {/* Cara pengambilan Ã¢â‚¬â€ dengan catatan yang bisa diatur di dashboard */}
               <h3 className="mt-8 text-base font-bold text-cocoa-800">
                 {t.order.payment.deliveryTitle}
               </h3>
@@ -644,13 +607,13 @@ export function OrderFlow({
                   {draft.paymentMethod === "cash"
                     ? t.order.payment.cash
                     : `${t.order.payment.transfer}${
-                        draft.transferMethod ? ` · ${draft.transferMethod}` : ""
+                        draft.transferMethod ? ` Ã‚Â· ${draft.transferMethod}` : ""
                       }`}
                 </ReviewRow>
                 <ReviewRow label={t.order.review.deliveryLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
                   {draft.deliveryMethod === "delivery"
-                    ? `${t.order.payment.delivery} — ${draft.address}`
-                    : `${t.order.payment.pickup}${settings.address ? ` — ${settings.address}` : ""}`}
+                    ? `${t.order.payment.delivery} Ã¢â‚¬â€ ${draft.address}`
+                    : `${t.order.payment.pickup}${settings.address ? ` Ã¢â‚¬â€ ${settings.address}` : ""}`}
                 </ReviewRow>
                 <ReviewRow
                   label={t.order.review.itemsLabel}
@@ -661,7 +624,7 @@ export function OrderFlow({
                     {cartLines.map((l) => (
                       <li key={l.flavor.id} className="flex justify-between gap-4">
                         <span>
-                          {l.qty}× {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
+                          {l.qty}Ãƒâ€” {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
                         </span>
                         <span className="tabular text-cocoa-500">
                           {formatIDR(l.flavor.price * l.qty, lang)}
@@ -691,29 +654,34 @@ export function OrderFlow({
 
               {/* Ringkasan biaya */}
               <div className="mt-6 rounded-2xl bg-cocoa-50 p-4">
-                {bundle.bundles > 0 ? (
+                {bundle.tiers.length > 0 ? (
                   <>
-                    <div className="flex justify-between text-sm text-cocoa-600">
-                      <span>
-                        {bundle.bundles} {t.order.review.bundle}
-                      </span>
-                      <span className="tabular">
-                        {formatIDR(bundle.bundles * settings.bundle_price, lang)}
-                      </span>
-                    </div>
+                    {bundle.tiers.map((tier, i) => (
+                      <div
+                        key={i}
+                        className={`flex justify-between text-cocoa-600 ${
+                          i > 0 ? "mt-2" : ""
+                        }`}
+                      >
+                        <span>
+                          {tier.qty} {t.order.review.bundle}
+                        </span>
+                        <span className="tabular">{formatIDR(tier.price, lang)}</span>
+                      </div>
+                    ))}
                     {bundle.leftover > 0 ? (
-                      <div className="mt-2 flex justify-between text-sm text-cocoa-600">
+                      <div className="mt-2 flex justify-between text-cocoa-600">
                         <span>
                           {bundle.leftover} {t.common.qty.toLowerCase()}
                         </span>
                         <span className="tabular">
-                          {formatIDR(bundle.leftover * avgUnitPrice, lang)}
+                          {formatIDR(bundle.leftoverTotal, lang)}
                         </span>
                       </div>
                     ) : null}
                   </>
                 ) : (
-                  <div className="flex justify-between text-sm text-cocoa-600">
+                  <div className="flex justify-between text-cocoa-600">
                     <span>{t.common.subtotal}</span>
                     <span className="tabular">{formatIDR(subtotal, lang)}</span>
                   </div>
@@ -800,7 +768,7 @@ export function OrderFlow({
                         {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
                       </p>
                       <p className="text-[11px] text-cocoa-400 tabular">
-                        {l.qty} × {formatIDR(l.flavor.price, lang)}
+                        {l.qty} Ãƒâ€” {formatIDR(l.flavor.price, lang)}
                       </p>
                     </div>
                     <p className="text-[13px] font-bold text-cocoa-800 tabular">
@@ -812,24 +780,29 @@ export function OrderFlow({
             )}
 
             <div className="space-y-2 border-t border-cocoa-100 bg-cocoa-50 px-4 py-3.5 text-sm">
-              {/* Rincian paket */}
-              {bundle.bundles > 0 ? (
+              {/* Rincian paket (bisa lebih dari satu paket) */}
+              {bundle.tiers.length > 0 ? (
                 <>
-                  <div className="flex justify-between text-cocoa-600">
-                    <span>
-                      {bundle.bundles} {t.order.review.bundle}
-                    </span>
-                    <span className="tabular">
-                      {formatIDR(bundle.bundles * settings.bundle_price, lang)}
-                    </span>
-                  </div>
+                  {bundle.tiers.map((tier, i) => (
+                    <div
+                      key={i}
+                      className={`flex justify-between text-cocoa-600 ${
+                        i > 0 ? "mt-2" : ""
+                      }`}
+                    >
+                      <span>
+                        {tier.qty} {t.order.review.bundle}
+                      </span>
+                      <span className="tabular">{formatIDR(tier.price, lang)}</span>
+                    </div>
+                  ))}
                   {bundle.leftover > 0 ? (
-                    <div className="flex justify-between text-cocoa-600">
+                    <div className="mt-2 flex justify-between text-cocoa-600">
                       <span>
                         {bundle.leftover} {t.common.qty.toLowerCase()}
                       </span>
                       <span className="tabular">
-                        {formatIDR(bundle.leftover * avgUnitPrice, lang)}
+                        {formatIDR(bundle.leftoverTotal, lang)}
                       </span>
                     </div>
                   ) : null}
@@ -958,30 +931,6 @@ function StepNav({
         {nextIcon}
       </button>
     </div>
-  );
-}
-
-function QtyButton({
-  children,
-  onClick,
-  disabled,
-  label,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="grid size-8 place-items-center rounded-lg border border-cocoa-200 text-cocoa-700 transition hover:bg-cocoa-100 disabled:opacity-40"
-    >
-      {children}
-    </button>
   );
 }
 

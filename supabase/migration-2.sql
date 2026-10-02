@@ -391,8 +391,9 @@ begin
   update public.store_settings set total_stock = p_stock where id = 1;
   v_new := p_stock;
 
+  -- flavor_id NULL: log untuk stok gabungan seluruh toko.
   insert into public.stock_logs (flavor_id, delta, reason, note, actor_id)
-  values (0, p_stock - v_old, 'global', coalesce(p_note, ''), auth.uid());
+  values (null, p_stock - v_old, 'global', coalesce(p_note, ''), auth.uid());
 
   return jsonb_build_object('total_stock', v_new, 'previous', v_old);
 end;

@@ -10,9 +10,9 @@ import {
   Truck,
   Wallet,
 } from "lucide-react";
-import { getActiveFlavors, getSettings } from "@/lib/data";
+import { getPublicMenu, getSettings } from "@/lib/data";
 import { getI18nDict } from "@/lib/i18n-server";
-import { FlavorGrid } from "@/components/customer/FlavorGrid";
+import { MenuBrowser } from "@/components/customer/MenuBrowser";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { AnnouncementBar } from "@/components/customer/AnnouncementBar";
@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [settings, flavors] = await Promise.all([getSettings(), getActiveFlavors()]);
+  const [settings, categories] = await Promise.all([getSettings(), getPublicMenu()]);
   const dicts = await getI18nDict();
 
   const open = settings?.is_preorder_open ?? true;
@@ -47,7 +47,11 @@ export default async function HomePage() {
         deadlineId={settings?.deadline_id}
         deadlineEn={settings?.deadline_en}
       />
-      <SiteHeader storeName={settings?.store_name ?? "Rumakomugi"} />
+      <SiteHeader
+        storeName={settings?.store_name ?? "Rumakomugi"}
+        logoUrl={settings?.logo_url ?? null}
+        brandLine={settings?.brand_line ?? ""}
+      />
 
       <main id="main">
         {/* ===================== HERO =====================
@@ -142,16 +146,9 @@ export default async function HomePage() {
             ) : null}
           </div>
 
-          {flavors.length === 0 ? (
-            <p className="card mt-10 p-10 text-center text-cocoa-400">{dicts.menu.empty}</p>
-          ) : (
-            <div className="mt-10">
-              <FlavorGrid
-                flavors={flavors}
-                remainingStock={settings?.stock_enabled ? settings.total_stock : null}
-              />
-            </div>
-          )}
+          <div className="mt-10">
+            <MenuBrowser categories={categories} />
+          </div>
         </section>
 
         {/* ===================== CARA PESAN ===================== */}
