@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Flame, PackageX, Sparkles, Star } from "lucide-react";
+import { Flame, PackageX, ShoppingBag, Star } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { formatIDR, isSoldOut } from "@/lib/utils";
 import type { Flavor } from "@/lib/types";
@@ -97,7 +97,7 @@ export function FlavorCard({
           </h3>
           {inCart > 0 ? (
             <span className="chip shrink-0 bg-matcha-100 text-matcha-700">
-              <Sparkles className="size-3" />
+              <ShoppingBag className="size-3" />
               {inCart}
             </span>
           ) : null}
@@ -130,6 +130,7 @@ export function FlavorCard({
           )}
         </div>
 
+        {/* Tombol hanya di halaman /order (bukan di beranda). */}
         {onAdd ? (
           <button
             type="button"

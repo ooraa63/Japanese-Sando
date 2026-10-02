@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import type { DeliveryMethod, Flavor, PaymentMethod } from "@/lib/types";
+import type { Flavor, PaymentMethod } from "@/lib/types";
 
 /**
  * Keranjang pre-order disimpan di localStorage supaya pembeli tidak
@@ -17,8 +17,6 @@ export interface CartDraft {
   name: string;
   phone: string;
   note: string;
-  address: string;
-  deliveryMethod: DeliveryMethod;
   paymentMethod: PaymentMethod | null;
   transferMethod: string;
   proofPath: string | null;
@@ -36,7 +34,12 @@ interface CartContextValue {
   add: (flavor: Flavor) => void;
   setQuantity: (flavorId: number, qty: number) => void;
   remove: (flavorId: number) => void;
+  /** Kosongkan semuanya (keranjang + data). */
   clear: () => void;
+  /** Kosongkan keranjang tapi pertahankan data pengirim. */
+  reset: () => void;
+  /** Hapus nama + nomor telepon saja. */
+  clearIdentity: () => void;
   updateDraft: (patch: Partial<CartDraft>) => void;
   totalItems: number;
 }
@@ -47,8 +50,6 @@ const EMPTY_DRAFT: CartDraft = {
   name: "",
   phone: "",
   note: "",
-  address: "",
-  deliveryMethod: "pickup",
   paymentMethod: null,
   transferMethod: "",
   proofPath: null,
@@ -145,6 +146,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     write({ ...store, draft: { ...store.draft, ...patch } });
   }, []);
 
+  /**
+   * Mengosongkan keranjang. Dipakai setelah pesanan berhasil dikirim supaya
+   * pembeli tidak Order ulang isi pesanan lama secara tidak sengaja.
+   */
+  const reset = useCallback(() => {
+    write({ quantities: {}, draft: EMPTY_DRAFT });
+  }, []);
+
+  /**
+   * Menghapus nama & nomor telepon saja, tanpa menyentuh isi keranjang.
+   * Dipanggil saat pembeli meninggalkan halaman /order, supaya data pribadi
+   * tidak ikut tersimpan untuk pesanan berikutnya.
+   */
+  const clearIdentity = useCallback(() => {
+    const next = { ...store.draft, name: "", phone: "" };
+    if (next.name === store.draft.name && next.phone === store.draft.phone) return;
+    write({ ...store, draft: next });
+  }, []);
+
   const totalItems = Object.values(current.quantities).reduce((s, q) => s + q, 0);
 
   const value: CartContextValue = {
@@ -154,6 +174,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setQuantity,
     remove,
     clear,
+    reset,
+    clearIdentity,
     updateDraft,
     totalItems,
   };

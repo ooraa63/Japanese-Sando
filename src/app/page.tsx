@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, MessageCircle, ShoppingBag, Sparkles, Timer, Truck, Wallet } from "lucide-react";
+import {
+  ArrowRight,
+  MessageCircle,
+  ShoppingBag,
+  Sparkles,
+  Timer,
+  Truck,
+  UtensilsCrossed,
+  Wallet,
+} from "lucide-react";
 import { getActiveFlavors, getSettings } from "@/lib/data";
 import { getI18nDict } from "@/lib/i18n-server";
 import { FlavorGrid } from "@/components/customer/FlavorGrid";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { AnnouncementBar } from "@/components/customer/AnnouncementBar";
-import { formatIDR, waLink } from "@/lib/utils";
+import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -31,7 +40,6 @@ export default async function HomePage() {
   const dicts = await getI18nDict();
 
   const open = settings?.is_preorder_open ?? true;
-  const cheapest = flavors.length ? Math.min(...flavors.map((f) => f.price)) : 0;
 
   return (
     <>
@@ -44,29 +52,23 @@ export default async function HomePage() {
       <SiteHeader />
 
       <main id="main">
-        {/* ===================== HERO ===================== */}
+        {/* ===================== HERO =====================
+            Foto tidak dipakai sebagai background full-bleed karena foto
+            menunya persegi dan akan terpotong di layar lebar/tinggi.
+            Instead: teks di kiri, foto dibingkai rapi di kanan. */}
         <section className="relative overflow-hidden bg-cocoa-950 text-cream-50">
-          <div className="absolute inset-0">
-            <Image
-              src="/foto-awal.jpeg"
-              alt="Aralam Japanese Sando"
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover object-center opacity-70"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-cocoa-950 via-cocoa-950/70 to-cocoa-950/40" />
-            <div className="absolute inset-0 bg-seigaha opacity-60" />
-          </div>
+          <div className="absolute inset-0 bg-seigaha opacity-70" />
+          <div className="absolute -top-24 -left-24 size-96 rounded-full bg-matcha-500/15 blur-3xl" />
+          <div className="absolute -right-20 -bottom-32 size-[26rem] rounded-full bg-berry-500/10 blur-3xl" />
 
-          <div className="relative mx-auto flex min-h-[calc(100dvh-4rem)] max-w-6xl flex-col justify-center px-4 py-16 sm:px-6 lg:py-24">
-            <div className="max-w-xl">
+          <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14 lg:py-20">
+            <div>
               <p className="chip border border-cream-50/25 bg-cream-50/10 text-cream-100 backdrop-blur-sm">
                 <Sparkles className="size-3.5" />
                 {dicts.hero.eyebrow}
               </p>
 
-              <h1 className="mt-5 text-4xl leading-[1.08] font-extrabold text-balance sm:text-5xl lg:text-6xl">
+              <h1 className="mt-5 text-4xl leading-[1.08] font-extrabold text-balance sm:text-5xl lg:text-[3.4rem]">
                 {dicts.hero.title}
               </h1>
 
@@ -91,38 +93,41 @@ export default async function HomePage() {
                 </a>
               </div>
 
-              {open ? (
-                <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-4 border-t border-cream-50/15 pt-6">
-                  <div>
-                    <dt className="text-2xl font-bold tabular text-honey-300">
-                      {flavors.length}
-                    </dt>
-                    <dd className="text-xs font-semibold tracking-wide text-cream-200/60 uppercase">
-                      {dicts.hero.stats.flavors}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-2xl font-bold tabular text-honey-300">
-                      {cheapest ? formatIDR(cheapest, "id") : "—"}
-                    </dt>
-                    <dd className="text-xs font-semibold tracking-wide text-cream-200/60 uppercase">
-                      {dicts.common.price}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-2xl font-bold text-honey-300">COD</dt>
-                    <dd className="text-xs font-semibold tracking-wide text-cream-200/60 uppercase">
-                      {dicts.hero.stats.cod}
-                    </dd>
-                  </div>
-                </dl>
-              ) : null}
+              <p className="mt-10 font-display text-xs tracking-[0.3em] text-cream-200/35 uppercase sm:text-sm">
+                {dicts.hero.badge}
+              </p>
+            </div>
+
+            {/* Foto: rasio 1:1 supaya utuh, tidak terpotong */}
+            <div className="relative mx-auto w-full max-w-sm lg:max-w-none">
+              <div className="relative aspect-square overflow-hidden rounded-3xl border border-cream-50/15 shadow-2xl shadow-black/40">
+                <Image
+                  src="/foto-awal.jpeg"
+                  alt="Aralam Japanese Sando"
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 90vw, 45vw"
+                  className="object-cover"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-cocoa-950/45 via-transparent to-transparent" />
+              </div>
+
+              {/* Kartu kecil: jumlah rasa */}
+              <div className="absolute -bottom-5 -left-3 flex items-center gap-3 rounded-2xl border border-cream-50/15 bg-cocoa-900/90 px-4 py-3 shadow-xl backdrop-blur-md sm:-left-6">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-matcha-500/20 text-matcha-300">
+                  <UtensilsCrossed className="size-4.5" />
+                </span>
+                <div className="leading-tight">
+                  <p className="font-display text-lg font-extrabold text-cream-50 tabular">
+                    {flavors.length}
+                  </p>
+                  <p className="text-[10px] font-bold tracking-wide text-cream-200/60 uppercase">
+                    {dicts.hero.stats.flavors}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-
-          <p className="relative mx-auto w-full max-w-6xl px-4 pb-8 text-center font-display text-sm tracking-[0.3em] text-cream-200/40 uppercase sm:px-6">
-            {dicts.hero.badge}
-          </p>
         </section>
 
         {/* ===================== MENU ===================== */}
@@ -136,11 +141,12 @@ export default async function HomePage() {
                 {dicts.menu.title}
               </h2>
               <p className="mt-2 text-[15px] text-cocoa-500">{dicts.menu.subtitle}</p>
+              <p className="mt-1.5 text-[13px] text-cocoa-400">{dicts.menu.readOnlyNote}</p>
             </div>
             {open ? (
-              <Link href="/order" className="btn-primary shrink-0">
+              <Link href="/order?step=menu" className="btn-primary shrink-0">
                 <ShoppingBag className="size-4" />
-                {dicts.hero.cta}
+                {dicts.menu.orderNow}
               </Link>
             ) : null}
           </div>

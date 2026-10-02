@@ -145,13 +145,13 @@ export const ADMIN_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 export function paymentLabel(method: PaymentMethod, lang: Language): string {
-  if (method === "cash") return lang === "en" ? "Cash on delivery" : "Bayar di tempat (COD)";
+  if (method === "cash") return lang === "en" ? "Pay in cash" : "Bayar tunai";
   return lang === "en" ? "Bank transfer" : "Transfer bank";
 }
 
 export function deliveryLabel(method: DeliveryMethod, lang: Language): string {
   if (method === "delivery") return lang === "en" ? "Delivery" : "Diantar";
-  return lang === "en" ? "Pickup" : "Ambil di tempat";
+  return lang === "en" ? "Collect in store" : "Ambil di toko";
 }
 
 /** Nomor pesanan acak untuk afflict draft keranjang di sisi pembeli. */

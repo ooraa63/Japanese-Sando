@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -15,11 +15,10 @@ import {
   ShoppingBag,
   Store,
   Trash2,
-  Truck,
   User,
   Wallet,
 } from "lucide-react";
-import type { DeliveryMethod, Flavor, PaymentMethod, StoreSettings } from "@/lib/types";
+import type { Flavor, PaymentMethod, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/components/customer/CartProvider";
@@ -43,8 +42,41 @@ export function OrderFlow({
   const { t, lang } = useI18n();
   const router = useRouter();
   const toast = useToast();
-  const { quantities, draft, add, setQuantity, remove, totalItems, updateDraft, clear } =
-    useCart();
+  const {
+    quantities,
+    draft,
+    add,
+    setQuantity,
+    remove,
+    totalItems,
+    updateDraft,
+    reset,
+    clearIdentity,
+  } = useCart();
+
+  // Jangan biarkan nama & nomor telepon tertinggal di browser kalau pembeli
+  // meninggalkan halaman ini — baik lewat navigasi dalam aplikasi (komponen
+  // di-unmount) maupun menutup / memuat ulang tab.
+  //
+  // `clearIdentity` disimpan di ref supaya listener tidak dibuat ulang tiap
+  // kali keranjang berubah; tanpa ini data akan terhapus saat pembeli masih
+  // sedang mengetik.
+  const clearIdentityRef = useRef(clearIdentity);
+  useEffect(() => {
+    clearIdentityRef.current = clearIdentity;
+  }, [clearIdentity]);
+
+  useEffect(() => {
+    const onLeave = () => clearIdentityRef.current();
+    // Saat komponen di-unmount (pindah halaman)
+    const onUnmount = () => clearIdentityRef.current();
+    // Saat tab ditutup atau dimuat ulang
+    window.addEventListener("pagehide", onLeave);
+    return () => {
+      window.removeEventListener("pagehide", onLeave);
+      onUnmount();
+    };
+  }, []);
 
   // Langkah awal diberikan oleh Server Component (dari ?step=), supaya
   // halaman ini tetap bisa di-render di server tanpa membaca `window`.
@@ -67,13 +99,8 @@ export function OrderFlow({
     (sum, l) => sum + l.flavor.price * l.qty,
     0
   );
-  const deliveryFee =
-    draft.deliveryMethod === "delivery" && subtotal >= (settings.free_shipping_min || 0)
-      ? 0
-      : draft.deliveryMethod === "delivery"
-        ? settings.delivery_fee
-        : 0;
-  const total = subtotal + deliveryFee;
+  // Semua pesanan diambil sendiri di toko, jadi tidak ada ongkir.
+  const total = subtotal;
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -108,10 +135,6 @@ export function OrderFlow({
       toast.warning(t.order.payment.title);
       return false;
     }
-    if (draft.deliveryMethod === "delivery" && draft.address.trim().length < 5) {
-      toast.warning(t.order.payment.addressError);
-      return false;
-    }
     if (draft.paymentMethod === "transfer" && !draft.proofPath) {
       toast.warning(t.order.payment.proofRequired);
       return false;
@@ -140,8 +163,9 @@ export function OrderFlow({
         p_customer_name: draft.name.trim(),
         p_phone: draft.phone.trim(),
         p_payment_method: draft.paymentMethod,
-        p_delivery_method: draft.deliveryMethod,
-        p_address: draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
+        // Selalu ambil di tempat — pembeli tidak memilih.
+        p_delivery_method: "pickup",
+        p_address: null,
         p_transfer_method: draft.transferMethod || null,
         p_payment_proof: draft.proofPath,
         p_note: draft.note.trim(),
@@ -158,7 +182,9 @@ export function OrderFlow({
       }
 
       const code = (data as { order_code: string }).order_code;
-      clear();
+      // Kosongkan keranjang + data pengirim supaya pesanan berikutnya
+      // dimulai dari form yang bersih.
+      reset();
       router.push(`/order/success/${code}`);
     } catch {
       toast.error(t.errors.generic);
@@ -371,7 +397,7 @@ export function OrderFlow({
                 subtitle={t.order.payment.subtitle}
               />
 
-              {/* Metode pembayaran */}
+              {/* Metode pembayaran — hanya cara bayar, tanpa pilihan terima */}
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <ChoiceCard
                   selected={draft.paymentMethod === "transfer"}
@@ -389,50 +415,27 @@ export function OrderFlow({
                 />
               </div>
 
-              {/* Pengiriman */}
-              <h3 className="mt-8 text-base font-bold text-cocoa-800">
-                {t.order.payment.deliveryTitle}
-              </h3>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <ChoiceCard
-                  selected={draft.deliveryMethod === "pickup"}
-                  onClick={() => updateDraft({ deliveryMethod: "pickup" as DeliveryMethod })}
-                  icon={<Store className="size-5" />}
-                  title={t.order.payment.pickup}
-                  desc={t.order.payment.pickupDesc}
-                />
-                <ChoiceCard
-                  selected={draft.deliveryMethod === "delivery"}
-                  onClick={() => updateDraft({ deliveryMethod: "delivery" as DeliveryMethod })}
-                  icon={<Truck className="size-5" />}
-                  title={t.order.payment.delivery}
-                  desc={t.order.payment.deliveryDesc}
-                />
-              </div>
-
-              {draft.deliveryMethod === "delivery" ? (
-                <div className="mt-4">
-                  <label htmlFor="address" className="label">
-                    {t.order.payment.address}
-                  </label>
-                  <textarea
-                    id="address"
-                    rows={3}
-                    className="input resize-none"
-                    placeholder={t.order.payment.addressPlaceholder}
-                    value={draft.address}
-                    onChange={(e) => updateDraft({ address: e.target.value })}
-                  />
-                  {settings.delivery_fee > 0 ? (
-                    <p className="mt-1.5 text-xs text-cocoa-400 tabular">
-                      {t.order.review.deliveryFee}: {formatIDR(settings.delivery_fee, lang)}
-                      {settings.free_shipping_min > 0
-                        ? ` · ${t.order.review.freeShipping} ${formatIDR(settings.free_shipping_min, lang)}`
-                        : ""}
+              {/* Pesanan selalu diambil sendiri di toko. Alamat toko akan
+                  tampil di sini setelah diisi di dashboard Pengaturan. */}
+              <div className="mt-6 flex items-start gap-3 rounded-2xl border border-cocoa-200 bg-cocoa-50 p-4">
+                <Store className="mt-0.5 size-5 shrink-0 text-cocoa-400" />
+                <div>
+                  <p className="text-sm font-bold text-cocoa-800">
+                    {t.order.payment.pickup}
+                  </p>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-cocoa-500">
+                    {t.order.payment.pickupDesc}
+                  </p>
+                  {settings.address ? (
+                    <p className="mt-1.5 text-[13px] text-cocoa-600">{settings.address}</p>
+                  ) : null}
+                  {settings.hours_id ? (
+                    <p className="mt-1.5 text-xs text-cocoa-400">
+                      {t.contact.hours}: {settings.hours_id}
                     </p>
                   ) : null}
                 </div>
-              ) : null}
+              </div>
 
               {/* Detail transfer */}
               {draft.paymentMethod === "transfer" ? (
@@ -541,25 +544,16 @@ export function OrderFlow({
                 >
                   <span dir="ltr">{formatPhone(draft.phone)}</span>
                 </ReviewRow>
-                <ReviewRow
-                  label={t.order.review.paymentLabel}
-                  onEdit={() => goTo("payment")}
-                  editLabel={t.order.review.editPayment}
-                >
+                <ReviewRow label={t.order.review.paymentLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
                   {draft.paymentMethod === "cash"
                     ? t.order.payment.cash
                     : `${t.order.payment.transfer}${
                         draft.transferMethod ? ` · ${draft.transferMethod}` : ""
                       }`}
                 </ReviewRow>
-                <ReviewRow
-                  label={t.order.review.deliveryLabel}
-                  onEdit={() => goTo("payment")}
-                  editLabel={t.order.review.editPayment}
-                >
-                  {draft.deliveryMethod === "delivery"
-                    ? `${t.order.payment.delivery} — ${draft.address}`
-                    : t.order.payment.pickup}
+                <ReviewRow label={t.order.review.deliveryLabel}>
+                  {t.order.payment.pickup}
+                  {settings.address ? ` — ${settings.address}` : ""}
                 </ReviewRow>
                 <ReviewRow
                   label={t.order.review.itemsLabel}
@@ -604,14 +598,6 @@ export function OrderFlow({
                   <span>{t.common.subtotal}</span>
                   <span className="tabular">{formatIDR(subtotal, lang)}</span>
                 </div>
-                {draft.deliveryMethod === "delivery" ? (
-                  <div className="mt-2 flex justify-between text-sm text-cocoa-600">
-                    <span>{t.order.review.deliveryFee}</span>
-                    <span className="tabular">
-                      {deliveryFee === 0 ? t.order.review.freeShipping : formatIDR(deliveryFee, lang)}
-                    </span>
-                  </div>
-                ) : null}
                 <div className="mt-3 flex justify-between border-t border-cocoa-200 pt-3 text-lg font-extrabold text-cocoa-900">
                   <span>{t.order.review.totalLabel}</span>
                   <span className="tabular">{formatIDR(total, lang)}</span>
@@ -692,16 +678,6 @@ export function OrderFlow({
                 <span>{t.common.subtotal}</span>
                 <span className="tabular">{formatIDR(subtotal, lang)}</span>
               </div>
-              {draft.deliveryMethod === "delivery" ? (
-                <div className="flex justify-between text-cocoa-600">
-                  <span>{t.order.review.deliveryFee}</span>
-                  <span className="tabular">
-                    {deliveryFee === 0
-                      ? t.order.review.freeShipping
-                      : formatIDR(deliveryFee, lang)}
-                  </span>
-                </div>
-              ) : null}
               <div className="flex justify-between border-t border-cocoa-200 pt-2 text-base font-extrabold text-cocoa-900">
                 <span>{t.common.total}</span>
                 <span className="tabular">{formatIDR(total, lang)}</span>
@@ -943,8 +919,8 @@ function ReviewRow({
 }: {
   label: string;
   children: React.ReactNode;
-  onEdit: () => void;
-  editLabel: string;
+  onEdit?: () => void;
+  editLabel?: string;
 }) {
   return (
     <div className="flex items-start gap-4 py-3.5">
@@ -952,13 +928,15 @@ function ReviewRow({
         <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">{label}</p>
         <div className="mt-1 text-sm leading-relaxed text-cocoa-800">{children}</div>
       </div>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold text-matcha-600 transition hover:bg-matcha-50"
-      >
-        {editLabel}
-      </button>
+      {onEdit && editLabel ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold text-matcha-600 transition hover:bg-matcha-50"
+        >
+          {editLabel}
+        </button>
+      ) : null}
     </div>
   );
 }
