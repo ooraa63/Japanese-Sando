@@ -1,0 +1,14 @@
+# Berkas yang tidak perlu ikut ke Vercel.
+# .gitignore sudah dipakai GitHub; daftar ini untuk folder yang tidak di-git
+# tapi tetap ada di komputermu (hasil test, log, dsb).
+
+scripts/
+supabase/
+Gambar/
+*.log
+lint.json
+tsconfig.tsbuildinfo
+
+# .env.local ditangani .gitignore, tapi pastikan lagi
+.env.local
+.env*.local

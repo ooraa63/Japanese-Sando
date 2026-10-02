@@ -195,13 +195,17 @@ baris terakhir `NOTIFY pgrst, 'reload schema';` supaya RPC terbaca.)
 
 ---
 
-## Bila deploy nanti (Vercel)
+## Deploy ke Vercel
 
-1. Push kode ke GitHub
-2. Import repository di Vercel (framework Next.js terdeteksi otomatis)
-3. Tambahkan semua variabel dari `.env.local` di **Settings → Environment
-   Variables** (untuk semua branch)
-4. Deploy
+Panduan lengkap ada di **[DEPLOY.md](DEPLOY.md)**. Ringkasnya:
 
-`DATABASE_URL` tidak wajib diisi di Vercel karena hanya dipakai oleh
-`npm run db:push` di komputermu.
+```bash
+vercel login      # buka browser, pilih Continue with GitHub
+vercel link       # sambungkan ke GitHub
+# isi 3 env var di Vercel Dashboard (lihat DEPLOY.md)
+vercel --prod     # deploy pertama
+```
+
+Setelah itu, setiap `git push` ke `main` otomatis deploy ulang.
+
+---
