@@ -142,12 +142,20 @@ if (list.ok) {
   if (o) console.log(`  -> contoh: ${o.order_code} ${o.customer_name} ${o.status} items=${o.items?.length}`);
 }
 
+const { rows: storeRows } = await client.query(`select store_name from public.store_settings where id=1;`);
+const storeName = storeRows[0]?.store_name ?? "Rumakomugi";
 const saveSettings = await asUser(
   "authenticated",
   adminClaims,
-  `select public.admin_save_settings(jsonb_build_object('store_name','Japanese Sando','min_order',1));`
+  `select public.admin_save_settings(
+     jsonb_build_object('store_name', $1::text, 'min_order', 1));`,
+  [storeName]
 );
 check("admin boleh menyimpan pengaturan", saveSettings.ok, JSON.stringify(saveSettings).slice(0, 200));
+
+const { rows: nameAfter } = await client.query(`select store_name from public.store_settings where id=1;`);
+check("nama toko tidak berubah oleh test", nameAfter[0].store_name === storeName,
+  `${nameAfter[0].store_name} vs ${storeName}`);
 
 // ------------------------------------------------------- non-admin
 console.log("\n=== 3. User login tapi bukan admin ===");

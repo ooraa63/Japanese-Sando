@@ -33,12 +33,15 @@ const schemaPath = path.resolve(process.cwd(), "supabase/schema.sql");
 const schemaSql = readFileSync(schemaPath, "utf8");
 const migration2Path = path.resolve(process.cwd(), "supabase/migration-2.sql");
 const migration3Path = path.resolve(process.cwd(), "supabase/migration-3.sql");
+const migration4Path = path.resolve(process.cwd(), "supabase/migration-4.sql");
 const sql =
   schemaSql +
   "\n\n" +
   (existsSync(migration2Path) ? readFileSync(migration2Path, "utf8") : "") +
   "\n\n" +
-  (existsSync(migration3Path) ? readFileSync(migration3Path, "utf8") : "");
+  (existsSync(migration3Path) ? readFileSync(migration3Path, "utf8") : "") +
+  "\n\n" +
+  (existsSync(migration4Path) ? readFileSync(migration4Path, "utf8") : "");
 
 const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
 

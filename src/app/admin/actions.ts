@@ -336,6 +336,15 @@ export async function setStockAction(
   return { ok: true, data: data as { total_stock: number; previous: number } };
 }
 
+export async function togglePreorderAction(open: boolean): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_toggle_preorder", { p_open: open });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 /* =============================================================================
  *  BATCH PRE-ORDER — SUDAH DIHAPUS
  *  Fitur batch tidak dipakai, jadi tabel & RPC-nya sudah di-drop

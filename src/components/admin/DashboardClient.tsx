@@ -23,7 +23,7 @@ import { useToast } from "@/components/ui/Toast";
 import {
   getDashboardStatsAction,
   getOrdersAction,
-  saveSettingsAction,
+  togglePreorderAction,
 } from "@/app/admin/actions";
 
 export function DashboardClient({
@@ -58,7 +58,8 @@ export function DashboardClient({
     const next = !open;
     setOpen(next);
     startToggle(async () => {
-      const res = await saveSettingsAction({ is_preorder_open: next });
+      // Fungsi khusus: hanya menyentuh is_preorder_open, tidak mengubah field lain
+      const res = await togglePreorderAction(next);
       if (res.ok) {
         toast.success(next ? t.admin.dash.openStore : t.admin.dash.closeStore);
       } else {

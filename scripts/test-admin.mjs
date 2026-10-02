@@ -270,6 +270,13 @@ const ghost = await rpcAuth("admin_update_order_status", {
 check("pesanan tidak ada ditolak", !ghost.ok, JSON.stringify(ghost.body));
 
 console.log("\n=== 6. Simpan produk & pengaturan ===");
+/** Baca nama toko yang sedang dipakai supaya test tidak mengubahnya. */
+async function currentStoreName() {
+  const res = await rest("store_settings", "select=store_name&id=eq.1&limit=1", session);
+  return res.body?.[0]?.store_name ?? "Rumakomugi";
+}
+console.log(`  nama toko sekarang: ${await currentStoreName()}`);
+
 const newFlavor = await rpcAuth("admin_save_flavor", {
   p_payload: {
     name_id: "Rasa Uji Otomatis",
@@ -299,7 +306,7 @@ const deleted = await rpcAuth("admin_delete_flavor", { p_flavor_id: newFlavorId 
 check("produk bisa dihapus", deleted.ok, JSON.stringify(deleted.body));
 
 const settingsSaved = await rpcAuth("admin_save_settings", {
-  p_payload: { store_name: "Japanese Sando", min_order: 1, whatsapp: "" },
+  p_payload: { store_name: currentStoreName(), min_order: 1, whatsapp: "" },
 });
 check("pengaturan bisa disimpan", settingsSaved.ok, JSON.stringify(settingsSaved.body));
 
