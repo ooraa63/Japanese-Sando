@@ -1,98 +1,89 @@
-# Deploy ke Vercel
+# Deploy ke Vercel (lewat Browser / Dashboard)
 
-Panduan ini untuk project Japanese Sando. Semua perintah dijalankan dari
-folder project:
+Cara ini **tidak perlu install apa pun** dan **tidak perlu buka terminal**.
+Semua dilakukan lewat browser di [vercel.com](https://vercel.com).
 
-```
-cd "D:\Minimax\Japanese Sando"
-```
+>Butuh ~5 menit.
 
 ---
 
-## Langkah 1 — Login Vercel (sekali saja)
+## Langkah 1 — Daftar / masuk ke Vercel
 
-Login membuka browser, jadi harus kamu yang jalankan:
-
-```bash
-vercel login
-```
-
-Pilih metode **Continue with GitHub** (paling gampang karena repo-nya
-sudah ada di GitHub).
-
-Cek berhasil/tidaknya:
-
-```bash
-vercel whoami
-```
-
-Kalau muncul namamu, sudah login.
+1. Buka **https://vercel.com**
+2. Klik **Sign Up** (kalau belum punya akun) atau **Log In**
+3. Pilih **Continue with GitHub** → masuk dengan akun GitHub kamu
+4. Vercel minta izin akses repository. Pilih **All repositories** supaya
+   project ini bisa dibaca.
 
 ---
 
-## Langkah 2 — Hubungkan ke GitHub
+## Langkah 2 — Import repository
 
-```bash
-vercel link
-```
-
-Vercel akan menanyakan beberapa hal:
-
-| Pertanyaan | Jawaban |
-| --- | --- |
-| `Set up and deploy?` | **Y** |
-| `Which scope?` | pilih akun pribadimu |
-| `Link to existing project?` | **N** (buat project baru) |
-| `What's your project's name?` | `japanese-sando` |
-| `In which directory is your code located?` | `.` (Enter saja) |
-
-Setelah itu Vercel otomatis upload kode ke GitHub repository
-`ooraa63/Japanese-Sando` dan menyambungkan branch `main`.
+1. Di dashboard Vercel, klik tab **Projects** (atau **Overview**)
+2. Klik tombol **Add New…** → **Project**
+3. Cari repository **`Japanese-Sando`** di kotak pencarian
+   - Kalau tidak muncul, klik **Adjust GitHub App Permissions** dan
+     beri akses ke repo itu
+4. Klik **Import** di sebelah kanan repo-nya
 
 ---
 
 ## Langkah 3 — Isi Environment Variables
 
-Vercel sudah membaca `.env.local`? **Tidak** — file itu tidak ikut
-upload demi keamanan. Kamu harus isi manual di dashboard.
+Vercel langsung memperlihatkan form konfigurasi. Pastikan bagian
+**Environment Variables** sudah diisi **sebelum** klik Deploy.
 
-Buka: **Vercel Dashboard → project `japanese-sando` → Settings →
-Environment Variables**
+Tambahkan 3 variabel ini (klik "Add Environment Variable" tiga kali):
 
-Tambahkan **3 variabel ini**:
-
-| Nama | Nilai |
+| Key | Value |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://xuavxcfnkqcszdacpwpo.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_LGcToBvAjehOHI3gmzTjjA_3-8J28JL` |
 | `NEXT_PUBLIC_SITE_URL` | `https://japanese-sando.vercel.app` |
 
-> **`DATABASE_URL` TIDAK perlu diisi di Vercel.** Variabel itu hanya
-> dipakai oleh `npm run db:push` di komputermu sendiri.
+> **Jangan isi `DATABASE_URL`.** Variabel itu hanya dipakai oleh
+> `npm run db:push` di komputermu, tidak perlu ada di Vercel.
 
-Centang **Production**, **Preview**, dan **Development** untuk ketiganya.
+Biarkan sisanya apa adanya:
 
----
-
-## Langkah 4 — Deploy pertama
-
-Kembali ke terminal:
-
-```bash
-vercel --prod
-```
-
-Tunggu sampai selesai. Vercel memberi alamat seperti:
-
-```
-https://japanese-sando.vercel.app
-```
+- **Framework Preset** — `Next.js` (otomatis terdeteksi)
+- **Root Directory** — `/`
+- **Build Command** — `npm run build`
+- **Output Directory** — `.next` (otomatis)
+- **Install Command** — `npm install`
 
 ---
 
-## Setelah itu — cara deploy berikutnya
+## Langkah 4 — Deploy
 
-Setiap kali kode di computer berubah:
+1. Klik tombol **Deploy**
+2. Tunggu ±1–2 menit sampai muncul tulisan **"Congratulations!"
+3. Klik tombol **Continue to Dashboard**
+4. Buka **Deployments** → klik domain di bagian atas, biasanya:
+   `https://japanese-sando-xxxx.vercel.app`
+5. Klik **"Visit"** untuk membuka website
+
+---
+
+## Langkah 5 — Cek semuanya jalan
+
+| Yang dicek | Alamat |
+| --- | --- |
+| Website pembeli | domain yang kamu dapat tadi |
+| Menu & tombol pre-order | klik "Pesan Sekarang" |
+| Dashboard penjual | domain tadi + `/admin` |
+| Login penjual | `sando.pemilik.2026@gmail.com` / `SandoPemilik2026` |
+
+Kalau halaman terbuka tapi muncul tulisan **"Supabase belum mengatur"**
+atau form pre-order kosong, berarti Environment Variables belum
+terpasang. Buka **Settings → Environment Variables**, periksa 3 variabel
+di atas, lalu **Deployments** → titik tiga → **Redeploy**.
+
+---
+
+## Deploy berikutnya ( otomatis )
+
+Setiap kali kode berubah di GitHub:
 
 ```bash
 git add -A
@@ -100,46 +91,36 @@ git commit -m "pesan perubahan"
 git push
 ```
 
-Vercel noticing push ke `main` dan **otomatis deploy ulang** dalam
-beberapa menit. Tidak perlu jalankan `vercel --prod` lagi.
+Vercel melihat perubahan di branch `main` dan **otomatis deploy ulang**
+dalam 1–2 menit. Tidak perlu buka Vercel lagi.
 
----
-
-## Cek hasil deploy
-
-| Halaman | Alamat |
-| --- | --- |
-| Website pembeli | `https://japanese-sando.vercel.app` |
-| Dashboard penjual | `https://japanese-sando.vercel.app/admin` |
-
-Kalau halaman terbuka tapi jawabannya "Supabase belum diatur", berarti
-Environment Variables belum terisi — ulangi Langkah 3 lalu deploy ulang.
+Untuk melihat progresnya, buka tab **Deployments** di dashboard.
 
 ---
 
 ## Domain sendiri (opsional)
 
-1. Vercel Dashboard → project → **Settings → Domains**
-2. Ketik domain yang kamu punya, misal `japanesesando.co.id`
-3. Vercel memberi catatan cara mengatur DNS
-4. Buka **Settings → Environment Variables**, ubah `NEXT_PUBLIC_SITE_URL`
-   jadi domain barumu, lalu deploy ulang
+Kalau sudah punya domain, misal `japanesesando.co.id`:
+
+1. **Settings → Domains**
+2. Ketik domain kamu → **Add**
+3. Vercel menampilkan catatan pengatur DNS (A record / CNAME)
+4. Masuk ke tempat domain kamu bought, ikuti catatan itu
+5. Setelah domain aktif, **Settings → Environment Variables**, ubah
+   `NEXT_PUBLIC_SITE_URL` jadi domain barumu
+6. **Deployments → Redeploy**
 
 ---
 
 ## Kalau ada masalah
 
-**Lihat log build:**
-```bash
-vercel logs
-```
+**Build gagal (halaman merah "Build Failed"):**
+Buka **Deployments** → klik deployment yang gagal → tab **Logs**.
+Biasanya penyebabnya nama environment variable salah ketik.
 
-**Deploy ulang dari nol:**
-```bash
-vercel --prod --force
-```
+**Halaman 500 saat dibuka:**
+Buka **Settings → Environment Variables**, pastikan tidak ada spasi
+tambahan di awal/akhir nilai.
 
-**Hapus proyek Vercel:**
-```bash
-vercel remove japanese-sando
-```
+**Mau deploy ulang dengan kode yang sama:**
+**Deployments** → titik tiga (⋯) di deployment → **Redeploy**.

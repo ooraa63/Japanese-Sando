@@ -197,14 +197,13 @@ baris terakhir `NOTIFY pgrst, 'reload schema';` supaya RPC terbaca.)
 
 ## Deploy ke Vercel
 
-Panduan lengkap ada di **[DEPLOY.md](DEPLOY.md)**. Ringkasnya:
+Panduan lengkap ada di **[DEPLOY.md](DEPLOY.md)** — lewat browser di
+vercel.com, tanpa perlu install apa pun:
 
-```bash
-vercel login      # buka browser, pilih Continue with GitHub
-vercel link       # sambungkan ke GitHub
-# isi 3 env var di Vercel Dashboard (lihat DEPLOY.md)
-vercel --prod     # deploy pertama
-```
+1. Masuk ke [vercel.com](https://vercel.com) dengan GitHub
+2. **Add New… → Project** → import repo `Japanese-Sando`
+3. Isi 3 environment variable (lihat DEPLOY.md)
+4. Klik **Deploy**
 
 Setelah itu, setiap `git push` ke `main` otomatis deploy ulang.
 
