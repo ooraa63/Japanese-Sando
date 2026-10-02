@@ -34,13 +34,7 @@ export default async function AdminLoginPage({
     }
   }
 
-  const [{ data: adminCount }, dicts, lang] = await Promise.all([
-    supabase.rpc("public_admin_count"),
-    getI18nDict(),
-    getLang(),
-  ]);
-
-  const needsSetup = (adminCount as number | null) === 0;
+  const [dicts, lang] = await Promise.all([getI18nDict(), getLang()]);
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-2">
@@ -93,7 +87,13 @@ export default async function AdminLoginPage({
             <LanguageToggle />
           </div>
 
-          <AuthForm mode={needsSetup ? "setup" : "login"} nextPath={next} />
+          <AuthForm nextPath={next} />
+
+          <p className="mt-5 text-center text-[11px] leading-relaxed text-cocoa-300">
+            {lang === "en"
+              ? "Accounts are created and managed in the Supabase dashboard."
+              : "Akun dibuat dan dikelola dari dashboard Supabase."}
+          </p>
 
           <Link
             href="/"

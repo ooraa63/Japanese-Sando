@@ -266,6 +266,9 @@ export const en = {
       needAccount: "Need an account?",
       createAccount: "Create one",
       invalid: "Wrong email or password.",
+      noAccess:
+        "This account is not registered as a store owner. Ask the owner to add it in Supabase.",
+      manageAccounts: "Accounts are created in Supabase",
       setupTitle: "Set up the seller account",
       setupSubtitle:
         "This page creates the first owner account. You can only do this once — afterwards this menu disappears.",

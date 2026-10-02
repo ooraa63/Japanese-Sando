@@ -8,7 +8,6 @@ import {
   Sparkles,
   Timer,
   Truck,
-  UtensilsCrossed,
   Wallet,
 } from "lucide-react";
 import { getActiveFlavors, getSettings } from "@/lib/data";
@@ -53,16 +52,27 @@ export default async function HomePage() {
 
       <main id="main">
         {/* ===================== HERO =====================
-            Foto tidak dipakai sebagai background full-bleed karena foto
-            menunya persegi dan akan terpotong di layar lebar/tinggi.
-            Instead: teks di kiri, foto dibingkai rapi di kanan. */}
+            Foto dipakai sebagai background full-bleed seperti semula.
+            Foto ini vertikal (2:3) dengan area gelap di bagian atas, jadi
+            titik fokusnya di tengah-bawah — teks diletakkan di area atas
+            yang sudah gelap, dan overlay gradien menjaga keterbacaan. */}
         <section className="relative overflow-hidden bg-cocoa-950 text-cream-50">
-          <div className="absolute inset-0 bg-seigaha opacity-70" />
-          <div className="absolute -top-24 -left-24 size-96 rounded-full bg-matcha-500/15 blur-3xl" />
-          <div className="absolute -right-20 -bottom-32 size-[26rem] rounded-full bg-berry-500/10 blur-3xl" />
+          <div className="absolute inset-0">
+            <Image
+              src="/hero-sando.jpg"
+              alt="Aralam Japanese Sando"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover object-[center_60%]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-cocoa-950/85 via-cocoa-950/55 to-cocoa-950/90" />
+            <div className="absolute inset-0 bg-gradient-to-r from-cocoa-950/90 via-cocoa-950/40 to-transparent" />
+            <div className="absolute inset-0 bg-seigaha opacity-30" />
+          </div>
 
-          <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14 lg:py-20">
-            <div>
+          <div className="relative mx-auto flex min-h-[calc(100dvh-4rem)] max-w-6xl flex-col justify-center px-4 py-16 sm:px-6 lg:py-24">
+            <div className="max-w-xl">
               <p className="chip border border-cream-50/25 bg-cream-50/10 text-cream-100 backdrop-blur-sm">
                 <Sparkles className="size-3.5" />
                 {dicts.hero.eyebrow}
@@ -96,36 +106,6 @@ export default async function HomePage() {
               <p className="mt-10 font-display text-xs tracking-[0.3em] text-cream-200/35 uppercase sm:text-sm">
                 {dicts.hero.badge}
               </p>
-            </div>
-
-            {/* Foto: rasio 1:1 supaya utuh, tidak terpotong */}
-            <div className="relative mx-auto w-full max-w-sm lg:max-w-none">
-              <div className="relative aspect-square overflow-hidden rounded-3xl border border-cream-50/15 shadow-2xl shadow-black/40">
-                <Image
-                  src="/foto-awal.jpeg"
-                  alt="Aralam Japanese Sando"
-                  fill
-                  priority
-                  sizes="(max-width: 1024px) 90vw, 45vw"
-                  className="object-cover"
-                />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-cocoa-950/45 via-transparent to-transparent" />
-              </div>
-
-              {/* Kartu kecil: jumlah rasa */}
-              <div className="absolute -bottom-5 -left-3 flex items-center gap-3 rounded-2xl border border-cream-50/15 bg-cocoa-900/90 px-4 py-3 shadow-xl backdrop-blur-md sm:-left-6">
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-matcha-500/20 text-matcha-300">
-                  <UtensilsCrossed className="size-4.5" />
-                </span>
-                <div className="leading-tight">
-                  <p className="font-display text-lg font-extrabold text-cream-50 tabular">
-                    {flavors.length}
-                  </p>
-                  <p className="text-[10px] font-bold tracking-wide text-cream-200/60 uppercase">
-                    {dicts.hero.stats.flavors}
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </section>

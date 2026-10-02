@@ -264,6 +264,9 @@ export const id: Dict = {
       needAccount: "Belum punya akun?",
       createAccount: "Buat dulu",
       invalid: "Email atau password salah.",
+      noAccess:
+        "Akun ini belum terdaftar sebagai pemilik toko. Minta pemilik menambahkannya di Supabase.",
+      manageAccounts: "Akun dibuat lewat Supabase",
       setupTitle: "Siapkan akun penjual",
       setupSubtitle:
         "Halaman ini membuat akun pemilik pertama, dan hanya bisa dilakukan satu kali. Setelah itu menu ini hilang.",

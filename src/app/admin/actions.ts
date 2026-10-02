@@ -27,6 +27,9 @@ function humanize(error: string | undefined): string {
   if (!error) return "generic";
   const code = error.trim();
   const known = [
+    "invalid_email",
+    "user_not_found",
+    "last_admin",
     "invalid_name",
     "name_too_long",
     "invalid_phone",
@@ -92,7 +95,10 @@ export async function signOutAction() {
   redirect("/admin/login");
 }
 
-/** Apakah sudah ada akun admin? (untuk menentukan halaman setup) */
+/**
+ * Berapa akun admin yang terdaftar. Berguna untuk memastikan akun yourself
+ * sudah masuk tabel `admins` (bisa dicek dari dashboard lewat SQL).
+ */
 export async function getAdminCountAction(): Promise<number> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("public_admin_count");
@@ -100,60 +106,87 @@ export async function getAdminCountAction(): Promise<number> {
   return (data as number) ?? 0;
 }
 
-const signupSchema = z.object({
-  fullName: z.string().trim().min(2, "fullName"),
-  email: z.string().trim().email("email"),
-  password: z.string().min(8, "passwordTooShort"),
-  confirmPassword: z.string(),
-});
-
-export async function signUpFirstAdminAction(
+/**
+ * Menambahkan akun admin.
+ *
+ * DIHAPUS dari antarmuka (form login tidak lagi menampilkan "buat akun"),
+ * karena pendaftaran lewat website bisa membuat akun yang tidak punya izin
+ * dan membingungkan. Akun dibuat dari dashboard Supabase:
+ *   Authentication -> Users -> Add user
+ * User pertama yang dibuat otomatis masuk tabel `admins` oleh trigger
+ * `on_first_user_created`. Untuk user berikutnya, jalankan SQL ini di
+ * SQL Editor Supabase:
+ *
+ *   insert into public.admins (user_id, email, full_name, role)
+ *   select id, email, raw_user_meta_data->>'full_name', 'staff'
+ *   from auth.users where email = 'email-kamu@example.com'
+ *   on conflict (user_id) do update set is_active = true;
+ */
+export async function grantAdminRoleAction(
   _prev: ActionResult | null,
   formData: FormData
-): Promise<ActionResult & { needsEmailConfirm?: boolean }> {
-  const parsed = signupSchema.safeParse({
-    fullName: formData.get("fullName"),
-    email: formData.get("email"),
-    password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword"),
-  });
-
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const path = issue?.path[0];
-    if (path === "confirmPassword") return { ok: false, error: "passwordMismatch" };
-    return { ok: false, error: String(path ?? "generic") };
-  }
-
-  const { fullName, email, password, confirmPassword } = parsed.data;
-  if (password !== confirmPassword) return { ok: false, error: "passwordMismatch" };
+): Promise<ActionResult> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) return { ok: false, error: "invalid_email" };
 
   const supabase = await createClient();
 
-  // Hanya boleh jika belum ada admin sama sekali.
-  const { data: count } = await supabase.rpc("public_admin_count");
-  if ((count as number) > 0) return { ok: false, error: "not_authorized" };
+  // Hanya admin yang sudah aktif boleh menambah admin lain.
+  const { data: isAdmin } = await supabase.rpc("is_admin");
+  if (!isAdmin) return { ok: false, error: "not_authorized" };
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: fullName } },
+  const { data: users, error: listError } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
   });
+  if (listError) return { ok: false, error: "generic" };
 
-  if (error) {
-    if (error.message.includes("rate limit") || error.message.includes("Email rate")) {
-      return { ok: false, error: "rate_limited" };
-    }
-    return { ok: false, error: "signupFailed" };
-  }
+  const user = users?.users.find((u) => u.email?.toLowerCase() === email);
+  if (!user) return { ok: false, error: "user_not_found" };
 
-  // Kalau Supabase meminta konfirmasi email, session belum dibuat.
-  if (!data.session) {
-    return { ok: true, needsEmailConfirm: true };
-  }
+  const { error } = await supabase.from("admins").upsert(
+    {
+      user_id: user.id,
+      email: user.email ?? email,
+      full_name:
+        (user.user_metadata?.full_name as string | undefined) ?? "",
+      role: "staff",
+      is_active: true,
+    },
+    { onConflict: "user_id" }
+  );
+
+  if (error) return { ok: false, error: "generic" };
+
+  revalidatePath("/admin", "layout");
+  return { ok: true };
+}
+
+/** Mencabut akses admin dari sebuah akun. */
+export async function revokeAdminRoleAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const userId = String(formData.get("userId") ?? "").trim();
+  if (!userId) return { ok: false, error: "invalid_email" };
+
+  const supabase = await createClient();
 
   const { data: isAdmin } = await supabase.rpc("is_admin");
-  if (!isAdmin) return { ok: false, error: "signupFailed" };
+  if (!isAdmin) return { ok: false, error: "not_authorized" };
+
+  // Jangan sampai admin terakhir kehilangan akses.
+  const { count } = await supabase
+    .from("admins")
+    .select("user_id", { count: "exact", head: true })
+    .eq("is_active", true);
+  if ((count ?? 0) <= 1) return { ok: false, error: "last_admin" };
+
+  const { error } = await supabase
+    .from("admins")
+    .update({ is_active: false })
+    .eq("user_id", userId);
+  if (error) return { ok: false, error: "generic" };
 
   revalidatePath("/admin", "layout");
   return { ok: true };
