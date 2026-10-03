@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Building2,
   Clock,
   CreditCard,
-  Gift,
   ImagePlus,
   Info,
   Loader2,
@@ -18,14 +18,20 @@ import {
   Store,
   Trash2,
   Truck,
+  Users,
   X,
 } from "lucide-react";
-import type { BankAccount, BundleTier, Flavor, StoreSettings } from "@/lib/types";
+import type { AdminUser, BankAccount, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import { saveSettingsAction } from "@/app/admin/actions";
-import { formatIDR, waLink } from "@/lib/utils";
+import {
+  createAdminAction,
+  getAdminAccountsAction,
+  revokeAdminAction,
+} from "@/app/admin/actions";
+import { formatDateTime, formatIDR, waLink } from "@/lib/utils";
 
 type Draft = Omit<StoreSettings, "id" | "updated_at" | "bank_accounts"> & {
   bank_accounts: BankAccount[];
@@ -74,17 +80,13 @@ function toDraft(s: StoreSettings | null): Draft {
 
 export function SettingsClient({
   initialSettings,
-  initialFlavors = [],
 }: {
   initialSettings: StoreSettings | null;
-  initialFlavors?: Flavor[];
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const [form, setForm] = useState<Draft>(() => toDraft(initialSettings));
   const [saving, startSaving] = useTransition();
-
-  const flavors = initialFlavors;
 
   function patch(next: Partial<Draft>) {
     setForm((prev) => ({ ...prev, ...next }));
@@ -380,7 +382,7 @@ export function SettingsClient({
                 className="btn-ghost !px-3 !py-1.5 !text-[12px]"
               >
                 <Plus className="size-3.5" />
-                {t.admin.settings.addAccount}
+                {t.admin.settings.addBankAccount}
               </button>
             </div>
 
@@ -504,38 +506,9 @@ export function SettingsClient({
         <p className="mt-2 text-xs text-cocoa-400">{t.admin.dash.stockAllFlavors}</p>
       </Section>
 
-      {/* ============ Harga paket ============ */}
-      <Section icon={<Gift className="size-4.5" />} title={t.admin.settings.bundleTitle}>
-        <div className="rounded-2xl border border-cocoa-200 p-4">
-          <label className="flex cursor-pointer items-center justify-between gap-3">
-            <span>
-              <span className="block text-sm font-bold text-cocoa-800">
-                {t.admin.settings.bundleEnabled}
-              </span>
-              <span className="mt-0.5 block text-xs text-cocoa-400">
-                {t.admin.settings.bundleHint}
-              </span>
-            </span>
-            <span className="relative inline-flex shrink-0">
-              <input
-                type="checkbox"
-                checked={form.bundle_enabled}
-                onChange={(e) => patch({ bundle_enabled: e.target.checked })}
-                className="peer sr-only"
-              />
-              <span className="h-6 w-11 rounded-full bg-cocoa-200 transition peer-checked:bg-matcha-500" />
-              <span className="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
-            </span>
-          </label>
-
-          {form.bundle_enabled ? (
-            <BundleTierEditor
-              tiers={form.bundle_tiers}
-              onChange={(tiers) => patch({ bundle_tiers: tiers })}
-              unitPrice={flavors[0]?.price ?? 0}
-            />
-          ) : null}
-        </div>
+      {/* ============ Account admin ============ */}
+      <Section icon={<Users className="size-4.5" />} title={t.admin.settings.accountTitle}>
+        <AccountManager />
       </Section>
 
       {/* ============ Catatan cara pengambilan ============ */}
@@ -721,171 +694,218 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 /**
- * Daftar harga paket. Seller bebas menambah sebanyak apa pun,
- * mis. beli 2 = 35.000 dan beli 4 = 65.000.
- *
- * Sistem memakai paket dengan qty terbesar yang tidak melebihi jumlah
- * pesanan; sisanya dibayar harga satuan.
+ * Kelola akun yang boleh masuk dashboard. Akun dibuat dari sini:
+ * user didaftarkan di Supabase lalu langsung diberi akses admin.
  */
-function BundleTierEditor({
-  tiers,
-  onChange,
-  unitPrice,
-}: {
-  tiers: BundleTier[];
-  onChange: (tiers: BundleTier[]) => void;
-  unitPrice: number;
-}) {
+function AccountManager() {
   const { t, lang } = useI18n();
+  const toast = useToast();
+  const router = useRouter();
+  const [accounts, setAccounts] = useState<AdminUser[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [busy, startBusy] = useTransition();
+  const [form, setForm] = useState({ fullName: "", email: "", password: "" });
 
-  const sorted = [...tiers].sort((a, b) => a.qty - b.qty);
-  const maxQty = Math.max(5, ...sorted.map((x) => x.qty)) + 1;
+  const load = useCallback(async () => {
+    const res = await getAdminAccountsAction();
+    if (res.ok && res.data) setAccounts(res.data);
+  }, []);
 
-  function update(i: number, next: Partial<BundleTier>) {
-    onChange(tiers.map((tier, idx) => (idx === i ? { ...tier, ...next } : tier)));
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const res = await getAdminAccountsAction();
+      if (cancelled) return;
+      if (res.ok && res.data) setAccounts(res.data);
+      setLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget as HTMLFormElement);
+    fd.set("fullName", form.fullName);
+    fd.set("email", form.email);
+    fd.set("password", form.password);
+
+    startBusy(async () => {
+      const res = await createAdminAction(null, fd);
+      if (!res.ok) {
+        const messages: Record<string, string> = {
+          invalid_email: t.errors.invalid_email,
+          weak_password: t.admin.login.passwordTooShort,
+          invalid_name: t.admin.login.fullNameRequired,
+          not_authorized: t.errors.not_authorized,
+          email_taken: t.admin.settings.emailTaken,
+          signup_failed: t.admin.login.signupFailed,
+        };
+        toast.error(messages[res.error ?? ""] ?? t.errors.generic);
+        return;
+      }
+      toast.success(t.admin.settings.accountCreated);
+      setForm({ fullName: "", email: "", password: "" });
+      setOpen(false);
+      await load();
+      router.refresh();
+    });
   }
 
-  function remove(i: number) {
-    onChange(tiers.filter((_, idx) => idx !== i));
+  function revoke(u: AdminUser) {
+    if (!window.confirm(t.admin.settings.revokeConfirm)) return;
+    startBusy(async () => {
+      const res = await revokeAdminAction(u.user_id);
+      if (!res.ok) {
+        toast.error(
+          res.error === "last_admin" ? t.admin.settings.lastAdmin : t.errors.generic
+        );
+        return;
+      }
+      toast.success(t.admin.settings.accountRevoked);
+      await load();
+      router.refresh();
+    });
   }
-
-  // Pratinjau 1..5 pcs memakai aturan yang sama dengan server: paket dengan
-  // qty terbesar yang tidak melebihi jumlah, sisanya harga satuan.
-  const preview = Array.from({ length: Math.min(5, maxQty) }, (_, k) => {
-    const n = k + 1;
-    const tier = [...sorted].filter((x) => x.qty <= n).sort((a, b) => b.qty - a.qty)[0];
-    if (!tier) return { n, total: n * unitPrice, saving: 0 };
-    const total = tier.price + (n - tier.qty) * unitPrice;
-    return { n, total, saving: Math.max(0, n * unitPrice - total) };
-  });
 
   return (
-    <div className="mt-4 space-y-4">
-      {sorted.length === 0 ? (
-        <p className="rounded-xl bg-cocoa-50 p-4 text-sm text-cocoa-500">
-          {t.admin.settings.bundleEmpty}
+    <div className="space-y-4">
+      {!loaded ? (
+        <p className="flex items-center gap-2 py-4 text-sm text-cocoa-400">
+          <Loader2 className="size-4 animate-spin" />
+          {t.common.loading}
         </p>
       ) : (
-        <ul className="space-y-2.5">
-          {sorted.map((tier, i) => {
-            const regular = tier.qty * unitPrice;
-            return (
-              <li
-                key={i}
-                className="rounded-xl border border-cocoa-200 p-3"
+        <ul className="divide-y divide-cocoa-100 rounded-2xl border border-cocoa-200">
+          {accounts.map((u) => (
+            <li key={u.user_id} className="flex items-center gap-3 px-4 py-3">
+              <span
+                className={`grid size-9 shrink-0 place-items-center rounded-xl ${
+                  u.is_active
+                    ? "bg-matcha-100 text-matcha-700"
+                    : "bg-cocoa-100 text-cocoa-400"
+                }`}
               >
-                <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-                  <div>
-                    <span className="label">{t.admin.settings.bundleSize}</span>
-                    <div className="relative">
-                      <input
-                        inputMode="numeric"
-                        min={2}
-                        className="input tabular"
-                        value={tier.qty}
-                        onChange={(e) =>
-                          update(i, {
-                            qty: Math.max(2, Number(e.target.value.replace(/\D/g, "")) || 2),
-                          })
-                        }
-                      />
-                      <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-xs font-bold text-cocoa-400">
-                        pcs
-                      </span>
-                    </div>
-                  </div>
+                <Users className="size-4" />
+              </span>
 
-                  <div>
-                    <span className="label">{t.admin.settings.bundlePrice}</span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
-                        Rp
-                      </span>
-                      <input
-                        inputMode="numeric"
-                        className="input pl-11 tabular"
-                        value={tier.price}
-                        onChange={(e) =>
-                          update(i, {
-                            price: Number(e.target.value.replace(/\D/g, "")) || 0,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => remove(i)}
-                    className="self-end rounded-lg p-2.5 text-berry-500 transition hover:bg-berry-500/10"
-                    aria-label={t.common.delete}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-
-                <p className="mt-1.5 text-xs text-cocoa-400">
-                  {tier.qty} × {formatIDR(unitPrice, lang)} ={" "}
-                  {formatIDR(regular, lang)}
-                  {tier.price < regular ? (
-                    <span className="ml-1.5 font-bold text-matcha-600">
-                      {t.admin.settings.bundleSave}{" "}
-                      {formatIDR(regular - tier.price, lang)}
-                    </span>
-                  ) : (
-                    <span className="ml-1.5 font-bold text-honey-500">
-                      {t.admin.settings.bundleNotCheaper}
-                    </span>
-                  )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-cocoa-800">
+                  {u.full_name || u.email}
                 </p>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <button
-        type="button"
-        onClick={() =>
-          onChange([
-            ...tiers,
-            { qty: (sorted.at(-1)?.qty ?? 1) + 1, price: (sorted.at(-1)?.price ?? 0) + 1000 },
-          ])
-        }
-        className="btn-outline w-full !py-2.5 !text-[13px]"
-      >
-        <Plus className="size-4" />
-        {t.admin.settings.bundleAdd}
-      </button>
-
-      {/* Contoh hasil hitungan */}
-      <div className="rounded-xl bg-cocoa-50 p-3.5">
-        <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
-          {t.admin.settings.bundlePreview}
-        </p>
-        <ul className="mt-2 space-y-1 text-[13px] text-cocoa-600 tabular">
-          {preview.map((p) => (
-            <li key={p.n} className="flex justify-between gap-3">
-              <span>
-                {p.n} {t.admin.settings.pcs}
-              </span>
-              <span className="font-bold">
-                {formatIDR(p.total, lang)}
-                {p.saving > 0 ? (
-                  <span className="ml-1.5 text-[11px] font-semibold text-matcha-600">
-                    (−{formatIDR(p.saving, lang)})
+                <p className="truncate text-[11px] text-cocoa-400">{u.email}</p>
+                <p className="mt-0.5 text-[10px] font-bold tracking-wide uppercase">
+                  <span className={u.is_active ? "text-matcha-600" : "text-cocoa-400"}>
+                    {u.is_active ? t.admin.settings.accountActive : t.admin.settings.accessRevoked}
                   </span>
-                ) : null}
-              </span>
+                  <span className="text-cocoa-300"> · {u.role}</span>
+                  {u.confirmed === false ? (
+                    <span className="text-berry-500">
+                      {" "}
+                      · {t.admin.settings.notConfirmed}
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+
+              {u.is_active ? (
+                <button
+                  type="button"
+                  onClick={() => revoke(u)}
+                  disabled={busy}
+                  className="shrink-0 rounded-lg border border-berry-500/30 px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
+                >
+                  {t.admin.settings.revoke}
+                </button>
+              ) : (
+                <span className="shrink-0 text-[11px] text-cocoa-400">
+                  {u.last_sign_in
+                    ? `${t.admin.settings.lastLogin} ${formatDateTime(u.last_sign_in, lang)}`
+                    : t.admin.settings.neverLogin}
+                </span>
+              )}
             </li>
           ))}
         </ul>
-      </div>
+      )}
+
+      {open ? (
+        <form onSubmit={submit} className="space-y-3 rounded-2xl border border-cocoa-200 bg-cocoa-50/50 p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="acc-name" className="label">
+                {t.admin.login.fullName}
+              </label>
+              <input
+                id="acc-name"
+                required
+                minLength={2}
+                className="input"
+                value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              />
+            </div>
+            <div>
+              <label htmlFor="acc-email" className="label">
+                {t.admin.login.email}
+              </label>
+              <input
+                id="acc-email"
+                type="email"
+                required
+                className="input"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="nama@email.com"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="acc-pass" className="label">
+              {t.admin.login.password}
+            </label>
+            <input
+              id="acc-pass"
+              type="password"
+              required
+              minLength={8}
+              className="input"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="••••••••"
+            />
+            <p className="mt-1.5 text-xs text-cocoa-400">{t.admin.settings.accountHint}</p>
+          </div>
+
+          <div className="flex gap-2">
+            <button type="submit" disabled={busy} className="btn-primary !py-2.5 !text-[13px]">
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              {t.admin.settings.createAccount}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              disabled={busy}
+              className="btn-ghost !py-2.5 !text-[13px]"
+            >
+              {t.common.cancel}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} className="btn-outline w-full !py-2.5 !text-[13px]">
+          <Plus className="size-4" />
+          {t.admin.settings.addAccount}
+        </button>
+      )}
     </div>
   );
 }
 
-/** Unggah foto background halaman depan ke bucket publik `flavor-images`. */function HeroImageField({
+/** Unggah foto (background halaman depan atau logo) ke bucket publik. */
+function HeroImageField({
   url,
   onChange,
   labels,
@@ -982,7 +1002,8 @@ function BundleTierEditor({
   );
 }
 
-function QrisField({  url,
+function QrisField({
+  url,
   onChange,
   labels,
 }: {

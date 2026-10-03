@@ -50,7 +50,19 @@ const anon = { role: "anon" };
 
 // Bersihkan & siapkan
 await client.query(`delete from public.orders;`);
-await client.query(`update public.store_settings set is_preorder_open = true, stock_enabled = true, total_stock = 10, delivery_fee = 5000 where id = 1;`);
+await client.query(`
+  update public.store_settings set
+    is_preorder_open = true, stock_enabled = true, total_stock = 10,
+    delivery_fee = 5000, min_order = 1, max_per_order = 50
+  where id = 1;`);
+// Paket dimatikan supaya assertion harga di test ini tidak ikut terpengaruh.
+await client.query(`update public.flavors set bundle_tiers = '[]'::jsonb;`);
+
+// Id flavor diambil dinamis karena bisa berubah (test lain menambah/menghapus).
+const { rows: flavorRows } = await client.query(`
+  select id from public.flavors where is_active order by sort_order, id limit 2;`);
+const F1 = flavorRows[0]?.id ?? 1;
+const F2 = flavorRows[1]?.id ?? F1;
 
 const totalStock = async () =>
   (await client.query(`select total_stock, stock_enabled from public.store_settings where id=1;`)).rows[0];
@@ -70,12 +82,12 @@ const setStatus = (id, st) =>
 console.log("\n=== 1. Stok GLOBAL: satu angka untuk semua rasa ===");
 console.log("  stok awal: 10 (berlaku untuk SEMUA rasa)");
 
-const a = await order("Andi", "081111000001", "pickup", null, [[1, 2]]);
+const a = await order("Andi", "081111000001", "pickup", null, [[F1, 2]]);
 check("pesanan 2 pcs Cookies & Cream dibuat", Boolean(a.order_code), JSON.stringify(a));
 console.log(`  sisa stok setelah order: ${(await totalStock()).total_stock}`);
 check("stok berkurang 2 (10 -> 8)", (await totalStock()).total_stock === 8);
 
-const b = await order("Budi", "081111000002", "pickup", null, [[3, 1]]);
+const b = await order("Budi", "081111000002", "pickup", null, [[F2, 1]]);
 check("pesanan 1 pcs Choco Matcha (rasa lain) dibuat", Boolean(b.order_code));
 console.log(`  sisa stok setelah order: ${(await totalStock()).total_stock}`);
 check("stok juga berkurang untuk rasa lain (8 -> 7)", (await totalStock()).total_stock === 7);
@@ -84,7 +96,7 @@ check("stok juga berkurang untuk rasa lain (8 -> 7)", (await totalStock()).total
 console.log("\n=== 2. Stok tidak boleh minus ===");
 // Maks per rasa dinaikkan supaya batas global yang diuji, bukan batas per rasa.
 await client.query(`update public.store_settings set max_per_order = 50 where id=1;`);
-const tooMuch = await order("Candra", "081111000003", "pickup", null, [[1, 9]]);
+const tooMuch = await order("Candra", "081111000003", "pickup", null, [[F1, 9]]);
 check("order melebihi stok ditolak", !tooMuch.order_code && /insufficient_stock/.test(tooMuch.error ?? ""),
   tooMuch.error ?? "");
 check("stok tetap 7 setelah order ditolak", (await totalStock()).total_stock === 7);
@@ -109,10 +121,10 @@ check("stok tetap 8 (barang sudah dibuat)", (await totalStock()).total_stock ===
 // ---------------------------------------------------------------- 7
 console.log("\n=== 7. Kirim (delivery) ===");
 await client.query(`update public.store_settings set total_stock = 20 where id=1;`);
-const noAddr = await order("Eko", "081111000005", "delivery", null, [[1, 1]]);
+const noAddr = await order("Eko", "081111000005", "delivery", null, [[F1, 1]]);
 check("delivery tanpa alamat ditolak", !noAddr.order_code && /address_required/.test(noAddr.error ?? ""),
   noAddr.error ?? "");
-const withAddr = await order("Eko", "081111000005", "delivery", "Jl. Merdeka No. 1, Jakarta", [[1, 1]]);
+const withAddr = await order("Eko", "081111000005", "delivery", "Jl. Merdeka No. 1, Jakarta", [[F1, 1]]);
 check("delivery dengan alamat berhasil", Boolean(withAddr.order_code), JSON.stringify(withAddr));
 check("ongkir ditambahkan (delivery_fee 5000)", withAddr.total_price === 18000 + 5000,
   `total=${withAddr.total_price}`);
@@ -120,7 +132,7 @@ check("ongkir ditambahkan (delivery_fee 5000)", withAddr.total_price === 18000 +
 // ---------------------------------------------------------------- 8
 console.log("\n=== 8. Stok dimatikan = tak terbatas ===");
 await client.query(`update public.store_settings set stock_enabled = false, total_stock = 0, max_per_order = 50 where id=1;`);
-const unlimited = await order("Fajar", "081111000006", "pickup", null, [[1, 30]]);
+const unlimited = await order("Fajar", "081111000006", "pickup", null, [[F1, 30]]);
 check("order 30 pcs berhasil saat stok mati", Boolean(unlimited.order_code), JSON.stringify(unlimited));
 check("stok tidak jadi minus", (await totalStock()).total_stock === 0);
 await client.query(`update public.store_settings set max_per_order = 20 where id=1;`);

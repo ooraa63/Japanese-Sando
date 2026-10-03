@@ -27,8 +27,9 @@
     "test:ui": "node scripts/test-reset.mjs",
     "test:stock": "node scripts/test-global-stock.mjs",
     "test:menu": "node scripts/test-categories.mjs",
+    "test:bundle": "node scripts/test-flavor-bundles.mjs",
     "test:settings": "node scripts/test-settings.mjs",
-    "test": "node scripts/test-flow.mjs && node scripts/test-rls.mjs && node scripts/test-categories.mjs && node scripts/test-global-stock.mjs && node scripts/test-settings.mjs && node scripts/test-reset.mjs"
+    "test": "node scripts/test-flow.mjs && node scripts/test-rls.mjs && node scripts/test-categories.mjs && node scripts/test-flavor-bundles.mjs && node scripts/test-global-stock.mjs && node scripts/test-settings.mjs && node scripts/test-reset.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

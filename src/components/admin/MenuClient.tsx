@@ -20,10 +20,10 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import type { Category, Flavor, StoreSettings } from "@/lib/types";
+import type { BundleTier, Category, Flavor, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
-import { formatIDR } from "@/lib/utils";
+import { calcBundle, formatIDR } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -263,6 +263,7 @@ export function MenuClient({
       stock_enabled: true,
       stock: 0,
       sort_order: String(nextOrder),
+      bundle_tiers: [],
       category_id: activeCategoryId,
       created_at: "",
       updated_at: "",
@@ -298,7 +299,8 @@ export function MenuClient({
         is_featured: editingFlavor.is_featured,
         stock_enabled: true,
         stock: 0,
-        sort_order: editingFlavor.sort_order,
+        sort_order: Number(editingFlavor.sort_order) || 0,
+        bundle_tiers: editingFlavor.bundle_tiers,
         category_id: editingFlavor.category_id ?? activeCategoryId,
       });
 
@@ -386,6 +388,7 @@ export function MenuClient({
       stock_enabled: true,
       stock: 0,
       sort_order: f.sort_order,
+      bundle_tiers: f.bundle_tiers ?? [],
       category_id: f.category_id,
     });
     setBusyId(null);
@@ -1026,6 +1029,23 @@ export function MenuClient({
               </div>
             </div>
 
+            {/* Paket harga untuk produk ini */}
+            <div className="rounded-2xl border border-cocoa-200 p-4">
+              <p className="text-sm font-bold text-cocoa-800">
+                {t.admin.menu.bundleTitle}
+              </p>
+              <p className="mt-0.5 text-xs text-cocoa-400">
+                {t.admin.menu.bundleHint}
+              </p>
+              <BundleTierEditor
+                tiers={editingFlavor.bundle_tiers ?? []}
+                onChange={(tiers) =>
+                  setEditingFlavor({ ...editingFlavor, bundle_tiers: tiers })
+                }
+                unitPrice={Number(editingFlavor.price.replace(/\D/g, "")) || 0}
+              />
+            </div>
+
             <div>
               <span className="label">{t.admin.menu.image}</span>
               <ImageField
@@ -1079,6 +1099,160 @@ export function MenuClient({
 }
 
 /* ---------- komponen kecil ---------- */
+
+/**
+ * Daftar harga paket untuk satu produk. Tambah sebanyak apa pun.
+ * Pratinjau memakai aturan yang sama dengan server: paket ditumpuk, paket
+ * dengan qty terbesar dulu, sisanya harga satuan.
+ */
+function BundleTierEditor({
+  tiers,
+  onChange,
+  unitPrice,
+}: {
+  tiers: BundleTier[];
+  onChange: (tiers: BundleTier[]) => void;
+  unitPrice: number;
+}) {
+  const { t, lang } = useI18n();
+
+  const sorted = [...tiers].sort((a, b) => a.qty - b.qty);
+
+  function update(i: number, next: Partial<BundleTier>) {
+    onChange(tiers.map((tier, idx) => (idx === i ? { ...tier, ...next } : tier)));
+  }
+
+  function remove(i: number) {
+    onChange(tiers.filter((_, idx) => idx !== i));
+  }
+
+  const preview = [1, 2, 3, 4, 5].map((n) => {
+    const calc = calcBundle(n, unitPrice, sorted);
+    return { n, total: calc.total, saving: calc.saving };
+  });
+
+  return (
+    <div className="mt-3 space-y-3">
+      {sorted.length === 0 ? (
+        <p className="rounded-xl bg-cocoa-50 p-3.5 text-sm text-cocoa-500">
+          {t.admin.menu.bundleEmpty}
+        </p>
+      ) : (
+        <ul className="space-y-2.5">
+          {sorted.map((tier, i) => {
+            const regular = tier.qty * unitPrice;
+            const worth = unitPrice > 0 && tier.price < regular;
+            return (
+              <li key={i} className="rounded-xl border border-cocoa-200 p-3">
+                <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                  <div>
+                    <span className="label">{t.admin.menu.bundleSize}</span>
+                    <div className="relative">
+                      <input
+                        inputMode="numeric"
+                        min={2}
+                        className="input tabular"
+                        value={tier.qty}
+                        onChange={(e) =>
+                          update(i, {
+                            qty: Math.max(2, Number(e.target.value.replace(/\D/g, "")) || 2),
+                          })
+                        }
+                      />
+                      <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-xs font-bold text-cocoa-400">
+                        pcs
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="label">{t.admin.menu.bundlePrice}</span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
+                        Rp
+                      </span>
+                      <input
+                        inputMode="numeric"
+                        className="input pl-11 tabular"
+                        value={tier.price}
+                        onChange={(e) =>
+                          update(i, { price: Number(e.target.value.replace(/\D/g, "")) || 0 })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => remove(i)}
+                    className="self-end rounded-lg p-2.5 text-berry-500 transition hover:bg-berry-500/10"
+                    aria-label={t.common.delete}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+
+                <p className="mt-1.5 text-xs text-cocoa-400">
+                  {tier.qty} × {formatIDR(unitPrice, lang)} ={" "}
+                  {formatIDR(regular, lang)}
+                  {worth ? (
+                    <span className="ml-1.5 font-bold text-matcha-600">
+                      {t.admin.menu.bundleSave} {formatIDR(regular - tier.price, lang)}
+                    </span>
+                  ) : unitPrice > 0 ? (
+                    <span className="ml-1.5 font-bold text-honey-500">
+                      {t.admin.menu.bundleNotCheaper}
+                    </span>
+                  ) : null}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <button
+        type="button"
+        onClick={() =>
+          onChange([
+            ...tiers,
+            {
+              qty: (sorted.at(-1)?.qty ?? 1) + 1,
+              price: Math.round((sorted.at(-1)?.price ?? unitPrice * 2) * 0.94 / 500) * 500,
+            },
+          ])
+        }
+        className="btn-outline w-full !py-2.5 !text-[13px]"
+      >
+        <Plus className="size-4" />
+        {t.admin.menu.bundleAdd}
+      </button>
+
+      <div className="rounded-xl bg-cocoa-50 p-3.5">
+        <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+          {t.admin.menu.bundlePreview}
+        </p>
+        <ul className="mt-2 space-y-1 text-[13px] text-cocoa-600 tabular">
+          {preview.map((p) => (
+            <li key={p.n} className="flex justify-between gap-3">
+              <span>
+                {p.n} {t.admin.menu.pcs}
+              </span>
+              <span className="font-bold">
+                {formatIDR(p.total, lang)}
+                {p.saving > 0 ? (
+                  <span className="ml-1.5 text-[11px] font-semibold text-matcha-600">
+                    (−{formatIDR(p.saving, lang)})
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 function Toggle({
   checked,

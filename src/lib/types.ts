@@ -38,6 +38,8 @@ export interface Flavor {
   desc_id: string;
   desc_en: string;
   price: number;
+  /** Paket milik produk ini: [{ qty: 2, price: 35000 }] */
+  bundle_tiers: BundleTier[];
   image_url: string | null;
   is_active: boolean;
   is_featured: boolean;
@@ -92,7 +94,7 @@ export interface StoreSettings {
   pickup_note_en: string;
   delivery_note_id: string;
   delivery_note_en: string;
-  /** Harga paket: daftar paket bebas dari seller */
+  /** Harga paket: daftar paket bebas dari seller (masih dipakai untuk pratinjau) */
   bundle_enabled: boolean;
   bundle_tiers: BundleTier[];
   /** Logo & tagline di bawah nama toko */
@@ -206,4 +208,7 @@ export interface AdminUser {
   role: "owner" | "staff";
   is_active: boolean;
   created_at: string;
+  /** Hanya diisi di daftar akun (Pengaturan) */
+  last_sign_in?: string | null;
+  confirmed?: boolean;
 }

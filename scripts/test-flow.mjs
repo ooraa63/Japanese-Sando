@@ -63,11 +63,19 @@ async function rest(table, query = "") {
 console.log("\n=== 1. Baca data publik (tanpa login) ===");
 const flavors = await rest(
   "flavors",
-  "select=id,slug,name_id,price,stock,is_active&order=sort_order"
+  "select=id,slug,name_id,price,is_active&is_active=eq.true&order=sort_order"
 );
 check("daftar rasa terbaca publik", flavors.ok && flavors.body.length >= 5,
   JSON.stringify(flavors.body).slice(0, 200));
-const settings = await rest("store_settings", "select=id,is_preorder_open,min_order&limit=1");
+
+// Id flavor dinamis — bisa berubah karena ada test yang menambah/menghapus.
+const FLAVOR = flavors.body?.[0]?.id ?? 1;
+void FLAVOR;
+
+const settings = await rest(
+  "store_settings",
+  "select=id,is_preorder_open,min_order,total_stock&limit=1"
+);
 check("pengaturan toko terbaca", settings.ok && settings.body?.[0]?.id === 1);
 
 console.log("\n=== 2. Validasi create_order menolak input buruk ===");
@@ -85,7 +93,7 @@ check("nama terlalu pendek ditolak", !bad.ok && /invalid_name/.test(bad.body?.me
 const badPhone = await rpc("create_order", {
   p_customer_name: "Budi Test",
   p_phone: "12345",
-  p_items: [{ flavor_id: 1, quantity: 1 }],
+  p_items: [{ flavor_id: FLAVOR, quantity: 1 }],
 });
 check("telepon tidak valid ditolak", !badPhone.ok && /invalid_phone/.test(badPhone.body?.message ?? ""));
 
@@ -100,7 +108,7 @@ const noProof = await rpc("create_order", {
   p_customer_name: "Budi Test",
   p_phone: "081234567890",
   p_payment_method: "transfer",
-  p_items: [{ flavor_id: 1, quantity: 1 }],
+  p_items: [{ flavor_id: FLAVOR, quantity: 1 }],
 });
 check("transfer tanpa bukti ditolak", !noProof.ok && /proof_required/.test(noProof.body?.message ?? ""));
 
@@ -108,7 +116,7 @@ const tooMuch = await rpc("create_order", {
   p_customer_name: "Budi Test",
   p_phone: "081234567890",
   p_payment_method: "cash",
-  p_items: [{ flavor_id: 1, quantity: 9999 }],
+  p_items: [{ flavor_id: FLAVOR, quantity: 9999 }],
 });
 check("jumlah melebihi batas ditolak", !tooMuch.ok && /invalid_quantity/.test(tooMuch.body?.message ?? ""));
 
@@ -117,7 +125,7 @@ const fakePrice = await rpc("create_order", {
   p_phone: "081234567890",
   p_payment_method: "cash",
   // coba kirim harga palsu â€” server harus mengabaikannya
-  p_items: [{ flavor_id: 1, quantity: 2, price: 1, unit_price: 1 }],
+  p_items: [{ flavor_id: FLAVOR, quantity: 2, price: 1, unit_price: 1 }],
 });
 check("harga palsu diabaikan server (harga asli dipakai)",
   fakePrice.ok && fakePrice.body.total_price > 1000,
@@ -132,7 +140,7 @@ const created = await rpc("create_order", {
   p_delivery_method: "pickup",
   p_note: "Tanpa kemasain, terima kasih",
   p_language: "id",
-  p_items: [{ flavor_id: 1, quantity: 2 }],
+  p_items: [{ flavor_id: FLAVOR, quantity: 2 }],
 });
 check("pesanan COD berhasil dibuat", created.ok && Boolean(created.body?.order_code),
   JSON.stringify(created.body));
@@ -140,7 +148,8 @@ console.log(`       kode pesanan: ${created.body?.order_code}`);
 console.log(`       total: Rp${created.body?.total_price}`);
 
 const settingsAfter = (await rest("store_settings", "select=total_stock&id=eq.1&limit=1")).body[0];
-check(`stok global berkurang 2 (${stockBefore} -> ${settingsAfter.total_stock})`,
+// Selisihnya harus sama dengan jumlah pcs yang dipesan (2), apa pun harga paketnya.
+check(`stok global berkurang sesuai jumlah pcs (${stockBefore} -> ${settingsAfter.total_stock})`,
   settingsAfter.total_stock === stockBefore - 2);
 check("sisa stok dikembalikan di respons",
   created.body?.remaining_stock === settingsAfter.total_stock,

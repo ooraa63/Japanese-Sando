@@ -136,48 +136,42 @@ export function waOrderLink(phone: string, order: Order, lang: Language): string
 }
 
 /**
- * Hitung harga akhir dari jumlah pcs memakai daftar paket milik seller.
+ * Hitung harga satu produk untuk sejumlah pcs memakai paket milik produk itu.
  *
- * Seller bebas menentukan paketnya, misal:
- *   [{ qty: 2, price: 35000 }, { qty: 4, price: 65000 }]
+ * Paket ditumpuk: ambil paket dengan qty terbesar yang masih muat, sebanyak
+ * mungkin, lalu sisanya harga satuan.
  *
- * Aturannya: paket DI TUMPUK — pakai paket dengan qty terbesar yang masih
- * muat, sebanyak mungkin, lalu sisanya dibayar harga satuan.
- *
- *   1 pcs -> satuan              = 18.000
- *   2 pcs -> paket 2             = 35.000
- *   3 pcs -> paket 2 + 1 satuan  = 53.000
- *   4 pcs -> paket 4             = 65.000
- *   5 pcs -> paket 4 + 1 satuan  = 83.000
- *   6 pcs -> paket 4 + paket 2   = 100.000
- *   8 pcs -> paket 4 x2          = 130.000
+ * Contoh Sando @ Rp18.000 dengan paket (2 = 35.000) dan (4 = 65.000):
+ *   1 pcs -> satuan             = 18.000
+ *   2 pcs -> paket 2            = 35.000
+ *   3 pcs -> paket 2 + 1 satuan = 53.000
+ *   4 pcs -> paket 4            = 65.000
+ *   6 pcs -> paket 4 + paket 2  = 100.000
  */
 export function calcBundle(
-  totalItems: number,
-  avgUnitPrice: number,
-  tiers: BundleTier[],
-  enabled = true
+  qty: number,
+  unitPrice: number,
+  tiers: BundleTier[]
 ): BundleBreakdown {
-  const base = totalItems * avgUnitPrice;
+  const base = qty * unitPrice;
   const plain: BundleBreakdown = {
     tiers: [],
-    leftover: totalItems,
+    leftover: qty,
     bundleTotal: 0,
     leftoverTotal: base,
     base,
     total: base,
     saving: 0,
   };
-  if (!enabled || totalItems < 2) return plain;
+  if (qty < 2) return plain;
 
   const valid = tiers
     .filter((t) => t.qty >= 2 && t.price >= 0)
     .sort((a, b) => b.qty - a.qty);
   if (valid.length === 0) return plain;
 
-  // Paket ditumpuk: ambil yang qty-nya terbesar selama masih muat.
   const used: BundleTier[] = [];
-  let left = totalItems;
+  let left = qty;
   while (left >= 2) {
     const tier = valid.find((t) => t.qty <= left);
     if (!tier) break;
@@ -186,15 +180,20 @@ export function calcBundle(
   }
 
   const bundleTotal = used.reduce((sum, t) => sum + t.price, 0);
-  const coveredQty = used.reduce((sum, t) => sum + t.qty, 0);
-  const leftover = totalItems - coveredQty;
-  const leftoverTotal = leftover * avgUnitPrice;
+  const covered = used.reduce((sum, t) => sum + t.qty, 0);
+  const leftover = qty - covered;
+  const leftoverTotal = leftover * unitPrice;
   const total = bundleTotal + leftoverTotal;
 
-  // Kalau paketnya ternyata tidak lebih murah dari beli satuan, pakai satuan.
+  // Paket ternyata tidak lebih murah dari beli satuan -> pakai satuan saja.
   if (total >= base) return plain;
 
   return { tiers: used, leftover, bundleTotal, leftoverTotal, base, total, saving: base - total };
+}
+
+/** Price satu produk untuk sejumlah pcs (versi ringkas). */
+export function flavorPrice(qty: number, flavor: { price: number; bundle_tiers?: BundleTier[] }): number {
+  return calcBundle(qty, flavor.price, flavor.bundle_tiers ?? []).total;
 }
 
 const STATUS_KEY: Record<OrderStatus, { id: string; en: string; color: string }> = {

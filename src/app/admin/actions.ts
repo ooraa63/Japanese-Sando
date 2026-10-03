@@ -388,6 +388,86 @@ export async function deleteCategoryAction(
   return { ok: true, data: data as { deactivated: boolean } };
 }
 
+export async function getAdminAccountsAction(): Promise<ActionResult<AdminUser[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_users");
+  if (error) return { ok: false, error: humanize(error.message) };
+  return { ok: true, data: (data as AdminUser[]) ?? [] };
+}
+
+/** Cabut akses dashboard dari sebuah akun (akun Supabase-nya tetap ada). */
+export async function revokeAdminAction(userId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_revoke_user", { p_user_id: userId });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/admin", "layout");
+  return { ok: true };
+}
+
+/**
+ * Buat akun admin baru.
+ *
+ * Dua langkah: daftarkan user-nya di Supabase lewat signup, lalu beri akses
+ * admin. Butuh "Confirm email" dimatikan di dashboard Supabase, kalau tidak
+ * user-nya belum terverifikasi sehingga tidak bisa masuk.
+ */
+export async function createAdminAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const fullName = String(formData.get("fullName") ?? "").trim();
+
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) return { ok: false, error: "invalid_email" };
+  if (password.length < 8) return { ok: false, error: "weak_password" };
+  if (fullName.length < 2) return { ok: false, error: "invalid_name" };
+
+  const supabase = await createClient();
+
+  // Hanya admin aktif yang boleh menambah admin lain
+  const { data: isAdmin } = await supabase.rpc("is_admin");
+  if (!isAdmin) return { ok: false, error: "not_authorized" };
+
+  // 1. Daftarkan user di Supabase
+  const { data: signUp, error: signUpError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: fullName } },
+  });
+
+  if (signUpError) {
+    // Sudah terdaftar? Coba beri akses saja (user mungkin dibuat manual).
+    const { data: granted } = await supabase.rpc("admin_grant_user", { p_email: email });
+    if (granted) return { ok: true };
+    return { ok: false, error: "email_taken" };
+  }
+
+  const newId = signUp.user?.id;
+  if (!newId) return { ok: false, error: "signup_failed" };
+
+  // 2. Beri akses admin
+  const { error: grantError } = await supabase
+    .from("admins")
+    .upsert(
+      {
+        user_id: newId,
+        email,
+        full_name: fullName,
+        role: "owner",
+        is_active: true,
+      },
+      { onConflict: "user_id" }
+    );
+
+  if (grantError) return { ok: false, error: "signup_failed" };
+
+  revalidatePath("/admin", "layout");
+  revalidatePath("/admin/settings");
+  return { ok: true };
+}
+
 /* =============================================================================
  *  BATCH PRE-ORDER — SUDAH DIHAPUS
  *  Fitur batch tidak dipakai, jadi tabel & RPC-nya sudah di-drop

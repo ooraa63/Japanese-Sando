@@ -104,18 +104,20 @@ export function OrderFlow({
     [quantities, flavorById]
   );
 
-  const rawTotal = cartLines.reduce((sum, l) => sum + l.flavor.price * l.qty, 0);
-  // Harga satuan rata-rata, dipakai untuk sisa pcs di luar paket.
-  const avgUnitPrice =
-    totalItems > 0 ? Math.round(rawTotal / totalItems) : (flavors[0]?.price ?? 0);
-
-  const bundle = calcBundle(
-    totalItems,
-    avgUnitPrice,
-    settings.bundle_tiers,
-    settings.bundle_enabled
+  // Harga dihitung per rasa, karena tiap produk punya paketnya sendiri.
+  // Contoh: 2 sando pakai paket sando, 1 croissant pakai harga biasa.
+  const lines = useMemo(
+    () =>
+      cartLines.map((l) => {
+        const calc = calcBundle(l.qty, l.flavor.price, l.flavor.bundle_tiers ?? []);
+        return { ...l, calc };
+      }),
+    [cartLines]
   );
-  const subtotal = bundle.total;
+
+  const subtotal = lines.reduce((sum, l) => sum + l.calc.total, 0);
+  const baseTotal = lines.reduce((sum, l) => sum + l.calc.base, 0);
+  const saving = baseTotal - subtotal;
 
   // Ongkir hanya untuk pengiriman; ambil di tempat gratis.
   const deliveryFee =
@@ -125,11 +127,17 @@ export function OrderFlow({
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
   const deliveryNote = lang === "en" ? settings.delivery_note_en : settings.delivery_note_id;
 
-  // Ringkasan paket diambil dari daftar paket yang paling murah di
-  // pengaturan seller, jadi otomatis ikut berubah kalau diganti.
-  const cheapestTier = [...settings.bundle_tiers]
-    .filter((tier) => tier.qty >= 2 && tier.price >= 0)
-    .sort((a, b) => a.price - b.price)[0];
+  // Ringkasan paket diambil dari paket termurah di seluruh toko, untuk
+  // memberi gambaran ke pembeli bahwa ada harga paket.
+  const cheapestTier = useMemo(() => {
+    const all = flavors.flatMap((f) =>
+      (f.bundle_tiers ?? []).map((tier) => ({ ...tier, unit: f.price }))
+    );
+    return all
+      .filter((tier) => tier.qty >= 2 && tier.price < tier.qty * tier.unit)
+      .sort((a, b) => a.price - b.price)[0];
+  }, [flavors]);
+
   const bundleOffer = cheapestTier
     ? t.order.review.bundleOffer
         .replace("{n}", String(cheapestTier.qty))
@@ -654,43 +662,15 @@ export function OrderFlow({
 
               {/* Ringkasan biaya */}
               <div className="mt-6 rounded-2xl bg-cocoa-50 p-4">
-                {bundle.tiers.length > 0 ? (
-                  <>
-                    {bundle.tiers.map((tier, i) => (
-                      <div
-                        key={i}
-                        className={`flex justify-between text-cocoa-600 ${
-                          i > 0 ? "mt-2" : ""
-                        }`}
-                      >
-                        <span>
-                          {tier.qty} {t.order.review.bundle}
-                        </span>
-                        <span className="tabular">{formatIDR(tier.price, lang)}</span>
-                      </div>
-                    ))}
-                    {bundle.leftover > 0 ? (
-                      <div className="mt-2 flex justify-between text-cocoa-600">
-                        <span>
-                          {bundle.leftover} {t.common.qty.toLowerCase()}
-                        </span>
-                        <span className="tabular">
-                          {formatIDR(bundle.leftoverTotal, lang)}
-                        </span>
-                      </div>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="flex justify-between text-cocoa-600">
-                    <span>{t.common.subtotal}</span>
-                    <span className="tabular">{formatIDR(subtotal, lang)}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-sm text-cocoa-600">
+                  <span>{t.common.subtotal}</span>
+                  <span className="tabular">{formatIDR(subtotal, lang)}</span>
+                </div>
 
-                {bundle.saving > 0 ? (
+                {saving > 0 ? (
                   <div className="mt-2 flex justify-between text-sm font-bold text-matcha-600">
                     <span>{t.order.review.saving}</span>
-                    <span className="tabular">-{formatIDR(bundle.saving, lang)}</span>
+                    <span className="tabular">−{formatIDR(saving, lang)}</span>
                   </div>
                 ) : null}
 
@@ -761,63 +741,48 @@ export function OrderFlow({
               </p>
             ) : (
               <ul className="divide-y divide-cocoa-100">
-                {cartLines.map((l) => (
-                  <li key={l.flavor.id} className="flex items-start gap-3 px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-bold text-cocoa-800">
-                        {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
-                      </p>
-                      <p className="text-[11px] text-cocoa-400 tabular">
-                        {l.qty} Ãƒâ€” {formatIDR(l.flavor.price, lang)}
+                {lines.map((l) => (
+                  <li key={l.flavor.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-bold text-cocoa-800">
+                          {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
+                        </p>
+                        <p className="text-[11px] text-cocoa-400 tabular">
+                          {l.qty} × {formatIDR(l.flavor.price, lang)}
+                        </p>
+                      </div>
+                      <p className="text-[13px] font-bold text-cocoa-800 tabular">
+                        {formatIDR(l.calc.total, lang)}
                       </p>
                     </div>
-                    <p className="text-[13px] font-bold text-cocoa-800 tabular">
-                      {formatIDR(l.flavor.price * l.qty, lang)}
-                    </p>
+
+                    {/* Rincian paket milik produk ini saja */}
+                    {l.calc.tiers.length > 0 ? (
+                      <p className="mt-1 text-[11px] font-semibold text-matcha-600 tabular">
+                        {l.calc.tiers
+                          .map((tier) => `${tier.qty} → ${formatIDR(tier.price, lang)}`)
+                          .join(" + ")}
+                        {l.calc.leftover > 0
+                          ? ` + ${l.calc.leftover} × ${formatIDR(l.flavor.price, lang)}`
+                          : ""}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             )}
 
             <div className="space-y-2 border-t border-cocoa-100 bg-cocoa-50 px-4 py-3.5 text-sm">
-              {/* Rincian paket (bisa lebih dari satu paket) */}
-              {bundle.tiers.length > 0 ? (
-                <>
-                  {bundle.tiers.map((tier, i) => (
-                    <div
-                      key={i}
-                      className={`flex justify-between text-cocoa-600 ${
-                        i > 0 ? "mt-2" : ""
-                      }`}
-                    >
-                      <span>
-                        {tier.qty} {t.order.review.bundle}
-                      </span>
-                      <span className="tabular">{formatIDR(tier.price, lang)}</span>
-                    </div>
-                  ))}
-                  {bundle.leftover > 0 ? (
-                    <div className="mt-2 flex justify-between text-cocoa-600">
-                      <span>
-                        {bundle.leftover} {t.common.qty.toLowerCase()}
-                      </span>
-                      <span className="tabular">
-                        {formatIDR(bundle.leftoverTotal, lang)}
-                      </span>
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="flex justify-between text-cocoa-600">
-                  <span>{t.common.subtotal}</span>
-                  <span className="tabular">{formatIDR(subtotal, lang)}</span>
-                </div>
-              )}
+              <div className="flex justify-between text-cocoa-600">
+                <span>{t.common.subtotal}</span>
+                <span className="tabular">{formatIDR(subtotal, lang)}</span>
+              </div>
 
-              {bundle.saving > 0 ? (
-                <div className="flex justify-between text-matcha-600">
+              {saving > 0 ? (
+                <div className="flex justify-between font-bold text-matcha-600">
                   <span>{t.order.review.saving}</span>
-                <span className="tabular">-{formatIDR(bundle.saving, lang)}</span>
+                  <span className="tabular">−{formatIDR(saving, lang)}</span>
                 </div>
               ) : null}
 

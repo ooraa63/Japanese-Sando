@@ -42,27 +42,47 @@ project Next.js:
   tombol buka/tutup pre-order
 - Dua bahasa
 
-#### Harga paket
+#### Harga paket (per produk)
 
-Seller **bebas menentukan** paketnya di **Pengaturan → Harga paket**,
-seanyak apa pun. Contoh: beli 2 = Rp35.000 dan beli 4 = Rp65.000.
+Setiap produk punya **paketnya sendiri**, diatur dari **dashboard → Menu →
+klik produk → ubah → "Paket harga"**. Masing-masing produk punya daftar
+paket sendiri, bukan satu daftar untuk seluruh toko.
 
-Aturannya: paket **ditumpuk** — pakai paket dengan qty terbesar yang
-masih muat, sebanyak mungkin, lalu sisanya harga satuan.
+Contoh Sando Sandwich @ Rp18.000 dengan paket `2 = Rp35.000` dan
+`4 = Rp65.000`:
 
 | Beli | Paket yang dipakai | Total | Hemat |
 | --- | --- | --- | --- |
-| 1 | — | Rp18.000 | — |
+| 1 | satuan | Rp18.000 | — |
 | **2** | paket 2 | **Rp35.000** | Rp1.000 |
-| **3** | paket 2 + 1 biasa | **Rp53.000** | Rp1.000 |
+| **3** | paket 2 + 1 satuan | **Rp53.000** | Rp1.000 |
 | **4** | paket 4 | **Rp65.000** | Rp7.000 |
-| **5** | paket 4 + 1 biasa | **Rp83.000** | Rp7.000 |
+| **5** | paket 4 + 1 satuan | **Rp83.000** | Rp7.000 |
 | **6** | paket 4 + paket 2 | **Rp100.000** | Rp8.000 |
 | **8** | paket 4 × 2 | **Rp130.000** | Rp14.000 |
 
-Paket boleh **campur rasa**. Semua dihitung ulang di server, jadi harga
-tidak bisa dimanipulasi dari browser. Kalau satu paket ternyata tidak
-lebih murah dari beli satuan, sistem otomatis mengabaikannya.
+Aturannya: paket **ditumpuk** — ambil paket dengan qty terbesar yang
+masih muat, sebanyak mungkin, lalu sisanya harga satuan.
+
+Kalau keranjang berisi dua produk berbeda, paket dihitung terpisah per
+produk. Contoh: 2 sando (paket) + 1 croissant = Rp35.000 + Rp15.000.
+
+Semua dihitung ulang di server, jadi harga tidak bisa dimanipulasi dari
+browser. Kalau satu paket ternyata tidak lebih murah dari beli satuan,
+sistem otomatis mengabaikannya.
+
+#### Akun penjual
+
+Tambah akun admin dari **Pengaturan → Akun penjual**. Cukup isi nama,
+email, dan password.
+
+> **Sebelum itu:** matikan **Confirm email** di Supabase Dashboard
+> (Authentication → Sign In / Providers). Kalau tidak, akun yang dibuat
+> tidak terverifikasi sehingga tidak bisa masuk.
+
+Ada juga tombol **Cabut akses** — akunnya tetap ada di Supabase tapi
+tidak bisa masuk dashboard. Akun admin terakhir tidak bisa dicabut
+supaya Anda tidak terkunci dari dashboard sendiri.
 
 #### Menu dua tingkat: jenis makanan → rasa
 
@@ -236,13 +256,16 @@ baris terakhir `NOTIFY pgrst, 'reload schema';` supaya RPC terbaca.)
 | `npm run typecheck` | Cek tipe TypeScript |
 | `npm run db:push` | Terapkan seluruh migrasi database (aman diulang) |
 | `npm run db:cleanup` | Hapus pesanan uji, buang duplikat, reset pengaturan |
-| `npm test` | Jalankan semua pengujian (sekitar 130 pemeriksaan) |
+| `npm test` | Jalankan semua pengujian (sekitar 180 pemeriksaan) |
 | `npm run test:order` | Alur pesanan lewat API (22 pemeriksaan) |
 | `npm run test:db` | RLS & hak akses admin (19 pemeriksaan) |
-| `npm run test:menu` | Kategori makanan & harga paket custom (27 pemeriksaan) |
+| `npm run test:menu` | Kategori makanan (21 pemeriksaan) |
+| `npm run test:bundle` | Harga paket per produk (20 pemeriksaan) |
 | `npm run test:stock` | Stok global & alur status pesanan (19 pemeriksaan) |
 | `npm run test:settings` | Pengaturan toko tidak hilang sebagian (26 pemeriksaan) |
-| `npm run test:ui` | Halaman publik & alur pre-order (13 pemeriksaan) |
+| `npm run test:admin` | Dashboard admin (26 pemeriksaan) |
+| `npm run test:ui` | Halaman publik & alur pre-order (17 pemeriksaan) |
+| `npm run test:pages` | Semua halaman terbuka dengan session login (11 pemeriksaan) |
 
 ---
 
@@ -256,7 +279,8 @@ baris terakhir `NOTIFY pgrst, 'reload schema';` supaya RPC terbaca.)
 │   ├── migration-2.sql        # stok global, catatan pengambilan
 │   ├── migration-3.sql        # hapus batch, harga paket
 │   ├── migration-4.sql        # perbaiki kehilangan data pengaturan
-│   └── migration-5.sql        # kategori makanan, paket custom, logo
+│   ├── migration-5.sql        # kategori makanan, paket custom, logo
+│   └── migration-6.sql        # paket per produk, akun admin
 ├── scripts/                   # migrasi & pengujian otomatis
 └── src/
     ├── proxy.ts               # penyegaran session + pengaman /admin
