@@ -44,6 +44,12 @@ await c.query(`
 await c.query(`update public.flavors set stock = 20;`);
 await c.query(`alter sequence public.order_code_seq restart with 1;`);
 
+// Kembalikan paket harga ke nilai bawaan (2 = 35.000, 4 = 65.000)
+await c.query(`
+  update public.flavors
+  set bundle_tiers = '[{"qty":2,"price":35000},{"qty":4,"price":65000}]'::jsonb
+  where price = 18000;`);
+
 // Kembalikan pengaturan ke nilai siap-jualan. Nama toko SENGAJA tidak diubah.
 await c.query(`
   update public.store_settings set
