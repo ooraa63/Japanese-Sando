@@ -128,6 +128,11 @@ begin
     end if;
   end if;
 
+  -- Instagram: wajib
+  if p_instagram is null or length(trim(replace(p_instagram, '@', ''))) = 0 then
+    raise exception 'invalid_instagram' using errcode = '22023';
+  end if;
+
   -- Metode pembayaran: hanya 'transfer' yang diizinkan (cash dihapus)
   if p_payment_method not in ('transfer') then
     raise exception 'invalid_payment_method' using errcode = '22023';

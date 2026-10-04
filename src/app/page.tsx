@@ -14,9 +14,9 @@ import { getI18nDict } from "@/lib/i18n-server";
 import { MenuBrowser } from "@/components/customer/MenuBrowser";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
-import { AnnouncementBar } from "@/components/customer/AnnouncementBar";
 import { ShopInfo } from "@/components/customer/ShopInfo";
 import { HeroCarousel } from "@/components/customer/HeroCarousel";
+import { AnnouncementPopup } from "@/components/customer/AnnouncementPopup";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 
@@ -44,12 +44,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <AnnouncementBar
-        messageId={settings?.announcement_id}
-        messageEn={settings?.announcement_en}
-        deadlineId={settings?.deadline_id}
-        deadlineEn={settings?.deadline_en}
-      />
+      <AnnouncementPopup />
       <SiteHeader
         storeName={settings?.store_name ?? "Rumakomugi"}
         logoUrl={settings?.logo_url ?? null}

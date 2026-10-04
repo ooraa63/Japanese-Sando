@@ -38,6 +38,12 @@ export function FlavorCard({
   selectable = false,
   soldCount = 0,
   showSocial = false,
+  /**
+   * `readOnlySocial` -> tampilkan counter 'terjual' & status like, tapi
+   * tombol like dinonaktifkan (untuk halaman pre-order yang hanya boleh
+   * melihat).
+   */
+  readOnlySocial = false,
 }: {
   flavor: Flavor;
   inCart?: number;
@@ -51,6 +57,8 @@ export function FlavorCard({
   soldCount?: number;
   /** Tampilkan like heart + counter 'terjual' di kartu. */
   showSocial?: boolean;
+  /** Read-only: tampil tapi jangan izinkan like. */
+  readOnlySocial?: boolean;
 }) {
   const { t, lang } = useI18n();
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
@@ -192,7 +200,7 @@ export function FlavorCard({
           />
         ) : null}
 
-        {/* Baris 'terjual' + like (hanya di halaman pilih menu, on demand) */}
+        {/* Baris 'terjual' + like (mode lihat di beranda, read-only di pre-order) */}
         {showSocial ? (
           <div className="mt-3 flex items-center justify-between border-t border-cocoa-100 pt-3 text-xs">
             <span className="text-cocoa-500">
@@ -203,13 +211,19 @@ export function FlavorCard({
             </span>
             <button
               type="button"
-              onClick={toggleLike}
+              onClick={() => {
+                if (readOnlySocial) return;
+                toggleLike();
+              }}
+              disabled={readOnlySocial}
               aria-pressed={isLiked}
               aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                isLiked
-                  ? "bg-berry-500 text-white"
-                  : "bg-cocoa-100 text-cocoa-600 hover:bg-berry-500/15 hover:text-berry-600"
+                readOnlySocial
+                  ? "bg-cocoa-100 text-cocoa-400"
+                  : isLiked
+                    ? "bg-berry-500 text-white"
+                    : "bg-cocoa-100 text-cocoa-600 hover:bg-berry-500/15 hover:text-berry-600"
               }`}
             >
               <Heart

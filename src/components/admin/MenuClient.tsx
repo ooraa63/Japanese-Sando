@@ -1010,36 +1010,7 @@ function CategoriesView(props: {
                       <ArrowLeft className="size-4 shrink-0 rotate-180 text-cocoa-300 transition group-hover:translate-x-0.5" />
                     </button>
 
-                    {/* Tombol stok cepat */}
-                    {c.stock_enabled ? (
-                      <div className="flex items-center gap-1.5 border-t border-cocoa-100 bg-cocoa-50/40 px-3 py-1.5">
-                        <button
-                          type="button"
-                          onClick={() => void changeCategoryStock(c, -1)}
-                          disabled={busyId === c.id || c.stock <= 0}
-                          className="grid size-7 place-items-center rounded-md border border-cocoa-200 text-cocoa-500 transition hover:bg-cocoa-100 disabled:opacity-40"
-                          aria-label="-1"
-                        >
-                          <Minus className="size-3.5" />
-                        </button>
-                        <span className="min-w-8 text-center font-display text-sm font-extrabold text-cocoa-800 tabular">
-                          {c.stock}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => void changeCategoryStock(c, 1)}
-                          disabled={busyId === c.id}
-                          className="grid size-7 place-items-center rounded-md border border-cocoa-200 text-cocoa-500 transition hover:bg-cocoa-100 disabled:opacity-40"
-                          aria-label="+1"
-                        >
-                          <Plus className="size-3.5" />
-                        </button>
-                        <span className="ml-2 text-[10px] font-bold text-cocoa-400 uppercase">
-                          {t.admin.menu.stockQuick}
-                        </span>
-                      </div>
-                    ) : null}
-
+                    {/* Aksi edit & hapus — tombol stok cepat dipindah ke halaman detail kategori */}
                     <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
                       <button
                         type="button"
@@ -1082,6 +1053,7 @@ function CategoriesView(props: {
             toggleFlavorActive,
             toggleFlavorFeatured,
             busyId,
+            changeCategoryStock,
           }}
         />
       )}
@@ -1100,6 +1072,7 @@ function FlavorList(props: {
   toggleFlavorActive: (f: Flavor) => Promise<void>;
   toggleFlavorFeatured: (f: Flavor) => Promise<void>;
   busyId: number | null;
+  changeCategoryStock: (c: Category, delta: number) => Promise<void>;
 }) {
   const {
     t,
@@ -1112,22 +1085,63 @@ function FlavorList(props: {
     toggleFlavorActive,
     toggleFlavorFeatured,
     busyId,
+    changeCategoryStock,
   } = props;
 
   return (
     <>
-      <div className="flex items-center gap-2.5">
-        <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-cocoa-300 to-cocoa-500 text-white">
-          <LayoutGrid className="size-4" />
-        </span>
-        <div>
-          <h2 className="font-display text-lg font-bold text-cocoa-900">
-            {lang === "en" ? activeCategory.name_en : activeCategory.name_id}
-          </h2>
-          <p className="text-xs text-cocoa-400">
-            {flavorsInCategory.length} {t.menu.flavors}
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cocoa-200 bg-white px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-cocoa-300 to-cocoa-500 text-white">
+            <LayoutGrid className="size-4" />
+          </span>
+          <div>
+            <h2 className="font-display text-lg font-bold text-cocoa-900">
+              {lang === "en" ? activeCategory.name_en : activeCategory.name_id}
+            </h2>
+            <p className="text-xs text-cocoa-400">
+              {flavorsInCategory.length} {t.menu.flavors}
+            </p>
+          </div>
         </div>
+
+        {/* Tombol stok di header kategori — muncul saat halaman detail */}
+        {activeCategory.stock_enabled ? (
+          <div className="flex items-center gap-2 rounded-xl bg-cream-50 px-2 py-1.5">
+            <span className="text-[10px] font-bold tracking-wide text-cocoa-500 uppercase">
+              {t.admin.menu.stockQuick}
+            </span>
+            <button
+              type="button"
+              onClick={() => void changeCategoryStock(activeCategory, -1)}
+              disabled={busyId === activeCategory.id || activeCategory.stock <= 0}
+              className="grid size-8 place-items-center rounded-md border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
+              aria-label="-1"
+            >
+              <Minus className="size-4" />
+            </button>
+            <span className="min-w-10 text-center font-display text-lg font-extrabold text-cocoa-900 tabular">
+              {activeCategory.stock}
+            </span>
+            <button
+              type="button"
+              onClick={() => void changeCategoryStock(activeCategory, 1)}
+              disabled={busyId === activeCategory.id}
+              className="grid size-8 place-items-center rounded-md border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
+              aria-label="+1"
+            >
+              <Plus className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void changeCategoryStock(activeCategory, 10)}
+              disabled={busyId === activeCategory.id}
+              className="rounded-md border border-cocoa-200 px-2 py-1.5 text-xs font-bold text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
+            >
+              +10
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {flavorsInCategory.length === 0 ? (

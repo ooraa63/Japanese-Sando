@@ -10,6 +10,7 @@ import {
   Check,
   Copy,
   Loader2,
+  MapPin,
   ShoppingBag,
   Store,
   Truck,
@@ -198,6 +199,11 @@ export function OrderFlow({
     const email = draft.email.trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       next.email = t.order.identity.emailError;
+    }
+    // Instagram wajib (username saja, tanpa @).
+    const ig = draft.instagram.trim().replace(/^@/, "");
+    if (!ig) {
+      next.instagram = t.order.identity.instagramError;
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -475,9 +481,7 @@ export function OrderFlow({
                   <div>
                     <label htmlFor="instagram" className="label">
                       {t.order.identity.instagram}
-                      <span className="ml-1 text-cocoa-400 text-[10px] font-semibold">
-                        ({t.common.optional})
-                      </span>
+                      <span className="ml-1 text-berry-500">*</span>
                     </label>
                     <div className="relative">
                       <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
@@ -486,17 +490,21 @@ export function OrderFlow({
                       <input
                         id="instagram"
                         dir="ltr"
-                        className="input pl-9"
+                        className={`input pl-9 ${errors.instagram ? "input-error" : ""}`}
                         placeholder="username"
                         value={draft.instagram}
                         autoComplete="off"
-                        onChange={(e) =>
+                        onChange={(e) => {
                           updateDraft({
                             instagram: e.target.value.replace(/^@/, "").replace(/\s/g, ""),
-                          })
-                        }
+                          });
+                          if (errors.instagram) setErrors((p) => ({ ...p, instagram: "" }));
+                        }}
                       />
                     </div>
+                    <p className="mt-1.5 text-xs text-cocoa-400">
+                      {errors.instagram ?? t.order.identity.instagramHint}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -563,43 +571,88 @@ export function OrderFlow({
                 />
               </div>
 
-              {/* Cara pengambilan — dengan catatan yang bisa diatur di dashboard */}
+              {/* Cara penerimaan — 2 tingkat: Ambil di toko / Diantar -> pilih zona spesifik */}
               <h3 className="mt-8 text-base font-bold text-cocoa-800">
                 {t.order.payment.deliveryTitle}
               </h3>
+
+              {/* Tingkat 1: Ambil di toko vs Diantar */}
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {deliveryZones.map((z) => {
-                  const zName = lang === "en" ? z.name_en : z.name_id;
-                  const zNote =
-                    (lang === "en" ? z.note_en : z.note_id) ?? "";
-                  const isPickup = z.id === "pickup";
-                  return (
-                    <ChoiceCard
-                      key={z.id}
-                      selected={draft.deliveryZone === z.id}
-                      onClick={() => {
-                        updateDraft({
-                          deliveryZone: z.id,
-                          deliveryMethod: isPickup ? "pickup" : "delivery",
-                        });
-                      }}
-                      icon={isPickup ? <Store className="size-5" /> : <Truck className="size-5" />}
-                      title={zName}
-                      desc={
-                        z.fee > 0
-                          ? `${formatIDR(z.fee, lang)}`
-                          : lang === "en"
-                            ? "Free"
-                            : "Gratis"
-                      }
-                      note={zNote || (isPickup ? pickupNote : "")}
-                    />
-                  );
-                })}
+                <ChoiceCard
+                  selected={draft.deliveryMethod === "pickup"}
+                  onClick={() =>
+                    updateDraft({
+                      deliveryMethod: "pickup",
+                      deliveryZone: "pickup",
+                      address: "",
+                      addressNote: "",
+                      lat: null,
+                      lng: null,
+                    })
+                  }
+                  icon={<Store className="size-5" />}
+                  title={t.order.payment.pickup}
+                  desc={t.order.payment.pickupDesc}
+                  note={pickupNote}
+                />
+                <ChoiceCard
+                  selected={draft.deliveryMethod === "delivery"}
+                  onClick={() =>
+                    // Saat pertama kali pilih 'Diantar', default ke zona
+                    // pertama yang bukan pickup.
+                    updateDraft({
+                      deliveryMethod: "delivery",
+                      deliveryZone:
+                        deliveryZones.find((z) => z.id !== "pickup")?.id ??
+                        "vihara",
+                    })
+                  }
+                  icon={<Truck className="size-5" />}
+                  title={t.order.payment.delivery}
+                  desc={t.order.payment.deliveryDesc}
+                />
               </div>
 
+              {/* Tingkat 2: zona spesifik (hanya muncul setelah pilih 'Dantar') */}
+              {draft.deliveryMethod === "delivery" ? (
+                <div className="mt-4">
+                  <p className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
+                    {t.order.payment.deliveryZoneTitle}
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    {deliveryZones
+                      .filter((z) => z.id !== "pickup")
+                      .map((z) => {
+                        const zName =
+                          lang === "en" ? z.name_en : z.name_id;
+                        const zNote =
+                          (lang === "en" ? z.note_en : z.note_id) ?? "";
+                        return (
+                          <ChoiceCard
+                            key={z.id}
+                            selected={draft.deliveryZone === z.id}
+                            onClick={() =>
+                              updateDraft({ deliveryZone: z.id })
+                            }
+                            icon={<MapPin className="size-5" />}
+                            title={zName}
+                            desc={
+                              z.fee > 0
+                                ? `${formatIDR(z.fee, lang)}`
+                                : lang === "en"
+                                  ? "Free"
+                                  : "Gratis"
+                            }
+                            note={zNote}
+                          />
+                        );
+                      })}
+                  </div>
+                </div>
+              ) : null}
+
               {/* Alamat + map picker — hanya untuk delivery (zone != 'pickup') */}
-              {draft.deliveryZone !== "pickup" ? (
+              {draft.deliveryMethod === "delivery" ? (
                 <AddressPicker
                   draft={draft}
                   updateDraft={updateDraft}
@@ -958,23 +1011,12 @@ export function OrderFlow({
             ) : null}
           </div>
 
-          {settings.whatsapp ? (
-            <a
-              href={`https://wa.me/${settings.whatsapp.replace(/\D/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-outline mt-4 w-full"
-            >
-              <MessageIcon />
-              {t.track.waSeller}
-            </a>
-          ) : null}
-        </aside>
+          </aside>
       </div>
 
       <CartDrawer
         categories={categories}
-        open={cartOpen}
+        open={cartOpen && step === "menu"}
         onClose={() => setCartOpen(false)}
       />
     </div>
@@ -982,23 +1024,6 @@ export function OrderFlow({
 }
 
 /* ---------- komponen kecil ---------- */
-
-function MessageIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-4"
-      aria-hidden
-    >
-      <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" />
-    </svg>
-  );
-}
 
 /**
  * Badge kecil di header langkah menu: total pcs dari semua kategori yang

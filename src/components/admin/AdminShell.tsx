@@ -8,6 +8,7 @@ import {
   ExternalLink,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
   Settings,
   Users,
@@ -24,6 +25,7 @@ const NAV = [
   { href: "/admin/orders", key: "orders" as const, icon: ClipboardList, exact: false },
   { href: "/admin/menu", key: "menu" as const, icon: UtensilsCrossed, exact: false },
   { href: "/admin/customers", key: "customers" as const, icon: Users, exact: false },
+  { href: "/admin/announcements", key: "announcements" as const, icon: Megaphone, exact: false },
   { href: "/admin/settings", key: "settings" as const, icon: Settings, exact: false },
 ];
 
@@ -45,6 +47,7 @@ export function AdminShell({
     orders: string;
     menu: string;
     customers: string;
+    announcements: string;
     settings: string;
     viewSite: string;
     signOut: string;

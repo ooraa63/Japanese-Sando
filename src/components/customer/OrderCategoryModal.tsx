@@ -95,6 +95,7 @@ export function OrderCategoryModal({
               remainingStock={remainingStock}
               selectable
               showSocial
+              readOnlySocial
               soldCount={soldCounts[f.id] ?? 0}
             />
           ))}

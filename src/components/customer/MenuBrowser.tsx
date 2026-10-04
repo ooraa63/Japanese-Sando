@@ -19,12 +19,15 @@ export function MenuBrowser({
   bundles = [],
   remainingStock = null,
   emptyLabel,
+  soldCounts = {},
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri (category_id=NULL). */
   bundles?: Bundle[];
   remainingStock?: number | null;
   emptyLabel?: string;
+  /** Map flavorId -> jumlah terjual (untuk like/sold di beranda). */
+  soldCounts?: Record<number, number>;
 }) {
   const { t, lang } = useI18n();
   const withFlavors = useMemo(
@@ -182,6 +185,8 @@ export function MenuBrowser({
                 flavor={f}
                 remainingStock={remainingStock}
                 categoryName={onlyOne ? undefined : lang === "en" ? shown.name_en : shown.name_id}
+                showSocial
+                soldCount={soldCounts[f.id] ?? 0}
               />
             ))}
           </div>

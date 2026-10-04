@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MapPin, X } from "lucide-react";
+import { Loader2, MapPin, Search, X } from "lucide-react";
 import type { Dict } from "@/lib/types";
 import type { CartDraft } from "@/components/customer/CartProvider";
 
@@ -9,17 +9,25 @@ import type { CartDraft } from "@/components/customer/CartProvider";
 type PickerDict = Dict["order"]["payment"];
 
 /**
- * Picker alamat + peta OpenStreetMap (via iframe — tanpa API key).
+ * Picker alamat dengan peta OSM.
  *
  * Alur:
- *   - User klik tombol "Pilih di peta" -> modal dengan peta.
- *   - Klik lokasi -> set lat/lng + reverse-geocode alamat via Nominatim (OSM).
- *   - User boleh edit alamat teks + catatan alamat.
+ *  - User ketik alamat (mis. "Jalan Asia Afrika 100, Bandung") di search box.
+ *  - Klik tombol cari -> Nominatim forward-geocode -> dapat {lat, lng, display_name}.
+ *  - Pilih dari hasil pencarian -> set alamat + koordinat.
+ *  - Bisa edit alamat teks & patokan (catatan alamat).
  *
- * Default center: Bandung (-6.917, 107.619) — bisa digeser manual nanti.
+ * OpenStreetMap embed iframe tidak mengirim event klik ke host, jadi
+ * user mengetik nama jalan (lebih akurat) daripada klik acak di peta.
  */
 const DEFAULT_CENTER = { lat: -6.917, lng: 107.619 };
-const NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse";
+const NOMINATIM_SEARCH = "https://nominatim.openstreetmap.org/search";
+
+type SearchResult = {
+  display_name: string;
+  lat: string;
+  lon: string;
+};
 
 export function AddressPicker({
   draft,
@@ -31,12 +39,10 @@ export function AddressPicker({
   dict: PickerDict;
 }) {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   const hasLocation =
     typeof draft.lat === "number" && typeof draft.lng === "number";
 
-  // Center peta: pakai draft.lat/lng kalau ada, fallback ke DEFAULT_CENTER.
   const center = useMemo(
     () =>
       hasLocation
@@ -55,35 +61,7 @@ export function AddressPicker({
     };
   }, [center]);
 
-  // Iframe URL — klik diteruskan via Nominatim (search) atau alamat manual.
   const iframeSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox.west}%2C${bbox.south}%2C${bbox.east}%2C${bbox.north}&layer=mapnik&marker=${center.lat}%2C${center.lng}`;
-
-  async function reverseGeocode(lat: number, lng: number) {
-    setBusy(true);
-    try {
-      const r = await fetch(
-        `${NOMINATIM_URL}?lat=${lat}&lon=${lng}&format=json&accept-language=id`,
-        {
-          headers: { "Accept-Language": "id,en" },
-        }
-      );
-      if (!r.ok) return "";
-      const j = (await r.json()) as { display_name?: string };
-      return j.display_name ?? "";
-    } catch {
-      return "";
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /**
-   * Buka picker di peta — versi sederhana: user memasukkan koordinat
-   * manual atau alamat teks. Koordinat bisa kita ambil dari embed map
-   * dengan klik — tapi OpenStreetMap embed tidak mengirim event ke host.
-   * Untuk UX sederhana: tampilkan peta (visually) + field input
-   * koordinat/alamat. Klik pada marker akan update posisi.
-   */
 
   return (
     <div className="mt-4 space-y-3">
@@ -110,7 +88,7 @@ export function AddressPicker({
         onChange={(e) => updateDraft({ address: e.target.value })}
       />
 
-      {/* Preview map ringkas (kalau sudah ada koordinat) */}
+      {/* Preview peta ringkas (kalau sudah ada koordinat) */}
       {hasLocation ? (
         <div className="overflow-hidden rounded-2xl border border-cocoa-200">
           <iframe
@@ -120,9 +98,7 @@ export function AddressPicker({
             loading="lazy"
           />
           <div className="flex items-center justify-between gap-2 border-t border-cocoa-100 bg-cream-50 px-3 py-1.5 text-[11px] text-cocoa-500">
-            <span className="tabular">
-              {center.lat.toFixed(5)}, {center.lng.toFixed(5)}
-            </span>
+            <span className="line-clamp-1 flex-1">{draft.address}</span>
             <button
               type="button"
               onClick={() => updateDraft({ lat: null, lng: null })}
@@ -138,7 +114,9 @@ export function AddressPicker({
       <div>
         <label htmlFor="address-note" className="label">
           {dict.addressNote}
-          <span className="ml-1 font-normal text-cocoa-400">({dict.addressNoteHint})</span>
+          <span className="ml-1 font-normal text-cocoa-400">
+            ({dict.addressNoteHint})
+          </span>
         </label>
         <textarea
           id="address-note"
@@ -151,21 +129,17 @@ export function AddressPicker({
       </div>
 
       {open ? (
-        <MapModal
+        <MapSearchModal
           center={center}
           onClose={() => setOpen(false)}
-          onManual={(lat, lng) => {
-            // Pakai Nominatim untuk ambil nama tempat dari koordinat.
-            void reverseGeocode(lat, lng).then((label) => {
-              updateDraft({
-                lat,
-                lng,
-                address: label || draft.address,
-              });
+          onPick={(lat, lng, label) => {
+            updateDraft({
+              lat,
+              lng,
+              address: label || draft.address,
             });
             setOpen(false);
           }}
-          busy={busy}
           dict={dict}
         />
       ) : null}
@@ -174,28 +148,65 @@ export function AddressPicker({
 }
 
 /**
- * Modal pilih lokasi: tampilkan peta besar + field manual koordinat.
- * Klik di peta -> set koordinat (via postMessage dari iframe).
+ * Modal pilih lokasi — search box dengan Nominatim + preview peta.
+ * Alih-alih input angka lat/lng, user ketik nama jalan/alamat.
  */
-function MapModal({
+function MapSearchModal({
   center,
   onClose,
-  onManual,
-  busy,
+  onPick,
   dict,
 }: {
   center: { lat: number; lng: number };
   onClose: () => void;
-  onManual: (lat: number, lng: number) => void;
-  busy: boolean;
+  onPick: (lat: number, lng: number, label: string) => void;
   dict: PickerDict;
 }) {
-  const [lat, setLat] = useState(center.lat);
-  const [lng, setLng] = useState(center.lng);
+  const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [preview, setPreview] = useState<{
+    lat: number;
+    lng: number;
+    label: string;
+  }>({ lat: center.lat, lng: center.lng, label: "" });
 
-  // Iframe URL — versi lebar
   const delta = 0.05;
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${center.lng - delta}%2C${center.lat - delta}%2C${center.lng + delta}%2C${center.lat + delta}&layer=mapnik&marker=${center.lat}%2C${center.lng}`;
+  const iframeSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${preview.lng - delta}%2C${preview.lat - delta}%2C${preview.lng + delta}%2C${preview.lat + delta}&layer=mapnik&marker=${preview.lat}%2C${preview.lng}`;
+
+  async function search(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    setBusy(true);
+    try {
+      const r = await fetch(
+        `${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=3&countrycodes=id`,
+        {
+          headers: { "Accept-Language": "id,en" },
+        }
+      );
+      if (!r.ok) {
+        setResults([]);
+        return;
+      }
+      const data = (await r.json()) as SearchResult[];
+      setResults(data);
+      // Preview ke hasil pertama
+      if (data.length > 0) {
+        const first = data[0];
+        setPreview({
+          lat: Number(first.lat),
+          lng: Number(first.lon),
+          label: first.display_name,
+        });
+      }
+    } catch {
+      setResults([]);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
@@ -223,58 +234,95 @@ function MapModal({
         <div className="space-y-3 px-5 py-4">
           <p className="text-xs text-cocoa-500">{dict.pickOnMapHint}</p>
 
-          {/* Peta iframe — embed OSM */}
+          {/* Search bar */}
+          <form onSubmit={search} className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-400" />
+            <input
+              type="search"
+              className="input pl-10"
+              placeholder={dict.searchPlaceholder}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={busy || query.trim().length === 0}
+              className="absolute inset-y-1.5 right-1.5 inline-flex items-center gap-1 rounded-md bg-cocoa-800 px-3 text-xs font-bold text-cream-50 transition hover:bg-cocoa-700 disabled:opacity-40"
+            >
+              {busy ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Search className="size-3.5" />
+              )}
+              {dict.searchButton}
+            </button>
+          </form>
+
+          {/* Preview peta */}
           <div className="overflow-hidden rounded-2xl border border-cocoa-200">
             <iframe
-              title="map-pick"
-              src={src}
-              className="h-64 w-full"
+              title="map-preview"
+              src={iframeSrc}
+              className="h-48 w-full"
               loading="lazy"
             />
           </div>
 
-          {/* Input manual koordinat */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="lat" className="label">
-                {dict.lat}
-              </label>
-              <input
-                id="lat"
-                type="number"
-                step="0.0001"
-                className="input tabular"
-                value={lat}
-                onChange={(e) => setLat(Number(e.target.value))}
-              />
+          {/* Hasil pencarian */}
+          {results.length > 0 ? (
+            <ul className="max-h-40 overflow-y-auto rounded-2xl border border-cocoa-200 bg-cocoa-50">
+              {results.map((r, i) => (
+                <li
+                  key={`${r.lat}-${r.lon}-${i}`}
+                  className="border-b border-cocoa-100 last:border-b-0"
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreview({
+                        lat: Number(r.lat),
+                        lng: Number(r.lon),
+                        label: r.display_name,
+                      })
+                    }
+                    className="block w-full px-3 py-2 text-left text-[12px] text-cocoa-700 transition hover:bg-cocoa-100"
+                  >
+                    <span className="line-clamp-2">{r.display_name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : query && !busy ? (
+            <p className="rounded-xl bg-honey-300/20 p-3 text-center text-xs font-semibold text-honey-500">
+              {dict.noResult}
+            </p>
+          ) : null}
+
+          {/* Preview alamat yang akan disimpan */}
+          {preview.label ? (
+            <div className="rounded-xl border border-cocoa-200 bg-cream-50 p-3">
+              <p className="text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
+                {dict.previewLabel}
+              </p>
+              <p className="mt-1 line-clamp-2 text-sm font-semibold text-cocoa-800">
+                {preview.label}
+              </p>
             </div>
-            <div>
-              <label htmlFor="lng" className="label">
-                {dict.lng}
-              </label>
-              <input
-                id="lng"
-                type="number"
-                step="0.0001"
-                className="input tabular"
-                value={lng}
-                onChange={(e) => setLng(Number(e.target.value))}
-              />
-            </div>
-          </div>
+          ) : null}
         </div>
 
         <footer className="flex items-center justify-end gap-2 border-t border-cocoa-100 bg-cocoa-50/60 px-5 py-3.5">
           <button type="button" onClick={onClose} className="btn-ghost">
-            Batal
+            {dict.cancel}
           </button>
           <button
             type="button"
-            onClick={() => onManual(lat, lng)}
+            onClick={() => onPick(preview.lat, preview.lng, preview.label)}
             className="btn-primary"
-            disabled={busy}
+            disabled={!preview.label}
           >
-            {busy ? "..." : dict.confirmLocation}
+            {dict.confirmLocation}
           </button>
         </footer>
       </div>

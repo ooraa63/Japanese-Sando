@@ -31,10 +31,21 @@ export function Modal({
     };
     document.addEventListener("keydown", onKey);
 
-    // Kunci scroll body + fokuskan panel agar keyboard user tidak tersesat
+    // Kunci scroll body + fokus ke input pertama dalam modal (kalau ada),
+    // supaya mengetik di input tidak langsung merebut fokus ke panel.
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
+
+    const panel = panelRef.current;
+    if (panel) {
+      const focusable = panel.querySelector<HTMLElement>(
+        'input, textarea, select, button, [tabindex]:not([tabindex="-1"])'
+      );
+      // Pakai rAF supaya input benar-benar sudah ter-mount sebelum fokus.
+      requestAnimationFrame(() => {
+        focusable?.focus();
+      });
+    }
 
     return () => {
       document.removeEventListener("keydown", onKey);
