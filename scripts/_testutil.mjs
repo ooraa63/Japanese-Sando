@@ -68,7 +68,8 @@ export async function resetAll(client, { bundles = [] } = {}) {
        max_per_order   = 50
      where id = 1;`
   );
-  await client.query(`update public.flavors set bundle_tiers = $1::jsonb;`, [
+  // Paket harga dimiliki jenis makanan (kategori).
+  await client.query(`update public.categories set bundle_tiers = $1::jsonb;`, [
     JSON.stringify(bundles),
   ]);
 }

@@ -192,8 +192,48 @@ export function calcBundle(
 }
 
 /** Price satu produk untuk sejumlah pcs (versi ringkas). */
-export function flavorPrice(qty: number, flavor: { price: number; bundle_tiers?: BundleTier[] }): number {
+export function flavorPrice(
+  qty: number,
+  flavor: { price: number; bundle_tiers?: BundleTier[] }
+): number {
   return calcBundle(qty, flavor.price, flavor.bundle_tiers ?? []).total;
+}
+
+/**
+ * Harga satu JENIS MAKANAN untuk sejumlah pcs.
+ *
+ * Paket dimiliki kategori, bukan rasa. Semua pcs dari satu jenis dihitung
+ * bersama, apa pun rasa yang dipilih — jadi beli 1 Choco Matcha + 1 Cookies &
+ * Cream tetap dianggap 2 pcs dari "Sando Sandwich" dan dapat paket 2.
+ */
+export function categoryPrice(
+  qty: number,
+  category: { bundle_tiers?: BundleTier[]; flavors?: Array<{ price: number }> }
+): number {
+  const flavors = category.flavors ?? [];
+  if (flavors.length === 0) return 0;
+  const avg = Math.round(flavors.reduce((s, f) => s + f.price, 0) / flavors.length);
+  return calcBundle(qty, avg, category.bundle_tiers ?? []).total;
+}
+
+/** Ringkasan paket termurah di seluruh toko — untuk teaser di beranda. */
+export function cheapestBundle(
+  categories: Array<{ bundle_tiers?: BundleTier[]; flavors?: Array<{ price: number }> }>
+): { qty: number; price: number } | null {
+  let best: { qty: number; price: number } | null = null;
+
+  for (const cat of categories) {
+    const flavors = cat.flavors ?? [];
+    if (flavors.length === 0) continue;
+    const avg = Math.round(flavors.reduce((s, f) => s + f.price, 0) / flavors.length);
+
+    for (const tier of cat.bundle_tiers ?? []) {
+      if (tier.qty < 2 || tier.price <= 0) continue;
+      if (tier.price >= tier.qty * avg) continue; // tidak lebih murah
+      if (!best || tier.price < best.price) best = { qty: tier.qty, price: tier.price };
+    }
+  }
+  return best;
 }
 
 const STATUS_KEY: Record<OrderStatus, { id: string; en: string; color: string }> = {

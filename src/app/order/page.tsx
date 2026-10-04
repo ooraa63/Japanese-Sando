@@ -3,7 +3,7 @@ import { getPublicMenu, getSettings } from "@/lib/data";
 import { getI18nDict } from "@/lib/i18n-server";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
-import { OrderFlow, type Step } from "@/components/customer/OrderFlow";
+import { OrderFlow } from "@/components/customer/OrderFlow";
 import type { StoreSettings } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -15,25 +15,15 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function OrderPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ step?: string }>;
-}) {
-  const [settings, categories, dicts, query] = await Promise.all([
+export default async function OrderPage() {
+  const [settings, categories, dicts] = await Promise.all([
     getSettings(),
     getPublicMenu(),
     getI18nDict(),
-    searchParams,
   ]);
 
-  // Tombol "Pesan sekarang" di beranda mengarahkan ke ?step=menu supaya
-  // pembeli langsung bisa memilih rasa.
-  const requested = query.step;
-  const initialStep: Step =
-    requested === "menu" || requested === "payment" || requested === "review"
-      ? requested
-      : "identity";
+  // Selalu mulai dari langkah identitas (nama + telepon), apa pun URL-nya.
+  // Pembeli tidak bisa melompat ke langkah pembayaran/konfirmasi.
 
   const storeName = settings?.store_name ?? "Rumakomugi";
   const logoUrl = settings?.logo_url ?? null;
@@ -66,7 +56,6 @@ export default async function OrderPage({
         <OrderFlow
           categories={categories}
           settings={settings as StoreSettings}
-          initialStep={initialStep}
         />
       </main>
       <SiteFooter settings={settings} />

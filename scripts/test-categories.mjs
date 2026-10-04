@@ -14,6 +14,7 @@ import {
 } from "./_testutil.mjs";
 
 const t = tracker();
+const check = t.check;
 const client = new Client({ connectionString: dbUrl(), ssl: { rejectUnauthorized: false } });
 await client.connect();
 
@@ -41,6 +42,21 @@ t.check("public_menu menyertakan daftar rasa", (pubMenu[0]?.flavors?.length ?? 0
 
 // ================================================================
 console.log("\n=== 2. Tambah kategori & rasa ===");
+// Buang sisa kategori uji dari run sebelumnya supaya test bisa diulang.
+const { rows: stale } = await client.query(
+  `select id from public.categories where slug = 'croissant';`
+);
+for (const cat of stale) {
+  await client.query(`update public.flavors set category_id = $1 where category_id = $2;`, [
+    String(sandwich?.id ?? 1),
+    cat.id,
+  ]);
+  await asUser("authenticated", admin, `select public.admin_delete_category($1);`, [
+    String(cat.id),
+  ]);
+}
+check("sisa kategori uji dibersihkan", true);
+
 const newCat = await asUser("authenticated", admin, `select public.admin_save_category(
   jsonb_build_object('name_id','Croissant', 'name_en','Croissant',
     'desc_id','Ragilementer', 'desc_en','Buttery', 'sort_order', 2));`);

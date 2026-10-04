@@ -165,6 +165,7 @@ export const en = {
       totalLabel: "Total to pay",
       bundle: "bundle(s)",
       bundleOffer: "Buy {n} pcs = {price} (you save!)",
+      bundleWithSavings: "with bundle pricing",
       saving: "Bundle savings",
       submit: "Send pre-order",
       submitting: "Sending...",

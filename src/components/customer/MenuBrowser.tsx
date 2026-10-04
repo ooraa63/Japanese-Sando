@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
-import { ChevronRight, LayoutGrid, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, LayoutGrid, Sparkles, UtensilsCrossed } from "lucide-react";
 import type { Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
 import { useCart } from "./CartProvider";
 import { useToast } from "@/components/ui/Toast";
+import { cheapestBundle, formatIDR } from "@/lib/utils";
 
 /**
- * Penjelajah menu dua tingkat: pilih kategori dulu, baru lihat rasanya.
+ * Penjelahar menu dua tingkat: pilih jenis makanan dulu, baru lihat rasanya.
  * Dipakai di beranda (mode lihat) dan di halaman pre-order (mode pilih).
  */
 export function MenuBrowser({
@@ -25,10 +26,25 @@ export function MenuBrowser({
   emptyLabel?: string;
 }) {
   const { t, lang } = useI18n();
-  const withFlavors = categories.filter((c) => (c.flavors?.length ?? 0) > 0);
+  const withFlavors = useMemo(
+    () => categories.filter((c) => (c.flavors?.length ?? 0) > 0),
+    [categories]
+  );
   const [activeId, setActiveId] = useState<number | null>(null);
 
   const active = withFlavors.find((c) => c.id === activeId) ?? null;
+
+  // Kalau hanya satu jenis, langsung tampilkan rasa-rasanya (tanpa perlu klik).
+  const onlyOne = withFlavors.length === 1;
+  const shown = onlyOne ? withFlavors[0] : active;
+
+  // Paket termurah di toko, untuk memberi gambaran ke pembeli
+  const best = useMemo(() => cheapestBundle(withFlavors), [withFlavors]);
+  const bestOffer = best
+    ? t.order.review.bundleOffer
+        .replace("{n}", String(best.qty))
+        .replace("{price}", formatIDR(best.price, lang))
+    : "";
 
   if (withFlavors.length === 0) {
     return (
@@ -36,15 +52,11 @@ export function MenuBrowser({
     );
   }
 
-  // Kalau hanya satu kategori, langsung tampilkan rasanya (tanpa perlu klik).
-  const onlyOne = withFlavors.length === 1;
-  const shown = onlyOne ? withFlavors[0] : active;
-
   return (
     <div className="space-y-5">
-      {/* ---------- Tingkat 1: kategori ---------- */}
+      {/* ---------- Tingkat 1: jenis makanan ---------- */}
       <div>
-        {onlyOne && withFlavors[0] ? (
+        {onlyOne ? (
           <p className="mb-3 flex items-center gap-2 text-sm font-bold text-cocoa-500">
             <UtensilsCrossed className="size-4" />
             {lang === "en" ? withFlavors[0].name_en : withFlavors[0].name_id}
@@ -71,7 +83,9 @@ export function MenuBrowser({
                     >
                       <span
                         className={`relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl ${
-                          c.image_url ? "bg-cocoa-100" : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
+                          c.image_url
+                            ? "bg-cocoa-100"
+                            : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
                         }`}
                       >
                         {c.image_url ? (
@@ -118,21 +132,32 @@ export function MenuBrowser({
       {/* ---------- Tingkat 2: rasa ---------- */}
       {shown ? (
         <div className="border-t border-cocoa-200 pt-5">
-          {!onlyOne ? (
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="flex items-center gap-2 text-sm font-bold text-cocoa-500">
-                <UtensilsCrossed className="size-4" />
-                {lang === "en" ? shown.name_en : shown.name_id}
-              </p>
-              <button
-                type="button"
-                onClick={() => setActiveId(null)}
-                className="text-xs font-bold text-cocoa-400 transition hover:text-cocoa-700"
-              >
-                ← {t.menu.changeCategory}
-              </button>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm font-bold text-cocoa-500">
+              <UtensilsCrossed className="size-4" />
+              {lang === "en" ? shown.name_en : shown.name_id}
+            </p>
+
+            <div className="flex items-center gap-3">
+              {/* Paket termurah di toko, untuk memberi gambaran ke pembeli */}
+              {bestOffer ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-berry-500/10 px-3 py-1 text-[11px] font-bold text-berry-600">
+                  <Sparkles className="size-3.5" />
+                  {bestOffer}
+                </span>
+              ) : null}
+
+              {!onlyOne ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveId(null)}
+                  className="text-xs font-bold text-cocoa-400 transition hover:text-cocoa-700"
+                >
+                  ← {t.menu.changeCategory}
+                </button>
+              ) : null}
             </div>
-          ) : null}
+          </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {(shown.flavors ?? []).map((f) => (

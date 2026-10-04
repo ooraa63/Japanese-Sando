@@ -139,7 +139,7 @@ export default async function HomePage() {
               <p className="mt-1.5 text-[13px] text-cocoa-400">{dicts.menu.readOnlyNote}</p>
             </div>
             {open ? (
-              <Link href="/order?step=menu" className="btn-primary shrink-0">
+              <Link href="/order" className="btn-primary shrink-0">
                 <ShoppingBag className="size-4" />
                 {dicts.menu.orderNow}
               </Link>

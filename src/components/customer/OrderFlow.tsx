@@ -18,9 +18,9 @@ import {
   Wallet,
 } from "lucide-react";
 import type {
+  CartLine,
   Category,
   DeliveryMethod,
-  Flavor,
   PaymentMethod,
   StoreSettings,
 } from "@/lib/types";
@@ -30,19 +30,17 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
-import { calcBundle, formatIDR, formatPhone } from "@/lib/utils";
+import { calcBundle, cheapestBundle, formatIDR, formatPhone } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
-export type Step = (typeof STEPS)[number];
+type Step = (typeof STEPS)[number];
 
 export function OrderFlow({
   categories,
   settings,
-  initialStep = "identity",
 }: {
   categories: Category[];
   settings: StoreSettings;
-  initialStep?: Step;
 }) {
   const { t, lang } = useI18n();
   const router = useRouter();
@@ -80,9 +78,8 @@ export function OrderFlow({
     };
   }, []);
 
-  // Langkah awal diberikan oleh Server Component (dari ?step=), supaya
-  // halaman ini tetap bisa di-render di server tanpa membaca `window`.
-  const [step, setStep] = useState<Step>(initialStep);
+  // Selalu mulai dari langkah identitas (nama + telepon).
+  const [step, setStep] = useState<Step>("identity");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -96,27 +93,42 @@ export function OrderFlow({
   );
   const flavorById = useMemo(() => new Map(flavors.map((f) => [f.id, f])), [flavors]);
 
-  const cartLines = useMemo(
-    () =>
-      (Object.entries(quantities) as [string, number][])
-        .map(([id, qty]) => ({ flavor: flavorById.get(Number(id)), qty }))
-        .filter((l): l is { flavor: Flavor; qty: number } => Boolean(l.flavor)),
-    [quantities, flavorById]
-  );
+  const cartLines = useMemo<CartLine[]>(() => {
+    const out: CartLine[] = [];
+    for (const [id, qty] of Object.entries(quantities)) {
+      const flavor = flavorById.get(Number(id));
+      if (flavor && qty > 0) out.push({ flavor, qty });
+    }
+    return out;
+  }, [quantities, flavorById]);
 
-  // Harga dihitung per rasa, karena tiap produk punya paketnya sendiri.
-  // Contoh: 2 sando pakai paket sando, 1 croissant pakai harga biasa.
-  const lines = useMemo(
-    () =>
-      cartLines.map((l) => {
-        const calc = calcBundle(l.qty, l.flavor.price, l.flavor.bundle_tiers ?? []);
-        return { ...l, calc };
-      }),
-    [cartLines]
-  );
+  // Harga dihitung per JENIS MAKANAN, karena paketnya milik kategori.
+  // Semua pcs dari satu jenis dihitung bersama, apa pun rasa yang dipilih:
+  // 1 Choco Matcha + 1 Cookies & Cream = 2 pcs dari "Sando Sandwich".
+  const groups = useMemo(() => {
+    const byCategory = new Map<number, { category: Category | null; lines: CartLine[] }>();
 
-  const subtotal = lines.reduce((sum, l) => sum + l.calc.total, 0);
-  const baseTotal = lines.reduce((sum, l) => sum + l.calc.base, 0);
+    for (const line of cartLines) {
+      const cat = categories.find((c) => c.id === line.flavor.category_id) ?? null;
+      const key = cat?.id ?? -line.flavor.id;
+      const prev = byCategory.get(key);
+      byCategory.set(key, {
+        category: cat,
+        lines: prev ? [...prev.lines, line] : [line],
+      });
+    }
+
+    return [...byCategory.values()].map(({ category, lines: ls }) => {
+      const qty = ls.reduce((s, l) => s + l.qty, 0);
+      const unit = Math.round(
+        ls.reduce((s, l) => s + l.flavor.price * l.qty, 0) / Math.max(qty, 1)
+      );
+      return { category, lines: ls, qty, calc: calcBundle(qty, unit, category?.bundle_tiers ?? []) };
+    });
+  }, [cartLines, categories]);
+
+  const subtotal = groups.reduce((sum, g) => sum + g.calc.total, 0);
+  const baseTotal = groups.reduce((sum, g) => sum + g.calc.base, 0);
   const saving = baseTotal - subtotal;
 
   // Ongkir hanya untuk pengiriman; ambil di tempat gratis.
@@ -127,21 +139,12 @@ export function OrderFlow({
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
   const deliveryNote = lang === "en" ? settings.delivery_note_en : settings.delivery_note_id;
 
-  // Ringkasan paket diambil dari paket termurah di seluruh toko, untuk
-  // memberi gambaran ke pembeli bahwa ada harga paket.
-  const cheapestTier = useMemo(() => {
-    const all = flavors.flatMap((f) =>
-      (f.bundle_tiers ?? []).map((tier) => ({ ...tier, unit: f.price }))
-    );
-    return all
-      .filter((tier) => tier.qty >= 2 && tier.price < tier.qty * tier.unit)
-      .sort((a, b) => a.price - b.price)[0];
-  }, [flavors]);
-
-  const bundleOffer = cheapestTier
+  // Paket milik jenis makanan, jadi cukup tampilkan yang termurah di toko.
+  const bestBundle = useMemo(() => cheapestBundle(categories), [categories]);
+  const bundleOffer = bestBundle
     ? t.order.review.bundleOffer
-        .replace("{n}", String(cheapestTier.qty))
-        .replace("{price}", formatIDR(cheapestTier.price, lang))
+        .replace("{n}", String(bestBundle.qty))
+        .replace("{price}", formatIDR(bestBundle.price, lang))
     : "";
 
   const stepIndex = STEPS.indexOf(step);
@@ -628,15 +631,35 @@ export function OrderFlow({
                   onEdit={() => goTo("menu")}
                   editLabel={t.order.review.editItems}
                 >
-                  <ul className="space-y-1.5">
-                    {cartLines.map((l) => (
-                      <li key={l.flavor.id} className="flex justify-between gap-4">
-                        <span>
-                          {l.qty}Ãƒâ€” {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
-                        </span>
-                        <span className="tabular text-cocoa-500">
-                          {formatIDR(l.flavor.price * l.qty, lang)}
-                        </span>
+                  <ul className="space-y-2.5">
+                    {groups.map((g) => (
+                      <li key={g.category?.id ?? `solo-${g.lines[0]?.flavor.id}`}>
+                        {g.category ? (
+                          <p className="text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
+                            {lang === "en" ? g.category.name_en : g.category.name_id}
+                          </p>
+                        ) : null}
+                        {g.lines.map((l) => (
+                          <div key={l.flavor.id} className="flex justify-between gap-4">
+                            <span>
+                              {l.qty}× {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
+                            </span>
+                            <span className="tabular text-cocoa-500">
+                              {formatIDR(l.flavor.price * l.qty, lang)}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between gap-4 font-bold text-cocoa-800">
+                          <span>
+                            {g.qty} {t.common.qty.toLowerCase()}
+                            {g.calc.tiers.length > 0 ? (
+                              <span className="ml-1.5 text-[11px] font-semibold text-matcha-600">
+                                {t.order.review.bundleWithSavings}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="tabular">{formatIDR(g.calc.total, lang)}</span>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -741,33 +764,50 @@ export function OrderFlow({
               </p>
             ) : (
               <ul className="divide-y divide-cocoa-100">
-                {lines.map((l) => (
-                  <li key={l.flavor.id} className="px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-bold text-cocoa-800">
-                          {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
-                        </p>
-                        <p className="text-[11px] text-cocoa-400 tabular">
-                          {l.qty} × {formatIDR(l.flavor.price, lang)}
-                        </p>
-                      </div>
-                      <p className="text-[13px] font-bold text-cocoa-800 tabular">
-                        {formatIDR(l.calc.total, lang)}
-                      </p>
-                    </div>
-
-                    {/* Rincian paket milik produk ini saja */}
-                    {l.calc.tiers.length > 0 ? (
-                      <p className="mt-1 text-[11px] font-semibold text-matcha-600 tabular">
-                        {l.calc.tiers
-                          .map((tier) => `${tier.qty} → ${formatIDR(tier.price, lang)}`)
-                          .join(" + ")}
-                        {l.calc.leftover > 0
-                          ? ` + ${l.calc.leftover} × ${formatIDR(l.flavor.price, lang)}`
-                          : ""}
+                {groups.map((g) => (
+                  <li key={g.category?.id ?? `solo-${g.lines[0]?.flavor.id}`} className="px-4 py-3">
+                    {/* Nama jenis makanan — paket dihitung per jenis */}
+                    {g.category ? (
+                      <p className="mb-1.5 text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
+                        {lang === "en" ? g.category.name_en : g.category.name_id}
                       </p>
                     ) : null}
+
+                    {g.lines.map((l) => (
+                      <div key={l.flavor.id} className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-bold text-cocoa-800">
+                            {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
+                          </p>
+                          <p className="text-[11px] text-cocoa-400 tabular">
+                            {l.qty} × {formatIDR(l.flavor.price, lang)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Rincian paket milik jenis makanan ini */}
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="text-[12px] font-semibold text-cocoa-600 tabular">
+                        {g.qty} {t.common.qty.toLowerCase()}
+                        {g.calc.tiers.length > 0 ? (
+                          <span className="ml-1.5 font-bold text-matcha-600">
+                            {g.calc.tiers
+                              .map((tier) => `${tier.qty} → ${formatIDR(tier.price, lang)}`)
+                              .join(" + ")}
+                            {g.calc.leftover > 0
+                              ? ` + ${g.calc.leftover} × ${formatIDR(
+                                  Math.round(g.calc.base / Math.max(g.qty, 1)),
+                                  lang
+                                )}`
+                              : ""}
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-[13px] font-bold text-cocoa-800 tabular">
+                        {formatIDR(g.calc.total, lang)}
+                      </p>
+                    </div>
                   </li>
                 ))}
               </ul>

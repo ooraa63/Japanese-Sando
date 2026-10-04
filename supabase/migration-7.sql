@@ -199,8 +199,11 @@ begin
     v_name := left(v_name, 80);
   end if;
 
-  v_slug := lower(regexp_replace(trim(both '-' from regexp_replace(
-    coalesce(p_payload ->> 'slug', v_name), '[^a-zA-Z0-9]+', '-', 'g')), '-', ''));
+  -- Slug dari "Cookies & Cream" harus jadi "cookies-cream", bukan
+  -- "cookiescream" -- karena itu spasi dan "&" diganti tanda hubung.
+  v_slug := trim(both '-' from
+    regexp_replace(lower(coalesce(nullif(btrim(coalesce(p_payload ->> 'slug', '')), ''), v_name)),
+                   '[^a-z0-9]+', '-', 'g'));
   if v_slug = '' then
     v_slug := 'item-' || substr(md5(random()::text), 1, 6);
   end if;
@@ -226,9 +229,6 @@ begin
       desc_id      = left(coalesce(p_payload ->> 'desc_id', ''), 500),
       desc_en      = left(coalesce(p_payload ->> 'desc_en', ''), 500),
       price        = v_price,
-      bundle_tiers = case when p_payload ? 'bundle_tiers'
-                          then public.clean_bundle_tiers(p_payload -> 'bundle_tiers')
-                          else bundle_tiers end,
       image_url    = case when p_payload ? 'image_url'
                           then nullif(trim(coalesce(p_payload ->> 'image_url', '')), '')
                           else image_url end,
@@ -242,7 +242,7 @@ begin
     returning id into v_id;
   else
     insert into public.flavors (
-      slug, name_id, name_en, desc_id, desc_en, price, bundle_tiers, image_url,
+      slug, name_id, name_en, desc_id, desc_en, price, image_url,
       is_active, is_featured, sort_order, category_id
     ) values (
       v_slug, v_name,
@@ -250,10 +250,6 @@ begin
       left(coalesce(p_payload ->> 'desc_id', ''), 500),
       left(coalesce(p_payload ->> 'desc_en', ''), 500),
       v_price,
-      public.clean_bundle_tiers(
-        case when jsonb_typeof(p_payload -> 'bundle_tiers') = 'array'
-             then p_payload -> 'bundle_tiers' else '[]'::jsonb end
-      ),
       nullif(trim(coalesce(p_payload ->> 'image_url', '')), ''),
       coalesce((p_payload ->> 'is_active')::boolean, true),
       coalesce((p_payload ->> 'is_featured')::boolean, false),

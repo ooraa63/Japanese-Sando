@@ -24,6 +24,8 @@ export interface Category {
   is_active: boolean;
   is_featured: boolean;
   sort_order: number;
+  /** Paket harga milik jenis makanan ini, berlaku untuk semua rasa di dalamnya */
+  bundle_tiers?: BundleTier[];
   /** Hanya diisi di listing admin */
   flavor_count?: number;
   /** Hanya diisi di public_menu() */
@@ -176,9 +178,10 @@ export interface TrackedOrder {
   items: OrderItem[];
 }
 
+/** Satu baris keranjang: rasa + jumlah. */
 export interface CartLine {
   flavor: Flavor;
-  quantity: number;
+  qty: number;
 }
 
 export interface DashboardStats {

@@ -58,27 +58,57 @@ check("form nama ada di HTML (tidak hanya skeleton)",
   orderHtml.includes("Nama lengkap") && !orderHtml.includes('value="" id="name" disabled'),
   "form tidak ter-render server");
 
-console.log("\n=== 3. Halaman /order?step=menu langsung ke langkah rasa ===");
-const menuPage = await fetch(`${APP}/order?step=menu`);
-const menuHtml = await menuPage.text();
-check("?step=menu membuka langkah pilih rasa",
-  menuHtml.includes("Mau pesan apa") && !menuHtml.includes("Siapa yang memesan"));
+console.log("\n=== 3. Halaman /order Selalu mulai dari langkah nama ===");
+// URL apa pun harus membuka langkah identitas, tidak ada cara melompat.
+for (const step of ["", "?step=menu", "?step=payment", "?step=review"]) {
+  const r = await fetch(`${APP}/order${step}`);
+  const txt = (await r.text())
+    .replace(/<script[\s\S]*?<\/script>/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ");
+  const opensName = txt.includes("Siapa yang memesan") || txt.includes("Who is ordering");
+  const skips = txt.includes("Mau pesan apa") || txt.includes("What would you like");
+  check(`/order${step || " (tanpa query)"} -> langkah nama`, opensName,
+    skips ? "langsung membuka menu (SALAH)" : "");
+}
 
-console.log("\n=== 4. Pilihan pengambilan di langkah pembayaran ===");
-const payPage = await fetch(`${APP}/order?step=payment`);
-const payHtml = await payPage.text();
-check("cara bayar tetap ada", payHtml.includes("Transfer bank") && payHtml.includes("Bayar tunai"));
-check("pilihan ambil di toko ada", payHtml.includes("Ambil di toko"));
-check("pilihan diantar ada kembali", payHtml.includes("Diantar"));
-check("catatan pengambilan tampil", payHtml.includes("Vihara Tian En") || payHtml.includes("gratis ongkir"));
+console.log("\n=== 4. Langkah pembayaran (dicek dari bundel client) ===");
+// Halaman /order hanya merender langkah nama di server. Pilihan cara bayar,
+// cara pengambilan, dan info paket baru muncul setelah pembeli menekan
+// "Lanjut" -- yaitu di sisi client. Karena itu isinya dicek dari bundel
+// JavaScript yang dikirim ke browser, bukan dari HTML.
+const orderPageHtml = await (await fetch(`${APP}/order`)).text();
+const chunkUrls = [...orderPageHtml.matchAll(/\/_next\/static\/chunks\/[^"]+\.js/g)].map((m) => m[0]);
+let bundle = "";
+for (const url of [...new Set(chunkUrls)]) {
+  try {
+    bundle += await (await fetch(`${APP}${url}`)).text();
+  } catch {
+    /* abaikan chunk yang gagal diambil */
+  }
+}
+check("cara bayar ada di bundel client",
+  bundle.includes("Transfer bank") && bundle.includes("Bayar tunai"));
+check("pilihan ambil di toko ada", bundle.includes("Ambil di toko"));
+check("pilihan diantar ada kembali", bundle.includes("Diantar"));
+check("info paket harga tampil", bundle.includes("Beli 2 pcs") || bundle.includes("lebih hemat"));
+// Catatan pengambilan diambil dari database (bukan teks di kode), jadi tidak
+// ikut ada di bundel. Dicek lewat API publik.
+const supa = await fetch(
+  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/store_settings?select=pickup_note_id&id=eq.1`,
+  { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY } }
+).then((r) => r.json());
+check("catatan pengambilan tersimpan di database",
+  typeof supa?.[0]?.pickup_note_id === "string" && supa[0].pickup_note_id.length > 10,
+  JSON.stringify(supa));
 
 console.log("\n=== 5. Beranda tidak bisa menambah ke keranjang ===");
 const home = await fetch(APP);
 const homeHtml = await home.text();
 check("tidak ada tombol 'Tambah ke keranjang' di beranda",
   !homeHtml.includes("Tambah ke keranjang"));
-check("ada tombol 'Pesan rasa ini' menuju /order",
-  homeHtml.includes("Pesan rasa ini") && homeHtml.includes("/order?step=menu"));
+check("tombol 'Pesan rasa ini' menuju /order (bukan ?step=menu)",
+  homeHtml.includes("Pesan rasa ini") && !homeHtml.includes("/order?step=menu"));
 
 console.log("\n=== 6. Header: logo, nama toko, dan brand line ===");
 check("foto hero jadi background (bukan kartu 1:1)",

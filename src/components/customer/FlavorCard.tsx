@@ -41,9 +41,12 @@ export function FlavorCard({
   const { t, lang } = useI18n();
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
   const desc = lang === "en" ? flavor.desc_en : flavor.desc_id;
-  const stockEnabled = remainingStock !== null;
-  const left = remainingStock ?? 0;
-  const soldOut = !flavor.is_active || (stockEnabled && left <= 0);
+  const stockEnabled = remainingStock !== null && remainingStock !== undefined;
+  const left = stockEnabled ? remainingStock : 0;
+  // `is_active` bisa undefined kalau objek rasa datang dari public_menu()
+  // (yang memang hanya mengirim rasa yang aktif). Unset berarti aktif.
+  const isActive = flavor.is_active ?? true;
+  const soldOut = !isActive || (stockEnabled && left <= 0);
   const low = stockEnabled && left > 0 && left <= 5;
 
   return (

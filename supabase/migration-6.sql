@@ -429,8 +429,10 @@ as $$
             'price', f.price,
             'bundle_tiers', f.bundle_tiers,
             'image_url', f.image_url,
+            'is_active', f.is_active,
             'is_featured', f.is_featured,
-            'sort_order', f.sort_order
+            'sort_order', f.sort_order,
+            'category_id', f.category_id
           ) order by f.sort_order, f.id
         )
         from public.flavors f

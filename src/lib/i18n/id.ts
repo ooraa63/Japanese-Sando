@@ -163,6 +163,7 @@ export const id: Dict = {
       totalLabel: "Total yang dibayar",
       bundle: "paket",
       bundleOffer: "Beli {n} pcs = {price} (lebih hemat!)",
+      bundleWithSavings: "dengan harga paket",
       saving: "Hemat paket",
       submit: "Kirim Pre-order",
       submitting: "Mengirim...",
