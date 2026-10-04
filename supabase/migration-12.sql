@@ -2,14 +2,14 @@
 --  MIGRASI 12 — Email wajib, IG, zona delivery, koordinat alamat, sold counter
 -- ----------------------------------------------------------------------------
 -- Perubahan:
-  * orders.customer_email: wajib (kecuali di-emptikan saat pre-order, validasi
-    di sisi aplikasi via Zod)
-  * orders.instagram: opsional, dipakai oleh admin untuk broadcast
-  * orders.delivery_zone: 'pickup' | 'vihara' | 'uvers' | 'other'
-  * orders.lat, orders.lng: koordinat alamat (nullable, dari picker peta)
-  * store_settings.delivery_zones: jsonb daftar zona dengan ongkir & catatan
-  * Catatan penghapusan metode cash: payment_method tetap diizinkan 'cash'
-    untuk backward compat, tapi UI toko menyembunyikannya
+--   - orders.customer_email: wajib (kecuali di-emptikan saat pre-order, validasi
+--     di sisi aplikasi via Zod)
+--   - orders.instagram: opsional, dipakai oleh admin untuk broadcast
+--   - orders.delivery_zone: 'pickup' | 'vihara' | 'uvers' | 'other'
+--   - orders.lat, orders.lng: koordinat alamat (nullable, dari picker peta)
+--   - store_settings.delivery_zones: jsonb daftar zona dengan ongkir & catatan
+--   - Catatan penghapusan metode cash: payment_method tetap diizinkan 'cash'
+--     untuk backward compat, tapi UI toko menyembunyikannya
 -- ============================================================================
 
 -- 1. Kolom baru di orders
@@ -587,6 +587,14 @@ $$;
 
 
 -- 8. Hapus method 'cash' dari enum constraint agar konsisten (DB lama pakai CHECK)
+--    Pertama backfill order lama 'cash' jadi 'transfer' (sebelum ulang business-logic).
+update public.orders
+  set payment_method = 'transfer'
+  where payment_method not in ('transfer', 'cash');
+update public.orders
+  set payment_method = 'transfer'
+  where payment_method = 'cash';
+
 alter table public.orders
   drop constraint if exists orders_payment_method_check;
 alter table public.orders

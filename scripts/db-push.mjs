@@ -73,8 +73,29 @@ try {
   await client.connect();
   console.log("Terhubung ke database.");
 
-  await client.query(sql);
-  console.log("Skema berhasil dijalankan.");
+  // Jalankan SQL per file agar error bisa dilokalisasi. Tiap file di-query
+  // terpisah; bila ada yang gagal, kita tahu yang mana.
+  const parts = [
+    { name: "schema.sql", sql: schemaSql },
+    { name: "migration-2.sql", sql: existsSync(migration2Path) ? readFileSync(migration2Path, "utf8") : "" },
+    { name: "migration-3.sql", sql: existsSync(migration3Path) ? readFileSync(migration3Path, "utf8") : "" },
+    { name: "migration-4.sql", sql: existsSync(migration4Path) ? readFileSync(migration4Path, "utf8") : "" },
+    { name: "migration-5.sql", sql: existsSync(migration5Path) ? readFileSync(migration5Path, "utf8") : "" },
+    { name: "migration-6.sql", sql: existsSync(migration6Path) ? readFileSync(migration6Path, "utf8") : "" },
+    { name: "migration-7.sql", sql: existsSync(migration7Path) ? readFileSync(migration7Path, "utf8") : "" },
+    { name: "migration-8.sql", sql: existsSync(migration8Path) ? readFileSync(migration8Path, "utf8") : "" },
+    { name: "migration-9.sql", sql: existsSync(migration9Path) ? readFileSync(migration9Path, "utf8") : "" },
+    { name: "migration-10.sql", sql: existsSync(migration10Path) ? readFileSync(migration10Path, "utf8") : "" },
+    { name: "migration-11.sql", sql: existsSync(migration11Path) ? readFileSync(migration11Path, "utf8") : "" },
+    { name: "migration-12.sql", sql: existsSync(migration12Path) ? readFileSync(migration12Path, "utf8") : "" },
+  ].filter((p) => p.sql.trim().length > 0);
+
+  for (const part of parts) {
+    console.log(`→ Menjalankan ${part.name} (${part.sql.length} karakter)...`);
+    await client.query(part.sql);
+    console.log(`✓ ${part.name} selesai.`);
+  }
+  console.log("\n✅ Semua file SQL berhasil dijalankan.");
 
   // Minta PostgREST memuat ulang definisi fungsi (kalau tidak, RPC baru
   // akan ditolak dengan PGRST202 sampai cache kedaluwarsa).
