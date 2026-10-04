@@ -34,7 +34,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [settings, categories] = await Promise.all([getSettings(), getPublicMenu()]);
+  const [settings, menu] = await Promise.all([getSettings(), getPublicMenu()]);
+  const categories = menu.categories;
+  const bundles = menu.bundles;
   const dicts = await getI18nDict();
 
   const open = settings?.is_preorder_open ?? true;
@@ -147,7 +149,24 @@ export default async function HomePage() {
           </div>
 
           <div className="mt-10">
-            <MenuBrowser categories={categories} />
+            <MenuBrowser
+              categories={categories}
+              bundles={(bundles as unknown as Array<{
+                id: number;
+                category_id: number | null;
+                slug: string;
+                name_id: string;
+                name_en: string;
+                desc_id: string;
+                desc_en: string;
+                price: number;
+                required_qty: number;
+                image_url: string | null;
+                is_active: boolean;
+                is_featured: boolean;
+                sort_order: number;
+              }>) ?? []}
+            />
           </div>
         </section>
 

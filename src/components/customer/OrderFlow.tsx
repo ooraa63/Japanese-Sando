@@ -11,7 +11,6 @@ import {
   Copy,
   Loader2,
   ShoppingBag,
-  Sparkles,
   Store,
   Truck,
   User,
@@ -30,7 +29,7 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
-import { calcBundle, cheapestBundle, formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
+import { formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
 type Step = (typeof STEPS)[number];
@@ -83,8 +82,19 @@ export function OrderFlow({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const stockEnabled = settings.stock_enabled;
-  const stockLeft = settings.total_stock;
+  // Stok per-kategori — total pcs dari kategori ini tidak boleh
+  // melebihi sisa stok kategori. Bundle (iterasi berikut) akan
+  // mengurangi stok kategori-nya sendiri.
+  const stockByCategory = useMemo(() => {
+    const m = new Map<number, { enabled: boolean; left: number }>();
+    for (const c of categories) {
+      m.set(c.id, {
+        enabled: c.stock_enabled,
+        left: Math.max(0, c.stock ?? 0),
+      });
+    }
+    return m;
+  }, [categories]);
 
   // Semua rasa dikumpulkan dari kategori yang tampil.
   const flavors = useMemo(
@@ -102,9 +112,8 @@ export function OrderFlow({
     return out;
   }, [quantities, flavorById]);
 
-  // Harga dihitung per JENIS MAKANAN, karena paketnya milik kategori.
-  // Semua pcs dari satu jenis dihitung bersama, apa pun rasa yang dipilih:
-  // 1 Choco Matcha + 1 Cookies & Cream = 2 pcs dari "Sando Sandwich".
+  // Kelompokkan baris keranjang per JENIS MAKANAN untuk tampilan ringkasan.
+  // Subtotal = harga satuan * qty (tanpa paket otomatis).
   const groups = useMemo(() => {
     const byCategory = new Map<number, { category: Category | null; lines: CartLine[] }>();
 
@@ -120,16 +129,13 @@ export function OrderFlow({
 
     return [...byCategory.values()].map(({ category, lines: ls }) => {
       const qty = ls.reduce((s, l) => s + l.qty, 0);
-      const unit = Math.round(
-        ls.reduce((s, l) => s + l.flavor.price * l.qty, 0) / Math.max(qty, 1)
-      );
-      return { category, lines: ls, qty, calc: calcBundle(qty, unit, category?.bundle_tiers ?? []) };
+      const total = ls.reduce((s, l) => s + l.flavor.price * l.qty, 0);
+      return { category, lines: ls, qty, total };
     });
   }, [cartLines, categories]);
 
-  const subtotal = groups.reduce((sum, g) => sum + g.calc.total, 0);
-  const baseTotal = groups.reduce((sum, g) => sum + g.calc.base, 0);
-  const saving = baseTotal - subtotal;
+  const subtotal = groups.reduce((sum, g) => sum + g.total, 0);
+  const saving = 0;
 
   // Ongkir hanya untuk pengiriman; ambil di tempat gratis.
   const deliveryFee =
@@ -138,14 +144,6 @@ export function OrderFlow({
 
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
   const deliveryNote = lang === "en" ? settings.delivery_note_en : settings.delivery_note_id;
-
-  // Paket milik jenis makanan, jadi cukup tampilkan yang termurah di toko.
-  const bestBundle = useMemo(() => cheapestBundle(categories), [categories]);
-  const bundleOffer = bestBundle
-    ? t.order.review.bundleOffer
-        .replace("{n}", String(bestBundle.qty))
-        .replace("{price}", formatIDR(bestBundle.price, lang))
-    : "";
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -172,10 +170,16 @@ export function OrderFlow({
       );
       return false;
     }
-    // Stok global: total pesanan tidak boleh melebihi sisa stok.
-    if (settings.stock_enabled && totalItems > settings.total_stock) {
-      toast.error(t.errors.insufficient_stock);
-      return false;
+    // Stok per-kategori: total pcs tiap kategori tidak boleh melebihi
+    // sisa stok kategori itu. Bundle menyusul di iterasi berikut.
+    for (const g of groups) {
+      const catId = g.category?.id;
+      if (!catId) continue;
+      const s = stockByCategory.get(catId);
+      if (s?.enabled && g.qty > s.left) {
+        toast.error(t.errors.insufficient_stock);
+        return false;
+      }
     }
     return true;
   }
@@ -254,8 +258,8 @@ export function OrderFlow({
           category:
             (lang === "en" ? g.category?.name_en : g.category?.name_id) ?? "",
           qty: g.qty,
-          unit_price: Math.round(g.calc.base / Math.max(g.qty, 1)),
-          line_total: g.calc.total,
+          unit_price: Math.round(g.total / Math.max(g.qty, 1)),
+          line_total: g.total,
           flavors: g.lines.map((l) => ({
             name: lang === "en" ? l.flavor.name_en : l.flavor.name_id,
             qty: l.qty,
@@ -409,29 +413,8 @@ export function OrderFlow({
                   title={t.order.menu.title}
                   subtitle={t.order.menu.subtitle}
                 />
-                {settings.stock_enabled ? (
-                  <p
-                    className={`mt-4 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold ${
-                      stockLeft > 0
-                        ? stockLeft <= 5
-                          ? "bg-honey-300/20 text-honey-500"
-                          : "bg-matcha-50 text-matcha-700"
-                        : "bg-berry-500/10 text-berry-600"
-                    }`}
-                  >
-                    {stockLeft > 0
-                      ? t.order.menu.stockLeft.replace("{n}", String(stockLeft))
-                      : t.menu.soldOut}
-                  </p>
-                ) : null}
-
-                {/* Info harga paket */}
-                {bundleOffer ? (
-                  <p className="mt-2 inline-flex items-center gap-2 rounded-xl bg-berry-500/10 px-3.5 py-2 text-sm font-bold text-berry-600">
-                    <Sparkles className="size-4" />
-                    {bundleOffer}
-                  </p>
-                ) : null}
+                {/* Info stok per kategori — total pcs yang masih tersedia */}
+                <StockBadge categories={categories} t={t} />
               </div>
 
               {/* Rincian item: klik kategori dulu, lalu rasa-rasanya */}
@@ -440,7 +423,7 @@ export function OrderFlow({
               ) : (
                 <OrderMenuBrowser
                   categories={categories}
-                  remainingStock={stockEnabled ? stockLeft : null}
+                  remainingStock={null}
                 />
               )}
 
@@ -675,13 +658,8 @@ export function OrderFlow({
                         <div className="flex justify-between gap-4 font-bold text-cocoa-800">
                           <span>
                             {g.qty} {t.common.qty.toLowerCase()}
-                            {g.calc.tiers.length > 0 ? (
-                              <span className="ml-1.5 text-[11px] font-semibold text-matcha-600">
-                                {t.order.review.bundleWithSavings}
-                              </span>
-                            ) : null}
                           </span>
-                          <span className="tabular">{formatIDR(g.calc.total, lang)}</span>
+                          <span className="tabular">{formatIDR(g.total, lang)}</span>
                         </div>
                       </li>
                     ))}
@@ -838,26 +816,13 @@ export function OrderFlow({
                       </div>
                     ))}
 
-                    {/* Rincian paket milik jenis makanan ini */}
+                    {/* Subtotal untuk jenis makanan ini */}
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <p className="text-[12px] font-semibold text-cocoa-600 tabular">
                         {g.qty} {t.common.qty.toLowerCase()}
-                        {g.calc.tiers.length > 0 ? (
-                          <span className="ml-1.5 font-bold text-matcha-600">
-                            {g.calc.tiers
-                              .map((tier) => `${tier.qty} → ${formatIDR(tier.price, lang)}`)
-                              .join(" + ")}
-                            {g.calc.leftover > 0
-                              ? ` + ${g.calc.leftover} × ${formatIDR(
-                                  Math.round(g.calc.base / Math.max(g.qty, 1)),
-                                  lang
-                                )}`
-                              : ""}
-                          </span>
-                        ) : null}
                       </p>
                       <p className="text-[13px] font-bold text-cocoa-800 tabular">
-                        {formatIDR(g.calc.total, lang)}
+                        {formatIDR(g.total, lang)}
                       </p>
                     </div>
                   </li>
@@ -934,6 +899,40 @@ function MessageIcon() {
     >
       <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z" />
     </svg>
+  );
+}
+
+/**
+ * Badge kecil di header langkah menu: total pcs dari semua kategori yang
+ * membatasi stok. Hanya dirender bila ada kategori dengan `stock_enabled`.
+ */
+function StockBadge({
+  categories,
+  t,
+}: {
+  categories: Category[];
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  // Akumulasi total pcs tersisa untuk kategori yang membatasi stok.
+  const tracked = categories.filter((c) => c.stock_enabled);
+  if (tracked.length === 0) return null;
+  const total = tracked.reduce((s, c) => s + Math.max(0, c.stock ?? 0), 0);
+  const low = total > 0 && total <= 5;
+
+  return (
+    <p
+      className={`mt-4 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold ${
+        total > 0
+          ? low
+            ? "bg-honey-300/20 text-honey-500"
+            : "bg-matcha-50 text-matcha-700"
+          : "bg-berry-500/10 text-berry-600"
+      }`}
+    >
+      {total > 0
+        ? t.order.menu.stockLeft.replace("{n}", String(total))
+        : t.menu.soldOut}
+    </p>
   );
 }
 

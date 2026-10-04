@@ -271,7 +271,7 @@ export function DashboardClient({
         {/* ---------- Sisi kanan ---------- */}
         <div className="space-y-6">
 
-          {/* Stok global */}
+          {/* Stok per-kategori — kelola dari Menu & stok */}
           <div className="card">
             <div className="flex items-center gap-2 border-b border-cocoa-100 px-5 py-4">
               <h2 className="flex items-center gap-2 text-base font-bold text-cocoa-800">
@@ -280,39 +280,15 @@ export function DashboardClient({
               </h2>
             </div>
             <div className="px-5 py-4">
-              {stats.stock_enabled ? (
-                <>
-                  <p className="font-display text-3xl font-extrabold text-cocoa-900 tabular">
-                    {stats.total_stock}
-                    <span className="ml-1.5 text-sm font-bold text-cocoa-400">
-                      {t.admin.dash.pcsLeft}
-                    </span>
-                  </p>
-                  <p className="mt-1 text-xs text-cocoa-400">
-                    {t.admin.dash.stockUsed.replace("{n}", String(stats.stock_used))}
-                  </p>
-                  <p className="mt-2 text-xs text-cocoa-500">
-                    {t.admin.dash.stockAllFlavors}
-                  </p>
-                  <div className="mt-3">
-                    <Link
-                      href="/admin/menu"
-                      className="text-xs font-bold text-matcha-600 transition hover:text-matcha-700"
-                    >
-                      {t.admin.dash.manageStock} â†’
-                    </Link>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-bold text-matcha-700">
-                    {t.admin.menu.noStock}
-                  </p>
-                  <p className="mt-1 text-xs text-cocoa-400">
-                    {t.admin.dash.stockUnlimited}
-                  </p>
-                </>
-              )}
+              <p className="text-sm text-cocoa-500">
+                {t.admin.dash.stockPerCategory}
+              </p>
+              <Link
+                href="/admin/menu"
+                className="mt-3 inline-flex text-xs font-bold text-matcha-600 transition hover:text-matcha-700"
+              >
+                {t.admin.dash.manageStock} →
+              </Link>
             </div>
           </div>
 

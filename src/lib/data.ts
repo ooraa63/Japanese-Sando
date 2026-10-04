@@ -37,18 +37,50 @@ export const getActiveFlavors = cache(async (): Promise<Flavor[]> => {
 });
 
 /**
- * Menu dua tingkat: kategori -> rasa.
+ * Hasil `public_menu()`: kategori beserta rasa-rasanya, plus daftar bundle
+ * berdiri sendiri (category_id IS NULL).
+ */
+export interface PublicMenuResult {
+  categories: Category[];
+  bundles: Array<{
+    id: number;
+    category_id: number | null;
+    slug: string;
+    name_id: string;
+    name_en: string;
+    desc_id: string;
+    desc_en: string;
+    price: number;
+    required_qty: number;
+    image_url: string | null;
+    is_active: boolean;
+    is_featured: boolean;
+    sort_order: number;
+  }>;
+}
+
+/**
+ * Menu dua tingkat: kategori -> rasa + bundle berdiri sendiri.
  * Satu panggilan RPC supaya tidak perlu join di client.
  */
-export const getPublicMenu = cache(async (): Promise<Category[]> => {
+export const getPublicMenu = cache(async (): Promise<PublicMenuResult> => {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("public_menu");
 
   if (error) {
     console.error("Gagal memuat menu:", error.message);
-    return [];
+    return { categories: [], bundles: [] };
   }
-  return (data as Category[]) ?? [];
+  // Backward-compat: kalau RPC masih return array (sebelum migrasi 11),
+  // perlakukan sebagai array of categories.
+  if (Array.isArray(data)) {
+    return { categories: (data as Category[]) ?? [], bundles: [] };
+  }
+  const obj = (data ?? {}) as PublicMenuResult;
+  return {
+    categories: obj.categories ?? [],
+    bundles: obj.bundles ?? [],
+  };
 });
 
 /** Ambil semua rasa termasuk yang nonaktif (khusus dashboard). */

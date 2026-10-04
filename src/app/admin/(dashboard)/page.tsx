@@ -19,12 +19,6 @@ const EMPTY_STATS: DashboardStats = {
   orders_today: 0,
   revenue_month: 0,
   flavor_count: 0,
-  stock_enabled: true,
-  total_stock: 0,
-  stock_used: 0,
-  bundle_enabled: true,
-  bundle_size: 2,
-  bundle_price: 0,
   sales_by_flavor: [],
 };
 

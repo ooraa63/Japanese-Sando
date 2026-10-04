@@ -1,6 +1,4 @@
 import type {
-  BundleBreakdown,
-  BundleTier,
   DeliveryMethod,
   InvoiceSnapshot as Invoice,
   Language,
@@ -137,101 +135,18 @@ export function waOrderLink(phone: string, order: Order, lang: Language): string
 }
 
 /**
- * Hitung harga satu produk untuk sejumlah pcs memakai paket milik produk itu.
- *
- * Paket ditumpuk: ambil paket dengan qty terbesar yang masih muat, sebanyak
- * mungkin, lalu sisanya harga satuan.
- *
- * Contoh Sando @ Rp18.000 dengan paket (2 = 35.000) dan (4 = 65.000):
- *   1 pcs -> satuan             = 18.000
- *   2 pcs -> paket 2            = 35.000
- *   3 pcs -> paket 2 + 1 satuan = 53.000
- *   4 pcs -> paket 4            = 65.000
- *   6 pcs -> paket 4 + paket 2  = 100.000
+ * Harga sebuah bundle termurah di toko — untuk teaser di beranda.
+ * Mengembalikan null kalau tidak ada bundle aktif.
  */
-export function calcBundle(
-  qty: number,
-  unitPrice: number,
-  tiers: BundleTier[]
-): BundleBreakdown {
-  const base = qty * unitPrice;
-  const plain: BundleBreakdown = {
-    tiers: [],
-    leftover: qty,
-    bundleTotal: 0,
-    leftoverTotal: base,
-    base,
-    total: base,
-    saving: 0,
-  };
-  if (qty < 2) return plain;
-
-  const valid = tiers
-    .filter((t) => t.qty >= 2 && t.price >= 0)
-    .sort((a, b) => b.qty - a.qty);
-  if (valid.length === 0) return plain;
-
-  const used: BundleTier[] = [];
-  let left = qty;
-  while (left >= 2) {
-    const tier = valid.find((t) => t.qty <= left);
-    if (!tier) break;
-    used.push(tier);
-    left -= tier.qty;
-  }
-
-  const bundleTotal = used.reduce((sum, t) => sum + t.price, 0);
-  const covered = used.reduce((sum, t) => sum + t.qty, 0);
-  const leftover = qty - covered;
-  const leftoverTotal = leftover * unitPrice;
-  const total = bundleTotal + leftoverTotal;
-
-  // Paket ternyata tidak lebih murah dari beli satuan -> pakai satuan saja.
-  if (total >= base) return plain;
-
-  return { tiers: used, leftover, bundleTotal, leftoverTotal, base, total, saving: base - total };
-}
-
-/** Price satu produk untuk sejumlah pcs (versi ringkas). */
-export function flavorPrice(
-  qty: number,
-  flavor: { price: number; bundle_tiers?: BundleTier[] }
-): number {
-  return calcBundle(qty, flavor.price, flavor.bundle_tiers ?? []).total;
-}
-
-/**
- * Harga satu JENIS MAKANAN untuk sejumlah pcs.
- *
- * Paket dimiliki kategori, bukan rasa. Semua pcs dari satu jenis dihitung
- * bersama, apa pun rasa yang dipilih — jadi beli 1 Choco Matcha + 1 Cookies &
- * Cream tetap dianggap 2 pcs dari "Sando Sandwich" dan dapat paket 2.
- */
-export function categoryPrice(
-  qty: number,
-  category: { bundle_tiers?: BundleTier[]; flavors?: Array<{ price: number }> }
-): number {
-  const flavors = category.flavors ?? [];
-  if (flavors.length === 0) return 0;
-  const avg = Math.round(flavors.reduce((s, f) => s + f.price, 0) / flavors.length);
-  return calcBundle(qty, avg, category.bundle_tiers ?? []).total;
-}
-
-/** Ringkasan paket termurah di seluruh toko — untuk teaser di beranda. */
 export function cheapestBundle(
-  categories: Array<{ bundle_tiers?: BundleTier[]; flavors?: Array<{ price: number }> }>
+  bundles: Array<{ price?: number; required_qty?: number; is_active?: boolean }>
 ): { qty: number; price: number } | null {
   let best: { qty: number; price: number } | null = null;
-
-  for (const cat of categories) {
-    const flavors = cat.flavors ?? [];
-    if (flavors.length === 0) continue;
-    const avg = Math.round(flavors.reduce((s, f) => s + f.price, 0) / flavors.length);
-
-    for (const tier of cat.bundle_tiers ?? []) {
-      if (tier.qty < 2 || tier.price <= 0) continue;
-      if (tier.price >= tier.qty * avg) continue; // tidak lebih murah
-      if (!best || tier.price < best.price) best = { qty: tier.qty, price: tier.price };
+  for (const b of bundles) {
+    if (!b.is_active || !b.price || !b.required_qty) continue;
+    if (b.price <= 0) continue;
+    if (!best || b.price < best.price) {
+      best = { qty: b.required_qty, price: b.price };
     }
   }
   return best;

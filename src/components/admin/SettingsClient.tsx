@@ -63,16 +63,12 @@ function toDraft(s: StoreSettings | null): Draft {
     announcement_id: s?.announcement_id ?? "",
     announcement_en: s?.announcement_en ?? "",
     is_preorder_open: s?.is_preorder_open ?? true,
-    stock_enabled: s?.stock_enabled ?? true,
-    total_stock: s?.total_stock ?? 20,
     hero_image_url: s?.hero_image_url ?? null,
     hero_image_mobile_url: s?.hero_image_mobile_url ?? null,
     pickup_note_id: s?.pickup_note_id ?? "",
     pickup_note_en: s?.pickup_note_en ?? "",
     delivery_note_id: s?.delivery_note_id ?? "",
     delivery_note_en: s?.delivery_note_en ?? "",
-    bundle_enabled: s?.bundle_enabled ?? true,
-    bundle_tiers: s?.bundle_tiers ?? [{ qty: 2, price: 35000 }],
     logo_url: s?.logo_url ?? null,
     brand_line: s?.brand_line ?? "Japanese Bake & Pastry",
   };
@@ -496,14 +492,8 @@ export function SettingsClient({
             onChange={(v) => patch({ delivery_fee: v })}
             prefix={formatIDR(0, lang)}
           />
-          <NumberField
-            label={t.admin.settings.totalStock}
-            value={form.total_stock}
-            min={0}
-            onChange={(v) => patch({ total_stock: v })}
-          />
         </div>
-        <p className="mt-2 text-xs text-cocoa-400">{t.admin.dash.stockAllFlavors}</p>
+        <p className="mt-2 text-xs text-cocoa-400">{t.admin.settings.stockHint}</p>
       </Section>
 
       {/* ============ Account admin ============ */}

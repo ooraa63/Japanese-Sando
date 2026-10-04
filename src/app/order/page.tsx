@@ -16,11 +16,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function OrderPage() {
-  const [settings, categories, dicts] = await Promise.all([
+  const [settings, menu, dicts] = await Promise.all([
     getSettings(),
     getPublicMenu(),
     getI18nDict(),
   ]);
+  const categories = menu.categories;
 
   // Selalu mulai dari langkah identitas (nama + telepon), apa pun URL-nya.
   // Pembeli tidak bisa melompat ke langkah pembayaran/konfirmasi.

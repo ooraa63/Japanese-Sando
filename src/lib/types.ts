@@ -28,12 +28,15 @@ export interface Category {
   is_active: boolean;
   is_featured: boolean;
   sort_order: number;
-  /** Paket harga milik jenis makanan ini, berlaku untuk semua rasa di dalamnya */
-  bundle_tiers?: BundleTier[];
+  /** Stok per-kategori — diisi di dashboard admin. */
+  stock_enabled: boolean;
+  stock: number;
   /** Hanya diisi di listing admin */
   flavor_count?: number;
   /** Hanya diisi di public_menu() */
   flavors?: Flavor[];
+  /** Bundle eksplisit yang terkait kategori ini. */
+  bundles?: Bundle[];
 }
 
 export interface Flavor {
@@ -44,8 +47,6 @@ export interface Flavor {
   desc_id: string;
   desc_en: string;
   price: number;
-  /** Paket milik produk ini: [{ qty: 2, price: 35000 }] */
-  bundle_tiers: BundleTier[];
   image_url: string | null;
   is_active: boolean;
   is_featured: boolean;
@@ -89,9 +90,6 @@ export interface StoreSettings {
   announcement_id: string;
   announcement_en: string;
   is_preorder_open: boolean;
-  /** Stok keseluruhan (bukan per rasa) */
-  stock_enabled: boolean;
-  total_stock: number;
   /** Foto background halaman depan */
   hero_image_url: string | null;
   hero_image_mobile_url: string | null;
@@ -100,37 +98,38 @@ export interface StoreSettings {
   pickup_note_en: string;
   delivery_note_id: string;
   delivery_note_en: string;
-  /** Harga paket: daftar paket bebas dari seller (masih dipakai untuk pratinjau) */
-  bundle_enabled: boolean;
-  bundle_tiers: BundleTier[];
   /** Logo & tagline di bawah nama toko */
   logo_url: string | null;
   brand_line: string;
   updated_at: string;
 }
 
-/** Satu paket: beli `{qty}` pcs dengan harga `{price}`. */
-export interface BundleTier {
-  qty: number;
+/**
+ * Bundle eksplisit — paket kombinasi yang penjual jual sebagai item
+ * tersendiri. Saat pembeli memilih bundle, mereka wajib memilih
+ * `required_qty` pcs rasa (biasanya dari kategori yang sama).
+ */
+export interface Bundle {
+  id: number;
+  category_id: number | null;
+  slug: string;
+  name_id: string;
+  name_en: string;
+  desc_id: string;
+  desc_en: string;
   price: number;
+  /** Jumlah slot rasa yang harus dipilih saat beli. */
+  required_qty: number;
+  image_url: string | null;
+  is_active: boolean;
+  is_featured: boolean;
+  sort_order: number;
 }
 
-/** Hasil kalkulasi harga paket untuk ditampilkan ke pembeli. */
-export interface BundleBreakdown {
-  /** Paket-paket yang dipakai (bisa lebih dari satu) */
-  tiers: BundleTier[];
-  /** PCS di luar paket, dibayar harga satuan */
-  leftover: number;
-  /** Total harga dari semua paket */
-  bundleTotal: number;
-  /** Harga PCS di luar paket */
-  leftoverTotal: number;
-  /** Total kalau semua dibeli satuan */
-  base: number;
-  /** Total akhir */
-  total: number;
-  /** Berapa hemat dibanding beli satuan semua */
-  saving: number;
+/** Slot pilihan rasa di dalam bundle (di sisi order). */
+export interface BundleSlotPick {
+  slot: number;
+  flavor_id: number;
 }
 
 export interface OrderItem {
@@ -253,14 +252,6 @@ export interface DashboardStats {
   orders_today: number;
   revenue_month: number;
   flavor_count: number;
-  /** Stok global */
-  stock_enabled: boolean;
-  total_stock: number;
-  stock_used: number;
-  /** Harga paket */
-  bundle_enabled: boolean;
-  bundle_size: number;
-  bundle_price: number;
   sales_by_flavor: Array<{ flavor_name: string; qty: number }>;
 }
 

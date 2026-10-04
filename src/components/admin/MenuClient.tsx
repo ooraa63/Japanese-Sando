@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Eye,
   EyeOff,
+  Gift,
   ImagePlus,
   LayoutGrid,
   Loader2,
@@ -20,18 +21,20 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import type { BundleTier, Category, Flavor, StoreSettings } from "@/lib/types";
+import type { Bundle, Category, Flavor, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
-import { calcBundle, formatIDR } from "@/lib/utils";
+import { formatIDR } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import {
   deleteCategoryAction,
   deleteFlavorAction,
+  deleteBundleAction,
   saveCategoryAction,
   saveFlavorAction,
-  setStockAction,
+  saveBundleAction,
+  setCategoryStockAction,
 } from "@/app/admin/actions";
 
 /**
@@ -44,64 +47,65 @@ interface FlavorDraft extends Omit<Flavor, "price" | "sort_order"> {
 }
 
 function toFlavorDraft(f: Flavor): FlavorDraft {
-  return {
-    ...f,
-    price: String(f.price),
-    sort_order: String(f.sort_order),
-  };
+  return { ...f, price: String(f.price), sort_order: String(f.sort_order) };
 }
 
 /**
- * Menu admin dua tingkat: daftar jenis makanan -> daftar rasa di dalamnya.
- * Tampilan default menunjukkan kategori; klik kategori untuk mengelola rasa.
+ * Bundle form state — price & sort_order string biar enak diketik.
+ */
+interface BundleDraft extends Omit<Bundle, "price" | "sort_order"> {
+  price: string;
+  sort_order: string;
+  category_id_str: string; // <select> butuh string
+}
+
+function toBundleDraft(b: Bundle): BundleDraft {
+  return {
+    ...b,
+    price: String(b.price),
+    sort_order: String(b.sort_order),
+    category_id_str: b.category_id == null ? "" : String(b.category_id),
+  };
+}
+
+type Tab = "categories" | "bundles";
+
+/**
+ * Menu admin — tiga tingkat:
+ *   1. Tab: Kategori | Bundle
+ *   2. Tingkat kategori: daftar kategori -> di dalamnya ada daftar rasa
+ *   3. Bundle: daftar bundle berdiri sendiri atau per kategori
+ *
+ * Tab "Kategori" mengikuti alur lama (klik kategori -> kelola rasa).
+ * Tab "Bundle" menampilkan semua bundle (bisa difilter per kategori).
  */
 export function MenuClient({
   initialFlavors,
   initialCategories,
-  initialSettings,
+  initialBundles,
 }: {
   initialFlavors: Flavor[];
   initialCategories: Category[];
-  initialSettings: StoreSettings | null;
+  initialBundles?: Bundle[];
+  /** Tidak dipakai langsung di klien — dipertahankan untuk kompatibilitas pemanggil. */
+  initialSettings?: StoreSettings | null;
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const router = useRouter();
 
+  const [tab, setTab] = useState<Tab>("categories");
   const [categories, setCategories] = useState(initialCategories);
   const [flavors, setFlavors] = useState(initialFlavors);
+  const [bundles, setBundles] = useState<Bundle[]>(initialBundles ?? []);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-
-  const [stock, setStock] = useState(initialSettings?.total_stock ?? 0);
-  const [stockEnabled, setStockEnabled] = useState(
-    initialSettings?.stock_enabled ?? true
-  );
-  const [stockBusy, setStockBusy] = useState(false);
   const [saving, startSaving] = useTransition();
 
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingFlavor, setEditingFlavor] = useState<FlavorDraft | null>(null);
+  const [editingBundle, setEditingBundle] = useState<BundleDraft | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
-
-  // Stok global diambil ulang tiap halaman dibuka.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("store_settings")
-        .select("total_stock, stock_enabled")
-        .eq("id", 1)
-        .maybeSingle();
-      if (cancelled || !data) return;
-      setStock(data.total_stock);
-      setStockEnabled(data.stock_enabled);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const activeCategory = categories.find((c) => c.id === activeCategoryId) ?? null;
 
@@ -120,36 +124,26 @@ export function MenuClient({
   const sortedCategories = useMemo(() => {
     const q = search.trim().toLowerCase();
     return [...categories]
-      .filter((c) => !q || c.name_id.toLowerCase().includes(q) || c.name_en.toLowerCase().includes(q))
+      .filter(
+        (c) =>
+          !q ||
+          c.name_id.toLowerCase().includes(q) ||
+          c.name_en.toLowerCase().includes(q)
+      )
       .sort((a, b) => a.sort_order - b.sort_order);
   }, [categories, search]);
 
-  /* ---------------- Stok global ---------------- */
-
-  async function changeStock(next: number) {
-    const target = Math.max(0, next);
-    setStockBusy(true);
-    const res = await setStockAction(target);
-    setStockBusy(false);
-
-    if (res.ok && res.data) {
-      setStock(res.data.total_stock);
-      router.refresh();
-    } else {
-      toast.error(t.errors.generic);
-    }
-  }
-
-  async function toggleStockEnabled(next: boolean) {
-    setStockEnabled(next);
-    const res = await setStockAction(stock);
-    if (!res.ok) {
-      setStockEnabled(!next);
-      toast.error(t.errors.generic);
-    } else {
-      router.refresh();
-    }
-  }
+  const filteredBundles = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return [...bundles]
+      .filter(
+        (b) =>
+          !q ||
+          b.name_id.toLowerCase().includes(q) ||
+          b.name_en.toLowerCase().includes(q)
+      )
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }, [bundles, search]);
 
   /* ---------------- Kategori ---------------- */
 
@@ -166,6 +160,8 @@ export function MenuClient({
       is_active: true,
       is_featured: false,
       sort_order: nextOrder,
+      stock_enabled: true,
+      stock: 0,
     });
   }
 
@@ -191,6 +187,8 @@ export function MenuClient({
         is_active: editingCategory.is_active,
         is_featured: editingCategory.is_featured,
         sort_order: editingCategory.sort_order,
+        stock_enabled: editingCategory.stock_enabled,
+        stock: editingCategory.stock,
       });
 
       if (!res.ok) {
@@ -263,7 +261,6 @@ export function MenuClient({
       stock_enabled: true,
       stock: 0,
       sort_order: String(nextOrder),
-      bundle_tiers: [],
       category_id: activeCategoryId,
       created_at: "",
       updated_at: "",
@@ -300,7 +297,6 @@ export function MenuClient({
         stock_enabled: true,
         stock: 0,
         sort_order: Number(editingFlavor.sort_order) || 0,
-        bundle_tiers: editingFlavor.bundle_tiers,
         category_id: editingFlavor.category_id ?? activeCategoryId,
       });
 
@@ -343,7 +339,11 @@ export function MenuClient({
               f.is_active &&
               !(editingFlavor.id === 0 && f.id === res.data!.id)
           ).length;
-          return { ...c, flavor_count: (c.flavor_count ?? 0) + (editingFlavor.id === 0 ? 1 : 0) || count };
+          return {
+            ...c,
+            flavor_count:
+              (c.flavor_count ?? 0) + (editingFlavor.id === 0 ? 1 : 0) || count,
+          };
         })
       );
 
@@ -364,7 +364,9 @@ export function MenuClient({
       return;
     }
     if (res.data?.deactivated) {
-      setFlavors((prev) => prev.map((x) => (x.id === f.id ? { ...x, is_active: false } : x)));
+      setFlavors((prev) =>
+        prev.map((x) => (x.id === f.id ? { ...x, is_active: false } : x))
+      );
       toast.warning(t.admin.menu.deactivated);
     } else {
       setFlavors((prev) => prev.filter((x) => x.id !== f.id));
@@ -388,14 +390,237 @@ export function MenuClient({
       stock_enabled: true,
       stock: 0,
       sort_order: f.sort_order,
-      bundle_tiers: f.bundle_tiers ?? [],
       category_id: f.category_id,
     });
     setBusyId(null);
 
     if (res.ok) {
-      setFlavors((prev) => prev.map((x) => (x.id === f.id ? { ...x, is_active: !f.is_active } : x)));
+      setFlavors((prev) =>
+        prev.map((x) => (x.id === f.id ? { ...x, is_active: !f.is_active } : x))
+      );
       toast.success(!f.is_active ? t.admin.menu.showToast : t.admin.menu.hideToast);
+    } else {
+      toast.error(t.errors.generic);
+    }
+  }
+
+  async function toggleFlavorFeatured(f: Flavor) {
+    setBusyId(f.id);
+    const res = await saveFlavorAction({
+      id: f.id,
+      name_id: f.name_id,
+      name_en: f.name_en,
+      desc_id: f.desc_id,
+      desc_en: f.desc_en,
+      price: f.price,
+      image_url: f.image_url ?? "",
+      is_active: f.is_active,
+      is_featured: !f.is_featured,
+      stock_enabled: true,
+      stock: 0,
+      sort_order: f.sort_order,
+      category_id: f.category_id,
+    });
+    setBusyId(null);
+
+    if (res.ok) {
+      setFlavors((prev) =>
+        prev.map((x) => (x.id === f.id ? { ...x, is_featured: !f.is_featured } : x))
+      );
+    } else {
+      toast.error(t.errors.generic);
+    }
+  }
+
+  /* ---------------- Bundle ---------------- */
+
+  function openNewBundle() {
+    const nextOrder = (bundles.at(-1)?.sort_order ?? 0) + 1;
+    setEditingBundle({
+      id: 0,
+      category_id: null,
+      category_id_str: activeCategory?.id ? String(activeCategory.id) : "",
+      slug: "",
+      name_id: "",
+      name_en: "",
+      desc_id: "",
+      desc_en: "",
+      price: "",
+      required_qty: 2,
+      image_url: null,
+      is_active: true,
+      is_featured: false,
+      sort_order: String(nextOrder),
+    });
+  }
+
+  function openEditBundle(b: Bundle) {
+    setEditingBundle(toBundleDraft(b));
+  }
+
+  function saveBundle() {
+    if (!editingBundle) return;
+    if (editingBundle.name_id.trim().length < 2) {
+      toast.warning(t.admin.menu.nameId);
+      return;
+    }
+    const price = Number(editingBundle.price.replace(/\D/g, ""));
+    if (!Number.isFinite(price) || price < 0) {
+      toast.warning(t.admin.menu.priceLabel);
+      return;
+    }
+
+    startSaving(async () => {
+      const res = await saveBundleAction({
+        id: editingBundle.id || null,
+        name_id: editingBundle.name_id.trim(),
+        name_en: editingBundle.name_en.trim(),
+        desc_id: editingBundle.desc_id.trim(),
+        desc_en: editingBundle.desc_en.trim(),
+        price,
+        required_qty: Math.max(1, editingBundle.required_qty),
+        image_url: editingBundle.image_url ?? "",
+        is_active: editingBundle.is_active,
+        is_featured: editingBundle.is_featured,
+        sort_order: Number(editingBundle.sort_order) || 0,
+        category_id:
+          editingBundle.category_id_str === ""
+            ? null
+            : Number(editingBundle.category_id_str),
+      });
+
+      if (!res.ok) {
+        toast.error(
+          res.error === "slug_taken" ? t.admin.menu.slugTaken : t.errors.generic
+        );
+        return;
+      }
+
+      setBundles((prev) => {
+        const id = res.data!.id;
+        const next: Bundle = {
+          ...editingBundle,
+          id,
+          slug:
+            editingBundle.name_id
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, ""),
+          price,
+          category_id:
+            editingBundle.category_id_str === ""
+              ? null
+              : Number(editingBundle.category_id_str),
+          sort_order: Number(editingBundle.sort_order) || 0,
+        };
+        const exists = prev.some((b) => b.id === id);
+        return exists
+          ? prev.map((b) => (b.id === id ? { ...b, ...next } : b))
+          : [...prev, next].sort((a, b) => a.sort_order - b.sort_order);
+      });
+
+      toast.success(t.admin.menu.bundleSaved);
+      setEditingBundle(null);
+      router.refresh();
+    });
+  }
+
+  async function removeBundle(b: Bundle) {
+    if (!window.confirm(t.admin.menu.deleteBundleConfirm)) return;
+    setBusyId(b.id);
+    const res = await deleteBundleAction(b.id);
+    setBusyId(null);
+
+    if (!res.ok) {
+      toast.error(t.errors.generic);
+      return;
+    }
+    if (res.data?.deactivated) {
+      setBundles((prev) =>
+        prev.map((x) => (x.id === b.id ? { ...x, is_active: false } : x))
+      );
+      toast.warning(t.admin.menu.bundleDeactivated);
+    } else {
+      setBundles((prev) => prev.filter((x) => x.id !== b.id));
+      toast.success(t.admin.menu.bundleDeleted);
+    }
+    router.refresh();
+  }
+
+  async function toggleBundleFeatured(b: Bundle) {
+    setBusyId(b.id);
+    const res = await saveBundleAction({
+      id: b.id,
+      name_id: b.name_id,
+      name_en: b.name_en,
+      desc_id: b.desc_id,
+      desc_en: b.desc_en,
+      price: b.price,
+      required_qty: b.required_qty,
+      image_url: b.image_url ?? "",
+      is_active: b.is_active,
+      is_featured: !b.is_featured,
+      sort_order: b.sort_order,
+      category_id: b.category_id,
+    });
+    setBusyId(null);
+
+    if (res.ok) {
+      setBundles((prev) =>
+        prev.map((x) =>
+          x.id === b.id ? { ...x, is_featured: !x.is_featured } : x
+        )
+      );
+    } else {
+      toast.error(t.errors.generic);
+    }
+  }
+
+  async function toggleBundleActive(b: Bundle) {
+    setBusyId(b.id);
+    const res = await saveBundleAction({
+      id: b.id,
+      name_id: b.name_id,
+      name_en: b.name_en,
+      desc_id: b.desc_id,
+      desc_en: b.desc_en,
+      price: b.price,
+      required_qty: b.required_qty,
+      image_url: b.image_url ?? "",
+      is_active: !b.is_active,
+      is_featured: b.is_featured,
+      sort_order: b.sort_order,
+      category_id: b.category_id,
+    });
+    setBusyId(null);
+
+    if (res.ok) {
+      setBundles((prev) =>
+        prev.map((x) =>
+          x.id === b.id ? { ...x, is_active: !x.is_active } : x
+        )
+      );
+      toast.success(!b.is_active ? t.admin.menu.showToast : t.admin.menu.hideToast);
+    } else {
+      toast.error(t.errors.generic);
+    }
+  }
+
+  /* ---------------- Stok per kategori ---------------- */
+
+  async function changeCategoryStock(c: Category, delta: number) {
+    const target = Math.max(0, (c.stock ?? 0) + delta);
+    setBusyId(c.id);
+    const res = await setCategoryStockAction(c.id, target);
+    setBusyId(null);
+
+    if (res.ok) {
+      setCategories((prev) =>
+        prev.map((x) =>
+          x.id === c.id ? { ...x, stock: res.data!.stock } : x
+        )
+      );
+      router.refresh();
     } else {
       toast.error(t.errors.generic);
     }
@@ -405,7 +630,7 @@ export function MenuClient({
 
   return (
     <div className="space-y-5">
-      {/* ---------- Header ---------- */}
+      {/* ---------- Header + tabs ---------- */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-cocoa-900 sm:text-3xl">
@@ -413,363 +638,85 @@ export function MenuClient({
           </h1>
           <p className="mt-1 text-sm text-cocoa-500">{t.admin.menu.subtitle}</p>
         </div>
-        {activeCategory ? (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveCategoryId(null)}
-              className="btn-ghost !px-4 !py-2.5"
-            >
-              <ArrowLeft className="size-4" />
-              {t.admin.menu.backToCategories}
-            </button>
-            <button type="button" onClick={openNewFlavor} className="btn-primary shrink-0">
-              <Plus className="size-4" />
-              {t.admin.menu.addFlavor}
-            </button>
-          </div>
-        ) : (
-          <button type="button" onClick={openNewCategory} className="btn-primary shrink-0">
-            <Plus className="size-4" />
-            {t.admin.menu.addCategory}
+
+        {/* Tab switcher — mobile: pill horizontal, desktop: di header */}
+        <div className="flex shrink-0 gap-1 rounded-xl border border-cocoa-200 bg-cream-50 p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setTab("categories");
+              setActiveCategoryId(null);
+            }}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition sm:text-sm ${
+              tab === "categories"
+                ? "bg-cocoa-800 text-cream-50 shadow"
+                : "text-cocoa-600 hover:bg-cocoa-100"
+            }`}
+          >
+            <LayoutGrid className="size-4" />
+            {t.admin.menu.tabCategories}
+            <span className="rounded-md bg-cocoa-100/60 px-1.5 py-0.5 text-[10px] font-bold tabular text-cocoa-600">
+              {categories.length}
+            </span>
           </button>
-        )}
-      </div>
-
-      {/* ---------- Stok global ---------- */}
-      <div className="card p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span
-              className={`grid size-11 shrink-0 place-items-center rounded-2xl ${
-                stockEnabled ? "bg-matcha-100 text-matcha-700" : "bg-cocoa-100 text-cocoa-400"
-              }`}
-            >
-              <Package className="size-5" />
+          <button
+            type="button"
+            onClick={() => setTab("bundles")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition sm:text-sm ${
+              tab === "bundles"
+                ? "bg-cocoa-800 text-cream-50 shadow"
+                : "text-cocoa-600 hover:bg-cocoa-100"
+            }`}
+          >
+            <Gift className="size-4" />
+            {t.admin.menu.tabBundles}
+            <span className="rounded-md bg-cocoa-100/60 px-1.5 py-0.5 text-[10px] font-bold tabular text-cocoa-600">
+              {bundles.length}
             </span>
-            <div>
-              <h2 className="text-base font-bold text-cocoa-800">
-                {t.admin.dash.stockTitle}
-              </h2>
-              <p className="mt-0.5 text-xs text-cocoa-500">
-                {t.admin.dash.stockAllFlavors}
-              </p>
-            </div>
-          </div>
-
-          <label className="flex cursor-pointer items-center gap-2.5">
-            <span className="text-sm font-semibold text-cocoa-600">
-              {t.admin.menu.stockEnabled}
-            </span>
-            <span className="relative inline-flex">
-              <input
-                type="checkbox"
-                checked={stockEnabled}
-                onChange={(e) => void toggleStockEnabled(e.target.checked)}
-                className="peer sr-only"
-              />
-              <span className="h-6 w-11 rounded-full bg-cocoa-200 transition peer-checked:bg-matcha-500" />
-              <span className="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
-            </span>
-          </label>
+          </button>
         </div>
-
-        {stockEnabled ? (
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-cocoa-100 pt-4">
-            <button
-              type="button"
-              onClick={() => void changeStock(stock - 1)}
-              disabled={stockBusy || stock === 0}
-              className="grid size-10 place-items-center rounded-xl border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50 disabled:opacity-40"
-              aria-label="-1"
-            >
-              <Minus className="size-4" />
-            </button>
-
-            <div className="min-w-24 text-center">
-              <p className="font-display text-4xl font-extrabold text-cocoa-900 tabular">
-                {stock}
-              </p>
-              <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
-                {t.admin.dash.pcsLeft}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => void changeStock(stock + 1)}
-              disabled={stockBusy}
-              className="grid size-10 place-items-center rounded-xl border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50 disabled:opacity-40"
-              aria-label="+1"
-            >
-              {stockBusy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Plus className="size-4" />
-              )}
-            </button>
-
-            <div className="ml-auto flex items-center gap-2">
-              <input
-                type="number"
-                min={0}
-                defaultValue={stock}
-                onBlur={(e) => {
-                  const v = Number(e.target.value.replace(/\D/g, ""));
-                  if (Number.isFinite(v) && v !== stock) void changeStock(v);
-                }}
-                className="input tabular !w-24 !py-2 text-center"
-                aria-label={t.admin.menu.stockAdjust}
-              />
-              <button
-                type="button"
-                onClick={() => void changeStock(stock + 10)}
-                disabled={stockBusy}
-                className="rounded-xl border border-cocoa-200 px-3 py-2 text-xs font-bold text-cocoa-600 transition hover:bg-cocoa-50 disabled:opacity-40"
-              >
-                +10
-              </button>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-4 border-t border-cocoa-100 pt-4 text-sm font-semibold text-cocoa-500">
-            {t.admin.dash.stockUnlimited}
-          </p>
-        )}
       </div>
 
-      {/* ---------- Pencarian ---------- */}
-      <div className="relative sm:max-w-sm">
-        <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-300" />
-        <input
-          className="input !py-2.5 pl-10"
-          placeholder={activeCategory ? t.admin.menu.searchPlaceholder : t.admin.menu.searchCategory}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          type="search"
+      {tab === "categories" ? (
+        <CategoriesView
+          {...{
+            t,
+            lang,
+            activeCategory,
+            sortedCategories,
+            flavorsInCategory,
+            search,
+            setSearch,
+            openNewCategory,
+            openEditCategory,
+            removeCategory,
+            setActiveCategoryId,
+            openNewFlavor,
+            openEditFlavor,
+            removeFlavor,
+            toggleFlavorActive,
+            toggleFlavorFeatured,
+            busyId,
+            changeCategoryStock,
+          }}
         />
-      </div>
-
-      {/* ---------- Tingkat 1: KATEGORI ---------- */}
-      {!activeCategory ? (
-        sortedCategories.length === 0 ? (
-          <div className="card p-14 text-center">
-            <LayoutGrid className="mx-auto size-8 text-cocoa-300" />
-            <p className="mt-3 text-sm text-cocoa-400">{t.admin.menu.noCategory}</p>
-            <button type="button" onClick={openNewCategory} className="btn-primary mt-5">
-              <Plus className="size-4" />
-              {t.admin.menu.addCategory}
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm text-cocoa-500">{t.admin.menu.categoryHint}</p>
-            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {sortedCategories.map((c) => {
-                const name = lang === "en" ? c.name_en : c.name_id;
-                const count = flavors.filter(
-                  (f) => f.category_id === c.id && f.is_active
-                ).length;
-
-                return (
-                  <li key={c.id} className="card overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveCategoryId(c.id);
-                        setSearch("");
-                      }}
-                      className="group flex w-full items-center gap-3.5 p-4 text-left transition hover:bg-cocoa-50"
-                    >
-                      <span
-                        className={`relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl ${
-                          c.image_url
-                            ? "bg-cocoa-100"
-                            : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
-                        }`}
-                      >
-                        {c.image_url ? (
-                          <Image
-                            src={c.image_url}
-                            alt=""
-                            fill
-                            sizes="56px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          <LayoutGrid className="size-6 text-white/70" />
-                        )}
-                        {!c.is_active ? (
-                          <span className="absolute inset-0 grid place-items-center bg-cocoa-950/65 text-[9px] font-bold tracking-wider text-white uppercase">
-                            off
-                          </span>
-                        ) : null}
-                      </span>
-
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-1.5">
-                          <span className="truncate font-display text-base font-bold text-cocoa-900">
-                            {name}
-                          </span>
-                          {c.is_featured ? (
-                            <Star className="size-3.5 shrink-0 fill-honey-400 text-honey-400" />
-                          ) : null}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-cocoa-400">
-                          {count} {t.menu.flavors}
-                        </span>
-                      </span>
-
-                      <ArrowLeft className="size-4 shrink-0 rotate-180 text-cocoa-300 transition group-hover:translate-x-0.5" />
-                    </button>
-
-                    <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditCategory(c)}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100"
-                      >
-                        <Pencil className="size-3.5" />
-                        {t.common.edit}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeCategory(c)}
-                        disabled={busyId === c.id}
-                        className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
-                      >
-                        {busyId === c.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="size-3.5" />
-                        )}
-                        {t.common.delete}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )
       ) : (
-        /* ---------- Tingkat 2: RASA ---------- */
-        <>
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-cocoa-300 to-cocoa-500 text-white">
-              <LayoutGrid className="size-4" />
-            </span>
-            <div>
-              <h2 className="font-display text-lg font-bold text-cocoa-900">
-                {lang === "en" ? activeCategory.name_en : activeCategory.name_id}
-              </h2>
-              <p className="text-xs text-cocoa-400">
-                {flavorsInCategory.length} {t.menu.flavors}
-              </p>
-            </div>
-          </div>
-
-          {flavorsInCategory.length === 0 ? (
-            <div className="card p-14 text-center">
-              <UtensilsCrossed className="mx-auto size-8 text-cocoa-300" />
-              <p className="mt-3 text-sm text-cocoa-400">{t.common.empty}</p>
-              <button type="button" onClick={openNewFlavor} className="btn-primary mt-5">
-                <Plus className="size-4" />
-                {t.admin.menu.addFlavor}
-              </button>
-            </div>
-          ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {flavorsInCategory.map((f) => {
-                const busy = busyId === f.id;
-                const name = lang === "en" ? f.name_en : f.name_id;
-
-                return (
-                  <li key={f.id} className="card overflow-hidden">
-                    <div className="flex gap-3.5 p-4">
-                      <div
-                        className={`relative size-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${
-                          f.image_url ? "bg-cocoa-100" : "from-cocoa-300 to-cocoa-500"
-                        }`}
-                      >
-                        {f.image_url ? (
-                          <Image
-                            src={f.image_url}
-                            alt={name}
-                            fill
-                            sizes="80px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          <span className="absolute inset-0 grid place-items-center font-display text-2xl font-bold text-white/60">
-                            {f.name_id.charAt(0)}
-                          </span>
-                        )}
-                        {!f.is_active ? (
-                          <span className="absolute inset-0 grid place-items-center bg-cocoa-950/65 text-[10px] font-bold tracking-wider text-white uppercase">
-                            off
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-display text-base leading-tight font-bold text-cocoa-900">
-                            {name}
-                          </h3>
-                          {f.is_featured ? (
-                            <Star className="size-3.5 shrink-0 fill-honey-400 text-honey-400" />
-                          ) : null}
-                        </div>
-                        <p className="mt-0.5 text-sm font-bold text-cocoa-600 tabular">
-                          {formatIDR(f.price, lang)}
-                        </p>
-                        <p className="mt-0.5 truncate font-mono text-[10px] text-cocoa-300">
-                          {f.slug}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditFlavor(f)}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100"
-                      >
-                        <Pencil className="size-3.5" />
-                        {t.common.edit}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleFlavorActive(f)}
-                        disabled={busy}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
-                      >
-                        {busy ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : f.is_active ? (
-                          <Eye className="size-3.5" />
-                        ) : (
-                          <EyeOff className="size-3.5" />
-                        )}
-                        {f.is_active ? t.admin.menu.active : t.admin.menu.hideToast}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeFlavor(f)}
-                        disabled={busy}
-                        className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
-                      >
-                        <Trash2 className="size-3.5" />
-                        {t.common.delete}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </>
+        <BundlesView
+          {...{
+            t,
+            lang,
+            filteredBundles,
+            search,
+            setSearch,
+            openNewBundle,
+            openEditBundle,
+            removeBundle,
+            toggleBundleActive,
+            toggleBundleFeatured,
+            busyId,
+            categories,
+          }}
+        />
       )}
 
       {/* ---------- Modal kategori ---------- */}
@@ -805,116 +752,11 @@ export function MenuClient({
         }
       >
         {editingCategory ? (
-          <div className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="c-name-id" className="label">
-                  {t.admin.menu.nameId}
-                </label>
-                <input
-                  id="c-name-id"
-                  className="input"
-                  value={editingCategory.name_id}
-                  onChange={(e) =>
-                    setEditingCategory({ ...editingCategory, name_id: e.target.value })
-                  }
-                  placeholder="Sando Sandwich"
-                />
-              </div>
-              <div>
-                <label htmlFor="c-name-en" className="label">
-                  {t.admin.menu.nameEn}
-                </label>
-                <input
-                  id="c-name-en"
-                  className="input"
-                  value={editingCategory.name_en}
-                  onChange={(e) =>
-                    setEditingCategory({ ...editingCategory, name_en: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="c-desc-id" className="label">
-                  {t.admin.menu.descId}
-                </label>
-                <textarea
-                  id="c-desc-id"
-                  rows={2}
-                  className="input resize-none"
-                  value={editingCategory.desc_id}
-                  onChange={(e) =>
-                    setEditingCategory({ ...editingCategory, desc_id: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label htmlFor="c-desc-en" className="label">
-                  {t.admin.menu.descEn}
-                </label>
-                <textarea
-                  id="c-desc-en"
-                  rows={2}
-                  className="input resize-none"
-                  value={editingCategory.desc_en}
-                  onChange={(e) =>
-                    setEditingCategory({ ...editingCategory, desc_en: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div>
-              <span className="label">{t.admin.menu.image}</span>
-              <ImageField
-                url={editingCategory.image_url ?? ""}
-                onChange={(url) =>
-                  setEditingCategory({ ...editingCategory, image_url: url || null })
-                }
-                labels={{
-                  upload: t.admin.menu.uploadImage,
-                  change: t.admin.menu.changeImage,
-                  remove: t.admin.menu.removeImage,
-                  hint: t.admin.menu.imageHint,
-                }}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="c-sort" className="label">
-                  {t.admin.menu.sortOrder}
-                </label>
-                <input
-                  id="c-sort"
-                  inputMode="numeric"
-                  className="input tabular"
-                  value={editingCategory.sort_order}
-                  onChange={(e) =>
-                    setEditingCategory({
-                      ...editingCategory,
-                      sort_order: Number(e.target.value.replace(/\D/g, "")) || 0,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex flex-col justify-end gap-3 pb-1">
-                <Toggle
-                  checked={editingCategory.is_active}
-                  onChange={(v) => setEditingCategory({ ...editingCategory, is_active: v })}
-                  label={t.admin.menu.active}
-                />
-                <Toggle
-                  checked={editingCategory.is_featured}
-                  onChange={(v) => setEditingCategory({ ...editingCategory, is_featured: v })}
-                  label={t.admin.menu.featured}
-                />
-              </div>
-            </div>
-          </div>
+          <CategoryForm
+            category={editingCategory}
+            setCategory={setEditingCategory}
+            t={t}
+          />
         ) : null}
       </Modal>
 
@@ -934,7 +776,12 @@ export function MenuClient({
             >
               {t.common.cancel}
             </button>
-            <button type="button" onClick={saveFlavor} disabled={saving} className="btn-primary">
+            <button
+              type="button"
+              onClick={saveFlavor}
+              disabled={saving}
+              className="btn-primary"
+            >
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               {saving ? t.common.saving : t.common.save}
             </button>
@@ -942,317 +789,1171 @@ export function MenuClient({
         }
       >
         {editingFlavor ? (
-          <div className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="f-name-id" className="label">
-                  {t.admin.menu.nameId}
-                </label>
-                <input
-                  id="f-name-id"
-                  className="input"
-                  value={editingFlavor.name_id}
-                  onChange={(e) =>
-                    setEditingFlavor({ ...editingFlavor, name_id: e.target.value })
-                  }
-                  placeholder="Caramel Cheese"
-                />
-              </div>
-              <div>
-                <label htmlFor="f-name-en" className="label">
-                  {t.admin.menu.nameEn}
-                </label>
-                <input
-                  id="f-name-en"
-                  className="input"
-                  value={editingFlavor.name_en}
-                  onChange={(e) =>
-                    setEditingFlavor({ ...editingFlavor, name_en: e.target.value })
-                  }
-                  placeholder={t.admin.menu.nameEnHint}
-                />
-              </div>
-            </div>
+          <FlavorForm
+            flavor={editingFlavor}
+            setFlavor={setEditingFlavor}
+            t={t}
+          />
+        ) : null}
+      </Modal>
 
-            <div>
-              <label htmlFor="f-price" className="label">
-                {t.admin.menu.priceLabel}
-              </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
-                  Rp
-                </span>
-                <input
-                  id="f-price"
-                  inputMode="numeric"
-                  className="input pl-11 tabular"
-                  value={editingFlavor.price}
-                  onChange={(e) =>
-                    setEditingFlavor({
-                      ...editingFlavor,
-                      price: e.target.value.replace(/\D/g, ""),
-                    })
-                  }
-                  placeholder="18000"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="f-desc-id" className="label">
-                  {t.admin.menu.descId}
-                </label>
-                <textarea
-                  id="f-desc-id"
-                  rows={2}
-                  className="input resize-none"
-                  value={editingFlavor.desc_id}
-                  onChange={(e) =>
-                    setEditingFlavor({ ...editingFlavor, desc_id: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label htmlFor="f-desc-en" className="label">
-                  {t.admin.menu.descEn}
-                </label>
-                <textarea
-                  id="f-desc-en"
-                  rows={2}
-                  className="input resize-none"
-                  value={editingFlavor.desc_en}
-                  onChange={(e) =>
-                    setEditingFlavor({ ...editingFlavor, desc_en: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            {/* Paket harga untuk produk ini */}
-            <div className="rounded-2xl border border-cocoa-200 p-4">
-              <p className="text-sm font-bold text-cocoa-800">
-                {t.admin.menu.bundleTitle}
-              </p>
-              <p className="mt-0.5 text-xs text-cocoa-400">
-                {t.admin.menu.bundleHint}
-              </p>
-              <BundleTierEditor
-                tiers={editingFlavor.bundle_tiers ?? []}
-                onChange={(tiers) =>
-                  setEditingFlavor({ ...editingFlavor, bundle_tiers: tiers })
-                }
-                unitPrice={Number(editingFlavor.price.replace(/\D/g, "")) || 0}
-              />
-            </div>
-
-            <div>
-              <span className="label">{t.admin.menu.image}</span>
-              <ImageField
-                url={editingFlavor.image_url ?? ""}
-                onChange={(url) => setEditingFlavor({ ...editingFlavor, image_url: url || null })}
-                labels={{
-                  upload: t.admin.menu.uploadImage,
-                  change: t.admin.menu.changeImage,
-                  remove: t.admin.menu.removeImage,
-                  hint: t.admin.menu.imageHint,
-                }}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="f-sort" className="label">
-                  {t.admin.menu.sortOrder}
-                </label>
-                <input
-                  id="f-sort"
-                  inputMode="numeric"
-                  className="input tabular"
-                  value={editingFlavor.sort_order}
-                  onChange={(e) =>
-                    setEditingFlavor({
-                      ...editingFlavor,
-                      sort_order: e.target.value.replace(/\D/g, ""),
-                    })
-                  }
-                />
-              </div>
-              <div className="flex flex-col justify-end gap-3 pb-1">
-                <Toggle
-                  checked={editingFlavor.is_active}
-                  onChange={(v) => setEditingFlavor({ ...editingFlavor, is_active: v })}
-                  label={t.admin.menu.active}
-                />
-                <Toggle
-                  checked={editingFlavor.is_featured}
-                  onChange={(v) => setEditingFlavor({ ...editingFlavor, is_featured: v })}
-                  label={t.admin.menu.featured}
-                />
-              </div>
-            </div>
-          </div>
+      {/* ---------- Modal bundle ---------- */}
+      <Modal
+        open={Boolean(editingBundle)}
+        onClose={() => setEditingBundle(null)}
+        title={editingBundle?.id ? t.admin.menu.editBundle : t.admin.menu.newBundle}
+        size="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingBundle(null)}
+              className="btn-ghost"
+              disabled={saving}
+            >
+              {t.common.cancel}
+            </button>
+            <button
+              type="button"
+              onClick={saveBundle}
+              disabled={saving}
+              className="btn-primary"
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+              {saving ? t.common.saving : t.common.save}
+            </button>
+          </>
+        }
+      >
+        {editingBundle ? (
+          <BundleForm
+            bundle={editingBundle}
+            setBundle={setEditingBundle}
+            categories={categories}
+            t={t}
+          />
         ) : null}
       </Modal>
     </div>
   );
 }
 
-/* ---------- komponen kecil ---------- */
+/* ===========================================================================
+ *  Sub-views
+ * =========================================================================*/
 
-/**
- * Daftar harga paket untuk satu produk. Tambah sebanyak apa pun.
- * Pratinjau memakai aturan yang sama dengan server: paket ditumpuk, paket
- * dengan qty terbesar dulu, sisanya harga satuan.
- */
-function BundleTierEditor({
-  tiers,
-  onChange,
-  unitPrice,
-}: {
-  tiers: BundleTier[];
-  onChange: (tiers: BundleTier[]) => void;
-  unitPrice: number;
+function CategoriesView(props: {
+  t: ReturnType<typeof useI18n>["t"];
+  lang: ReturnType<typeof useI18n>["lang"];
+  activeCategory: Category | null;
+  sortedCategories: Category[];
+  flavorsInCategory: Flavor[];
+  search: string;
+  setSearch: (s: string) => void;
+  openNewCategory: () => void;
+  openEditCategory: (c: Category) => void;
+  removeCategory: (c: Category) => Promise<void>;
+  setActiveCategoryId: (id: number | null) => void;
+  openNewFlavor: () => void;
+  openEditFlavor: (f: Flavor) => void;
+  removeFlavor: (f: Flavor) => Promise<void>;
+  toggleFlavorActive: (f: Flavor) => Promise<void>;
+  toggleFlavorFeatured: (f: Flavor) => Promise<void>;
+  busyId: number | null;
+  changeCategoryStock: (c: Category, delta: number) => Promise<void>;
 }) {
-  const { t, lang } = useI18n();
-
-  const sorted = [...tiers].sort((a, b) => a.qty - b.qty);
-
-  function update(i: number, next: Partial<BundleTier>) {
-    onChange(tiers.map((tier, idx) => (idx === i ? { ...tier, ...next } : tier)));
-  }
-
-  function remove(i: number) {
-    onChange(tiers.filter((_, idx) => idx !== i));
-  }
-
-  const preview = [1, 2, 3, 4, 5].map((n) => {
-    const calc = calcBundle(n, unitPrice, sorted);
-    return { n, total: calc.total, saving: calc.saving };
-  });
+  const {
+    t,
+    lang,
+    activeCategory,
+    sortedCategories,
+    flavorsInCategory,
+    search,
+    setSearch,
+    openNewCategory,
+    openEditCategory,
+    removeCategory,
+    setActiveCategoryId,
+    openNewFlavor,
+    openEditFlavor,
+    removeFlavor,
+    toggleFlavorActive,
+    toggleFlavorFeatured,
+    busyId,
+    changeCategoryStock,
+  } = props;
 
   return (
-    <div className="mt-3 space-y-3">
-      {sorted.length === 0 ? (
-        <p className="rounded-xl bg-cocoa-50 p-3.5 text-sm text-cocoa-500">
-          {t.admin.menu.bundleEmpty}
-        </p>
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {activeCategory ? (
+          <button
+            type="button"
+            onClick={() => setActiveCategoryId(null)}
+            className="btn-ghost"
+          >
+            <ArrowLeft className="size-4" />
+            {t.admin.menu.backToCategories}
+          </button>
+        ) : (
+          <span />
+        )}
+        <button
+          type="button"
+          onClick={activeCategory ? openNewFlavor : openNewCategory}
+          className="btn-primary shrink-0"
+        >
+          <Plus className="size-4" />
+          {activeCategory ? t.admin.menu.addFlavor : t.admin.menu.addCategory}
+        </button>
+      </div>
+
+      {!activeCategory ? (
+        <div className="relative sm:max-w-sm">
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-300" />
+          <input
+            className="input !py-2.5 pl-10"
+            placeholder={t.admin.menu.searchCategory}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            type="search"
+          />
+        </div>
+      ) : null}
+
+      {!activeCategory ? (
+        sortedCategories.length === 0 ? (
+          <div className="card p-14 text-center">
+            <LayoutGrid className="mx-auto size-8 text-cocoa-300" />
+            <p className="mt-3 text-sm text-cocoa-400">{t.admin.menu.noCategory}</p>
+            <button
+              type="button"
+              onClick={openNewCategory}
+              className="btn-primary mt-5"
+            >
+              <Plus className="size-4" />
+              {t.admin.menu.addCategory}
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-cocoa-500">{t.admin.menu.categoryHint}</p>
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {sortedCategories.map((c) => {
+                const name = lang === "en" ? c.name_en : c.name_id;
+                const count = c.flavor_count ?? 0;
+                const low =
+                  c.stock_enabled && c.stock > 0 && c.stock <= 5;
+                return (
+                  <li key={c.id} className="card overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCategoryId(c.id);
+                        setSearch("");
+                      }}
+                      className="group flex w-full items-center gap-3.5 p-4 text-left transition hover:bg-cocoa-50"
+                    >
+                      <span
+                        className={`relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl sm:size-16 ${
+                          c.image_url
+                            ? "bg-cocoa-100"
+                            : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
+                        }`}
+                      >
+                        {c.image_url ? (
+                          <Image
+                            src={c.image_url}
+                            alt=""
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <LayoutGrid className="size-7 text-white/70" />
+                        )}
+                        {!c.is_active ? (
+                          <span className="absolute inset-0 grid place-items-center bg-cocoa-950/65 text-[9px] font-bold tracking-wider text-white uppercase">
+                            off
+                          </span>
+                        ) : null}
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate font-display text-base font-bold text-cocoa-900">
+                            {name}
+                          </span>
+                          {c.is_featured ? (
+                            <Star className="size-3.5 shrink-0 fill-honey-400 text-honey-400" />
+                          ) : null}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-cocoa-400">
+                          {count} {t.menu.flavors}
+                        </span>
+                        {c.stock_enabled ? (
+                          <span
+                            className={`mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                              c.stock <= 0
+                                ? "bg-berry-500/10 text-berry-600"
+                                : low
+                                    ? "bg-honey-300/20 text-honey-500"
+                                    : "bg-matcha-50 text-matcha-700"
+                            }`}
+                          >
+                            <Package className="size-3" />
+                            {c.stock} {t.admin.dash.pcsLeft}
+                          </span>
+                        ) : null}
+                      </span>
+
+                      <ArrowLeft className="size-4 shrink-0 rotate-180 text-cocoa-300 transition group-hover:translate-x-0.5" />
+                    </button>
+
+                    {/* Tombol stok cepat */}
+                    {c.stock_enabled ? (
+                      <div className="flex items-center gap-1.5 border-t border-cocoa-100 bg-cocoa-50/40 px-3 py-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void changeCategoryStock(c, -1)}
+                          disabled={busyId === c.id || c.stock <= 0}
+                          className="grid size-7 place-items-center rounded-md border border-cocoa-200 text-cocoa-500 transition hover:bg-cocoa-100 disabled:opacity-40"
+                          aria-label="-1"
+                        >
+                          <Minus className="size-3.5" />
+                        </button>
+                        <span className="min-w-8 text-center font-display text-sm font-extrabold text-cocoa-800 tabular">
+                          {c.stock}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void changeCategoryStock(c, 1)}
+                          disabled={busyId === c.id}
+                          className="grid size-7 place-items-center rounded-md border border-cocoa-200 text-cocoa-500 transition hover:bg-cocoa-100 disabled:opacity-40"
+                          aria-label="+1"
+                        >
+                          <Plus className="size-3.5" />
+                        </button>
+                        <span className="ml-2 text-[10px] font-bold text-cocoa-400 uppercase">
+                          {t.admin.menu.stockQuick}
+                        </span>
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditCategory(c)}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100"
+                      >
+                        <Pencil className="size-3.5" />
+                        {t.common.edit}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeCategory(c)}
+                        disabled={busyId === c.id}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
+                      >
+                        {busyId === c.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-3.5" />
+                        )}
+                        {t.common.delete}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )
       ) : (
-        <ul className="space-y-2.5">
-          {sorted.map((tier, i) => {
-            const regular = tier.qty * unitPrice;
-            const worth = unitPrice > 0 && tier.price < regular;
+        <FlavorList
+          {...{
+            t,
+            lang,
+            activeCategory,
+            flavorsInCategory,
+            openNewFlavor,
+            openEditFlavor,
+            removeFlavor,
+            toggleFlavorActive,
+            toggleFlavorFeatured,
+            busyId,
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function FlavorList(props: {
+  t: ReturnType<typeof useI18n>["t"];
+  lang: ReturnType<typeof useI18n>["lang"];
+  activeCategory: Category;
+  flavorsInCategory: Flavor[];
+  openNewFlavor: () => void;
+  openEditFlavor: (f: Flavor) => void;
+  removeFlavor: (f: Flavor) => Promise<void>;
+  toggleFlavorActive: (f: Flavor) => Promise<void>;
+  toggleFlavorFeatured: (f: Flavor) => Promise<void>;
+  busyId: number | null;
+}) {
+  const {
+    t,
+    lang,
+    activeCategory,
+    flavorsInCategory,
+    openNewFlavor,
+    openEditFlavor,
+    removeFlavor,
+    toggleFlavorActive,
+    toggleFlavorFeatured,
+    busyId,
+  } = props;
+
+  return (
+    <>
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-cocoa-300 to-cocoa-500 text-white">
+          <LayoutGrid className="size-4" />
+        </span>
+        <div>
+          <h2 className="font-display text-lg font-bold text-cocoa-900">
+            {lang === "en" ? activeCategory.name_en : activeCategory.name_id}
+          </h2>
+          <p className="text-xs text-cocoa-400">
+            {flavorsInCategory.length} {t.menu.flavors}
+          </p>
+        </div>
+      </div>
+
+      {flavorsInCategory.length === 0 ? (
+        <div className="card p-14 text-center">
+          <UtensilsCrossed className="mx-auto size-8 text-cocoa-300" />
+          <p className="mt-3 text-sm text-cocoa-400">{t.common.empty}</p>
+          <button
+            type="button"
+            onClick={openNewFlavor}
+            className="btn-primary mt-5"
+          >
+            <Plus className="size-4" />
+            {t.admin.menu.addFlavor}
+          </button>
+        </div>
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {flavorsInCategory.map((f) => {
+            const busy = busyId === f.id;
+            const name = lang === "en" ? f.name_en : f.name_id;
             return (
-              <li key={i} className="rounded-xl border border-cocoa-200 p-3">
-                <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-                  <div>
-                    <span className="label">{t.admin.menu.bundleSize}</span>
-                    <div className="relative">
-                      <input
-                        inputMode="numeric"
-                        min={2}
-                        className="input tabular"
-                        value={tier.qty}
-                        onChange={(e) =>
-                          update(i, {
-                            qty: Math.max(2, Number(e.target.value.replace(/\D/g, "")) || 2),
-                          })
-                        }
-                      />
-                      <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-xs font-bold text-cocoa-400">
-                        pcs
-                      </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="label">{t.admin.menu.bundlePrice}</span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
-                        Rp
-                      </span>
-                      <input
-                        inputMode="numeric"
-                        className="input pl-11 tabular"
-                        value={tier.price}
-                        onChange={(e) =>
-                          update(i, { price: Number(e.target.value.replace(/\D/g, "")) || 0 })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => remove(i)}
-                    className="self-end rounded-lg p-2.5 text-berry-500 transition hover:bg-berry-500/10"
-                    aria-label={t.common.delete}
+              <li key={f.id} className="card overflow-hidden">
+                <div className="flex gap-3.5 p-4">
+                  <div
+                    className={`relative size-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${
+                      f.image_url
+                        ? "bg-cocoa-100"
+                        : "from-cocoa-300 to-cocoa-500"
+                    }`}
                   >
-                    <Trash2 className="size-4" />
-                  </button>
+                    {f.image_url ? (
+                      <Image
+                        src={f.image_url}
+                        alt={name}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span className="absolute inset-0 grid place-items-center font-display text-2xl font-bold text-white/60">
+                        {f.name_id.charAt(0)}
+                      </span>
+                    )}
+                    {!f.is_active ? (
+                      <span className="absolute inset-0 grid place-items-center bg-cocoa-950/65 text-[10px] font-bold tracking-wider text-white uppercase">
+                        off
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-display text-base leading-tight font-bold text-cocoa-900">
+                        {name}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => void toggleFlavorFeatured(f)}
+                        disabled={busy}
+                        title={t.admin.menu.featuredHint}
+                        className={`shrink-0 rounded-md p-1 transition disabled:opacity-40 ${
+                          f.is_featured
+                            ? "bg-honey-300/30 text-honey-600"
+                            : "text-cocoa-300 hover:bg-cocoa-100 hover:text-honey-500"
+                        }`}
+                      >
+                        <Star
+                          className={`size-3.5 ${
+                            f.is_featured ? "fill-current" : ""
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    <p className="mt-0.5 text-sm font-bold text-cocoa-600 tabular">
+                      {formatIDR(f.price, lang)}
+                    </p>
+                    <p className="mt-0.5 truncate font-mono text-[10px] text-cocoa-300">
+                      {f.slug}
+                    </p>
+                  </div>
                 </div>
 
-                <p className="mt-1.5 text-xs text-cocoa-400">
-                  {tier.qty} × {formatIDR(unitPrice, lang)} ={" "}
-                  {formatIDR(regular, lang)}
-                  {worth ? (
-                    <span className="ml-1.5 font-bold text-matcha-600">
-                      {t.admin.menu.bundleSave} {formatIDR(regular - tier.price, lang)}
-                    </span>
-                  ) : unitPrice > 0 ? (
-                    <span className="ml-1.5 font-bold text-honey-500">
-                      {t.admin.menu.bundleNotCheaper}
-                    </span>
-                  ) : null}
-                </p>
+                <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
+                  <button
+                    type="button"
+                    onClick={() => openEditFlavor(f)}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100"
+                  >
+                    <Pencil className="size-3.5" />
+                    {t.common.edit}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void toggleFlavorActive(f)}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
+                  >
+                    {busy ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : f.is_active ? (
+                      <Eye className="size-3.5" />
+                    ) : (
+                      <EyeOff className="size-3.5" />
+                    )}
+                    {f.is_active ? t.admin.menu.active : t.admin.menu.hideToast}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeFlavor(f)}
+                    disabled={busy}
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
+                  >
+                    <Trash2 className="size-3.5" />
+                    {t.common.delete}
+                  </button>
+                </div>
               </li>
             );
           })}
         </ul>
       )}
+    </>
+  );
+}
 
-      <button
-        type="button"
-        onClick={() =>
-          onChange([
-            ...tiers,
-            {
-              qty: (sorted.at(-1)?.qty ?? 1) + 1,
-              price: Math.round((sorted.at(-1)?.price ?? unitPrice * 2) * 0.94 / 500) * 500,
-            },
-          ])
-        }
-        className="btn-outline w-full !py-2.5 !text-[13px]"
-      >
-        <Plus className="size-4" />
-        {t.admin.menu.bundleAdd}
-      </button>
+function BundlesView(props: {
+  t: ReturnType<typeof useI18n>["t"];
+  lang: ReturnType<typeof useI18n>["lang"];
+  filteredBundles: Bundle[];
+  search: string;
+  setSearch: (s: string) => void;
+  openNewBundle: () => void;
+  openEditBundle: (b: Bundle) => void;
+  removeBundle: (b: Bundle) => Promise<void>;
+  toggleBundleActive: (b: Bundle) => Promise<void>;
+  toggleBundleFeatured: (b: Bundle) => Promise<void>;
+  busyId: number | null;
+  categories: Category[];
+}) {
+  const {
+    t,
+    lang,
+    filteredBundles,
+    search,
+    setSearch,
+    openNewBundle,
+    openEditBundle,
+    removeBundle,
+    toggleBundleActive,
+    toggleBundleFeatured,
+    busyId,
+    categories,
+  } = props;
 
-      <div className="rounded-xl bg-cocoa-50 p-3.5">
-        <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
-          {t.admin.menu.bundlePreview}
-        </p>
-        <ul className="mt-2 space-y-1 text-[13px] text-cocoa-600 tabular">
-          {preview.map((p) => (
-            <li key={p.n} className="flex justify-between gap-3">
-              <span>
-                {p.n} {t.admin.menu.pcs}
-              </span>
-              <span className="font-bold">
-                {formatIDR(p.total, lang)}
-                {p.saving > 0 ? (
-                  <span className="ml-1.5 text-[11px] font-semibold text-matcha-600">
-                    (−{formatIDR(p.saving, lang)})
-                  </span>
-                ) : null}
-              </span>
-            </li>
-          ))}
+  const getCategoryName = (id: number | null) => {
+    if (id == null) return null;
+    const c = categories.find((x) => x.id === id);
+    if (!c) return null;
+    return lang === "en" ? c.name_en : c.name_id;
+  };
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" onClick={openNewBundle} className="btn-primary shrink-0">
+          <Plus className="size-4" />
+          {t.admin.menu.addBundle}
+        </button>
+        <div className="relative w-full sm:max-w-sm sm:w-auto">
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-300" />
+          <input
+            className="input !py-2.5 pl-10"
+            placeholder={t.admin.menu.searchBundle}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            type="search"
+          />
+        </div>
+      </div>
+
+      <p className="text-sm text-cocoa-500">{t.admin.menu.bundleHint}</p>
+
+      {filteredBundles.length === 0 ? (
+        <div className="card p-14 text-center">
+          <Gift className="mx-auto size-8 text-cocoa-300" />
+          <p className="mt-3 text-sm text-cocoa-400">{t.admin.menu.noBundle}</p>
+          <button type="button" onClick={openNewBundle} className="btn-primary mt-5">
+            <Plus className="size-4" />
+            {t.admin.menu.addBundle}
+          </button>
+        </div>
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filteredBundles.map((b) => {
+            const busy = busyId === b.id;
+            const name = lang === "en" ? b.name_en : b.name_id;
+            const catName = getCategoryName(b.category_id);
+            return (
+              <li key={b.id} className="card overflow-hidden">
+                <div className="flex gap-3.5 p-4">
+                  <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-honey-300 to-berry-500">
+                    {b.image_url ? (
+                      <Image
+                        src={b.image_url}
+                        alt={name}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span className="absolute inset-0 grid place-items-center text-white/70">
+                        <Gift className="size-7" />
+                      </span>
+                    )}
+                    {!b.is_active ? (
+                      <span className="absolute inset-0 grid place-items-center bg-cocoa-950/65 text-[10px] font-bold tracking-wider text-white uppercase">
+                        off
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-display text-base leading-tight font-bold text-cocoa-900">
+                        {name}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => void toggleBundleFeatured(b)}
+                        disabled={busy}
+                        title={t.admin.menu.featuredHint}
+                        className={`shrink-0 rounded-md p-1 transition disabled:opacity-40 ${
+                          b.is_featured
+                            ? "bg-honey-300/30 text-honey-600"
+                            : "text-cocoa-300 hover:bg-cocoa-100 hover:text-honey-500"
+                        }`}
+                      >
+                        <Star
+                          className={`size-3.5 ${
+                            b.is_featured ? "fill-current" : ""
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    <p className="mt-0.5 text-sm font-bold text-cocoa-600 tabular">
+                      {formatIDR(b.price, lang)}
+                    </p>
+                    <p className="mt-0.5 text-[11px] font-bold text-matcha-700">
+                      {b.required_qty}× {t.menu.flavors}
+                    </p>
+                    {catName ? (
+                      <p className="mt-0.5 truncate text-[10px] text-cocoa-400">
+                        {catName}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 border-t border-cocoa-100 bg-cocoa-50/60 px-2 py-2">
+                  <button
+                    type="button"
+                    onClick={() => openEditBundle(b)}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100"
+                  >
+                    <Pencil className="size-3.5" />
+                    {t.common.edit}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void toggleBundleActive(b)}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
+                  >
+                    {busy ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : b.is_active ? (
+                      <Eye className="size-3.5" />
+                    ) : (
+                      <EyeOff className="size-3.5" />
+                    )}
+                    {b.is_active ? t.admin.menu.active : t.admin.menu.hideToast}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeBundle(b)}
+                    disabled={busy}
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10 disabled:opacity-40"
+                  >
+                    <Trash2 className="size-3.5" />
+                    {t.common.delete}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
+      )}
+    </>
+  );
+}
+
+/* ===========================================================================
+ *  Form fields
+ * =========================================================================*/
+
+function CategoryForm({
+  category,
+  setCategory,
+  t,
+}: {
+  category: Category;
+  setCategory: (next: Category | null) => void;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="c-name-id" className="label">
+            {t.admin.menu.nameId}
+          </label>
+          <input
+            id="c-name-id"
+            className="input"
+            value={category.name_id}
+            onChange={(e) =>
+              setCategory({ ...category, name_id: e.target.value })
+            }
+            placeholder="Sando Sandwich"
+          />
+        </div>
+        <div>
+          <label htmlFor="c-name-en" className="label">
+            {t.admin.menu.nameEn}
+          </label>
+          <input
+            id="c-name-en"
+            className="input"
+            value={category.name_en}
+            onChange={(e) =>
+              setCategory({ ...category, name_en: e.target.value })
+            }
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="c-desc-id" className="label">
+            {t.admin.menu.descId}
+          </label>
+          <textarea
+            id="c-desc-id"
+            rows={2}
+            className="input resize-none"
+            value={category.desc_id}
+            onChange={(e) =>
+              setCategory({ ...category, desc_id: e.target.value })
+            }
+          />
+        </div>
+        <div>
+          <label htmlFor="c-desc-en" className="label">
+            {t.admin.menu.descEn}
+          </label>
+          <textarea
+            id="c-desc-en"
+            rows={2}
+            className="input resize-none"
+            value={category.desc_en}
+            onChange={(e) =>
+              setCategory({ ...category, desc_en: e.target.value })
+            }
+          />
+        </div>
+      </div>
+
+      <div>
+        <span className="label">{t.admin.menu.image}</span>
+        <ImageField
+          url={category.image_url ?? ""}
+          onChange={(url) =>
+            setCategory({ ...category, image_url: url || null })
+          }
+          labels={{
+            upload: t.admin.menu.uploadImage,
+            change: t.admin.menu.changeImage,
+            remove: t.admin.menu.removeImage,
+            hint: t.admin.menu.imageHint,
+          }}
+        />
+      </div>
+
+      {/* Stok per-kategori */}
+      <div className="rounded-2xl border border-cocoa-200 bg-cream-50 p-4">
+        <p className="text-sm font-bold text-cocoa-800">
+          {t.admin.menu.stockTitle}
+        </p>
+        <p className="mt-0.5 text-xs text-cocoa-500">
+          {t.admin.menu.stockHint}
+        </p>
+        <div className="mt-3 space-y-3">
+          <Toggle
+            checked={category.stock_enabled}
+            onChange={(v) => setCategory({ ...category, stock_enabled: v })}
+            label={t.admin.menu.stockEnabled}
+          />
+          {category.stock_enabled ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setCategory({
+                    ...category,
+                    stock: Math.max(0, category.stock - 1),
+                  })
+                }
+                className="grid size-9 place-items-center rounded-lg border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50"
+                aria-label="-1"
+              >
+                <Minus className="size-4" />
+              </button>
+              <input
+                type="number"
+                min={0}
+                value={category.stock}
+                onChange={(e) =>
+                  setCategory({
+                    ...category,
+                    stock: Math.max(0, Number(e.target.value.replace(/\D/g, "")) || 0),
+                  })
+                }
+                className="input tabular !w-24 text-center"
+                aria-label={t.admin.menu.stockAdjust}
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setCategory({ ...category, stock: category.stock + 1 })
+                }
+                className="grid size-9 place-items-center rounded-lg border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50"
+                aria-label="+1"
+              >
+                <Plus className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategory({ ...category, stock: category.stock + 10 })}
+                className="rounded-lg border border-cocoa-200 px-3 py-2 text-xs font-bold text-cocoa-600 transition hover:bg-cocoa-50"
+              >
+                +10
+              </button>
+              <span className="text-xs text-cocoa-400 tabular">
+                {t.admin.menu.stockUnit}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="c-sort" className="label">
+            {t.admin.menu.sortOrder}
+          </label>
+          <input
+            id="c-sort"
+            inputMode="numeric"
+            className="input tabular"
+            value={category.sort_order}
+            onChange={(e) =>
+              setCategory({
+                ...category,
+                sort_order: Number(e.target.value.replace(/\D/g, "")) || 0,
+              })
+            }
+          />
+        </div>
+        <div className="flex flex-col justify-end gap-3 pb-1">
+          <Toggle
+            checked={category.is_active}
+            onChange={(v) => setCategory({ ...category, is_active: v })}
+            label={t.admin.menu.active}
+          />
+          <Toggle
+            checked={category.is_featured}
+            onChange={(v) => setCategory({ ...category, is_featured: v })}
+            label={t.admin.menu.favorite}
+          />
+        </div>
       </div>
     </div>
   );
 }
+
+function FlavorForm({
+  flavor,
+  setFlavor,
+  t,
+}: {
+  flavor: FlavorDraft;
+  setFlavor: (next: FlavorDraft | null) => void;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="f-name-id" className="label">
+            {t.admin.menu.nameId}
+          </label>
+          <input
+            id="f-name-id"
+            className="input"
+            value={flavor.name_id}
+            onChange={(e) => setFlavor({ ...flavor, name_id: e.target.value })}
+            placeholder="Caramel Cheese"
+          />
+        </div>
+        <div>
+          <label htmlFor="f-name-en" className="label">
+            {t.admin.menu.nameEn}
+          </label>
+          <input
+            id="f-name-en"
+            className="input"
+            value={flavor.name_en}
+            onChange={(e) => setFlavor({ ...flavor, name_en: e.target.value })}
+            placeholder={t.admin.menu.nameEnHint}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="f-price" className="label">
+          {t.admin.menu.priceLabel}
+        </label>
+        <div className="relative">
+          <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
+            Rp
+          </span>
+          <input
+            id="f-price"
+            inputMode="numeric"
+            className="input pl-11 tabular"
+            value={flavor.price}
+            onChange={(e) =>
+              setFlavor({ ...flavor, price: e.target.value.replace(/\D/g, "") })
+            }
+            placeholder="18000"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="f-desc-id" className="label">
+            {t.admin.menu.descId}
+          </label>
+          <textarea
+            id="f-desc-id"
+            rows={2}
+            className="input resize-none"
+            value={flavor.desc_id}
+            onChange={(e) =>
+              setFlavor({ ...flavor, desc_id: e.target.value })
+            }
+          />
+        </div>
+        <div>
+          <label htmlFor="f-desc-en" className="label">
+            {t.admin.menu.descEn}
+          </label>
+          <textarea
+            id="f-desc-en"
+            rows={2}
+            className="input resize-none"
+            value={flavor.desc_en}
+            onChange={(e) =>
+              setFlavor({ ...flavor, desc_en: e.target.value })
+            }
+          />
+        </div>
+      </div>
+
+      <div>
+        <span className="label">{t.admin.menu.image}</span>
+        <ImageField
+          url={flavor.image_url ?? ""}
+          onChange={(url) =>
+            setFlavor({ ...flavor, image_url: url || null })
+          }
+          labels={{
+            upload: t.admin.menu.uploadImage,
+            change: t.admin.menu.changeImage,
+            remove: t.admin.menu.removeImage,
+            hint: t.admin.menu.imageHint,
+          }}
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="f-sort" className="label">
+            {t.admin.menu.sortOrder}
+          </label>
+          <input
+            id="f-sort"
+            inputMode="numeric"
+            className="input tabular"
+            value={flavor.sort_order}
+            onChange={(e) =>
+              setFlavor({
+                ...flavor,
+                sort_order: e.target.value.replace(/\D/g, ""),
+              })
+            }
+          />
+        </div>
+        <div className="flex flex-col justify-end gap-3 pb-1">
+          <Toggle
+            checked={flavor.is_active}
+            onChange={(v) => setFlavor({ ...flavor, is_active: v })}
+            label={t.admin.menu.active}
+          />
+          <Toggle
+            checked={flavor.is_featured}
+            onChange={(v) => setFlavor({ ...flavor, is_featured: v })}
+            label={t.admin.menu.favorite}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BundleForm({
+  bundle,
+  setBundle,
+  categories,
+  t,
+}: {
+  bundle: BundleDraft;
+  setBundle: (next: BundleDraft | null) => void;
+  categories: Category[];
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="b-name-id" className="label">
+            {t.admin.menu.nameId}
+          </label>
+          <input
+            id="b-name-id"
+            className="input"
+            value={bundle.name_id}
+            onChange={(e) => setBundle({ ...bundle, name_id: e.target.value })}
+            placeholder="Bundle 2 Sando Sandwich"
+          />
+        </div>
+        <div>
+          <label htmlFor="b-name-en" className="label">
+            {t.admin.menu.nameEn}
+          </label>
+          <input
+            id="b-name-en"
+            className="input"
+            value={bundle.name_en}
+            onChange={(e) => setBundle({ ...bundle, name_en: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="b-price" className="label">
+            {t.admin.menu.priceLabel}
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
+              Rp
+            </span>
+            <input
+              id="b-price"
+              inputMode="numeric"
+              className="input pl-11 tabular"
+              value={bundle.price}
+              onChange={(e) =>
+                setBundle({
+                  ...bundle,
+                  price: e.target.value.replace(/\D/g, ""),
+                })
+              }
+              placeholder="35000"
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="b-qty" className="label">
+            {t.admin.menu.bundleSlots}
+          </label>
+          <input
+            id="b-qty"
+            inputMode="numeric"
+            className="input tabular"
+            value={bundle.required_qty}
+            onChange={(e) =>
+              setBundle({
+                ...bundle,
+                required_qty: Math.max(
+                  1,
+                  Number(e.target.value.replace(/\D/g, "")) || 1
+                ),
+              })
+            }
+          />
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="b-category" className="label">
+          {t.admin.menu.bundleCategory}
+        </label>
+        <select
+          id="b-category"
+          className="input"
+          value={bundle.category_id_str}
+          onChange={(e) =>
+            setBundle({ ...bundle, category_id_str: e.target.value })
+          }
+        >
+          <option value="">{t.admin.menu.bundleStandalone}</option>
+          {categories.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.name_id}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-[11px] text-cocoa-400">
+          {t.admin.menu.bundleCategoryHint}
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="b-desc-id" className="label">
+            {t.admin.menu.descId}
+          </label>
+          <textarea
+            id="b-desc-id"
+            rows={2}
+            className="input resize-none"
+            value={bundle.desc_id}
+            onChange={(e) =>
+              setBundle({ ...bundle, desc_id: e.target.value })
+            }
+          />
+        </div>
+        <div>
+          <label htmlFor="b-desc-en" className="label">
+            {t.admin.menu.descEn}
+          </label>
+          <textarea
+            id="b-desc-en"
+            rows={2}
+            className="input resize-none"
+            value={bundle.desc_en}
+            onChange={(e) =>
+              setBundle({ ...bundle, desc_en: e.target.value })
+            }
+          />
+        </div>
+      </div>
+
+      <div>
+        <span className="label">{t.admin.menu.image}</span>
+        <ImageField
+          url={bundle.image_url ?? ""}
+          onChange={(url) => setBundle({ ...bundle, image_url: url || null })}
+          labels={{
+            upload: t.admin.menu.uploadImage,
+            change: t.admin.menu.changeImage,
+            remove: t.admin.menu.removeImage,
+            hint: t.admin.menu.imageHint,
+          }}
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="b-sort" className="label">
+            {t.admin.menu.sortOrder}
+          </label>
+          <input
+            id="b-sort"
+            inputMode="numeric"
+            className="input tabular"
+            value={bundle.sort_order}
+            onChange={(e) =>
+              setBundle({
+                ...bundle,
+                sort_order: e.target.value.replace(/\D/g, ""),
+              })
+            }
+          />
+        </div>
+        <div className="flex flex-col justify-end gap-3 pb-1">
+          <Toggle
+            checked={bundle.is_active}
+            onChange={(v) => setBundle({ ...bundle, is_active: v })}
+            label={t.admin.menu.active}
+          />
+          <Toggle
+            checked={bundle.is_featured}
+            onChange={(v) => setBundle({ ...bundle, is_featured: v })}
+            label={t.admin.menu.favorite}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- komponen kecil ---------- */
 
 function Toggle({
   checked,
