@@ -97,7 +97,7 @@ export default async function HomePage() {
                 {dicts.hero.title}
               </h1>
 
-              <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-cream-200/85 sm:text-base">
+              <p className="mt-5 max-w-lg text-base leading-relaxed text-cream-200/85">
                 {dicts.hero.subtitle}
               </p>
 
@@ -135,7 +135,7 @@ export default async function HomePage() {
               <h2 className="mt-2 text-3xl font-extrabold text-cocoa-900 sm:text-4xl">
                 {dicts.menu.title}
               </h2>
-              <p className="mt-2 text-[15px] text-cocoa-500">{dicts.menu.subtitle}</p>
+              <p className="mt-2 text-base text-cocoa-500">{dicts.menu.subtitle}</p>
               <p className="mt-1.5 text-[13px] text-cocoa-400">{dicts.menu.readOnlyNote}</p>
             </div>
             {open ? (
@@ -164,7 +164,7 @@ export default async function HomePage() {
               <h2 className="mt-2 text-3xl font-extrabold text-cocoa-900 sm:text-4xl">
                 {dicts.howItWorks.title}
               </h2>
-              <p className="mt-2 text-[15px] text-cocoa-500">{dicts.howItWorks.subtitle}</p>
+              <p className="mt-2 text-base text-cocoa-500">{dicts.howItWorks.subtitle}</p>
             </div>
 
             <ol className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -200,7 +200,7 @@ export default async function HomePage() {
               <h2 className="text-3xl font-extrabold text-balance sm:text-4xl">
                 {dicts.order.title}
               </h2>
-              <p className="mx-auto mt-3 max-w-md text-[15px] text-cream-200/75">
+              <p className="mx-auto mt-3 max-w-md text-base text-cream-200/75">
                 {dicts.order.subtitle}
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

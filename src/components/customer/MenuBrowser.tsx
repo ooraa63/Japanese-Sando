@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { ChevronRight, LayoutGrid, Sparkles, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, LayoutGrid, Plus, Sparkles, UtensilsCrossed } from "lucide-react";
 import type { Category } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
 import { cheapestBundle, formatIDR } from "@/lib/utils";
+import { OrderCategoryModal } from "./OrderCategoryModal";
+import { useCart } from "./CartProvider";
 
 /**
  * Penjelahar menu di beranda (mode lihat-saja):
@@ -173,8 +175,10 @@ export function MenuBrowser({
 
 /**
  * Daftar menu untuk halaman pre-order:
- * Tampilkan SEMUA kategori & rasa dalam satu halaman (scroll per kategori),
- * bukan harus klik kategori dulu. Lebih cepat di mobile.
+ * Tampilkan kategori sebagai kartu; klik kategori -> buka modal dengan
+ * grid rasa + stepper +/- di dalamnya. Lebih cepat di HP (tidak harus
+ * scroll semua rasa) dan siap untuk menu lain di masa depan (setiap
+ * kategori punya modal-nya sendiri).
  */
 export function OrderMenuBrowser({
   categories,
@@ -184,57 +188,94 @@ export function OrderMenuBrowser({
   remainingStock: number | null;
 }) {
   const { t, lang } = useI18n();
+  const { quantities } = useCart();
   const withFlavors = useMemo(
     () => categories.filter((c) => (c.flavors?.length ?? 0) > 0),
     [categories]
   );
+  const [openId, setOpenId] = useState<number | null>(null);
+
+  const active = withFlavors.find((c) => c.id === openId) ?? null;
 
   if (withFlavors.length === 0) {
     return <p className="card p-10 text-center text-cocoa-400">{t.menu.empty}</p>;
   }
 
   return (
-    <div className="space-y-6">
-      {withFlavors.map((c) => {
-        const name = lang === "en" ? c.name_en : c.name_id;
-        return (
-          <section
-            key={c.id}
-            className="card overflow-hidden"
-            aria-labelledby={`cat-${c.id}`}
-          >
-            <header className="flex items-center justify-between gap-3 border-b border-cocoa-100 bg-cocoa-50 px-4 py-3 sm:px-5">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cocoa-800 text-cream-50">
-                  <UtensilsCrossed className="size-4" />
+    <>
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        {withFlavors.map((c) => {
+          const name = lang === "en" ? c.name_en : c.name_id;
+          const desc = lang === "en" ? c.desc_en : c.desc_id;
+          // Total pcs kategori ini yang sudah masuk keranjang.
+          const inCart = (c.flavors ?? []).reduce(
+            (s, f) => s + (quantities[String(f.id)] ?? 0),
+            0
+          );
+
+          return (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => setOpenId(c.id)}
+                className="group flex w-full items-center gap-3.5 rounded-2xl border-2 border-cocoa-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-matcha-400 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99] sm:p-3.5"
+              >
+                <span
+                  className={`relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl sm:size-16 ${
+                    c.image_url
+                      ? "bg-cocoa-100"
+                      : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
+                  }`}
+                >
+                  {c.image_url ? (
+                    <Image
+                      src={c.image_url}
+                      alt=""
+                      fill
+                      sizes="64px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <LayoutGrid className="size-7 text-white/70" />
+                  )}
                 </span>
-                <div className="min-w-0">
-                  <h3
-                    id={`cat-${c.id}`}
-                    className="truncate font-display text-base font-bold text-cocoa-900 sm:text-lg"
-                  >
-                    {name}
-                  </h3>
-                  <p className="text-[11px] font-semibold text-cocoa-400">
+
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate font-display text-base font-bold text-cocoa-900 sm:text-lg">
+                      {name}
+                    </span>
+                    {inCart > 0 ? (
+                      <span className="chip shrink-0 bg-matcha-500 text-white">
+                        {inCart}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-cocoa-400">
                     {c.flavors?.length} {t.menu.flavors}
-                  </p>
-                </div>
-              </div>
-            </header>
-            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-              {(c.flavors ?? []).map((f) => (
-                <FlavorCard
-                  key={f.id}
-                  flavor={f}
-                  remainingStock={remainingStock}
-                  selectable
-                  categoryName={undefined}
-                />
-              ))}
-            </div>
-          </section>
-        );
-      })}
-    </div>
+                  </span>
+                  {desc ? (
+                    <span className="mt-0.5 line-clamp-1 block text-[12px] text-cocoa-500">
+                      {desc}
+                    </span>
+                  ) : null}
+                </span>
+
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-matcha-50 text-matcha-600 transition group-hover:bg-matcha-500 group-hover:text-white sm:size-11">
+                  <Plus className="size-4 sm:size-5" />
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <OrderCategoryModal
+        category={active}
+        open={active !== null}
+        onClose={() => setOpenId(null)}
+        remainingStock={remainingStock}
+      />
+    </>
   );
 }

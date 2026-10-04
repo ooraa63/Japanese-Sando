@@ -50,7 +50,7 @@ export default async function OrderPage() {
           <h1 className="text-3xl font-extrabold text-cocoa-900 sm:text-4xl">
             {dicts.order.title}
           </h1>
-          <p className="mt-2 text-[15px] text-cocoa-500">{dicts.order.subtitle}</p>
+          <p className="mt-2 text-base text-cocoa-500">{dicts.order.subtitle}</p>
         </div>
 
         <OrderFlow

@@ -189,10 +189,9 @@ export function OrderFlow({
       toast.warning(t.order.payment.addressError);
       return false;
     }
-    if (draft.paymentMethod === "transfer" && !draft.proofPath) {
-      toast.warning(t.order.payment.proofRequired);
-      return false;
-    }
+    // Bukti transfer TIDAK wajib saat submit — pembeli boleh transfer
+    // dulu, baru upload bukti di langkah review, atau kirim via WA
+    // belakangan. Penjual akan follow up via WhatsApp.
     return true;
   }
 
@@ -437,7 +436,7 @@ export function OrderFlow({
 
               {/* Rincian item: klik kategori dulu, lalu rasa-rasanya */}
               {categories.length === 0 ? (
-                <p className="card p-10 text-center text-cocoa-400">{t.menu.empty}</p>
+                <p className="card p-8 text-center text-cocoa-400 sm:p-10">{t.menu.empty}</p>
               ) : (
                 <OrderMenuBrowser
                   categories={categories}
@@ -602,17 +601,6 @@ export function OrderFlow({
                       {t.order.payment.qrisUnavailable}
                     </p>
                   ) : null}
-
-                  <div>
-                    <h3 className="mb-3 text-base font-bold text-cocoa-800">
-                      {t.order.payment.proofTitle}
-                    </h3>
-                    <ProofUploader
-                      path={draft.proofPath}
-                      required
-                      onChange={(p) => updateDraft({ proofPath: p })}
-                    />
-                  </div>
                 </div>
               ) : null}
 
@@ -747,6 +735,35 @@ export function OrderFlow({
                   <span className="tabular">{formatIDR(total, lang)}</span>
                 </div>
               </div>
+
+              {/* Upload bukti transfer — hanya untuk metode transfer.
+                  Diletakkan SETELAH total supaya pembeli bisa lihat
+                  nominal dulu sebelum transfer & upload. Tidak wajib;
+                  boleh di-skip dan kirim lewat WA. */}
+              {draft.paymentMethod === "transfer" ? (
+                <div className="mt-6 rounded-2xl border border-cocoa-200 bg-cream-50 p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-matcha-100 text-matcha-700">
+                      <Building2 className="size-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-bold text-cocoa-900">
+                        {t.order.payment.proofTitle}
+                      </h3>
+                      <p className="mt-1 text-[13px] leading-relaxed text-cocoa-500">
+                        {t.order.review.proofHint}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <ProofUploader
+                      path={draft.proofPath}
+                      required={false}
+                      onChange={(p) => updateDraft({ proofPath: p })}
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <p className="mt-4 text-xs leading-relaxed text-cocoa-400">{t.order.review.consent}</p>
 

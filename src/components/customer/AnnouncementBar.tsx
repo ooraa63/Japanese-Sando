@@ -50,7 +50,7 @@ export function AnnouncementBar({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-cream-200/60 transition hover:bg-cream-50/10 hover:text-cream-50"
+          className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-md text-cream-200/60 transition hover:bg-cream-50/10 hover:text-cream-50 sm:right-2 sm:size-8"
           aria-label={expanded ? "Hide" : "Show more"}
           aria-expanded={expanded}
         >

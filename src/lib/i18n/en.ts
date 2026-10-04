@@ -171,6 +171,8 @@ export const en = {
       submitting: "Sending...",
       consent:
         "By sending this pre-order you agree that we may contact you on WhatsApp about this order.",
+      proofHint:
+        "Already paid? Upload the receipt here so we can process your order faster. Not yet? No worries — you can also send it later via WhatsApp.",
     },
     closed: {
       title: "Pre-order is closed",

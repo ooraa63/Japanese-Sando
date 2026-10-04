@@ -158,7 +158,7 @@
   }
 
   .input {
-    @apply w-full rounded-xl border border-cocoa-200 bg-white px-4 py-3 text-[15px] text-cocoa-800
+    @apply w-full rounded-xl border border-cocoa-200 bg-white px-4 py-3 text-base text-cocoa-800
            placeholder:text-cocoa-300 transition
            focus:border-matcha-500 focus:ring-2 focus:ring-matcha-200 focus:outline-none
            disabled:bg-cocoa-50 disabled:text-cocoa-400;
@@ -219,8 +219,7 @@
   header,
   footer,
   nav,
-  .print-hidden,
-  body > *:not(main) {
+  .print-hidden {
     display: none !important;
   }
   html, body {

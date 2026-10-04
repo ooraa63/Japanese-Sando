@@ -169,6 +169,8 @@ export const id: Dict = {
       submitting: "Mengirim...",
       consent:
         "Dengan mengirim pre-order ini, kamu setuju kami menghubungi lewat WhatsApp soal pesanan ini.",
+      proofHint:
+        "Sudah transfer? Upload bukti di sini biar pesananmu lebih cepat diproses. Belum? Tenang — kamu juga bisa kirim bukti lewat WhatsApp nanti.",
     },
     closed: {
       title: "Pre-order sedang tutup",

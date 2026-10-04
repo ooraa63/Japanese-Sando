@@ -39,7 +39,7 @@ export default async function TrackPage({
             <PackageSearch className="size-6" />
           </span>
           <h1 className="mt-4 text-3xl font-extrabold text-cocoa-900">{dicts.track.title}</h1>
-          <p className="mx-auto mt-2 max-w-md text-[15px] text-cocoa-500">
+          <p className="mx-auto mt-2 max-w-md text-base text-cocoa-500">
             {dicts.track.subtitle}
           </p>
         </div>
