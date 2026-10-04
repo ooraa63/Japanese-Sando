@@ -1,22 +1,24 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   Building2,
   CheckCircle2,
   Download,
   Home,
+  Image as ImageIcon,
+  Loader2,
   MapPin,
   MessageCircle,
   PackageCheck,
-  Printer,
   Search,
   ShoppingBag,
   Store,
   Truck,
   Wallet,
 } from "lucide-react";
+import { toPng } from "html-to-image";
 import { useI18n } from "@/lib/i18n";
 import type {
   Dict,
@@ -102,6 +104,30 @@ export function SuccessClient({
 
   const storeName = settings?.store_name ?? "Rumakomugi";
   const dict = t.success;
+  const docRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (!docRef.current) return;
+    setDownloading(true);
+    try {
+      const dataUrl = await toPng(docRef.current, {
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+      });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `invoice-${code}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Gagal generate invoice:", err);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <>
@@ -114,19 +140,27 @@ export function SuccessClient({
           settings={settings}
           dict={dict}
           lang={lang}
+          onDownload={handleDownload}
+          downloading={downloading}
         />
       </div>
 
-      {/* Invoice untuk dicetak — disembunyikan di layar sampai dibuka. */}
+      {/* Invoice disembunyikan dari layar, tapi tetap di DOM untuk toPng.
+        Posisi absolute + off-screen — gambar akan di-capture. */}
       {invoice ? (
-        <div className="hidden print:block">
-          <InvoiceDocument
-            invoice={invoice}
-            storeName={storeName}
-            settings={settings}
-            lang={lang}
-            dict={dict}
-          />
+        <div
+          aria-hidden
+          className="pointer-events-none fixed left-[-9999px] top-0 w-[720px]"
+        >
+          <div ref={docRef}>
+            <InvoiceDocument
+              invoice={invoice}
+              storeName={storeName}
+              settings={settings}
+              lang={lang}
+              dict={dict}
+            />
+          </div>
         </div>
       ) : null}
     </>
@@ -140,6 +174,8 @@ function SuccessScreen({
   settings,
   dict,
   lang,
+  onDownload,
+  downloading,
 }: {
   invoice: InvoiceSnapshot | null;
   code: string;
@@ -147,12 +183,10 @@ function SuccessScreen({
   settings: StoreSettings | null;
   dict: SuccessDict;
   lang: Language;
+  onDownload: () => void;
+  downloading: boolean;
 }) {
   const { t } = useI18n();
-
-  function handlePrint() {
-    if (typeof window !== "undefined") window.print();
-  }
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
@@ -185,26 +219,22 @@ function SuccessScreen({
             <div className="mt-6 space-y-5">
               <InvoiceSummary invoice={invoice} lang={lang} dict={dict} />
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="btn-matcha w-full"
-                >
-                  <Printer className="size-4" />
-                  {dict.printTitle}
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="btn-outline w-full"
-                >
+              <button
+                type="button"
+                onClick={onDownload}
+                disabled={downloading}
+                className="btn-matcha w-full"
+              >
+                {downloading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
                   <Download className="size-4" />
-                  {dict.downloadTitle}
-                </button>
-              </div>
-              <p className="text-center text-[11px] text-cocoa-400">
-                {dict.printHint}
+                )}
+                {dict.downloadTitle}
+              </button>
+              <p className="flex items-center justify-center gap-1.5 text-center text-[11px] text-cocoa-400">
+                <ImageIcon className="size-3" />
+                {dict.downloadHint}
               </p>
             </div>
           ) : null}

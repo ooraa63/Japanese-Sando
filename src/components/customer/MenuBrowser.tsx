@@ -201,9 +201,12 @@ export function MenuBrowser({
 export function OrderMenuBrowser({
   categories,
   remainingStock,
+  soldCounts,
 }: {
   categories: Category[];
   remainingStock: number | null;
+  /** Map flavorId -> jumlah pcs terjual (accepted/ready/delivered). */
+  soldCounts?: Record<number, number>;
 }) {
   const { t, lang } = useI18n();
   const { quantities } = useCart();
@@ -293,6 +296,7 @@ export function OrderMenuBrowser({
         open={active !== null}
         onClose={() => setOpenId(null)}
         remainingStock={remainingStock}
+        soldCounts={soldCounts}
       />
     </>
   );

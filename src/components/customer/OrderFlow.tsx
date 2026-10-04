@@ -28,6 +28,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
 import { AddressPicker } from "@/components/customer/AddressPicker";
+import { CartDrawer } from "@/components/customer/CartDrawer";
 import { formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
@@ -81,6 +82,26 @@ export function OrderFlow({
   const [step, setStep] = useState<Step>("identity");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [soldCounts, setSoldCounts] = useState<Record<number, number>>({});
+
+  // Tarik counter 'terjual' per-flavor saat halaman dibuka.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.rpc("public_flavor_sold_counts");
+      if (cancelled || !Array.isArray(data)) return;
+      const m: Record<number, number> = {};
+      for (const row of data as Array<{ flavor_id: number; qty: number }>) {
+        m[row.flavor_id] = row.qty;
+      }
+      setSoldCounts(m);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Stok per-kategori — total pcs dari kategori ini tidak boleh
   // melebihi sisa stok kategori. Bundle (iterasi berikut) akan
@@ -508,6 +529,7 @@ export function OrderFlow({
                 <OrderMenuBrowser
                   categories={categories}
                   remainingStock={null}
+                  soldCounts={soldCounts}
                 />
               )}
 
@@ -857,9 +879,14 @@ export function OrderFlow({
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between gap-2 border-b border-cocoa-100 bg-cocoa-50 px-4 py-3">
               <h2 className="text-sm font-bold text-cocoa-800">{t.order.menu.cartTitle}</h2>
-              <span className="chip bg-cocoa-200/70 text-cocoa-700 tabular">
+              <button
+                type="button"
+                onClick={() => setCartOpen(true)}
+                className="inline-flex items-center gap-1 rounded-full bg-cocoa-200/70 px-2.5 py-0.5 text-xs font-bold text-cocoa-700 transition hover:bg-matcha-100 hover:text-matcha-700"
+              >
                 {totalItems} {t.common.qty.toLowerCase()}
-              </span>
+                <span aria-hidden>›</span>
+              </button>
             </div>
 
             {cartLines.length === 0 ? (
@@ -868,16 +895,14 @@ export function OrderFlow({
               </p>
             ) : (
               <ul className="divide-y divide-cocoa-100">
-                {groups.map((g) => (
+                {groups.slice(0, 3).map((g) => (
                   <li key={g.category?.id ?? `solo-${g.lines[0]?.flavor.id}`} className="px-4 py-3">
-                    {/* Nama jenis makanan — paket dihitung per jenis */}
                     {g.category ? (
-                      <p className="mb-1.5 text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
+                      <p className="mb-1 text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
                         {lang === "en" ? g.category.name_en : g.category.name_id}
                       </p>
                     ) : null}
-
-                    {g.lines.map((l) => (
+                    {g.lines.slice(0, 3).map((l) => (
                       <div key={l.flavor.id} className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-bold text-cocoa-800">
@@ -889,18 +914,18 @@ export function OrderFlow({
                         </div>
                       </div>
                     ))}
-
-                    {/* Subtotal untuk jenis makanan ini */}
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-[12px] font-semibold text-cocoa-600 tabular">
-                        {g.qty} {t.common.qty.toLowerCase()}
+                    {g.lines.length > 3 ? (
+                      <p className="mt-1 text-[11px] text-cocoa-500">
+                        +{g.lines.length - 3} {t.menu.flavors}…
                       </p>
-                      <p className="text-[13px] font-bold text-cocoa-800 tabular">
-                        {formatIDR(g.total, lang)}
-                      </p>
-                    </div>
+                    ) : null}
                   </li>
                 ))}
+                {groups.length > 3 ? (
+                  <li className="px-4 py-2 text-center text-[11px] text-cocoa-500">
+                    +{groups.length - 3}…
+                  </li>
+                ) : null}
               </ul>
             )}
 
@@ -909,13 +934,6 @@ export function OrderFlow({
                 <span>{t.common.subtotal}</span>
                 <span className="tabular">{formatIDR(subtotal, lang)}</span>
               </div>
-
-              {saving > 0 ? (
-                <div className="flex justify-between font-bold text-matcha-600">
-                  <span>{t.order.review.saving}</span>
-                  <span className="tabular">−{formatIDR(saving, lang)}</span>
-                </div>
-              ) : null}
 
               {draft.deliveryMethod === "delivery" ? (
                 <div className="flex justify-between text-cocoa-600">
@@ -953,6 +971,12 @@ export function OrderFlow({
           ) : null}
         </aside>
       </div>
+
+      <CartDrawer
+        categories={categories}
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+      />
     </div>
   );
 }

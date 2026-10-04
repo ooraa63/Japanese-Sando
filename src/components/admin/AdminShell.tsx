@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  Users,
   UtensilsCrossed,
   X,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const NAV = [
   { href: "/admin", key: "dashboard" as const, icon: LayoutDashboard, exact: true },
   { href: "/admin/orders", key: "orders" as const, icon: ClipboardList, exact: false },
   { href: "/admin/menu", key: "menu" as const, icon: UtensilsCrossed, exact: false },
+  { href: "/admin/customers", key: "customers" as const, icon: Users, exact: false },
   { href: "/admin/settings", key: "settings" as const, icon: Settings, exact: false },
 ];
 
@@ -42,6 +44,7 @@ export function AdminShell({
     dashboard: string;
     orders: string;
     menu: string;
+    customers: string;
     settings: string;
     viewSite: string;
     signOut: string;

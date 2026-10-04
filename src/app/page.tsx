@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowRight,
   MessageCircle,
@@ -16,6 +15,8 @@ import { MenuBrowser } from "@/components/customer/MenuBrowser";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { AnnouncementBar } from "@/components/customer/AnnouncementBar";
+import { ShopInfo } from "@/components/customer/ShopInfo";
+import { HeroCarousel } from "@/components/customer/HeroCarousel";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 
@@ -56,33 +57,18 @@ export default async function HomePage() {
       />
 
       <main id="main">
-        {/* ===================== HERO =====================
-            Foto dipakai sebagai background full-bleed seperti semula.
-            Foto ini vertikal (2:3) dengan area gelap di bagian atas, jadi
-            titik fokusnya di tengah-bawah — teks diletakkan di area atas
-            yang sudah gelap, dan overlay gradien menjaga keterbacaan. */}
+        {/* ===================== TOKO INFO (di atas) ===================== */}
+        <ShopInfo settings={settings} />
+
+        {/* ===================== HERO + CAROUSEL ===================== */}
         <section className="relative overflow-hidden bg-cocoa-950 text-cream-50">
           <div className="absolute inset-0">
-            <Image
-              src={settings?.hero_image_url || "/hero-sando.jpg"}
-              alt="Aralam Japanese Sando"              fill
-              priority
-              sizes="100vw"
-              className="object-cover object-[center_60%]"
+            <HeroCarousel
+              images={settings?.hero_carousel_urls ?? []}
+              fallback={settings?.hero_image_url || "/hero-sando.jpg"}
+              fallbackMobile={settings?.hero_image_mobile_url ?? undefined}
+              intervalMs={4000}
             />
-            {/* Foto khusus mobile, dipakai hanya di layar kecil */}
-            {settings?.hero_image_mobile_url ? (
-              <div className="absolute inset-0 md:hidden">
-                <Image
-                  src={settings.hero_image_mobile_url}
-                  alt=""
-                  fill
-                  priority
-                  sizes="100vw"
-                  className="object-cover"
-                />
-              </div>
-            ) : null}
             <div className="absolute inset-0 bg-gradient-to-b from-cocoa-950/85 via-cocoa-950/55 to-cocoa-950/90" />
             <div className="absolute inset-0 bg-gradient-to-r from-cocoa-950/90 via-cocoa-950/40 to-transparent" />
             <div className="absolute inset-0 bg-seigaha opacity-30" />

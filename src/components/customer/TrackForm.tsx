@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Loader2, Search, XCircle } from "lucide-react";
-import type { StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime, formatIDR } from "@/lib/utils";
@@ -10,10 +9,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { OrderStatusTimeline } from "@/components/customer/OrderStatusTimeline";
 
 export function TrackForm({
-  settings: _settings,
   initialCode = "",
 }: {
-  settings: StoreSettings | null;
   initialCode?: string;
 }) {
   const { t, lang } = useI18n();

@@ -27,7 +27,7 @@ export function AnnouncementBar({
 
   return (
     <div className="relative z-50 bg-cocoa-950 text-cream-100">
-      <div className="mx-auto flex max-w-6xl items-center justify-center gap-x-6 gap-y-0.5 px-4 py-2 text-center text-[12px] sm:px-6">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-1 px-4 py-3 text-center text-sm font-semibold sm:px-6 sm:text-base">
         {message ? (
           <p
             className={`flex items-center gap-2 font-semibold text-honey-300 ${

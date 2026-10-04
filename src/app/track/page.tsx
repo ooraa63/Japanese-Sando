@@ -44,7 +44,7 @@ export default async function TrackPage({
           </p>
         </div>
 
-        <TrackForm settings={settings} initialCode={initialCode} />
+        <TrackForm initialCode={initialCode} />
       </main>
       <SiteFooter settings={settings} />
     </>

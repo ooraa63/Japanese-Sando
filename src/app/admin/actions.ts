@@ -249,6 +249,33 @@ export async function getAdminsAction(): Promise<ActionResult<AdminUser[]>> {
   return { ok: true, data: (data as AdminUser[]) ?? [] };
 }
 
+export interface AdminCustomerRow {
+  id: number;
+  order_code: string;
+  customer_name: string;
+  customer_email: string | null;
+  instagram: string | null;
+  phone: string;
+  phone_normalized: string;
+  created_at: string;
+  status: OrderStatus;
+  order_count: number;
+  total_spent: number;
+}
+
+/**
+ * Daftar pelanggan unik (phone_normalized) untuk broadcast. RPC publik
+ * `admin_list_customers` sudah disiapkan di migration-12.
+ */
+export async function getCustomersAction(): Promise<
+  ActionResult<AdminCustomerRow[]>
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_customers");
+  if (error) return { ok: false, error: humanize(error.message) };
+  return { ok: true, data: (data as AdminCustomerRow[]) ?? [] };
+}
+
 /* =============================================================================
  *  UBAH DATA
  * ========================================================================== */

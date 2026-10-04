@@ -23,11 +23,14 @@ export function OrderCategoryModal({
   open,
   onClose,
   remainingStock,
+  soldCounts = {},
 }: {
   category: Category | null;
   open: boolean;
   onClose: () => void;
   remainingStock: number | null;
+  /** Map flavorId -> jumlah terjual. */
+  soldCounts?: Record<number, number>;
 }) {
   const { t, lang } = useI18n();
   const { quantities } = useCart();
@@ -91,6 +94,8 @@ export function OrderCategoryModal({
               flavor={f}
               remainingStock={remainingStock}
               selectable
+              showSocial
+              soldCount={soldCounts[f.id] ?? 0}
             />
           ))}
         </div>
