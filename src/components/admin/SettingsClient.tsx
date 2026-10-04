@@ -69,6 +69,22 @@ function toDraft(s: StoreSettings | null): Draft {
     pickup_note_en: s?.pickup_note_en ?? "",
     delivery_note_id: s?.delivery_note_id ?? "",
     delivery_note_en: s?.delivery_note_en ?? "",
+    delivery_zones: s?.delivery_zones ?? [
+      { id: "pickup", name_id: "Ambil di toko", name_en: "Pickup", fee: 0 },
+      {
+        id: "vihara",
+        name_id: "Vihara Tian En",
+        name_en: "Vihara Tian En",
+        fee: 10000,
+      },
+      { id: "uvers", name_id: "UVERS", name_en: "UVERS", fee: 10000 },
+      {
+        id: "other",
+        name_id: "Luar itu",
+        name_en: "Other areas",
+        fee: 15000,
+      },
+    ],
     logo_url: s?.logo_url ?? null,
     brand_line: s?.brand_line ?? "Japanese Bake & Pastry",
   };

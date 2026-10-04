@@ -41,6 +41,7 @@ const migration8Path = path.resolve(process.cwd(), "supabase/migration-8.sql");
 const migration9Path = path.resolve(process.cwd(), "supabase/migration-9.sql");
 const migration10Path = path.resolve(process.cwd(), "supabase/migration-10.sql");
 const migration11Path = path.resolve(process.cwd(), "supabase/migration-11.sql");
+const migration12Path = path.resolve(process.cwd(), "supabase/migration-12.sql");
 const sql =
   schemaSql +
   "\n\n" +
@@ -62,7 +63,9 @@ const sql =
   "\n\n" +
   (existsSync(migration10Path) ? readFileSync(migration10Path, "utf8") : "") +
   "\n\n" +
-  (existsSync(migration11Path) ? readFileSync(migration11Path, "utf8") : "");
+  (existsSync(migration11Path) ? readFileSync(migration11Path, "utf8") : "") +
+  "\n\n" +
+  (existsSync(migration12Path) ? readFileSync(migration12Path, "utf8") : "");
 
 const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
 

@@ -198,8 +198,7 @@ export const ADMIN_STATUS_FILTERS: OrderStatus[] = [
   "rejected",
 ];
 
-export function paymentLabel(method: PaymentMethod, lang: Language): string {
-  if (method === "cash") return lang === "en" ? "Pay in cash" : "Bayar tunai";
+export function paymentLabel(_method: PaymentMethod, lang: Language): string {
   return lang === "en" ? "Bank transfer" : "Transfer bank";
 }
 

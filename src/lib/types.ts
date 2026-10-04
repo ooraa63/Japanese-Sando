@@ -14,7 +14,7 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
-export type PaymentMethod = "transfer" | "cash";
+export type PaymentMethod = "transfer";
 export type DeliveryMethod = "pickup" | "delivery";
 
 export interface Category {
@@ -98,10 +98,28 @@ export interface StoreSettings {
   pickup_note_en: string;
   delivery_note_id: string;
   delivery_note_en: string;
+  /** Daftar zona delivery yang bisa dipilih pembeli. */
+  delivery_zones: DeliveryZone[];
+  /** Foto tambahan untuk hero carousel. */
+  hero_carousel_urls?: string[];
   /** Logo & tagline di bawah nama toko */
   logo_url: string | null;
   brand_line: string;
   updated_at: string;
+}
+
+/**
+ * Zona pengiriman — selain opsi "ambil di toko" (id='pickup'), penjual
+ * dapat menambah zona lain (mis. 'Vihara Tian En', 'UVERS'). Tiap zona
+ * punya ongkir dan catatan yang ditampilkan ke pembeli.
+ */
+export interface DeliveryZone {
+  id: string;
+  name_id: string;
+  name_en: string;
+  fee: number;
+  note_id?: string;
+  note_en?: string;
 }
 
 /**
@@ -143,9 +161,15 @@ export interface Order {
   id: number;
   order_code: string;
   customer_name: string;
+  customer_email: string | null;
+  instagram: string | null;
   phone: string;
   delivery_method: DeliveryMethod;
+  delivery_zone: string;
   address: string | null;
+  address_note: string | null;
+  lat: number | null;
+  lng: number | null;
   payment_method: PaymentMethod;
   transfer_method: string | null;
   payment_proof_path: string | null;

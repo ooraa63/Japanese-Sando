@@ -19,8 +19,6 @@ import {
 import type {
   CartLine,
   Category,
-  DeliveryMethod,
-  PaymentMethod,
   StoreSettings,
 } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -29,6 +27,7 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
+import { AddressPicker } from "@/components/customer/AddressPicker";
 import { formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
@@ -46,6 +45,7 @@ export function OrderFlow({
   const toast = useToast();
   const {
     quantities,
+    notes,
     draft,
     totalItems,
     updateDraft,
@@ -137,13 +137,28 @@ export function OrderFlow({
   const subtotal = groups.reduce((sum, g) => sum + g.total, 0);
   const saving = 0;
 
-  // Ongkir hanya untuk pengiriman; ambil di tempat gratis.
+  // Daftar zona delivery dari settings — selalu ada 1+ (fallback ke pickup).
+  const deliveryZones =
+    settings.delivery_zones && settings.delivery_zones.length > 0
+      ? settings.delivery_zones
+      : [
+          {
+            id: "pickup",
+            name_id: "Ambil di toko",
+            name_en: "Pickup in store",
+            fee: 0,
+            note_id: "",
+            note_en: "",
+          },
+        ];
+
+  // Ongkir dari zona delivery (kalau pickup = 0). Ambil dari settings.delivery_zones.
+  const currentZone = deliveryZones.find((z) => z.id === draft.deliveryZone);
   const deliveryFee =
-    draft.deliveryMethod === "delivery" ? settings.delivery_fee : 0;
+    draft.deliveryMethod === "delivery" && currentZone ? currentZone.fee : 0;
   const total = subtotal + deliveryFee;
 
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
-  const deliveryNote = lang === "en" ? settings.delivery_note_en : settings.delivery_note_id;
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -158,6 +173,11 @@ export function OrderFlow({
     if (draft.name.trim().length < 2) next.name = t.order.identity.nameError;
     const digits = draft.phone.replace(/\D/g, "");
     if (digits.length < 9) next.phone = t.order.identity.phoneError;
+    // Email wajib (format sederhana).
+    const email = draft.email.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      next.email = t.order.identity.emailError;
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -218,15 +238,27 @@ export function OrderFlow({
       const supabase = createClient();
       const { data, error } = await supabase.rpc("create_order", {
         p_customer_name: draft.name.trim(),
+        p_customer_email: draft.email.trim(),
+        p_instagram: draft.instagram.trim(),
         p_phone: draft.phone.trim(),
-        p_payment_method: draft.paymentMethod,
+        p_payment_method: "transfer",
         p_delivery_method: draft.deliveryMethod,
-        p_address: draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
+        p_delivery_zone: draft.deliveryZone,
+        p_address:
+          draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
+        p_address_note:
+          draft.deliveryMethod === "delivery" ? draft.addressNote.trim() : null,
+        p_lat: draft.lat,
+        p_lng: draft.lng,
         p_transfer_method: draft.transferMethod || null,
         p_payment_proof: draft.proofPath,
         p_note: draft.note.trim(),
         p_language: lang,
-        p_items: cartLines.map((l) => ({ flavor_id: l.flavor.id, quantity: l.qty })),
+        p_items: cartLines.map((l) => ({
+          flavor_id: l.flavor.id,
+          quantity: l.qty,
+          note: notes[String(l.flavor.id)] || null,
+        })),
       });
 
       if (error) {
@@ -249,7 +281,7 @@ export function OrderFlow({
         phone: draft.phone.trim(),
         address: draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
         note: draft.note.trim(),
-        payment_method: draft.paymentMethod as "transfer" | "cash",
+        payment_method: "transfer" as const,
         transfer_method: draft.transferMethod || null,
         delivery_method: draft.deliveryMethod,
         created_at: new Date().toISOString(),
@@ -375,6 +407,7 @@ export function OrderFlow({
                 <div>
                   <label htmlFor="phone" className="label">
                     {t.order.identity.phone}
+                    <span className="ml-1 text-berry-500">*</span>
                   </label>
                   <input
                     id="phone"
@@ -393,6 +426,57 @@ export function OrderFlow({
                   <p className="mt-1.5 text-xs text-cocoa-400">
                     {errors.phone ?? t.order.identity.phoneHint}
                   </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="email" className="label">
+                      {t.order.identity.email}
+                      <span className="ml-1 text-berry-500">*</span>
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      inputMode="email"
+                      dir="ltr"
+                      className={`input tabular ${errors.email ? "input-error" : ""}`}
+                      placeholder="you@gmail.com"
+                      value={draft.email}
+                      autoComplete="email"
+                      onChange={(e) => {
+                        updateDraft({ email: e.target.value });
+                        if (errors.email) setErrors((p) => ({ ...p, email: "" }));
+                      }}
+                    />
+                    <p className="mt-1.5 text-xs text-cocoa-400">
+                      {errors.email ?? t.order.identity.emailHint}
+                    </p>
+                  </div>
+                  <div>
+                    <label htmlFor="instagram" className="label">
+                      {t.order.identity.instagram}
+                      <span className="ml-1 text-cocoa-400 text-[10px] font-semibold">
+                        ({t.common.optional})
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
+                        @
+                      </span>
+                      <input
+                        id="instagram"
+                        dir="ltr"
+                        className="input pl-9"
+                        placeholder="username"
+                        value={draft.instagram}
+                        autoComplete="off"
+                        onChange={(e) =>
+                          updateDraft({
+                            instagram: e.target.value.replace(/^@/, "").replace(/\s/g, ""),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               <StepNav
@@ -446,67 +530,59 @@ export function OrderFlow({
                 subtitle={t.order.payment.subtitle}
               />
 
-              {/* Metode pembayaran Ã¢â‚¬â€ hanya cara bayar, tanpa pilihan terima */}
+              {/* Pembayaran: hanya transfer (cash dihapus) */}
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <ChoiceCard
-                  selected={draft.paymentMethod === "transfer"}
-                  onClick={() => updateDraft({ paymentMethod: "transfer" as PaymentMethod })}
+                  selected
+                  onClick={() => updateDraft({ paymentMethod: "transfer" })}
                   icon={<Building2 className="size-5" />}
                   title={t.order.payment.transfer}
                   desc={t.order.payment.transferDesc}
                 />
-                <ChoiceCard
-                  selected={draft.paymentMethod === "cash"}
-                  onClick={() => updateDraft({ paymentMethod: "cash" as PaymentMethod })}
-                  icon={<Wallet className="size-5" />}
-                  title={t.order.payment.cash}
-                  desc={t.order.payment.cashDesc}
-                />
               </div>
 
-              {/* Cara pengambilan Ã¢â‚¬â€ dengan catatan yang bisa diatur di dashboard */}
+              {/* Cara pengambilan — dengan catatan yang bisa diatur di dashboard */}
               <h3 className="mt-8 text-base font-bold text-cocoa-800">
                 {t.order.payment.deliveryTitle}
               </h3>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <ChoiceCard
-                  selected={draft.deliveryMethod === "pickup"}
-                  onClick={() => updateDraft({ deliveryMethod: "pickup" as DeliveryMethod })}
-                  icon={<Store className="size-5" />}
-                  title={t.order.payment.pickup}
-                  desc={t.order.payment.pickupDesc}
-                  note={pickupNote}
-                />
-                <ChoiceCard
-                  selected={draft.deliveryMethod === "delivery"}
-                  onClick={() => updateDraft({ deliveryMethod: "delivery" as DeliveryMethod })}
-                  icon={<Truck className="size-5" />}
-                  title={t.order.payment.delivery}
-                  desc={t.order.payment.deliveryDesc}
-                  note={deliveryNote}
-                />
+                {deliveryZones.map((z) => {
+                  const zName = lang === "en" ? z.name_en : z.name_id;
+                  const zNote =
+                    (lang === "en" ? z.note_en : z.note_id) ?? "";
+                  const isPickup = z.id === "pickup";
+                  return (
+                    <ChoiceCard
+                      key={z.id}
+                      selected={draft.deliveryZone === z.id}
+                      onClick={() => {
+                        updateDraft({
+                          deliveryZone: z.id,
+                          deliveryMethod: isPickup ? "pickup" : "delivery",
+                        });
+                      }}
+                      icon={isPickup ? <Store className="size-5" /> : <Truck className="size-5" />}
+                      title={zName}
+                      desc={
+                        z.fee > 0
+                          ? `${formatIDR(z.fee, lang)}`
+                          : lang === "en"
+                            ? "Free"
+                            : "Gratis"
+                      }
+                      note={zNote || (isPickup ? pickupNote : "")}
+                    />
+                  );
+                })}
               </div>
 
-              {/* Alamat hanya diminta kalau dikirim */}
-              {draft.deliveryMethod === "delivery" ? (
-                <div className="mt-4">
-                  <label htmlFor="address" className="label">
-                    {t.order.payment.address}
-                  </label>
-                  <textarea
-                    id="address"
-                    rows={3}
-                    className="input resize-none"
-                    placeholder={t.order.payment.addressPlaceholder}
-                    value={draft.address}
-                    onChange={(e) => updateDraft({ address: e.target.value })}
-                  />
-                  {settings.delivery_fee > 0 ? (
-                    <p className="mt-1.5 text-xs text-cocoa-400 tabular">
-                      {t.order.review.deliveryFee}: {formatIDR(settings.delivery_fee, lang)}
-                    </p>
-                  ) : null}
-                </div>
+              {/* Alamat + map picker — hanya untuk delivery (zone != 'pickup') */}
+              {draft.deliveryZone !== "pickup" ? (
+                <AddressPicker
+                  draft={draft}
+                  updateDraft={updateDraft}
+                  dict={t.order.payment}
+                />
               ) : settings.address ? (
                 <div className="mt-4 flex items-start gap-3 rounded-2xl border border-cocoa-200 bg-cocoa-50 p-4">
                   <Store className="mt-0.5 size-5 shrink-0 text-cocoa-400" />
@@ -621,11 +697,9 @@ export function OrderFlow({
                   <span dir="ltr">{formatPhone(draft.phone)}</span>
                 </ReviewRow>
                 <ReviewRow label={t.order.review.paymentLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
-                  {draft.paymentMethod === "cash"
-                    ? t.order.payment.cash
-                    : `${t.order.payment.transfer}${
-                        draft.transferMethod ? ` Ã‚Â· ${draft.transferMethod}` : ""
-                      }`}
+                  {`${t.order.payment.transfer}${
+                    draft.transferMethod ? ` · ${draft.transferMethod}` : ""
+                  }`}
                 </ReviewRow>
                 <ReviewRow label={t.order.review.deliveryLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
                   {draft.deliveryMethod === "delivery"
