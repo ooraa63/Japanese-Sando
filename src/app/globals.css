@@ -72,11 +72,20 @@
     color: var(--color-cocoa-800);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    /* Default 16px di mobile agar teks tidak terlalu kecil untuk dibaca;
+       tetap 15px di layar lebih besar supaya layout tidak melebar. */
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  @media (min-width: 640px) {
+    body { font-size: 15px; }
   }
 
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     letter-spacing: -0.015em;
+    line-height: 1.2;
   }
 
   /* Fokus keyboard yang jelas */
@@ -201,5 +210,37 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ====== Styling cetak: invoice dari halaman sukses ====== */
+@media print {
+  /* Sembunyikan header, footer, navbar, dan tombol layar. */
+  header,
+  footer,
+  nav,
+  .print-hidden,
+  body > *:not(main) {
+    display: none !important;
+  }
+  html, body {
+    background-color: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: none !important;
+  }
+  /* Utilitas print-only: tampilkan elemen yang di-hidden di layar. */
+  .hidden.print\:block {
+    display: block !important;
   }
 }

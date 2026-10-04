@@ -2,6 +2,7 @@ import type {
   BundleBreakdown,
   BundleTier,
   DeliveryMethod,
+  InvoiceSnapshot as Invoice,
   Language,
   Order,
   OrderStatus,
@@ -295,6 +296,136 @@ export function deliveryLabel(method: DeliveryMethod, lang: Language): string {
 /** Nomor pesanan acak untuk afflict draft keranjang di sisi pembeli. */
 export function draftKey(): string {
   return "js_cart_v1";
+}
+
+/* =============================================================================
+ *  INVOICE SNAPSHOT — untuk halaman sukses setelah pesanan dibuat.
+ * ========================================================================== */
+
+/** Kunci sessionStorage yang dipakai untuk menyimpan invoice terakhir. */
+const INVOICE_KEY = "last_invoice";
+
+/**
+ * Simpan invoice ke sessionStorage. Dipanggil tepat sebelum navigasi ke
+ * `/order/success/[code]` supaya halaman sukses bisa menampilkan invoice
+ * lengkap tanpa harus query DB lagi (tabel `orders` RLS-nya tertutup untuk
+ * publik).
+ */
+export function saveInvoice(invoice: Invoice): void {
+  try {
+    window.sessionStorage.setItem(INVOICE_KEY, JSON.stringify(invoice));
+  } catch {
+    // SessionStorage tidak tersedia / penuh — abaikan, halaman sukses akan
+    // menampilkan versi ringkas dan pembeli tetap bisa melacak via /track.
+  }
+}
+
+/** Ambil invoice dari sessionStorage, atau null kalau tidak ada / kode tidak cocok. */
+export function readInvoice(orderCode: string | null): Invoice | null {
+  if (!orderCode) return null;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(INVOICE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Invoice;
+    if (!parsed || parsed.order_code !== orderCode) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Memori klien untuk invoice yang ditarik dari RPC publik. Dipakai agar
+ * halaman sukses dapat menampilkan invoice walaupun sessionStorage sudah
+ * hilang (mis. user refresh halaman / buka link langsung dari history).
+ */
+let invoiceMemory: Invoice | null = null;
+
+/**
+ * Tarik invoice: coba memori -> sessionStorage -> RPC publik `public_invoice`.
+ * Return `null` kalau semua sumber kosong (kode salah / RPC gagal).
+ *
+ * Promise.resolve supaya signature bisa dipanggil langsung di hook klien
+ * tanpa `useEffect`.
+ */
+export async function fetchInvoice(orderCode: string): Promise<Invoice | null> {
+  if (!orderCode) return null;
+  // 1. Memori (hasil RPC sebelumnya di tab ini)
+  if (invoiceMemory && invoiceMemory.order_code === orderCode) {
+    return invoiceMemory;
+  }
+  // 2. SessionStorage (snapshot dari submit order)
+  const fromStorage = readInvoice(orderCode);
+  if (fromStorage) {
+    invoiceMemory = fromStorage;
+    return fromStorage;
+  }
+  // 3. RPC publik (hanya di browser). `public_invoice` adalah
+  // `security definer`, jadi ANON client boleh memanggil tanpa login.
+  if (typeof window === "undefined") return null;
+  try {
+    const { createClient } = await import("./supabase/client");
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("public_invoice", {
+      p_code: orderCode,
+    });
+    if (error || !data) return null;
+    const remote = data as Invoice;
+    if (remote.order_code === orderCode) {
+      invoiceMemory = remote;
+      return remote;
+    }
+  } catch {
+    // jaringan / RPC error — diam saja, halaman tampil versi ringkas.
+  }
+  return null;
+}
+
+/**
+ * Versi sinkron untuk `useSyncExternalStore`. Dipakai sebelum fetch
+ * selesai; setelah fetch selesai, snapshot berikutnya akan return data
+ * dari memori. Aman untuk dipanggil di server (return null).
+ */
+export function getInvoiceSnapshot(orderCode: string | null): Invoice | null {
+  if (!orderCode) return null;
+  if (invoiceMemory && invoiceMemory.order_code === orderCode) {
+    return invoiceMemory;
+  }
+  return readInvoice(orderCode);
+}
+
+/** Trigger listener agar komponen yang menunggu invoice dari RPC bisa render ulang. */
+const invoiceListeners = new Set<() => void>();
+function notifyInvoice(): void {
+  for (const l of invoiceListeners) l();
+}
+
+/** Subscribe perubahan invoice (untuk `useSyncExternalStore`). */
+export function subscribeInvoice(listener: () => void): () => void {
+  invoiceListeners.add(listener);
+  return () => invoiceListeners.delete(listener);
+}
+
+/**
+ * Inisialisasi fetch invoice dari RPC publik. Dipanggil dari klien setelah
+ * mount. Hasilnya disimpan ke memori dan memberitahu semua listener.
+ */
+export async function loadInvoiceFromApi(orderCode: string): Promise<void> {
+  const data = await fetchInvoice(orderCode);
+  // Simpan ke memori dan kasih tahu listener (bahkan kalau null — agar
+  // UI bisa berhenti loading).
+  if (data) invoiceMemory = data;
+  notifyInvoice();
+}
+
+/** Sinkronkan memori dari sessionStorage (untuk transisi awal). */
+export function primeInvoiceMemory(orderCode: string): void {
+  const snap = readInvoice(orderCode);
+  if (snap) {
+    invoiceMemory = snap;
+    notifyInvoice();
+  }
 }
 
 export function clampQty(qty: number, max: number): number {

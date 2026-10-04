@@ -39,7 +39,7 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
   return (
     <footer id="contact" className="mt-20 bg-cocoa-900 text-cream-200">
       <div className="bg-seigaha">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-4">
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 sm:py-14 md:grid-cols-4">
           <div className="md:col-span-2">
             <div className="flex items-center gap-3">
               {settings?.logo_url ? (

@@ -3,26 +3,22 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { ChevronRight, LayoutGrid, Sparkles, UtensilsCrossed } from "lucide-react";
-import type { Category, Flavor } from "@/lib/types";
+import type { Category } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
-import { useCart } from "./CartProvider";
-import { useToast } from "@/components/ui/Toast";
 import { cheapestBundle, formatIDR } from "@/lib/utils";
 
 /**
- * Penjelahar menu dua tingkat: pilih jenis makanan dulu, baru lihat rasanya.
- * Dipakai di beranda (mode lihat) dan di halaman pre-order (mode pilih).
+ * Penjelahar menu di beranda (mode lihat-saja):
+ * klik kategori dulu, lalu lihat rasanya.
  */
 export function MenuBrowser({
   categories,
   remainingStock = null,
-  onAdd,
   emptyLabel,
 }: {
   categories: Category[];
   remainingStock?: number | null;
-  onAdd?: (flavor: Flavor) => void;
   emptyLabel?: string;
 }) {
   const { t, lang } = useI18n();
@@ -64,7 +60,7 @@ export function MenuBrowser({
         ) : (
           <>
             <p className="mb-3 text-sm font-bold text-cocoa-500">{t.menu.pickCategory}</p>
-            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
               {withFlavors.map((c) => {
                 const name = lang === "en" ? c.name_en : c.name_id;
                 const desc = lang === "en" ? c.desc_en : c.desc_id;
@@ -159,13 +155,12 @@ export function MenuBrowser({
             </div>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
             {(shown.flavors ?? []).map((f) => (
               <FlavorCard
                 key={f.id}
                 flavor={f}
                 remainingStock={remainingStock}
-                onAdd={onAdd}
                 categoryName={onlyOne ? undefined : lang === "en" ? shown.name_en : shown.name_id}
               />
             ))}
@@ -176,7 +171,11 @@ export function MenuBrowser({
   );
 }
 
-/** Pembungkus yang juga toasted saat tambah ke keranjang. */
+/**
+ * Daftar menu untuk halaman pre-order:
+ * Tampilkan SEMUA kategori & rasa dalam satu halaman (scroll per kategori),
+ * bukan harus klik kategori dulu. Lebih cepat di mobile.
+ */
 export function OrderMenuBrowser({
   categories,
   remainingStock,
@@ -184,20 +183,58 @@ export function OrderMenuBrowser({
   categories: Category[];
   remainingStock: number | null;
 }) {
-  const { add } = useCart();
-  const toast = useToast();
   const { t, lang } = useI18n();
+  const withFlavors = useMemo(
+    () => categories.filter((c) => (c.flavors?.length ?? 0) > 0),
+    [categories]
+  );
 
-  function handleAdd(flavor: Flavor) {
-    add(flavor);
-    toast.success(lang === "en" ? flavor.name_en : flavor.name_id, t.menu.addToCart);
+  if (withFlavors.length === 0) {
+    return <p className="card p-10 text-center text-cocoa-400">{t.menu.empty}</p>;
   }
 
   return (
-    <MenuBrowser
-      categories={categories}
-      remainingStock={remainingStock}
-      onAdd={handleAdd}
-    />
+    <div className="space-y-6">
+      {withFlavors.map((c) => {
+        const name = lang === "en" ? c.name_en : c.name_id;
+        return (
+          <section
+            key={c.id}
+            className="card overflow-hidden"
+            aria-labelledby={`cat-${c.id}`}
+          >
+            <header className="flex items-center justify-between gap-3 border-b border-cocoa-100 bg-cocoa-50 px-4 py-3 sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cocoa-800 text-cream-50">
+                  <UtensilsCrossed className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <h3
+                    id={`cat-${c.id}`}
+                    className="truncate font-display text-base font-bold text-cocoa-900 sm:text-lg"
+                  >
+                    {name}
+                  </h3>
+                  <p className="text-[11px] font-semibold text-cocoa-400">
+                    {c.flavors?.length} {t.menu.flavors}
+                  </p>
+                </div>
+              </div>
+            </header>
+            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+              {(c.flavors ?? []).map((f) => (
+                <FlavorCard
+                  key={f.id}
+                  flavor={f}
+                  remainingStock={remainingStock}
+                  selectable
+                  categoryName={undefined}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
   );
 }

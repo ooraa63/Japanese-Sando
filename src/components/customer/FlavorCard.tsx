@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { Flame, PackageX, ShoppingBag, Star } from "lucide-react";
+import { Flame, Minus, PackageX, Plus, ShoppingBag, Star } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useCart } from "@/components/customer/CartProvider";
+import { useToast } from "@/components/ui/Toast";
 import { formatIDR } from "@/lib/utils";
 import type { Flavor } from "@/lib/types";
 
@@ -23,20 +25,25 @@ function gradientFor(slug: string) {
 
 export function FlavorCard({
   flavor,
-  onAdd,
   inCart = 0,
   compact = false,
   remainingStock = null,
   categoryName,
+  /**
+   * `selectable` -> kartu punya tombol +/- (dipakai di halaman /order).
+   * Default false supaya kartu di beranda murni lihat-saja tanpa akses
+   * ke keranjang.
+   */
+  selectable = false,
 }: {
   flavor: Flavor;
-  onAdd?: (flavor: Flavor) => void;
   inCart?: number;
   compact?: boolean;
   /** Stok keseluruhan toko (bukan per rasa). null = tak terbatas. */
   remainingStock?: number | null;
   /** Nama kategori, ditampilkan sebagai label kecil di atas nama rasa. */
   categoryName?: string;
+  selectable?: boolean;
 }) {
   const { t, lang } = useI18n();
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
@@ -59,7 +66,7 @@ export function FlavorCard({
     >
       {/* Foto / placeholder */}
       <div
-        className={`relative aspect-[4/3] overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)}`}
+        className={`relative aspect-[5/3] overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)} sm:aspect-[4/3]`}
       >
         {flavor.image_url ? (
           <Image
@@ -111,7 +118,7 @@ export function FlavorCard({
           <h3 className="font-display text-lg leading-tight font-bold text-cocoa-900">
             {name}
           </h3>
-          {inCart > 0 ? (
+          {!selectable && inCart > 0 ? (
             <span className="chip shrink-0 bg-matcha-100 text-matcha-700">
               <ShoppingBag className="size-3" />
               {inCart}
@@ -146,22 +153,105 @@ export function FlavorCard({
           )}
         </div>
 
-        {/* Tombol hanya di halaman /order (bukan di beranda). */}
-        {onAdd ? (
-          <button
-            type="button"
-            onClick={() => onAdd(flavor)}
-            disabled={soldOut}
-            className={`mt-4 w-full text-sm ${
-              soldOut
-                ? "btn border border-cocoa-200 bg-cocoa-50 text-cocoa-400"
-                : "btn-primary"
-            }`}
-          >
-            {soldOut ? t.menu.unavailable : `+ ${t.menu.addToCart}`}
-          </button>
+        {selectable ? (
+          <FlavorCardStepper
+            flavor={flavor}
+            soldOut={soldOut}
+            stockEnabled={stockEnabled}
+            left={left}
+          />
         ) : null}
       </div>
     </article>
+  );
+}
+
+/**
+ * Stepper +/- untuk halaman /order. Dipisah supaya `useCart()` /
+ * `useToast()` tidak terpanggil ketika kartu hanya untuk dilihat
+ * (mis. di beranda).
+ */
+function FlavorCardStepper({
+  flavor,
+  soldOut,
+  stockEnabled,
+  left,
+}: {
+  flavor: Flavor;
+  soldOut: boolean;
+  stockEnabled: boolean;
+  left: number;
+}) {
+  const { t, lang } = useI18n();
+  const cart = useCart();
+  const toast = useToast();
+  const name = lang === "en" ? flavor.name_en : flavor.name_id;
+  const qty = cart.quantities[String(flavor.id)] ?? 0;
+
+  if (soldOut) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="mt-4 w-full cursor-not-allowed rounded-xl border border-cocoa-200 bg-cocoa-50 py-2.5 text-sm font-bold text-cocoa-400"
+      >
+        {t.menu.unavailable}
+      </button>
+    );
+  }
+
+  if (qty > 0) {
+    return (
+      <div
+        className="mt-4 inline-flex w-full items-stretch overflow-hidden rounded-xl border-2 border-matcha-500 bg-white shadow-sm"
+        role="group"
+        aria-label={name}
+      >
+        <button
+          type="button"
+          onClick={() => cart.setQuantity(flavor.id, qty - 1)}
+          aria-label={`-1 ${name}`}
+          className="grid w-12 shrink-0 place-items-center text-matcha-600 transition hover:bg-matcha-50 active:scale-95"
+        >
+          <Minus className="size-4" />
+        </button>
+        <div className="flex flex-1 items-center justify-center font-display text-base font-extrabold text-cocoa-900 tabular">
+          {qty}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const next = qty + 1;
+            // Hormati sisa stok (kalau ada) supaya langkah berikutnya
+            // tidak menambah lebih dari yang dijual.
+            if (stockEnabled && left > 0 && next > left) {
+              toast.warning(
+                name,
+                t.order.menu.maxReached.replace("{n}", String(left))
+              );
+              return;
+            }
+            cart.add(flavor);
+          }}
+          aria-label={`+1 ${name}`}
+          className="grid w-12 shrink-0 place-items-center bg-matcha-500 text-white transition hover:bg-matcha-600 active:scale-95"
+        >
+          <Plus className="size-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        cart.add(flavor);
+        toast.success(name, t.menu.addToCart);
+      }}
+      className="btn-primary mt-4 w-full text-sm"
+    >
+      + {t.menu.addToCart}
+    </button>
   );
 }

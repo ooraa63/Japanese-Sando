@@ -30,7 +30,7 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
-import { calcBundle, cheapestBundle, formatIDR, formatPhone } from "@/lib/utils";
+import { calcBundle, cheapestBundle, formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
 type Step = (typeof STEPS)[number];
@@ -235,6 +235,41 @@ export function OrderFlow({
       }
 
       const code = (data as { order_code: string }).order_code;
+      // Simpan snapshot invoice ke sessionStorage supaya halaman sukses bisa
+      // menampilkannya (termasuk tombol cetak/unduh). Data ini hanya hidup di
+      // tab ini — kalau user menutup tab, invoice tetap bisa dilacak via
+      // halaman /track dengan kode + nomor telepon.
+      // `paymentMethod` pasti terisi setelah validatePayment() lulus.
+      const invoice = {
+        order_code: code,
+        customer_name: draft.name.trim(),
+        phone: draft.phone.trim(),
+        address: draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
+        note: draft.note.trim(),
+        payment_method: draft.paymentMethod as "transfer" | "cash",
+        transfer_method: draft.transferMethod || null,
+        delivery_method: draft.deliveryMethod,
+        created_at: new Date().toISOString(),
+        language: lang,
+        items: groups.map((g) => ({
+          category:
+            (lang === "en" ? g.category?.name_en : g.category?.name_id) ?? "",
+          qty: g.qty,
+          unit_price: Math.round(g.calc.base / Math.max(g.qty, 1)),
+          line_total: g.calc.total,
+          flavors: g.lines.map((l) => ({
+            name: lang === "en" ? l.flavor.name_en : l.flavor.name_id,
+            qty: l.qty,
+            unit_price: l.flavor.price,
+            line_total: l.flavor.price * l.qty,
+          })),
+        })),
+        subtotal,
+        delivery_fee: deliveryFee,
+        saving,
+        total,
+      };
+      saveInvoice(invoice);
       // Kosongkan keranjang + data pengirim supaya pesanan berikutnya
       // dimulai dari form yang bersih.
       reset();

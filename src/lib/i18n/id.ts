@@ -195,6 +195,12 @@ export const id: Dict = {
     trackTitle: "Cek status pesanan",
     orderAgain: "Pesan lagi",
     home: "Kembali ke beranda",
+    invoiceTitle: "Rincian Invoice",
+    printTitle: "Cetak Invoice",
+    downloadTitle: "Unduh Invoice (PDF)",
+    printHint:
+      "Pilih “Simpan sebagai PDF” di dialog cetak untuk mengunduh invoice.",
+    thanks: "Terima kasih atas pesanannya!",
   },
   track: {
     title: "Cek Status Pesanan",

@@ -1,5 +1,9 @@
 // ===== Domain types (cerminan tabel public di Supabase) =====
 
+import type { Dict } from "@/lib/i18n/en";
+
+export type { Dict };
+
 export type Language = "id" | "en";
 
 export type OrderStatus =
@@ -182,6 +186,62 @@ export interface TrackedOrder {
 export interface CartLine {
   flavor: Flavor;
   qty: number;
+}
+
+/**
+ * Snapshot invoice yang disimpan di sessionStorage setelah pesanan dibuat.
+ * Dipakai oleh halaman sukses untuk menampilkan rincian seperti invoice
+ * tanpa harus query database lagi (RLS menutup akses publik ke tabel orders).
+ */
+export interface InvoiceLineItem {
+  /** Nama jenis makanan (mis. "Sando Sandwich"), kosong untuk item tanpa kategori. */
+  category: string;
+  /** Total PCS untuk jenis makanan ini (paket dihitung per jenis). */
+  qty: number;
+  /** Harga satuan rerata (= base / qty), untuk tampilan di invoice. */
+  unit_price: number;
+  /** Total harga untuk jenis makanan ini setelah paket. */
+  line_total: number;
+  /** Rincian per rasa di dalam jenis makanan ini. */
+  flavors: Array<{
+    name: string;
+    qty: number;
+    unit_price: number;
+    line_total: number;
+  }>;
+}
+
+/**
+ * Item flat dari RPC publik `public_invoice` / `track_order` — tidak
+ * dikelompokkan per kategori, hanya daftar baris dari tabel `order_items`.
+ */
+export interface InvoiceFlatItem {
+  flavor_name: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+
+export interface InvoiceSnapshot {
+  order_code: string;
+  customer_name: string;
+  phone: string;
+  address: string | null;
+  note: string;
+  payment_method: PaymentMethod;
+  transfer_method: string | null;
+  delivery_method: DeliveryMethod;
+  created_at: string;
+  language: Language;
+  /** Item dikelompokkan per kategori (format lengkap, dari sessionStorage). */
+  items?: InvoiceLineItem[];
+  /** Item flat (dari RPC publik). Opsional: jika `items` tidak ada, gunakan ini. */
+  flat_items?: InvoiceFlatItem[];
+  subtotal: number;
+  delivery_fee: number;
+  /** Hemat dari paket (base - subtotal). 0 kalau tidak ada paket / tidak diketahui. */
+  saving: number;
+  total: number;
 }
 
 export interface DashboardStats {

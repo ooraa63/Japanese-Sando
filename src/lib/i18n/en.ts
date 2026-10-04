@@ -197,6 +197,12 @@ export const en = {
     trackTitle: "Track your order",
     orderAgain: "Order again",
     home: "Back to home",
+    invoiceTitle: "Invoice details",
+    printTitle: "Print invoice",
+    downloadTitle: "Download invoice (PDF)",
+    printHint:
+      'Choose "Save as PDF" in the print dialog to download the invoice.',
+    thanks: "Thank you for your order!",
   },
   track: {
     title: "Track your order",
