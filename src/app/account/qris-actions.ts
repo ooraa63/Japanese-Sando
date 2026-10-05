@@ -73,6 +73,8 @@ export async function createQrisOrderAction(
     return { ok: false, error: "midtrans_not_configured" };
   }
 
+  try {
+
   // Parse payload dari formData (single JSON field).
   let payload: unknown;
   try {
@@ -167,9 +169,16 @@ export async function createQrisOrderAction(
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("Midtrans chargeQris gagal:", msg);
+    console.error("[qris-actions] midtrans_charge or set_charge gagal:", msg, { stack: e instanceof Error ? e.stack : undefined });
     return { ok: false, error: "midtrans_charge_failed" };
   }
+} catch (outerErr) {
+  // Safety net: kalau ada error di luar try-catch dalam (mis. schema validation,
+  // payload decode, dll), log dan return generic supaya gak silent-fail.
+  const msg = outerErr instanceof Error ? outerErr.message : String(outerErr);
+  console.error("[qris-actions] outer error:", msg, { stack: outerErr instanceof Error ? outerErr.stack : undefined });
+  return { ok: false, error: "generic" };
+}
 }
 
 /** Ambil total_price dari orders (private). Dipakai oleh createQrisOrderAction
