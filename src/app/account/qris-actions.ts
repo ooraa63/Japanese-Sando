@@ -115,6 +115,7 @@ export async function createQrisOrderAction(
 
   if (rpcErr || !rpcResult) {
     const msg = rpcErr?.message ?? "rpc_failed";
+    console.error("[qris-actions] create_order failed:", msg, { rpcErr });
     return { ok: false, error: mapRpcError(msg) };
   }
 
@@ -189,6 +190,13 @@ function mapRpcError(message: string): string {
   if (m.includes("insufficient_stock")) return "insufficient_stock";
   if (m.includes("address_required")) return "address_required";
   if (m.includes("preorder_closed")) return "preorder_closed";
+  if (m.includes("empty_cart")) return "empty_cart";
+  if (m.includes("too_many_items")) return "too_many_items";
+  if (m.includes("name_too_long")) return "name_too_long";
+  if (m.includes("settings_missing")) return "settings_missing";
+  if (m.includes("invalid_payment_method")) return "invalid_payment_method";
+  if (m.includes("invalid_delivery_method")) return "invalid_delivery_method";
+  if (m.includes("invalid_delivery_zone")) return "invalid_delivery_zone";
   return "generic";
 }
 
