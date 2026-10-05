@@ -41,6 +41,11 @@ export const id: Dict = {
     fontSizeNormal: "Normal",
     fontSizeCompact: "Kecil",
     fontSizeToggleLabel: "Perkecil teks & tampilan",
+    sold: "terjual",
+    liked: "disukai",
+    pick: "Pilih",
+    picked: "Dipilih",
+    remove: "Hapus",
   },
   cart: {
     title: "Keranjangmu",

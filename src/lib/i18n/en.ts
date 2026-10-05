@@ -43,6 +43,11 @@ export const en = {
     fontSizeNormal: "Normal",
     fontSizeCompact: "Compact",
     fontSizeToggleLabel: "Smaller text & layout",
+    sold: "sold",
+    liked: "liked",
+    pick: "Pick",
+    picked: "Picked",
+    remove: "Remove",
   },
   cart: {
     title: "Your cart",
