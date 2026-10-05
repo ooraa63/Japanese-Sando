@@ -47,7 +47,12 @@ interface FlavorDraft extends Omit<Flavor, "price" | "sort_order"> {
 }
 
 function toFlavorDraft(f: Flavor): FlavorDraft {
-  return { ...f, price: String(f.price), sort_order: String(f.sort_order) };
+  return {
+    ...f,
+    likes_count: f.likes_count ?? 0,
+    price: String(f.price),
+    sort_order: String(f.sort_order),
+  };
 }
 
 /**
@@ -261,6 +266,7 @@ export function MenuClient({
       stock_enabled: true,
       stock: 0,
       sort_order: String(nextOrder),
+      likes_count: 0,
       category_id: activeCategoryId,
       created_at: "",
       updated_at: "",

@@ -53,6 +53,7 @@ export interface Flavor {
   stock_enabled: boolean;
   stock: number;
   sort_order: number;
+  likes_count: number;
   category_id?: number | null;
   created_at: string;
   updated_at: string;
@@ -100,8 +101,10 @@ export interface StoreSettings {
   delivery_note_en: string;
   /** Daftar zona delivery yang bisa dipilih pembeli. */
   delivery_zones: DeliveryZone[];
-  /** Foto tambahan untuk hero carousel. */
+  /** Foto tambahan untuk hero carousel (desktop). */
   hero_carousel_urls?: string[];
+  /** Foto tambahan untuk hero carousel (mobile) — tidak disamakan dengan desktop. */
+  hero_mobile_carousel_urls?: string[];
   /** Logo & tagline di bawah nama toko */
   logo_url: string | null;
   brand_line: string;

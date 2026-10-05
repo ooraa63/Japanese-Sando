@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -21,7 +21,6 @@ export function Modal({
   size?: "sm" | "md" | "lg" | "xl";
 }) {
   const { t } = useI18n();
-  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -31,21 +30,11 @@ export function Modal({
     };
     document.addEventListener("keydown", onKey);
 
-    // Kunci scroll body + fokus ke input pertama dalam modal (kalau ada),
-    // supaya mengetik di input tidak langsung merebut fokus ke panel.
+    // Kunci scroll body. JANGAN ambil fokus ke panel/input — input akan
+    // kehilangan fokus setiap kali parent re-render (mis. saat user
+    // mengetik di field yang controlled). Browser natural focus sudah cukup.
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
-    const panel = panelRef.current;
-    if (panel) {
-      const focusable = panel.querySelector<HTMLElement>(
-        'input, textarea, select, button, [tabindex]:not([tabindex="-1"])'
-      );
-      // Pakai rAF supaya input benar-benar sudah ter-mount sebelum fokus.
-      requestAnimationFrame(() => {
-        focusable?.focus();
-      });
-    }
 
     return () => {
       document.removeEventListener("keydown", onKey);
@@ -64,6 +53,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
+      {/* Backdrop klik tunggal bukan opsi — klik tunggal tutup modal. */}
       <button
         type="button"
         aria-label={t.common.close}
@@ -71,8 +61,9 @@ export function Modal({
         className="absolute inset-0 cursor-default bg-cocoa-950/60 backdrop-blur-sm"
       />
       <div
-        ref={panelRef}
-        tabIndex={-1}
+        // Pakai onMouseDown untuk cegah close-on-backdrop-click ketika
+        // user sedang klik di dalam panel (mis. start typing in input).
+        onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={title}

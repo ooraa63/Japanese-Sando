@@ -88,6 +88,7 @@ export const en = {
     notePlaceholder: "Note (e.g. no chili)",
     bundlesTitle: "Value bundles",
     soldCount: "sold",
+    likesCount: "liked",
     like: "Like",
     liked: "Liked",
     likeAdd: "Mark as liked",

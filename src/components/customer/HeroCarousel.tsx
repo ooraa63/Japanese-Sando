@@ -5,43 +5,75 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
- * Carousel gambar — auto-slide 4 detik, swipeable di mobile, navigasi
- * panah di desktop. Dipakai di hero beranda. Gambar disimpan di Settings
- * (`hero_carousel_urls`) atau fallback ke `hero_image_url` / mobile.
+ * Carousel gambar — auto-slide 4 detik, navigasi panah di desktop.
  *
- * Catatan: tidak pakai library pihak ketiga — kita pakai timer + state
- * sederhana karena kebutuhan cuma fade transition.
+ * ATURAN: hanya auto-slide jika ada lebih dari 1 gambar. Kalau cuma 1,
+ * tampil statis (tidak ada indicator, panah, atau interval).
+ *
+ * Gambar di-sumber dari:
+ *   - Mobile: hero_image_mobile_url + hero_mobile_carousel_urls
+ *   - Desktop: hero_image_url + hero_carousel_urls
+ *   - Array dihitung per render, lalu pakai as key trigger reset active index.
  */
 export function HeroCarousel({
   images,
+  imagesMobile,
   fallback,
   fallbackMobile,
   intervalMs = 4000,
 }: {
-  /** Daftar URL gambar opsional; kalau kosong pakai fallback. */
   images?: string[];
+  /** Daftar URL gambar carousel untuk mobile — tidak disamakan dengan desktop. */
+  imagesMobile?: string[];
   fallback: string;
   fallbackMobile?: string;
   intervalMs?: number;
 }) {
-  const urls =
-    images && images.length > 0
-      ? [fallback, ...images]
-      : [fallbackMobile ?? fallback, fallback];
+  // Hitung array URL per render (SSR-friendly: pakai default non-mobile).
+  const isMobile =
+    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 
-  const [idx, setIdx] = useState(0);
+  const desktopUrls = [fallback, ...(images ?? [])].filter(Boolean);
+  const mobileUrls = fallbackMobile
+    ? [fallbackMobile, ...(imagesMobile ?? [])]
+    : [fallback, ...(imagesMobile ?? [])];
+
+  const urls = isMobile ? mobileUrls : desktopUrls;
+  const shouldSlide = urls.length > 1;
+  const slidesKey = urls.join("|") + (isMobile ? "|m" : "|d");
+
+  return (
+    <CarouselInner
+      key={slidesKey}
+      urls={urls}
+      shouldSlide={shouldSlide}
+      intervalMs={intervalMs}
+    />
+  );
+}
+
+/**
+ * Inner component — dirender dengan `key` yang berubah saat URL / device
+ * berubah, sehingga state index otomatis reset ke 0 (mount ulang).
+ */
+function CarouselInner({
+  urls,
+  shouldSlide,
+  intervalMs,
+}: {
+  urls: string[];
+  shouldSlide: boolean;
+  intervalMs: number;
+}) {
+  const [active, setActive] = useState(0);
 
   useEffect(() => {
-    if (urls.length <= 1) return;
+    if (!shouldSlide) return;
     const t = window.setInterval(() => {
-      setIdx((i) => (i + 1) % urls.length);
+      setActive((i) => (i + 1) % urls.length);
     }, intervalMs);
     return () => window.clearInterval(t);
-  }, [urls.length, intervalMs]);
-
-  function go(delta: number) {
-    setIdx((i) => (i + delta + urls.length) % urls.length);
-  }
+  }, [shouldSlide, urls.length, intervalMs]);
 
   return (
     <div className="absolute inset-0">
@@ -54,32 +86,32 @@ export function HeroCarousel({
           priority={i === 0}
           sizes="100vw"
           className={`object-cover transition-opacity duration-700 ${
-            i === idx ? "opacity-100" : "opacity-0"
+            i === active ? "opacity-100" : "opacity-0"
           }`}
         />
       ))}
-      {/* Indikator di bawah */}
-      {urls.length > 1 ? (
-        <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
-          {urls.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setIdx(i)}
-              aria-label={`Slide ${i + 1}`}
-              className={`size-2 rounded-full transition ${
-                i === idx ? "bg-cream-50" : "bg-cream-50/40"
-              }`}
-            />
-          ))}
-        </div>
-      ) : null}
-      {/* Panah navigasi (desktop) */}
-      {urls.length > 1 ? (
+
+      {shouldSlide ? (
         <>
+          {/* Indikator di bawah */}
+          <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
+            {urls.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setActive(i)}
+                aria-label={`Slide ${i + 1}`}
+                className={`size-2 rounded-full transition ${
+                  i === active ? "bg-cream-50" : "bg-cream-50/40"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Panah navigasi (desktop) */}
           <button
             type="button"
-            onClick={() => go(-1)}
+            onClick={() => setActive((i) => (i - 1 + urls.length) % urls.length)}
             aria-label="Sebelumnya"
             className="absolute top-1/2 left-3 z-10 hidden -translate-y-1/2 grid size-10 place-items-center rounded-full bg-cocoa-950/40 text-cream-50 backdrop-blur-sm transition hover:bg-cocoa-950/60 sm:grid"
           >
@@ -87,7 +119,7 @@ export function HeroCarousel({
           </button>
           <button
             type="button"
-            onClick={() => go(1)}
+            onClick={() => setActive((i) => (i + 1) % urls.length)}
             aria-label="Berikutnya"
             className="absolute top-1/2 right-3 z-10 hidden -translate-y-1/2 grid size-10 place-items-center rounded-full bg-cocoa-950/40 text-cream-50 backdrop-blur-sm transition hover:bg-cocoa-950/60 sm:grid"
           >

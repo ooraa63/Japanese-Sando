@@ -86,6 +86,7 @@ export const id: Dict = {
     notePlaceholder: "Catatan (mis. jangan pakai cabe)",
     bundlesTitle: "Pilihan Paket Hemat",
     soldCount: "terjual",
+    likesCount: "disuka",
     like: "Suka",
     liked: "Disuka",
     likeAdd: "Tandai suka",

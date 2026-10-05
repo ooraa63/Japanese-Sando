@@ -52,14 +52,12 @@ export default async function HomePage() {
       />
 
       <main id="main">
-        {/* ===================== TOKO INFO (di atas) ===================== */}
-        <ShopInfo settings={settings} />
-
-        {/* ===================== HERO + CAROUSEL ===================== */}
+        {/* ===================== HERO + CAROUSEL + TOKO INFO OVERLAY ===================== */}
         <section className="relative overflow-hidden bg-cocoa-950 text-cream-50">
           <div className="absolute inset-0">
             <HeroCarousel
               images={settings?.hero_carousel_urls ?? []}
+              imagesMobile={settings?.hero_mobile_carousel_urls ?? []}
               fallback={settings?.hero_image_url || "/hero-sando.jpg"}
               fallbackMobile={settings?.hero_image_mobile_url ?? undefined}
               intervalMs={4000}
@@ -68,6 +66,9 @@ export default async function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-r from-cocoa-950/90 via-cocoa-950/40 to-transparent" />
             <div className="absolute inset-0 bg-seigaha opacity-30" />
           </div>
+
+          {/* Overlay info toko — floating di pojok bawah */}
+          <ShopInfo settings={settings} />
 
           <div className="relative mx-auto flex min-h-[calc(100dvh-4rem)] max-w-6xl flex-col justify-center px-4 py-16 sm:px-6 lg:py-24">
             <div className="max-w-xl">

@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Clock,
-  MapPin,
-  MessageCircle,
-  Timer,
-} from "lucide-react";
+import { Clock, MapPin, MessageCircle, Timer } from "lucide-react";
 import type { StoreSettings } from "@/lib/types";
 
 function InstagramGlyph({ className }: { className?: string }) {
@@ -26,47 +21,38 @@ function InstagramGlyph({ className }: { className?: string }) {
     </svg>
   );
 }
-import { useI18n } from "@/lib/i18n";
 
 /**
- * Strip info toko di atas hero — memindahkan hal-hal penting dari footer
- * ke posisi paling gampang dilihat pembeli: IG, WhatsApp, email, alamat,
- * jam buka, deadline pre-order.
+ * Strip info toko — versi overlay floating (absolute di pojok bawah hero
+ * image). Kontak dengan chip WA/IG + alamat + jam. Tampil ringkas & elegan
+ * dengan backdrop-blur supaya tetap terbaca di atas foto apapun.
  */
 export function ShopInfo({ settings }: { settings: StoreSettings | null }) {
-  const { t, lang } = useI18n();
   const s = settings;
   if (!s) return null;
 
-  const hours = lang === "en" ? s.hours_en : s.hours_id;
-  const deadline = lang === "en" ? s.deadline_en : s.deadline_id;
-
-  // Minimal: WA + IG saja dianggap "inti" — sisanya tambahan.
+  const hours = s.hours_id || s.hours_en;
+  const deadline = s.deadline_id || s.deadline_en;
   const hasCta = s.whatsapp || s.instagram;
   if (!hasCta && !s.address && !hours && !deadline) return null;
 
   return (
-    <section className="border-b border-cocoa-200 bg-cream-100/70">
-      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-5">
-        <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+    <div className="absolute inset-x-0 bottom-0 z-10 px-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-6xl items-end pb-4 sm:pb-6">
+        <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl bg-cocoa-950/55 px-3 py-2 text-cream-100 shadow-2xl backdrop-blur-md ring-1 ring-cream-50/15 sm:gap-3 sm:px-4">
           {s.whatsapp ? (
             <a
               href={`https://wa.me/${s.whatsapp.replace(/\D/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-start gap-2.5 rounded-2xl bg-white p-3 transition hover:bg-cocoa-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-matcha-500/95 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-matcha-500 sm:text-sm"
+              title={s.whatsapp}
             >
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-matcha-100 text-matcha-700">
-                <MessageCircle className="size-4" />
+              <MessageCircle className="size-3.5" />
+              <span className="hidden tabular sm:inline" dir="ltr">
+                {s.whatsapp}
               </span>
-              <span className="min-w-0">
-                <span className="block text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
-                  {t.contact.whatsapp}
-                </span>
-                <span className="block font-bold text-cocoa-900 tabular" dir="ltr">
-                  {s.whatsapp}
-                </span>
-              </span>
+              <span className="sm:hidden">WhatsApp</span>
             </a>
           ) : null}
 
@@ -75,19 +61,14 @@ export function ShopInfo({ settings }: { settings: StoreSettings | null }) {
               href={`https://instagram.com/${s.instagram.replace(/^@/, "")}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-start gap-2.5 rounded-2xl bg-white p-3 transition hover:bg-cocoa-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-berry-500/95 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-berry-500 sm:text-sm"
+              title={`@${s.instagram.replace(/^@/, "")}`}
             >
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-berry-500/15 text-berry-500">
-                <InstagramGlyph className="size-4" />
+              <InstagramGlyph className="size-3.5" />
+              <span className="hidden sm:inline">
+                @{s.instagram.replace(/^@/, "")}
               </span>
-              <span className="min-w-0">
-                <span className="block text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
-                  Instagram
-                </span>
-                <span className="block font-bold text-cocoa-900 tabular">
-                  @{s.instagram.replace(/^@/, "")}
-                </span>
-              </span>
+              <span className="sm:hidden">Instagram</span>
             </a>
           ) : null}
 
@@ -96,49 +77,32 @@ export function ShopInfo({ settings }: { settings: StoreSettings | null }) {
               href={s.maps_url || "#"}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-start gap-2.5 rounded-2xl bg-white p-3 transition hover:bg-cocoa-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-cocoa-800/70 px-3 py-1.5 text-xs font-bold text-cream-50 transition hover:bg-cocoa-800/90 sm:text-sm"
+              title={s.address}
             >
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-cocoa-100 text-cocoa-600">
-                <MapPin className="size-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
-                  {t.contact.address}
-                </span>
-                <span className="block font-bold text-cocoa-900 line-clamp-2">
-                  {s.address}
-                </span>
-              </span>
+              <MapPin className="size-3.5 shrink-0" />
+              <span className="line-clamp-1 max-w-[12rem]">{s.address}</span>
             </a>
           ) : null}
 
           {hours || deadline ? (
-            <div className="flex items-start gap-2.5 rounded-2xl bg-white p-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-honey-300/30 text-honey-500">
-                <Clock className="size-4" />
-              </span>
-              <span className="min-w-0">
-                {hours ? (
-                  <>
-                    <span className="block text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
-                      {t.contact.hours}
-                    </span>
-                    <span className="block font-bold text-cocoa-900">
-                      {hours}
-                    </span>
-                  </>
-                ) : null}
-                {deadline ? (
-                  <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-berry-500/10 px-1.5 py-0.5 text-[11px] font-bold text-berry-600">
-                    <Timer className="size-3" />
-                    {t.contact.deadline}: {deadline}
-                  </span>
-                ) : null}
-              </span>
+            <div className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-cocoa-800/70 px-3 py-1.5 text-xs font-bold text-cream-50 sm:text-sm">
+              {hours ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="size-3.5" />
+                  <span className="hidden tabular sm:inline">{hours}</span>
+                </span>
+              ) : null}
+              {deadline ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-honey-400/90 px-1.5 py-0.5 text-[10px] text-cocoa-900">
+                  <Timer className="size-3" />
+                  <span>{deadline}</span>
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

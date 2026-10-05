@@ -71,7 +71,10 @@ export function FlavorCard({
   const soldOut = !isActive || (stockEnabled && left <= 0);
   const low = stockEnabled && left > 0 && left <= 5;
 
-  // Like state — disimpan per-device di localStorage. Inisialisasi dari storage.
+  // Session-id per-device untuk tracking like di server. localStorage agar
+// konsisten antar reload. Server pakai tabel flavor_likes dengan
+// (flavor_id, session_id) untuk hitung likes_count.
+  const sessionIdKey = "sando_session_id";
   const likeKey = `like:flavor:${flavor.id}`;
   const [isLiked, setIsLiked] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -81,7 +84,24 @@ export function FlavorCard({
       return false;
     }
   });
+  const [likesCount, setLikesCount] = useState<number>(flavor.likes_count ?? 0);
+
+  function getSessionId(): string {
+    if (typeof window === "undefined") return "ssr";
+    try {
+      let s = window.localStorage.getItem(sessionIdKey);
+      if (!s) {
+        s = `s-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+        window.localStorage.setItem(sessionIdKey, s);
+      }
+      return s;
+    } catch {
+      return "ssr";
+    }
+  }
+
   function toggleLike() {
+    if (readOnlySocial) return;
     setIsLiked((prev) => {
       const next = !prev;
       try {
@@ -92,6 +112,36 @@ export function FlavorCard({
       }
       return next;
     });
+    // Optimistic update counter
+    setLikesCount((c) => Math.max(0, c + (isLiked ? -1 : 1)));
+    // Kirim ke server (async, fire-and-forget)
+    const sessionId = getSessionId();
+    void (async () => {
+      try {
+        const res = await fetch("/api/flavor-like", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flavor_id: flavor.id, session_id: sessionId }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            liked: boolean;
+            likes_count: number;
+          };
+          // Sync dengan server
+          setIsLiked(data.liked);
+          setLikesCount(data.likes_count);
+          try {
+            if (data.liked) window.localStorage.setItem(likeKey, "1");
+            else window.localStorage.removeItem(likeKey);
+          } catch {
+            /* abaikan */
+          }
+        }
+      } catch {
+        /* diam — localStorage sudah ter-update */
+      }
+    })();
   }
 
   return (
@@ -203,12 +253,21 @@ export function FlavorCard({
         {/* Baris 'terjual' + like (mode lihat di beranda, read-only di pre-order) */}
         {showSocial ? (
           <div className="mt-3 flex items-center justify-between border-t border-cocoa-100 pt-3 text-xs">
-            <span className="text-cocoa-500">
-              <span className="font-bold text-cocoa-700 tabular">
-                {soldCount}
-              </span>{" "}
-              {t.menu.soldCount.replace("{n}", "")}
-            </span>
+            <div className="flex items-center gap-3 text-cocoa-500">
+              <span>
+                <span className="font-bold text-cocoa-700 tabular">
+                  {soldCount}
+                </span>{" "}
+                {t.menu.soldCount.replace("{n}", "")}
+              </span>
+              <span className="text-cocoa-300">·</span>
+              <span>
+                <span className="font-bold text-berry-500 tabular">
+                  {likesCount}
+                </span>{" "}
+                {t.menu.likesCount.replace("{n}", "")}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => {
