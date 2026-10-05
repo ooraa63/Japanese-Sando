@@ -122,7 +122,7 @@ export const id: Dict = {
   },
   order: {
     title: "Pesan Sandonya Sekarang",
-    subtitle: "Tanpa akun. Cuma butuh satu menit.",
+    subtitle: "Boleh pakai akun, boleh juga tidak. Cuma butuh satu menit.",
     stepIdentity: "Data Kamu",
     stepMenu: "Pilih Rasa",
     stepPayment: "Pembayaran",
@@ -342,6 +342,8 @@ export const id: Dict = {
         invalidEmail: "Format email tidak valid.",
         weakPassword: "Gunakan minimal 8 karakter.",
         userNotFound: "Email atau kata sandi salah.",
+        emailNotVerified:
+          "Verifikasi email dulu. Cek kotak masuk untuk link verifikasi.",
         emailTaken: "Email ini sudah dipakai. Coba masuk saja.",
         signupFailed:
           "Pendaftaran gagal. Hubungi kami kalau terus muncul pesan ini.",
@@ -363,6 +365,9 @@ export const id: Dict = {
       phone: "Nomor telepon (WhatsApp)",
       phonePlaceholder: "0812 3456 7890",
       phoneHint: "Untuk update pesanan. Nomor Indonesia tidak apa-apa.",
+      dateOfBirth: "Tanggal lahir",
+      dateOfBirthHint:
+        "Untuk promo ulang tahun. Di email marketing, hanya tahun lahir yang ditampilkan.",
       instagram: "Instagram",
       instagramPlaceholder: "username",
       instagramHint: "Tanpa @. Wajib untuk info promo.",
@@ -372,12 +377,17 @@ export const id: Dict = {
       loginLink: "Masuk",
       guestHint: "Cuma mau pesan sekali?",
       guestLink: "Lanjut sebagai tamu",
+      verifyEmailTitle: "Cek kotak masuk kamu",
+      verifyEmailDesc:
+        "Kami kirim link verifikasi ke email kamu. Klik link-nya, lalu masuk di sini.",
       errors: {
         invalidEmail: "Format email tidak valid.",
         weakPassword: "Gunakan minimal 8 karakter.",
         invalidPhone: "Nomor telepon tidak valid.",
         invalidName: "Silakan isi nama kamu.",
         nameTooLong: "Nama terlalu panjang.",
+        invalidDateOfBirth:
+          "Tanggal lahir tidak valid (usia minimal 13 tahun).",
         emailTaken: "Email ini sudah dipakai. Coba masuk saja.",
         signupFailed:
           "Pendaftaran gagal. Hubungi kami kalau terus muncul pesan ini.",
@@ -396,6 +406,7 @@ export const id: Dict = {
       emailLabel: "Email",
       fullName: "Nama lengkap",
       phone: "Nomor telepon",
+      dateOfBirth: "Tanggal lahir",
       instagram: "Instagram",
       save: "Simpan perubahan",
       saving: "Menyimpan...",

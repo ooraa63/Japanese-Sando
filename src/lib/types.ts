@@ -324,6 +324,8 @@ export interface CustomerProfile {
   full_name: string;
   phone: string;
   instagram: string | null;
+  /** ISO date "YYYY-MM-DD", atau null kalau belum diisi (backfill). */
+  date_of_birth: string | null;
   created_at: string;
   updated_at: string;
 }

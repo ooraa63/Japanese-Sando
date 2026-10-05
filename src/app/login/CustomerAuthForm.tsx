@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  Cake,
   KeyRound,
   Loader2,
   LogIn,
@@ -34,6 +35,16 @@ export function CustomerAuthForm({
   const [state, setState] = useState<CustomerActionResult | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Setelah berhasil register, UI menampilkan "check inbox" selama
+  // state.requiresVerification true. Auto-dismiss setelah 30 detik supaya
+  // user tidak stuck.
+  const [verifyBannerShown, setVerifyBannerShown] = useState(false);
+  useEffect(() => {
+    if (!verifyBannerShown) return;
+    const t = setTimeout(() => setVerifyBannerShown(false), 30_000);
+    return () => clearTimeout(t);
+  }, [verifyBannerShown]);
+
   const d = mode === "login" ? dict.login : dict.register;
   // Akses field khusus register (fullName, phone, instagram, dst) lewat
   // `r` supaya TypeScript tidak mengeluh tentang union narrowing.
@@ -52,17 +63,20 @@ export function CustomerAuthForm({
     if (code === "email_taken") return d.errors.emailTaken;
     if (code === "signup_failed") return d.errors.signupFailed;
     if (code === "not_authenticated") return d.errors.notAuthenticated;
-    // Field khusus login: user_not_found
+    // Login-only:
     if (code === "user_not_found") return loginErrors.userNotFound;
-    // Field khusus register:
+    if (code === "email_not_verified") return loginErrors.emailNotVerified;
+    // Register-only:
     if (code === "invalid_phone") return registerErrors.invalidPhone;
     if (code === "invalid_name") return registerErrors.invalidName;
     if (code === "name_too_long") return registerErrors.nameTooLong;
+    if (code === "invalid_date_of_birth") return registerErrors.invalidDateOfBirth;
     return d.errors.generic;
   }
 
   function submit(formData: FormData) {
     setState(null);
+    setVerifyBannerShown(false);
     startTransition(async () => {
       const result =
         mode === "login"
@@ -70,6 +84,12 @@ export function CustomerAuthForm({
           : await signUpCustomerAction(null, formData);
 
       if (result.ok) {
+        if (result.requiresVerification) {
+          // Email verifikasi dikirim — tampilkan banner "cek inbox",
+          // JANGAN redirect (sesi belum aktif).
+          setVerifyBannerShown(true);
+          return;
+        }
         const target = nextPath && nextPath.startsWith("/") ? nextPath : "/account";
         router.replace(target);
         router.refresh();
@@ -189,6 +209,26 @@ export function CustomerAuthForm({
             </div>
 
             <div>
+              <label htmlFor="dateOfBirth" className="label">
+                {r.dateOfBirth}
+                <span className="ml-1 text-berry-500">*</span>
+              </label>
+              <div className="relative">
+                <Cake className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-300" />
+                <input
+                  id="dateOfBirth"
+                  name="dateOfBirth"
+                  type="date"
+                  required
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="input pl-10"
+                  autoComplete="bday"
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-cocoa-400">{r.dateOfBirthHint}</p>
+            </div>
+
+            <div>
               <label htmlFor="instagram" className="label">
                 {r.instagram}
                 <span className="ml-1 text-berry-500">*</span>
@@ -210,6 +250,13 @@ export function CustomerAuthForm({
               <p className="mt-1.5 text-xs text-cocoa-400">{r.instagramHint}</p>
             </div>
           </>
+        ) : null}
+
+        {verifyBannerShown && r ? (
+          <p className="rounded-xl bg-matcha-500/10 px-3.5 py-3 text-sm text-matcha-700">
+            <strong className="block font-extrabold">{r.verifyEmailTitle}</strong>
+            <span className="mt-1 block text-matcha-700/90">{r.verifyEmailDesc}</span>
+          </p>
         ) : null}
 
         {errorMessage ? (

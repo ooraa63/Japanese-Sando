@@ -124,7 +124,7 @@ export const en = {
   },
   order: {
     title: "Pre-order your sando",
-    subtitle: "No account needed. Takes about a minute.",
+    subtitle: "Optional account. Takes about a minute.",
     stepIdentity: "Your details",
     stepMenu: "Choose flavors",
     stepPayment: "Payment",
@@ -343,6 +343,8 @@ export const en = {
         invalidEmail: "Please enter a valid email.",
         weakPassword: "Use at least 8 characters.",
         userNotFound: "Wrong email or password.",
+        emailNotVerified:
+          "Please verify your email first. Check your inbox for the link.",
         emailTaken: "This email is already used.",
         signupFailed:
           "We could not finish signing you up. Please contact us if it keeps happening.",
@@ -364,6 +366,9 @@ export const en = {
       phone: "Phone number (WhatsApp)",
       phonePlaceholder: "0812 3456 7890",
       phoneHint: "Used for order updates. Indonesian numbers are fine.",
+      dateOfBirth: "Date of birth",
+      dateOfBirthHint:
+        "Required for birthday promos. We only show your year of birth, not your full DOB, in marketing emails.",
       instagram: "Instagram",
       instagramPlaceholder: "username",
       instagramHint: "Without @. Required for promo updates.",
@@ -373,12 +378,16 @@ export const en = {
       loginLink: "Sign in",
       guestHint: "Just want to order once?",
       guestLink: "Continue as guest",
+      verifyEmailTitle: "Check your inbox",
+      verifyEmailDesc:
+        "We sent a verification link to your email. Click it, then sign in here.",
       errors: {
         invalidEmail: "Please enter a valid email.",
         weakPassword: "Use at least 8 characters.",
         invalidPhone: "Please enter a valid phone number.",
         invalidName: "Please enter your name.",
         nameTooLong: "That name is too long.",
+        invalidDateOfBirth: "Please enter a valid date (you must be at least 13).",
         emailTaken: "This email is already used. Try signing in instead.",
         signupFailed:
           "We could not finish signing you up. Please contact us if it keeps happening.",
@@ -397,6 +406,7 @@ export const en = {
       emailLabel: "Email",
       fullName: "Full name",
       phone: "Phone",
+      dateOfBirth: "Date of birth",
       instagram: "Instagram",
       save: "Save changes",
       saving: "Saving...",

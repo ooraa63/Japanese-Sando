@@ -20,12 +20,16 @@
 --    baris profil di sini. Identitas ini dipakai untuk auto-fill di /order.
 -- =============================================================================
 create table if not exists public.customer_profiles (
-  user_id     uuid        primary key references auth.users(id) on delete cascade,
-  full_name   text        not null check (length(trim(full_name)) >= 2),
-  phone       text        not null,
-  instagram   text,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  user_id       uuid        primary key references auth.users(id) on delete cascade,
+  full_name     text        not null check (length(trim(full_name)) >= 2),
+  phone         text        not null,
+  instagram     text,
+  -- Tanggal lahir customer. Wajib di sisi form signup, disimpan di sini
+  -- untuk referensi promo ulang tahun & validasi umur. Nullable untuk
+  -- backfill dari baris lama (lihat juga customer_bootstrap_from_metadata).
+  date_of_birth date        check (date_of_birth <= current_date),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
 create index if not exists customer_profiles_phone_idx
@@ -73,7 +77,7 @@ using (user_id = auth.uid());
 
 -- =============================================================================
 -- 3. RPC — customer_profile()
---    Ambil profil customer (nama, telepon, IG, email) dari auth context.
+--    Ambil profil customer (nama, telepon, IG, DOB, email) dari auth context.
 --    Return null kalau belum login / belum punya profil.
 -- =============================================================================
 create or replace function public.customer_profile()
@@ -97,6 +101,7 @@ begin
     'full_name', cp.full_name,
     'phone', cp.phone,
     'instagram', cp.instagram,
+    'date_of_birth', cp.date_of_birth,
     'created_at', cp.created_at,
     'updated_at', cp.updated_at
   )
@@ -113,14 +118,15 @@ grant execute on function public.customer_profile() to anon, authenticated;
 
 
 -- =============================================================================
--- 4. RPC — customer_upsert_own_profile(p_full_name, p_phone, p_instagram)
+-- 4. RPC — customer_upsert_own_profile(p_full_name, p_phone, p_instagram, p_date_of_birth)
 --    Simpan profil customer yang sedang login (insert atau update).
 --    Dipakai setelah register / saat user update identitas.
 -- =============================================================================
 create or replace function public.customer_upsert_own_profile(
-  p_full_name   text,
-  p_phone       text,
-  p_instagram   text default null
+  p_full_name     text,
+  p_phone         text,
+  p_instagram     text default null,
+  p_date_of_birth date default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -142,24 +148,98 @@ begin
     raise exception 'invalid_phone' using errcode = '22023';
   end if;
 
-  insert into public.customer_profiles (user_id, full_name, phone, instagram)
+  insert into public.customer_profiles (user_id, full_name, phone, instagram, date_of_birth)
   values (
     v_user_id,
     trim(p_full_name),
     trim(p_phone),
-    nullif(trim(coalesce(p_instagram, '')), '')
+    nullif(trim(coalesce(p_instagram, '')), ''),
+    p_date_of_birth
   )
   on conflict (user_id) do update
-    set full_name   = excluded.full_name,
-        phone       = excluded.phone,
-        instagram   = excluded.instagram,
-        updated_at  = now();
+    set full_name     = excluded.full_name,
+        phone         = excluded.phone,
+        instagram     = excluded.instagram,
+        date_of_birth = excluded.date_of_birth,
+        updated_at    = now();
 
   return public.customer_profile();
 end;
 $$;
 
-grant execute on function public.customer_upsert_own_profile(text, text, text) to authenticated;
+grant execute on function public.customer_upsert_own_profile(text, text, text, date) to authenticated;
+
+
+-- =============================================================================
+-- 4b. RPC — customer_bootstrap_from_metadata()
+--      Buat customer_profiles row dari raw_user_meta_data Supabase Auth,
+--      kalau user sudah login tapi belum punya profil.
+--
+--      Dipakai untuk flow "Confirm email ON" di Supabase: signup user
+--      dibuat + field user disimpan ke user_metadata, tapi customer_profiles
+--      tidak bisa dibuat karena sesi null saat signup. Setelah user verifikasi
+--      email dan login, RPC ini membuat profil dari user_metadata sehingga
+--      identitas bisa di-auto-fill di /order.
+--
+--      Kalau user sudah punya profil, return existing (idempotent).
+-- =============================================================================
+create or replace function public.customer_bootstrap_from_metadata()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id    uuid := auth.uid();
+  v_meta       jsonb;
+  v_full_name  text;
+  v_phone      text;
+  v_instagram  text;
+  v_dob_text   text;
+  v_dob        date;
+begin
+  if v_user_id is null then
+    raise exception 'not_authenticated' using errcode = '22023';
+  end if;
+
+  -- Kalau profil sudah ada, return existing — tidak double-write.
+  if exists (select 1 from public.customer_profiles where user_id = v_user_id) then
+    return public.customer_profile();
+  end if;
+
+  -- Ambil dari raw_user_meta_data (di-set saat auth.signUp options.data).
+  select raw_user_meta_data into v_meta
+  from auth.users
+  where id = v_user_id;
+
+  v_full_name := nullif(trim(coalesce(v_meta ->> 'full_name', '')), '');
+  v_phone     := nullif(trim(coalesce(v_meta ->> 'phone', '')), '');
+  v_instagram := nullif(trim(coalesce(v_meta ->> 'instagram', '')), '');
+  v_dob_text  := nullif(trim(coalesce(v_meta ->> 'date_of_birth', '')), '');
+
+  if v_dob_text is not null then
+    begin
+      v_dob := v_dob_text::date;
+    exception when others then
+      v_dob := null;
+    end;
+  end if;
+
+  if v_full_name is null or length(v_full_name) < 2 then
+    raise exception 'invalid_name' using errcode = '22023';
+  end if;
+  if v_phone is null or length(public.normalize_phone(v_phone)) < 9 then
+    raise exception 'invalid_phone' using errcode = '22023';
+  end if;
+
+  insert into public.customer_profiles (user_id, full_name, phone, instagram, date_of_birth)
+  values (v_user_id, v_full_name, v_phone, v_instagram, v_dob);
+
+  return public.customer_profile();
+end;
+$$;
+
+grant execute on function public.customer_bootstrap_from_metadata() to authenticated;
 
 
 -- =============================================================================

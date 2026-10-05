@@ -4,6 +4,69 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-05 — Akun buyer: DOB wajib, verifikasi email, skip identitas kalau login
+
+**Mengubah:**
+
+- `supabase/migration-16.sql`
+  - `customer_profiles` tambah kolom `date_of_birth date` (nullable, ≤ today, untuk promo ulang tahun).
+  - `customer_upsert_own_profile` tambah parameter `p_date_of_birth date default null`.
+  - `customer_profile` return `date_of_birth` di JSON.
+  - RPC baru `customer_bootstrap_from_metadata()` — membuat `customer_profiles` row dari `auth.users.raw_user_meta_data` untuk flow "Confirm email ON" (signup → verifikasi → login → bootstrap).
+- `src/lib/types.ts` — `CustomerProfile.date_of_birth: string | null`.
+- `src/app/account/actions.ts`:
+  - `signUpCustomerAction` — validasi DOB (ISO date, usia min 13), simpan semua field ke `options.data` (Supabase user_metadata), detect `signUp.session`:
+      - ada (Confirm email OFF) → langsung `customer_upsert_own_profile`
+      - null (Confirm email ON) → return `{ok: true, requiresVerification: true}` (UI tampilkan banner "cek inbox")
+  - `signInCustomerAction` — detect error "Email not confirmed" → return `email_not_verified`. Setelah login sukses, best-effort call `customer_bootstrap_from_metadata` kalau profil belum ada.
+  - `updateCustomerProfileAction` — sekarang menerima `dateOfBirth`.
+- `src/app/login/CustomerAuthForm.tsx`:
+  - Tambah field **date_of_birth** di mode register (icon `Cake`, max=today).
+  - State `verifyBannerShown` + banner matcha "Cek kotak masuk" saat signup butuh verifikasi (auto-dismiss 30 detik).
+  - Handle error code baru: `email_not_verified`, `invalid_date_of_birth`.
+- `src/app/account/AccountClient.tsx` — field **Tanggal lahir** di form profil (`type=date`, max=today, defaultValue dari `profile.date_of_birth`).
+- `src/components/customer/OrderFlow.tsx`:
+  - Step awal: `useState<Step>(profile ? "menu" : "identity")` — buyer login langsung ke "Choose flavors", tidak perlu step identitas.
+  - **Hapus banner "Value bundles — N bundle available"** di step identitas (per request user).
+- `src/lib/i18n/{id,en}.ts`:
+  - Subtitle `/order` jadi "Optional account. Takes about a minute." (id: "Boleh pakai akun, boleh juga tidak. Cuma butuh satu menit.").
+  - `customerAuth.register`: tambah `dateOfBirth`, `dateOfBirthHint`, `verifyEmailTitle`, `verifyEmailDesc`, error `invalidDateOfBirth`.
+  - `customerAuth.login.errors`: tambah `emailNotVerified`.
+  - `account.profile`: tambah `dateOfBirth`.
+- `src/components/customer/OrderFlow.tsx` — hapus import `Gift` (sudah tidak dipakai setelah banner dihapus).
+
+**Mengapa:**
+
+1. **DOB wajib di signup**: Promo ulang tahun butuh tanggal lahir. Validasi usia min 13 (mengikuti eCommerce umum). Hanya tahun lahir yang dipakai di email marketing, sesuai UX best-practice.
+2. **Verifikasi email**: User minta "verifikasinya harus dari email". Implementasi: `signUp` + simpan field ke `user_metadata`; RPC `customer_bootstrap_from_metadata` membuat profil dari metadata setelah user verifikasi + login. Login detect "Email not confirmed" dari Supabase Auth.
+3. **Skip identitas kalau login**: Identitas sudah ke-isi otomatis dari profil, jadi step "Your details" cuma guest-flow. Mengurangi 1 klik untuk buyer yang sudah punya akun.
+4. **Hapus banner Value bundles**: Visual noise di step identitas — info bundle cukup ditampilkan di step "Choose flavors" saja.
+
+**Verifikasi:**
+- `npx tsc --noEmit` — zero errors
+- `npx eslint src` — zero errors / warnings
+- `npx next build` — sukses
+
+**Catatan penting:**
+
+- Supabase project **harus** aktifkan "Confirm email" di dashboard
+  (Authentication → Providers → Email → Enable Confirm email = ON).
+  Sebelumnya di `MEMORY/gotchas.md` #13 kami nyaran OFF — sekarang
+  dibalik. Lihat juga `MEMORY/gotchas.md` #13 update.
+- Admin signup juga akan kena edurmend verifikasi (karena pakai pola
+  signUp yang sama). Setelah admin signup, admin perlu cek email untuk
+  link verifikasi. Tidak ada perubahan kode admin create_side_action yang
+  signifikan — sesi null cuma membuat admin harus login ulang setelah
+  verifikasi, bukan masalah besar.
+- Flow signup: form submit → Supabase kirim email → UI banner matcha
+  "Cek kotak masuk" → user klik link → user kembali ke /login → login
+  sukses → bootstrap profile → redirect ke tujuan.
+- Setelah `npm run db:push` jalan, kolom `date_of_birth` akan dibuat.
+  Untuk data lama (kalau pernah ada customer_profiles baris sebelum
+  update ini), DOB akan NULL — UI tampilkan input kosong, user bisa
+  update manual di /account.
+
+---
 ## 2026-10-05 — Akun buyer (login/register/guest) + auto-fill identitas
 
 **Scope:** feat: akun buyer, feat: halaman /account

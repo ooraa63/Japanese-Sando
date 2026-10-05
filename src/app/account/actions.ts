@@ -13,6 +13,11 @@ export interface CustomerActionResult<T = undefined> {
   ok: boolean;
   data?: T;
   error?: string;
+  /**
+   * True kalau signup berhasil & Supabase mengirim email verifikasi, dan
+   * sesi belum aktif (Confirm email ON). UI menampilkan "cek email kamu".
+   */
+  requiresVerification?: boolean;
 }
 
 function humanize(error: string | undefined): string {
@@ -29,9 +34,29 @@ function humanize(error: string | undefined): string {
     "user_not_found",
     "signup_failed",
     "not_authenticated",
+    "invalid_date_of_birth",
     "generic",
   ];
   return known.includes(code) ? code : "generic";
+}
+
+/**
+ * Validasi tanggal lahir — ISO YYYY-MM-DD, usia minimum 13 tahun (mengikuti
+ * kebanyakan eCommerce), BUKAN di masa depan.
+ */
+function parseDateOfBirth(s: string): string | null {
+  if (!s) return null;
+  // Tolak kalau bukan YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(s + "T00:00:00Z");
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  if (d.getTime() > now.getTime()) return null;
+  // Umur minimum 13 tahun
+  const thirteenYearsAgo = new Date(now);
+  thirteenYearsAgo.setUTCFullYear(thirteenYearsAgo.getUTCFullYear() - 13);
+  if (d.getTime() > thirteenYearsAgo.getTime()) return null;
+  return s;
 }
 
 /**
@@ -56,51 +81,74 @@ export async function signUpCustomerAction(
   const fullName = String(formData.get("fullName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
+  const dobRaw = String(formData.get("dateOfBirth") ?? "").trim();
 
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) return { ok: false, error: "invalid_email" };
   if (password.length < 8) return { ok: false, error: "weak_password" };
   if (fullName.length < 2) return { ok: false, error: "invalid_name" };
   if (phone.replace(/\D/g, "").length < 9) return { ok: false, error: "invalid_phone" };
 
+  const dob = parseDateOfBirth(dobRaw);
+  if (dobRaw && !dob) return { ok: false, error: "invalid_date_of_birth" };
+
   const supabase = await createClient();
 
-  // 1. Daftar user di Supabase Auth. Cookie sesi akan ter-set jika
-  //    "Confirm email" disabled.
+  // 1. Daftar user di Supabase Auth. Field identitas disimpan ke
+  //    raw_user_meta_data supaya bisa di-bootstrap setelah verifikasi
+  //    email (kalau "Confirm email" ON di Supabase).
   const { data: signUp, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } },
+    options: {
+      data: {
+        full_name: fullName,
+        phone,
+        instagram,
+        date_of_birth: dob,
+      },
+    },
   });
 
   if (signUpError) {
-    // Email sudah dipakai? Jangan bocorkan apakah email terdaftar.
-    return { ok: false, error: "email_taken" };
+    if (/already registered|already been registered/i.test(signUpError.message)) {
+      return { ok: false, error: "email_taken" };
+    }
+    if (/password/i.test(signUpError.message) && /short|characters/i.test(signUpError.message)) {
+      return { ok: false, error: "weak_password" };
+    }
+    if (/email/i.test(signUpError.message) && /invalid/i.test(signUpError.message)) {
+      return { ok: false, error: "invalid_email" };
+    }
+    return { ok: false, error: "signup_failed" };
   }
 
   const newId = signUp.user?.id;
   if (!newId) {
-    // Tidak ada sesi = "Confirm email" enabled dan user belum verifikasi.
     return { ok: false, error: "signup_failed" };
   }
 
-  // 2. Simpan profil identitas di customer_profiles via RPC.
-  //    RPC ini akan raise exception kalau validasi gagal — kita petakan
-  //    ke error code yang sudah ada di tabel humanize.
-  const { error: profileErr } = await supabase.rpc("customer_upsert_own_profile", {
-    p_full_name: fullName,
-    p_phone: phone,
-    p_instagram: instagram || null,
-  });
+  // 2a. Kalau sesi aktif (Confirm email OFF), langsung simpan profil.
+  if (signUp.session) {
+    const { error: profileErr } = await supabase.rpc("customer_upsert_own_profile", {
+      p_full_name: fullName,
+      p_phone: phone,
+      p_instagram: instagram || null,
+      p_date_of_birth: dob,
+    });
 
-  if (profileErr) {
-    // Kalau profil gagal disimpan, hapus auth user supaya tidak ada
-    // akun tanpa profil (best-effort). signOut untuk membersihkan sesi.
-    await supabase.auth.signOut();
-    return { ok: false, error: humanize(profileErr.message) };
+    if (profileErr) {
+      await supabase.auth.signOut();
+      return { ok: false, error: humanize(profileErr.message) };
+    }
+    revalidatePath("/", "layout");
+    return { ok: true };
   }
 
+  // 2b. Confirm email ON: sesi null. Identitas sudah di user_metadata.
+  //     Setelah user verifikasi email + login, RPC
+  //     `customer_bootstrap_from_metadata` akan membuat customer_profiles.
   revalidatePath("/", "layout");
-  return { ok: true };
+  return { ok: true, requiresVerification: true };
 }
 
 /** Login untuk customer yang sudah punya akun. */
@@ -117,6 +165,9 @@ export async function signInCustomerAction(
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
+    if (/email not confirmed|email_not_confirmed|not.*verified/i.test(error.message)) {
+      return { ok: false, error: "email_not_verified" };
+    }
     if (/invalid login credentials/i.test(error.message)) {
       return { ok: false, error: "user_not_found" };
     }
@@ -124,6 +175,15 @@ export async function signInCustomerAction(
       return { ok: false, error: "generic" };
     }
     return { ok: false, error: "user_not_found" };
+  }
+
+  // Login sukses. Kalau customer_profiles belum ada (mis. signup dengan
+  // Confirm email ON), bootstrap dari user_metadata. Best-effort — kalau
+  // RPC gagal, login tetap dianggap sukses, user bisa isi profil di /account.
+  try {
+    await supabase.rpc("customer_bootstrap_from_metadata");
+  } catch (e) {
+    console.warn("customer_bootstrap_from_metadata gagal:", e);
   }
 
   revalidatePath("/", "layout");
@@ -139,34 +199,46 @@ export async function signOutCustomerAction(): Promise<void> {
 }
 
 /**
- * Update identitas customer yang sedang login (nama, telepon, IG).
+ * Update identitas customer yang sedang login (nama, telepon, IG, DOB).
  * Dipakai dari halaman /account.
  */
 const profileSchema = z.object({
   fullName: z.string().trim().min(2).max(80),
   phone: z.string().trim().min(9),
   instagram: z.string().trim().max(40).optional().nullable(),
+  dateOfBirth: z.string().trim().optional().nullable(),
 });
 
 export async function updateCustomerProfileAction(
   _prev: CustomerActionResult | null,
   formData: FormData
 ): Promise<CustomerActionResult> {
-  const parsed = profileSchema.safeParse({
+  const raw = {
     fullName: String(formData.get("fullName") ?? "").trim(),
     phone: String(formData.get("phone") ?? "").trim(),
-    instagram: String(formData.get("instagram") ?? "")
-      .trim()
-      .replace(/^@/, "")
-      .replace(/\s/g, "") || null,
-  });
+    instagram:
+      String(formData.get("instagram") ?? "")
+        .trim()
+        .replace(/^@/, "")
+        .replace(/\s/g, "") || null,
+    dateOfBirth: String(formData.get("dateOfBirth") ?? "").trim() || null,
+  };
+  const parsed = profileSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "invalid_payload" };
+
+  // Validasi tanggal lahir (kalau diisi)
+  let dob: string | null = null;
+  if (parsed.data.dateOfBirth) {
+    dob = parseDateOfBirth(parsed.data.dateOfBirth);
+    if (!dob) return { ok: false, error: "invalid_date_of_birth" };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("customer_upsert_own_profile", {
     p_full_name: parsed.data.fullName,
     p_phone: parsed.data.phone,
     p_instagram: parsed.data.instagram,
+    p_date_of_birth: dob,
   });
 
   if (error) return { ok: false, error: humanize(error.message) };

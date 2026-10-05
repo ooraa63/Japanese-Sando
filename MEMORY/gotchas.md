@@ -139,13 +139,25 @@ Project ini punya `src/proxy.ts` yang dipakai Next.js 16 (bukan
 file itu. Lihat dokumentasi Next.js 16 untuk `proxy.ts`.
 
 
-## 13. Customer auth butuh "Confirm email" OFF di Supabase
+## 13. Customer auth butuh "Confirm email" ON di Supabase
 
-`signUpCustomerAction` pakai `supabase.auth.signUp()` lalu langsung
-menggunakan sesi untuk `customer_upsert_own_profile`. Kalau
-"Confirm email" di Supabase Auth AKTIF, `data.session` null saat
-signup, sehingga RPC upsert gagal dengan `not_authenticated`. Lihat
-ADMIN-ACCOUNT.md untuk cara mematikan.
+Buyer signup butuh verifikasi email. Project WAJIB aktifkan "Confirm
+email" di Supabase Dashboard → Authentication → Providers → Email.
+
+- Saat signup, `signUp.session` null sampai user klik link verifikasi.
+- Server action `signUpCustomerAction` return `{ok: true, requiresVerification: true}`
+  — UI menampilkan banner "cek kotak masuk".
+- Identitas (nama, telepon, IG, DOB) disimpan ke `raw_user_meta_data`
+  via `options.data` di `auth.signUp`. Setelah verifikasi + login,
+  `signInCustomerAction` best-effort panggil
+  `customer_bootstrap_from_metadata()` untuk membuat
+  `customer_profiles` row dari metadata.
+- Login sebelum verifikasi → error `Email not confirmed` dari Supabase,
+  petakan ke error code `email_not_verified`.
+
+CATATAN: Admin signup juga akan kena edurmend verifikasi karena pakai
+pola `auth.signUp()` yang sama. Setelah admin signup, admin perlu cek
+email dan login ulang. Tidak perlu update kode admin.
 
 
 ## 14. Migration-16 harus dijalankan manual setelah deploy

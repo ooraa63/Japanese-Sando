@@ -118,6 +118,20 @@ export function AccountClient({
               autoComplete="tel"
             />
           </div>
+          <div>
+            <label htmlFor="dateOfBirth" className="label">
+              {dict.profile.dateOfBirth}
+            </label>
+            <input
+              id="dateOfBirth"
+              name="dateOfBirth"
+              type="date"
+              defaultValue={profile.date_of_birth ?? ""}
+              max={new Date().toISOString().slice(0, 10)}
+              className="input"
+              autoComplete="bday"
+            />
+          </div>
           <div className="sm:col-span-2">
             <label htmlFor="instagram" className="label">
               {dict.profile.instagram}

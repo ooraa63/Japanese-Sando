@@ -9,7 +9,6 @@ import {
   Building2,
   Check,
   Copy,
-  Gift,
   Loader2,
   MapPin,
   ShoppingBag,
@@ -87,8 +86,12 @@ export function OrderFlow({
     };
   }, []);
 
-  // Selalu mulai dari langkah identitas (nama + telepon).
-  const [step, setStep] = useState<Step>("identity");
+  // Kalau customer sudah login & punya profil, identitas sudah ke-isi
+  // otomatis. Tidak perlu step "identity" — langsung ke "menu".
+  // Catatan: useState initial hanya jalan sekali, jadi user yang logout
+  // setelah halaman dimuat akan tetap di step dia sekarang sampai dia
+  // refresh. Itu acceptable — Guest UX di tengah flow = friction.
+  const [step, setStep] = useState<Step>(profile ? "menu" : "identity");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
@@ -542,26 +545,6 @@ export function OrderFlow({
                 title={t.order.identity.title}
                 subtitle={t.order.identity.subtitle}
               />
-
-              {/* Info paket hemat — tampil di langkah identitas supaya
-                  pembeli tahu ada pilihan bundle. Tidak wajib; kalau tidak
-                  ada bundle, section ini di-skip. */}
-              {bundles.length > 0 ? (
-                <div className="mt-4 flex items-center gap-3 rounded-2xl border border-berry-200 bg-berry-500/5 p-3.5">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-berry-500/15 text-berry-600">
-                    <Gift className="size-4" />
-                  </span>
-                  <p className="text-[13px] leading-snug text-cocoa-700">
-                    <span className="font-bold text-berry-700">
-                      {t.menu.bundleSection}
-                    </span>{" "}
-                    —{" "}
-                    {lang === "en"
-                      ? `${bundles.length} bundle${bundles.length > 1 ? "s" : ""} available. Pick flavors in the next step.`
-                      : `${bundles.length} paket tersedia. Pilih rasa di langkah berikutnya.`}
-                  </p>
-                </div>
-              ) : null}
 
               {/* Kalau customer login, tampilkan salam + identitas otomatis.
                   User tetap boleh mengubah field sebelum submit. */}
