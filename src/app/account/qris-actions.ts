@@ -123,6 +123,7 @@ export async function createQrisOrderAction(
     .order_code;
   const grossAmount = await getOrderTotal(orderCode);
   if (grossAmount == null) {
+    console.error("[qris-actions] order_total_missing for", orderCode);
     return { ok: false, error: "order_total_missing" };
   }
 
@@ -146,6 +147,10 @@ export async function createQrisOrderAction(
       p_expires_at: charge.expiresAt,
     });
     if (setErr) {
+      console.error("[qris-actions] set_order_qris_charge gagal:", setErr.message, {
+        orderCode,
+        transactionId: charge.transactionId,
+      });
       return { ok: false, error: "save_charge_failed" };
     }
 
