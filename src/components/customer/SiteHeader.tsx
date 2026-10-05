@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, X, ShoppingBag } from "lucide-react";
+import { LogIn, Menu, UserCircle, X, ShoppingBag } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { FontSizeToggle } from "@/components/ui/FontSizeToggle";
+import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
 
 export function SiteHeader({
   storeName = "Rumakomugi",
@@ -18,6 +19,7 @@ export function SiteHeader({
   brandLine?: string;
 }) {
   const { t } = useI18n();
+  const { profile } = useCustomerAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -95,6 +97,27 @@ export function SiteHeader({
         <div className="flex items-center gap-2">
           <FontSizeToggle />
           <LanguageToggle />
+          {profile ? (
+            <Link
+              href="/account"
+              className="hidden h-10 items-center gap-1.5 rounded-full bg-matcha-50 px-3 text-[13px] font-bold text-matcha-700 transition hover:bg-matcha-100 sm:inline-flex"
+              aria-label={t.customerAuth.accountChip}
+              title={t.customerAuth.accountChip}
+            >
+              <UserCircle className="size-4" />
+              <span className="hidden lg:inline">
+                {profile.full_name.split(" ")[0]}
+              </span>
+            </Link>
+          ) : (
+            <Link
+              href="/login?next=/order"
+              className="hidden h-10 items-center gap-1.5 rounded-full border border-cocoa-200 bg-white px-3 text-[13px] font-bold text-cocoa-700 transition hover:bg-cocoa-100 sm:inline-flex"
+            >
+              <LogIn className="size-4" />
+              <span>{t.customerAuth.loginCta}</span>
+            </Link>
+          )}
           <Link
             href="/order"
             className="btn-primary hidden !px-4 !py-2.5 text-[13px] sm:inline-flex"
@@ -127,6 +150,25 @@ export function SiteHeader({
                 {l.label}
               </Link>
             ))}
+            {profile ? (
+              <Link
+                href="/account"
+                onClick={() => setOpen(false)}
+                className="mt-2 flex items-center gap-2 rounded-xl border border-matcha-300 bg-matcha-50 px-3 py-3 text-sm font-bold text-matcha-700"
+              >
+                <UserCircle className="size-4" />
+                {profile.full_name.split(" ")[0]}
+              </Link>
+            ) : (
+              <Link
+                href="/login?next=/order"
+                onClick={() => setOpen(false)}
+                className="mt-2 flex items-center justify-center gap-2 rounded-xl border border-cocoa-200 bg-white px-3 py-3 text-sm font-bold text-cocoa-700"
+              >
+                <LogIn className="size-4" />
+                {t.customerAuth.loginCta}
+              </Link>
+            )}
             <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-cocoa-200 bg-white px-3 py-2.5">
               <div className="flex items-center gap-2 text-sm font-semibold text-cocoa-700">
                 <FontSizeToggle />

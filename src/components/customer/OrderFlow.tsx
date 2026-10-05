@@ -32,6 +32,7 @@ import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
 import { AddressPicker } from "@/components/customer/AddressPicker";
 import { CartDrawer } from "@/components/customer/CartDrawer";
+import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
 import { formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
 
 const STEPS = ["identity", "menu", "payment", "review"] as const;
@@ -50,6 +51,7 @@ export function OrderFlow({
   const { t, lang } = useI18n();
   const router = useRouter();
   const toast = useToast();
+  const { profile } = useCustomerAuth();
   const {
     quantities,
     notes,
@@ -109,6 +111,28 @@ export function OrderFlow({
       cancelled = true;
     };
   }, []);
+
+  // Auto-fill identitas dari profil customer (kalau login). Hanya jalan
+  // sekali — kalau user sudah sempat ganti value di form, kita hormati
+  // inputnya. Ref `autoFilledFrom` menandai sudah auto-fill di-this-account
+  // supaya tidak overwrite perubahan manual.
+  const autoFilledFromRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!profile) return;
+    if (autoFilledFromRef.current === profile.user_id) return;
+    // Hanya auto-fill field yang masih kosong — biar perubahan manual
+    // dari user (mis. update nomor telepon di akun yang sama) tidak hilang.
+    const patch: Partial<typeof draft> = {};
+    if (!draft.name.trim() && profile.full_name) patch.name = profile.full_name;
+    if (!draft.phone.trim() && profile.phone) patch.phone = profile.phone;
+    if (!draft.instagram.trim() && profile.instagram) {
+      patch.instagram = profile.instagram;
+    }
+    if (Object.keys(patch).length > 0) {
+      updateDraft(patch);
+    }
+    autoFilledFromRef.current = profile.user_id;
+  }, [profile, draft.name, draft.phone, draft.instagram, updateDraft]);
 
   // Stok per-kategori — total pcs dari kategori ini tidak boleh
   // melebihi sisa stok kategori. Bundle dihitung dari slot yang dipilih
@@ -356,6 +380,10 @@ export function OrderFlow({
           bundle_id: entry.bundle.id,
           slots: entry.slots.map((flavorId) => ({ flavor_id: flavorId })),
         })),
+        // user_id: kalau customer login, tautkan order ke akun mereka
+        // supaya muncul di halaman /account. Guest checkout: null.
+        // Backend akan override dengan auth.uid() kalau ada (lebih trustworthy).
+        p_user_id: profile?.user_id ?? null,
       });
 
       if (error) {
@@ -531,6 +559,25 @@ export function OrderFlow({
                     {lang === "en"
                       ? `${bundles.length} bundle${bundles.length > 1 ? "s" : ""} available. Pick flavors in the next step.`
                       : `${bundles.length} paket tersedia. Pilih rasa di langkah berikutnya.`}
+                  </p>
+                </div>
+              ) : null}
+
+              {/* Kalau customer login, tampilkan salam + identitas otomatis.
+                  User tetap boleh mengubah field sebelum submit. */}
+              {profile ? (
+                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-matcha-200 bg-matcha-500/5 p-3.5">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-matcha-500/15 text-matcha-700">
+                    <User className="size-4" />
+                  </span>
+                  <p className="text-[13px] leading-snug text-cocoa-700">
+                    <span className="font-bold text-matcha-700">
+                      {lang === "en" ? `Hi, ${profile.full_name}` : `Hai, ${profile.full_name}`}
+                    </span>{" "}
+                    —{" "}
+                    {lang === "en"
+                      ? "Your saved details are filled in. You can change anything before sending."
+                      : "Data tersimpan sudah terisi. Kamu bisa mengubahnya sebelum kirim."}
                   </p>
                 </div>
               ) : null}

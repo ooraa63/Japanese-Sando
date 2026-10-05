@@ -137,3 +137,39 @@ fungsi `readStorage()`.
 Project ini punya `src/proxy.ts` yang dipakai Next.js 16 (bukan
 `middleware.ts`). Kalau mau menambah request interception, edit
 file itu. Lihat dokumentasi Next.js 16 untuk `proxy.ts`.
+
+
+## 13. Customer auth butuh "Confirm email" OFF di Supabase
+
+`signUpCustomerAction` pakai `supabase.auth.signUp()` lalu langsung
+menggunakan sesi untuk `customer_upsert_own_profile`. Kalau
+"Confirm email" di Supabase Auth AKTIF, `data.session` null saat
+signup, sehingga RPC upsert gagal dengan `not_authenticated`. Lihat
+ADMIN-ACCOUNT.md untuk cara mematikan.
+
+
+## 14. Migration-16 harus dijalankan manual setelah deploy
+
+`/login`, `/register`, dan `/account` bergantung pada RPC
+`customer_profile()`, `customer_upsert_own_profile()`, dan
+`customer_orders()`. Sebelum migration-16 diterapkan ke database,
+halaman auth tetap render tapi profil null + register akan error
+"function not found" di langkah kedua.
+
+Sebelum deploy ke environment baru:
+1. Jalankan `npm run db:push` (atau SQL editor) untuk apply
+   `supabase/migration-16.sql`.
+2. Verify RPC bisa dipanggil sebagai anon:
+   `select customer_profile();` harus return null (bukan error).
+
+
+## 15. Auth admin & customer beda Supabase Auth ini
+
+Admin signin di `/admin/login` pakai RPC `is_admin()` (lihat
+`auth-users` di Supabase). Customer signin di `/login` pakai RPC
+`customer_profile()`. Cookie session dibedakan oleh role klaim; user
+yang tidak di tabel `admins` akan ditolak dari dashboard admin.
+
+Tabel `customer_profiles` terpisah dari `admins`. Tidak ada shared
+tabel "users" di project ini — Supabase `auth.users` adalah sumber
+kebenaran tunggal untuk siapa yang bisa sign in.

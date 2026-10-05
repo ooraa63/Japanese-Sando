@@ -1,7 +1,13 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { Category, Flavor, StoreSettings } from "@/lib/types";
+import type {
+  Category,
+  CustomerOrderSummary,
+  CustomerProfile,
+  Flavor,
+  StoreSettings,
+} from "@/lib/types";
 
 /** Ambil pengaturan toko. Aman dipanggil tanpa login. */
 export const getSettings = cache(async (): Promise<StoreSettings | null> => {
@@ -122,4 +128,43 @@ export const getAllFlavors = cache(async (): Promise<Flavor[]> => {
     return [];
   }
   return (data as Flavor[]) ?? [];
+});
+
+/**
+ * Ambil profil customer yang sedang login. Null kalau belum login atau
+ * user Supabase belum punya baris di customer_profiles.
+ *
+ * Dipakai oleh halaman /order untuk auto-fill identitas dan oleh halaman
+ * /account untuk menampilkan info akun. RPC `customer_profile()` dibuat
+ * security-definer dan membaca dari auth context, jadi aman dipanggil
+ * tanpa RLS khusus.
+ */
+export const getCustomerProfile = cache(async (): Promise<CustomerProfile | null> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("customer_profile");
+  if (error) {
+    // Kemungkinan user belum login atau tabel belum ada. Diam saja supaya
+    // halaman publik tetap jalan tanpa memunculkan error.
+    if (error.message !== "JWT expired" && !/does not exist/i.test(error.message)) {
+      console.error("Gagal memuat profil customer:", error.message);
+    }
+    return null;
+  }
+  return (data as CustomerProfile | null) ?? null;
+});
+
+/**
+ * Daftar pesanan milik customer yang sedang login, urut terbaru dulu.
+ * Null kalau RPC tidak tersedia atau user belum login.
+ */
+export const getCustomerOrders = cache(async (): Promise<CustomerOrderSummary[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("customer_orders");
+  if (error) {
+    if (!/does not exist/i.test(error.message)) {
+      console.error("Gagal memuat pesanan customer:", error.message);
+    }
+    return [];
+  }
+  return (data as CustomerOrderSummary[] | null) ?? [];
 });

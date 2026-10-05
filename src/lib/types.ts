@@ -317,6 +317,33 @@ export interface DashboardStats {
   sales_by_flavor: Array<{ flavor_name: string; qty: number }>;
 }
 
+/** Buyer opsional — kalau customer login, profil ini tersedia untuk auto-fill. */
+export interface CustomerProfile {
+  user_id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  instagram: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Ringkasan pesanan milik customer (untuk halaman /account). */
+export interface CustomerOrderSummary {
+  id: number;
+  order_code: string;
+  status: OrderStatus;
+  subtotal: number;
+  delivery_fee: number;
+  total_price: number;
+  item_count: number;
+  delivery_method: DeliveryMethod;
+  delivery_zone: string;
+  created_at: string;
+  updated_at: string;
+  language: Language;
+}
+
 export interface AdminUser {
   user_id: string;
   email: string;

@@ -164,3 +164,78 @@ bisa dibuat jauh sebelum fitur pre-order ini.
 
 - Update `MEMORY/CHANGELOG.md` setiap ada perubahan signifikan.
 - Jangan taruh informasi sensitif (API key, password, dsb.) di sini.
+
+
+---
+
+## D9. Akun buyer pakai Supabase Auth (bukan auth custom)
+
+**Keputusan:** Buyer yang daftar di /register dibuat di `auth.users` lewat
+`supabase.auth.signUp()` (anon key). Profil tambahan (nama, telepon, IG)
+disimpan di tabel `customer_profiles` (1:1 dengan `auth.users`) lewat RPC
+`customer_upsert_own_profile` (security definer).
+
+**Alasan:**
+
+- Admin sudah pakai Supabase Auth dengan pola yang sama (lihat
+  `grantAdminRoleAction` di admin/actions.ts). Konsistensi.
+- Magic link, reset password, RLS, semuanya sudah built-in — tidak perlu
+  roll JWT.
+
+**Konsekuensi:**
+
+- Supabase project HARUS non-aktifkan "Confirm email" supaya signup tanpa
+  verifikasi. Kalau tidak, `data.session` null di signup dan `customer_profiles`
+  tidak terisi.
+- Admin & customer dipisah dengan tegas: `admins` (role) vs
+  `customer_profiles` (identitas). RLS berbeda untuk tiap tabel.
+
+
+---
+
+## D10. Auto-fill identitas OrderFlow hanya saat field masih kosong
+
+**Keputusan:** Saat `useCustomerAuth().profile` tersedia, `OrderFlow`
+auto-fill `draft.name / phone / instagram` dari profil — SELAMA field di
+draft kosong. Perubahan manual user dihormati.
+
+Ref `autoFilledFromRef` menandai sudah auto-fill untuk user_id tertentu;
+kalau akun berganti, auto-fill jalan lagi.
+
+**Alasan:**
+
+- Pembeli yang sering order tidak harus ketik ulang identitas tiap kali.
+- Pembeli yang perlu update (mis. ganti nomor telepon) bisa edit field;
+  auto-fill berikutnya tidak akan overwrite.
+
+**Konsekuensi:**
+
+- Kalau profil di-update di /account, perubahan baru akan auto-fill di
+  pre-order berikutnya (bukan pre-order yang sedang dibuka).
+- Backend create_order selalu baca dari `auth.uid()` (bukan dari field
+  input), jadi integritas order ↔ akun tidak bisa dimanipulasi.
+
+
+---
+
+## D11. Guest checkout tetap didukung, tanpa friction
+
+**Keputusan:** `orders.user_id` nullable. Pembeli yang tidak login tetap
+bisa checkout seperti biasa. `create_order` jalan dengan `p_user_id = null`
+dan `auth.uid() = null`; backend tidak error.
+
+**Alasan:**
+
+- User minta "bisa ada akun atau login as guest". Guest adalah default;
+  akun adalah opsional. Tidak boleh ada friction untuk user yang cuma
+  pesan sekali.
+
+**Konsekuensi:**
+
+- Halaman `customer_order()` RPC hanya return order dengan
+  `user_id = auth.uid()`. Guest order tidak pernah muncul di akun
+  customer manapun — bahkan kalau dia register dengan email yang sama,
+  order lama tetap tidak terkait (kami tidak melakukan backfill otomatis).
+- Kalau guest register dengan email yang sama dengan order sebelumnya,
+  order lama tidak akan muncul di `/account` customer baru. Backfill
+  manual bisa ditambahkan jika perlu.

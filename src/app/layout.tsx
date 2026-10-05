@@ -7,6 +7,8 @@ import { LANG_COOKIE, langFromCookie } from "@/lib/i18n/shared";
 import { CartProvider } from "@/components/customer/CartProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 import { FontSizeProvider } from "@/components/ui/FontSizeProvider";
+import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider";
+import { getCustomerProfile } from "@/lib/data";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -74,6 +76,11 @@ export default async function RootLayout({
   const cookieStore = await cookies();
   const lang = langFromCookie(cookieStore.get(LANG_COOKIE)?.value);
 
+  // Profil customer digunakan untuk header (tombol "Akun saya" vs "Masuk")
+  // dan auto-fill identitas di /order. RPC `customer_profile()` return
+  // null kalau belum login — aman dipanggil untuk semua visitor.
+  const initialProfile = await getCustomerProfile();
+
   return (
     // `data-scroll-behavior` dipakai Next.js 16 agar navigasi antar halaman
     // tetap langsung ke atas, bukan smooth-scroll.
@@ -86,7 +93,11 @@ export default async function RootLayout({
         <I18nProvider initialLang={lang}>
           <FontSizeProvider>
             <ToastProvider>
-              <CartProvider>{children}</CartProvider>
+              <CartProvider>
+                <CustomerAuthProvider initialProfile={initialProfile}>
+                  {children}
+                </CustomerAuthProvider>
+              </CartProvider>
             </ToastProvider>
           </FontSizeProvider>
         </I18nProvider>
