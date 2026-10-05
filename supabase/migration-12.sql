@@ -383,63 +383,74 @@ security definer
 set search_path = public
 as $$
 declare
-  v_order public.orders%rowtype;
+  v_order_id int := 0;
   v_items jsonb;
   v_bundles jsonb;
+  v_result jsonb;
 begin
-  select * into v_order
-  from public.orders
-  where upper(order_code) = upper(trim(coalesce(p_code, '')))
+  -- Cari id order; simpan di variabel biasa (bukan %rowtype) supaya
+  -- subquery bisa reference tanpa CTE.
+  select o.id into v_order_id
+  from public.orders o
+  where upper(o.order_code) = upper(trim(coalesce(p_code, '')))
   limit 1;
 
-  if not found then
+  if v_order_id is null or v_order_id = 0 then
     return null;
   end if;
 
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'flavor_name', flavor_name,
-    'quantity', quantity,
-    'unit_price', unit_price,
-    'line_total', line_total
-  ) order by id), '[]'::jsonb)
-  into v_items
-  from public.order_items where order_id = v_order.id;
-
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'bundle_id', bi.bundle_id,
-    'bundle_name', b.name_id,
-    'slots', (
-      select coalesce(jsonb_agg(jsonb_build_object(
-        'slot', bi2.slot,
-        'flavor_name', oi2.flavor_name,
-        'flavor_id', bi2.flavor_id
-      ) order by bi2.slot), '[]'::jsonb)
-      from public.bundle_items bi2
-      join public.order_items oi2 on oi2.order_id = bi2.order_id and oi2.flavor_id = bi2.flavor_id
-      where bi2.order_id = v_order.id and bi2.bundle_id = bi.bundle_id
+  -- Pakai CTE supaya v_order_id visible di subquery.
+  return (
+    with ord as (
+      select * from public.orders where id = v_order_id
     )
-  )), '[]'::jsonb)
-  into v_bundles
-  from public.bundle_items bi
-  join public.bundles b on b.id = bi.bundle_id
-  where bi.order_id = v_order.id
-  group by bi.bundle_id, b.name_id;
-
-  return jsonb_build_object(
-    'order_code', v_order.order_code,
-    'status', v_order.status,
-    'delivery_method', v_order.delivery_method,
-    'delivery_zone', v_order.delivery_zone,
-    'subtotal', v_order.subtotal,
-    'delivery_fee', v_order.delivery_fee,
-    'total', v_order.total_price,
-    'item_count', v_order.item_count,
-    'language', v_order.language,
-    'created_at', v_order.created_at,
-    'updated_at', v_order.updated_at,
-    'note', v_order.note,
-    'flat_items', v_items,
-    'bundles', v_bundles
+    select jsonb_build_object(
+      'order_code', ord.order_code,
+      'status', ord.status,
+      'delivery_method', ord.delivery_method,
+      'delivery_zone', ord.delivery_zone,
+      'subtotal', ord.subtotal,
+      'delivery_fee', ord.delivery_fee,
+      'total', ord.total_price,
+      'item_count', ord.item_count,
+      'language', ord.language,
+      'created_at', ord.created_at,
+      'updated_at', ord.updated_at,
+      'note', ord.note,
+      'flat_items', (
+        select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)
+        from (
+          select flavor_name, quantity, unit_price, line_total
+          from public.order_items
+          where order_id = ord.id
+          order by id
+        ) t
+      ),
+      'bundles', (
+        select coalesce(jsonb_agg(to_jsonb(sub.b)), '[]'::jsonb)
+        from (
+          select jsonb_build_object(
+            'bundle_id', bi.bundle_id,
+            'bundle_name', b.name_id,
+            'slots', (
+              select coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb)
+              from (
+                select bi2.slot as slot, oi2.flavor_name, bi2.flavor_id
+                from public.bundle_items bi2
+                join public.order_items oi2 on oi2.order_id = bi2.order_id and oi2.flavor_id = bi2.flavor_id
+                where bi2.order_id = ord.id and bi2.bundle_id = bi.bundle_id
+                order by bi2.slot
+              ) s
+            )
+          ) as b
+          from public.bundle_items bi
+          join public.bundles b on b.id = bi.bundle_id
+          where bi.order_id = ord.id
+          order by bi.bundle_id
+        ) sub
+      )
+    )
+    from ord
   );
 end;
 $$;
@@ -460,28 +471,33 @@ begin
   end if;
 
   return (
-    select coalesce(jsonb_agg(
-      jsonb_build_object(
-        'id', o.id,
-        'order_code', o.order_code,
-        'customer_name', o.customer_name,
-        'customer_email', o.customer_email,
-        'instagram', o.instagram,
-        'phone', o.phone,
-        'phone_normalized', o.phone_normalized,
-        'created_at', o.created_at,
-        'status', o.status,
-        'order_count', coalesce(c.cnt, 0),
-        'total_spent', coalesce(c.total, 0)
-      ) order by o.created_at desc
-    ), '[]'::jsonb)
+    with per_phone as (
+    select
+      phone_normalized,
+      count(*)::int as cnt,
+      sum(total_price)::int as total
+    from public.orders
+    group by phone_normalized
+  ),
+  src as (
+    select jsonb_build_object(
+      'id', o.id,
+      'order_code', o.order_code,
+      'customer_name', o.customer_name,
+      'customer_email', o.customer_email,
+      'instagram', o.instagram,
+      'phone', o.phone,
+      'phone_normalized', o.phone_normalized,
+      'created_at', o.created_at,
+      'status', o.status,
+      'order_count', coalesce(p.cnt, 0),
+      'total_spent', coalesce(p.total, 0)
+    ) as row_to_json
     from public.orders o
-    left join lateral (
-      select count(*)::int as cnt, sum(o2.total_price)::int as total
-      from public.orders o2
-      where o2.phone_normalized = o.phone_normalized
-    ) c on true
-    group by o.id, c.cnt, c.total
+    left join per_phone p on p.phone_normalized = o.phone_normalized
+    order by o.created_at desc
+  )
+  select coalesce(jsonb_agg(row_to_json), '[]'::jsonb) from src
   );
 end;
 $$;
@@ -511,7 +527,6 @@ $$;
 grant execute on function public.public_flavor_sold_counts() to anon, authenticated;
 
 
--- 7. Update public_invoice — sertakan delivery_zone, lat/lng, customer_email, instagram
 create or replace function public.public_invoice(p_code text)
 returns jsonb
 language plpgsql
@@ -519,77 +534,80 @@ security definer
 set search_path = public
 as $$
 declare
-  v_order public.orders%rowtype;
-  v_items jsonb;
-  v_bundles jsonb;
+  v_order_id int := 0;
 begin
-  select * into v_order
-  from public.orders
-  where upper(order_code) = upper(trim(coalesce(p_code, '')))
+  select o.id into v_order_id
+  from public.orders o
+  where upper(o.order_code) = upper(trim(coalesce(p_code, '')))
   limit 1;
 
-  if not found then
+  if v_order_id is null or v_order_id = 0 then
     return null;
   end if;
 
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'flavor_name', flavor_name,
-    'quantity', quantity,
-    'unit_price', unit_price,
-    'line_total', line_total
-  ) order by id), '[]'::jsonb)
-  into v_items
-  from public.order_items where order_id = v_order.id;
-
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'bundle_id', bi.bundle_id,
-    'bundle_name', b.name_id,
-    'slots', (
-      select coalesce(jsonb_agg(jsonb_build_object(
-        'slot', bi2.slot,
-        'flavor_name', oi2.flavor_name,
-        'flavor_id', bi2.flavor_id
-      ) order by bi2.slot), '[]'::jsonb)
-      from public.bundle_items bi2
-      join public.order_items oi2 on oi2.order_id = bi2.order_id and oi2.flavor_id = bi2.flavor_id
-      where bi2.order_id = v_order.id and bi2.bundle_id = bi.bundle_id
+  return (
+    with ord as (select * from public.orders where id = v_order_id)
+    select jsonb_build_object(
+      'order_code', ord.order_code,
+      'customer_name', ord.customer_name,
+      'customer_email', ord.customer_email,
+      'instagram', ord.instagram,
+      'phone', ord.phone,
+      'address', ord.address,
+      'address_note', ord.address_note,
+      'lat', ord.lat,
+      'lng', ord.lng,
+      'note', ord.note,
+      'payment_method', ord.payment_method,
+      'transfer_method', ord.transfer_method,
+      'delivery_method', ord.delivery_method,
+      'delivery_zone', ord.delivery_zone,
+      'subtotal', ord.subtotal,
+      'delivery_fee', ord.delivery_fee,
+      'saving', 0,
+      'total', ord.total_price,
+      'item_count', ord.item_count,
+      'status', ord.status,
+      'language', ord.language,
+      'created_at', ord.created_at,
+      'updated_at', ord.updated_at,
+      'flat_items', (
+        select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)
+        from (
+          select flavor_name, quantity, unit_price, line_total
+          from public.order_items
+          where order_id = ord.id
+          order by id
+        ) t
+      ),
+      'bundles', (
+        select coalesce(jsonb_agg(to_jsonb(sub.b)), '[]'::jsonb)
+        from (
+          select jsonb_build_object(
+            'bundle_id', bi.bundle_id,
+            'bundle_name', b.name_id,
+            'slots', (
+              select coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb)
+              from (
+                select bi2.slot as slot, oi2.flavor_name, bi2.flavor_id
+                from public.bundle_items bi2
+                join public.order_items oi2 on oi2.order_id = bi2.order_id and oi2.flavor_id = bi2.flavor_id
+                where bi2.order_id = ord.id and bi2.bundle_id = bi.bundle_id
+                order by bi2.slot
+              ) s
+            )
+          ) as b
+          from public.bundle_items bi
+          join public.bundles b on b.id = bi.bundle_id
+          where bi.order_id = ord.id
+          order by bi.bundle_id
+        ) sub
+      )
     )
-  )), '[]'::jsonb)
-  into v_bundles
-  from public.bundle_items bi
-  join public.bundles b on b.id = bi.bundle_id
-  where bi.order_id = v_order.id
-  group by bi.bundle_id, b.name_id;
-
-  return jsonb_build_object(
-    'order_code', v_order.order_code,
-    'customer_name', v_order.customer_name,
-    'customer_email', v_order.customer_email,
-    'instagram', v_order.instagram,
-    'phone', v_order.phone,
-    'address', v_order.address,
-    'address_note', v_order.address_note,
-    'lat', v_order.lat,
-    'lng', v_order.lng,
-    'note', v_order.note,
-    'payment_method', v_order.payment_method,
-    'transfer_method', v_order.transfer_method,
-    'delivery_method', v_order.delivery_method,
-    'delivery_zone', v_order.delivery_zone,
-    'subtotal', v_order.subtotal,
-    'delivery_fee', v_order.delivery_fee,
-    'saving', 0,
-    'total', v_order.total_price,
-    'item_count', v_order.item_count,
-    'status', v_order.status,
-    'language', v_order.language,
-    'created_at', v_order.created_at,
-    'flat_items', v_items,
-    'bundles', v_bundles
+    from ord
   );
 end;
 $$;
-
 
 -- 8. Hapus method 'cash' dari enum constraint agar konsisten (DB lama pakai CHECK)
 --    Pertama backfill order lama 'cash' jadi 'transfer' (sebelum ulang business-logic).

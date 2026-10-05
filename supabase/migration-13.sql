@@ -45,19 +45,15 @@ stable
 security definer
 set search_path = public
 as $$
-  select coalesce(jsonb_agg(jsonb_build_object(
-    'id', a.id,
-    'title', a.title,
-    'body_md', a.body_md,
-    'image_url', a.image_url,
-    'cta_label', a.cta_label,
-    'cta_href', a.cta_href,
-    'sort_order', a.sort_order,
-    'created_at', a.created_at
-  )), '[]'::jsonb)
-  from public.announcements a
-  where a.is_active
-  order by a.sort_order asc, a.created_at desc;
+  select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)
+  from (
+    select
+      a.id, a.title, a.body_md, a.image_url,
+      a.cta_label, a.cta_href, a.sort_order, a.created_at
+    from public.announcements a
+    where a.is_active
+    order by a.sort_order asc, a.created_at desc
+  ) t;
 $$;
 
 grant execute on function public.public_list_announcements() to anon, authenticated;
@@ -76,18 +72,14 @@ begin
   end if;
 
   return (
-    select coalesce(jsonb_agg(jsonb_build_object(
-      'id', a.id,
-      'title', a.title,
-      'body_md', a.body_md,
-      'image_url', a.image_url,
-      'cta_label', a.cta_label,
-      'cta_href', a.cta_href,
-      'is_active', a.is_active,
-      'sort_order', a.sort_order,
-      'created_at', a.created_at
-    ) order by a.sort_order, a.id), '[]'::jsonb)
-    from public.announcements a
+    select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)
+    from (
+      select
+        a.id, a.title, a.body_md, a.image_url,
+        a.cta_label, a.cta_href, a.is_active, a.sort_order, a.created_at
+      from public.announcements a
+      order by a.sort_order, a.id
+    ) t
   );
 end;
 $$;
