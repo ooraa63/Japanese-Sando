@@ -77,10 +77,35 @@ export const getPublicMenu = cache(async (): Promise<PublicMenuResult> => {
     return { categories: (data as Category[]) ?? [], bundles: [] };
   }
   const obj = (data ?? {}) as PublicMenuResult;
-  return {
-    categories: obj.categories ?? [],
-    bundles: obj.bundles ?? [],
-  };
+  const categories = obj.categories ?? [];
+  const topLevelBundles = obj.bundles ?? [];
+
+  // RPC `public_menu` mengembalikan:
+  //   - top-level `bundles`: hanya bundle dengan category_id IS NULL
+  //   - per-kategori `categories[].bundles`: bundle yang terkait kategori itu
+  //     ATAU berdiri sendiri (NULL) — jadi tiap kategori bisa dapat duplikat
+  //     bundle berdiri sendiri.
+  // Untuk konsistensi tampilan, kita gabung semua bundle aktif (unik by id)
+  // dan buang field `bundles` per-kategori supaya tidak bikin ambigu.
+  const byId = new Map<number, (typeof topLevelBundles)[number]>();
+  for (const b of topLevelBundles) byId.set(b.id, b);
+  for (const c of categories) {
+    for (const b of c.bundles ?? []) byId.set(b.id, b);
+  }
+  const bundles = [...byId.values()].sort((a, b) => {
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    return a.id - b.id;
+  });
+
+  // Hapus `bundles` per-kategori dari output supaya tidak ambigu dan tidak
+  // membengkakkan payload (frontend pakai `bundles` top-level saja).
+  const slimCategories = categories.map((c) => {
+    const { bundles: _ignored, ...rest } = c;
+    void _ignored;
+    return rest as Category;
+  });
+
+  return { categories: slimCategories, bundles };
 });
 
 /** Ambil semua rasa termasuk yang nonaktif (khusus dashboard). */

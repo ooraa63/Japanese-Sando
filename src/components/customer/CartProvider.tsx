@@ -2,7 +2,13 @@
 
 import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import type { DeliveryMethod, Flavor, PaymentMethod } from "@/lib/types";
+import type {
+  Bundle,
+  CartBundleEntry,
+  DeliveryMethod,
+  Flavor,
+  PaymentMethod,
+} from "@/lib/types";
 
 /**
  * Keranjang pre-order disimpan di localStorage supaya pembeli tidak
@@ -35,6 +41,8 @@ export interface CartStore {
   quantities: Record<string, number>;
   /** flavorId (string) -> catatan per item (mis. "jangan pakai cabe") */
   notes: Record<string, string>;
+  /** Bundle yang sudah dipilih pembelanja, dengan slot terisi. */
+  bundles: CartBundleEntry[];
   draft: CartDraft;
 }
 
@@ -42,11 +50,19 @@ interface CartContextValue {
   quantities: Record<string, number>;
   /** Catatan per rasa (key = flavorId sebagai string). */
   notes: Record<string, string>;
+  /** Bundle di keranjang. */
+  bundles: CartBundleEntry[];
   draft: CartDraft;
   add: (flavor: Flavor) => void;
   setQuantity: (flavorId: number, qty: number) => void;
   remove: (flavorId: number) => void;
   setNote: (flavorId: number, note: string) => void;
+  /**
+   * Tambah bundle ke keranjang. `slots` harus berisi `required_qty`
+   * flavorId (sudah tervalidasi di UI sebelum dipanggil).
+   */
+  addBundle: (bundle: Bundle, slots: number[]) => string;
+  removeBundle: (entryId: string) => void;
   /** Kosongkan semuanya (keranjang + data). */
   clear: () => void;
   /** Kosongkan keranjang tapi pertahankan data pengirim. */
@@ -80,6 +96,7 @@ const EMPTY_DRAFT: CartDraft = {
 const EMPTY_STORE: CartStore = Object.freeze({
   quantities: Object.freeze({}) as Record<string, number>,
   notes: Object.freeze({}) as Record<string, string>,
+  bundles: Object.freeze([]) as unknown as CartBundleEntry[],
   draft: EMPTY_DRAFT,
 });
 
@@ -119,7 +136,14 @@ function setNote(flavorId: number, note: string) {
 function readStorage(): CartStore {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { quantities: {}, notes: {}, draft: EMPTY_DRAFT };
+    if (!raw) {
+      return {
+        quantities: {},
+        notes: {},
+        bundles: [],
+        draft: EMPTY_DRAFT,
+      };
+    }
     const parsed = JSON.parse(raw) as Partial<CartStore>;
     const quantities: Record<string, number> = {};
     for (const [id, qty] of Object.entries(parsed.quantities ?? {})) {
@@ -130,13 +154,24 @@ function readStorage(): CartStore {
     for (const [id, n] of Object.entries(parsed.notes ?? {})) {
       if (typeof n === "string" && n.trim()) notes[id] = n;
     }
+    const bundles: CartBundleEntry[] = Array.isArray(parsed.bundles)
+      ? (parsed.bundles as unknown as CartBundleEntry[]).filter(
+          (b) =>
+            b &&
+            typeof b.id === "string" &&
+            b.bundle &&
+            typeof b.bundle.id === "number" &&
+            Array.isArray(b.slots)
+        )
+      : ([] as CartBundleEntry[]);
     return {
       quantities,
       notes,
+      bundles,
       draft: { ...EMPTY_DRAFT, ...(parsed.draft ?? {}) },
     };
   } catch {
-    return { quantities: {}, notes: {}, draft: EMPTY_DRAFT };
+    return { quantities: {}, notes: {}, bundles: [], draft: EMPTY_DRAFT };
   }
 }
 
@@ -182,8 +217,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const remove = useCallback((flavorId: number) => setQuantity(flavorId, 0), [setQuantity]);
 
+  const addBundle = useCallback((bundle: Bundle, slots: number[]): string => {
+    const id = `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const entry: CartBundleEntry = { id, bundle, slots };
+    write({ ...store, bundles: [...store.bundles, entry] });
+    return id;
+  }, []);
+
+  const removeBundle = useCallback((entryId: string) => {
+    const next = store.bundles.filter((b) => b.id !== entryId);
+    if (next.length === store.bundles.length) return;
+    write({ ...store, bundles: next });
+  }, []);
+
   const clear = useCallback(() => {
-    write({ quantities: {}, notes: {}, draft: EMPTY_DRAFT });
+    write({ quantities: {}, notes: {}, bundles: [], draft: EMPTY_DRAFT });
   }, []);
 
   const updateDraft = useCallback((patch: Partial<CartDraft>) => {
@@ -195,7 +243,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
    * pembeli tidak Order ulang isi pesanan lama secara tidak sengaja.
    */
   const reset = useCallback(() => {
-    write({ quantities: {}, notes: {}, draft: EMPTY_DRAFT });
+    write({ quantities: {}, notes: {}, bundles: [], draft: EMPTY_DRAFT });
   }, []);
 
   /**
@@ -222,16 +270,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
     write({ ...store, draft: next });
   }, []);
 
-  const totalItems = Object.values(current.quantities).reduce((s, q) => s + q, 0);
+  // Total pcs fisik = item satuan + slot bundle (1 slot = 1 pcs fisik).
+  const totalItemsFromQty = Object.values(current.quantities).reduce(
+    (s, q) => s + q,
+    0
+  );
+  const totalItemsFromBundles = current.bundles.reduce(
+    (s, b) => s + b.slots.filter((x) => x !== null).length,
+    0
+  );
+  const totalItems = totalItemsFromQty + totalItemsFromBundles;
 
   const value: CartContextValue = {
     quantities: current.quantities,
     notes: current.notes ?? {},
+    bundles: current.bundles ?? [],
     draft: current.draft,
     add,
     setQuantity,
     remove,
     setNote,
+    addBundle,
+    removeBundle,
     clear,
     reset,
     clearIdentity,

@@ -215,6 +215,22 @@ export interface CartLine {
 }
 
 /**
+ * Bundle yang sudah ada di keranjang pembeli. Setiap bundle punya
+ * `required_qty` slot; tiap slot menyimpan flavor_id yang dipilih.
+ *
+ * Backend (`create_order(p_bundles)`) menerima array seperti ini:
+ *   [{ bundle_id, slots: [{flavor_id}, ...] }]
+ * dan akan menyimpan stok per-rasa + memvalidasi kecocokan kategori.
+ */
+export interface CartBundleEntry {
+  /** Id baris keranjang (uniq per entry). Dipakai untuk hapus / edit. */
+  id: string;
+  bundle: Bundle;
+  /** Isi slot: untuk slot 1..N, simpan flavorId yang dipilih. */
+  slots: Array<number | null>;
+}
+
+/**
  * Snapshot invoice yang disimpan di sessionStorage setelah pesanan dibuat.
  * Dipakai oleh halaman sukses untuk menampilkan rincian seperti invoice
  * tanpa harus query database lagi (RLS menutup akses publik ke tabel orders).
@@ -248,6 +264,18 @@ export interface InvoiceFlatItem {
   line_total: number;
 }
 
+/** Bundle entry di invoice publik (RPC) + snapshot lokal. */
+export interface InvoiceBundleEntry {
+  bundle_id: number;
+  bundle_name: string;
+  /** Tiap slot: flavor yang dipilih di slot tsb. */
+  slots: Array<{
+    slot: number;
+    flavor_id: number;
+    flavor_name: string;
+  }>;
+}
+
 export interface InvoiceSnapshot {
   order_code: string;
   customer_name: string;
@@ -263,6 +291,13 @@ export interface InvoiceSnapshot {
   items?: InvoiceLineItem[];
   /** Item flat (dari RPC publik). Opsional: jika `items` tidak ada, gunakan ini. */
   flat_items?: InvoiceFlatItem[];
+  /**
+   * Bundle yang ada di pesanan ini (dari RPC publik `public_invoice`).
+   * Tiap bundle berisi slot-slot berisi nama rasa yang dipilih. Snapshot
+   * lokal (sessionStorage) mungkin menyimpan versi lebih lengkap dengan
+   * `unit_price` per-slot.
+   */
+  bundles?: InvoiceBundleEntry[];
   subtotal: number;
   delivery_fee: number;
   /** Hemat dari paket (base - subtotal). 0 kalau tidak ada paket / tidak diketahui. */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Minus, Plus, ShoppingBag, X, Trash2 } from "lucide-react";
+import { Gift, Minus, Plus, ShoppingBag, X, Trash2 } from "lucide-react";
 import Image from "next/image";
 import type { Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -15,7 +15,8 @@ type CartLine = { flavor: Flavor; qty: number };
  * Mobile: slide up dari bawah. Desktop: panel di kanan.
  *
  * Berisi:
- *   - Daftar item per kategori (rasa saja — bundle menyusul).
+ *   - Daftar item per kategori (rasa satuan).
+ *   - Daftar bundle yang sudah dipilih (dengan ringkasan slot).
  *   - Stepper +/- per item.
  *   - Catatan per item (inline).
  *   - Subtotal.
@@ -48,10 +49,16 @@ export function CartDrawer({
     [cart.quantities, allFlavors]
   );
 
-  const subtotal = cartLines.reduce(
+  // Subtotal item satuan + bundle.
+  const subtotalItems = cartLines.reduce(
     (s, l) => s + l.flavor.price * l.qty,
     0
   );
+  const subtotalBundles = cart.bundles.reduce(
+    (s, b) => s + b.bundle.price,
+    0
+  );
+  const subtotal = subtotalItems + subtotalBundles;
 
   const totalItems = cart.totalItems;
 
@@ -87,12 +94,13 @@ export function CartDrawer({
         </header>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {cartLines.length === 0 ? (
+          {cartLines.length === 0 && cart.bundles.length === 0 ? (
             <p className="py-12 text-center text-sm text-cocoa-400">
               {t.cart.empty}
             </p>
           ) : (
             <ul className="space-y-3">
+              {/* ----- Item satuan ----- */}
               {cartLines.map((l) => {
                 const note = cart.notes[String(l.flavor.id)] ?? "";
                 return (
@@ -167,6 +175,83 @@ export function CartDrawer({
                       maxLength={120}
                       className="input mt-2 !py-1.5 !text-[12px]"
                     />
+                  </li>
+                );
+              })}
+
+              {/* ----- Bundle entries ----- */}
+              {cart.bundles.map((entry) => {
+                const bName = lang === "en" ? entry.bundle.name_en : entry.bundle.name_id;
+                return (
+                  <li
+                    key={entry.id}
+                    className="rounded-2xl border-2 border-honey-300/60 bg-honey-300/10 p-3"
+                  >
+                    <div className="flex gap-3">
+                      <div className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-honey-300 to-berry-500">
+                        {entry.bundle.image_url ? (
+                          <Image
+                            src={entry.bundle.image_url}
+                            alt=""
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <span className="absolute inset-0 grid place-items-center text-white/70">
+                            <Gift className="size-5" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold tracking-wide text-berry-600 uppercase">
+                          {t.menu.bundleLabel}
+                        </p>
+                        <p className="truncate text-sm font-bold text-cocoa-900">
+                          {bName}
+                        </p>
+                        <p className="text-[11px] text-cocoa-500">
+                          {t.menu.bundleIncludes.replace(
+                            "{n}",
+                            String(entry.bundle.required_qty)
+                          )}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-extrabold text-cocoa-900 tabular">
+                        {formatIDR(entry.bundle.price, lang)}
+                      </p>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <ul className="flex flex-wrap gap-1.5 text-[11px] text-cocoa-600">
+                        {entry.slots.map((flavorId, idx) => {
+                          const flavor = allFlavors.find((f) => f.id === flavorId);
+                          const fname = flavor
+                            ? lang === "en"
+                              ? flavor.name_en
+                              : flavor.name_id
+                            : `#${flavorId}`;
+                          return (
+                            <li
+                              key={idx}
+                              className="rounded-full bg-cocoa-100 px-2 py-0.5"
+                            >
+                              <span className="font-bold text-cocoa-500">
+                                {idx + 1}.
+                              </span>{" "}
+                              {fname}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <button
+                        type="button"
+                        onClick={() => cart.removeBundle(entry.id)}
+                        className="grid size-8 shrink-0 place-items-center rounded-lg text-cocoa-400 transition hover:bg-berry-500/10 hover:text-berry-500"
+                        aria-label={t.common.delete}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
                   </li>
                 );
               })}

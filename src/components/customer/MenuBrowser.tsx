@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
 import { cheapestBundle, formatIDR } from "@/lib/utils";
 import { OrderCategoryModal } from "./OrderCategoryModal";
+import { OrderBundleModal } from "./OrderBundleModal";
 import { useCart } from "./CartProvider";
 
 /**
@@ -65,7 +66,7 @@ export function MenuBrowser({
             <Gift className="size-4 text-berry-500" />
             {t.menu.bundlesTitle}
           </p>
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="density-bundle-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {bundles.map((b) => (
               <BundleCard key={b.id} bundle={b} lang={lang} t={t} />
             ))}
@@ -178,7 +179,7 @@ export function MenuBrowser({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+          <div className="density-flavor-grid grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
             {(shown.flavors ?? []).map((f) => (
               <FlavorCard
                 key={f.id}
@@ -202,107 +203,208 @@ export function MenuBrowser({
  * grid rasa + stepper +/- di dalamnya. Lebih cepat di HP (tidak harus
  * scroll semua rasa) dan siap untuk menu lain di masa depan (setiap
  * kategori punya modal-nya sendiri).
+ *
+ * Bundle berdiri sendiri (atau yang terkait kategori) ditampilkan di
+ * section terpisah di atas, supaya pembeli tahu ada pilihan paket hemat.
+ * Bundle: klik -> modal pilih {required_qty} slot rasa -> masuk keranjang.
  */
 export function OrderMenuBrowser({
   categories,
+  bundles = [],
   remainingStock,
   soldCounts,
 }: {
   categories: Category[];
+  /** Bundle berdiri sendiri (category_id=NULL) atau per-kategori. */
+  bundles?: Bundle[];
   remainingStock: number | null;
   /** Map flavorId -> jumlah pcs terjual (accepted/ready/delivered). */
   soldCounts?: Record<number, number>;
 }) {
   const { t, lang } = useI18n();
-  const { quantities } = useCart();
+  const { quantities, bundles: cartBundles } = useCart();
   const withFlavors = useMemo(
     () => categories.filter((c) => (c.flavors?.length ?? 0) > 0),
     [categories]
   );
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [openCategoryId, setOpenCategoryId] = useState<number | null>(null);
+  const [openBundleId, setOpenBundleId] = useState<number | null>(null);
 
-  const active = withFlavors.find((c) => c.id === openId) ?? null;
+  const activeCategory = withFlavors.find((c) => c.id === openCategoryId) ?? null;
+  const activeBundle = bundles.find((b) => b.id === openBundleId) ?? null;
 
-  if (withFlavors.length === 0) {
+  const empty = withFlavors.length === 0 && bundles.length === 0;
+  if (empty) {
     return <p className="card p-10 text-center text-cocoa-400">{t.menu.empty}</p>;
   }
 
   return (
     <>
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-        {withFlavors.map((c) => {
-          const name = lang === "en" ? c.name_en : c.name_id;
-          const desc = lang === "en" ? c.desc_en : c.desc_id;
-          // Total pcs kategori ini yang sudah masuk keranjang.
-          const inCart = (c.flavors ?? []).reduce(
-            (s, f) => s + (quantities[String(f.id)] ?? 0),
-            0
-          );
+      {/* ---------- Section bundle (paket hemat) ---------- */}
+      {bundles.length > 0 ? (
+        <div id="bundle-section" className="mb-8 scroll-mt-20">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-berry-500/10 text-berry-600">
+              <Gift className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-display text-lg font-extrabold text-cocoa-900">
+                {t.menu.bundleSection}
+              </p>
+              <p className="text-xs text-cocoa-500">
+                {lang === "en"
+                  ? "Mix and match flavors in one bundle"
+                  : "Pilih beberapa rasa dalam satu paket"}
+              </p>
+            </div>
+          </div>
+          <ul className="density-bundle-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {bundles.map((b) => {
+              const inCart = cartBundles.filter((cb) => cb.bundle.id === b.id).length;
+              return (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenBundleId(b.id)}
+                    className="group block h-full w-full overflow-hidden rounded-2xl border-2 border-cocoa-200 bg-white text-left transition hover:-translate-y-0.5 hover:border-matcha-400 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99]"
+                  >
+                    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-transparent bg-white">
+                      <div className="relative aspect-[5/3] overflow-hidden bg-gradient-to-br from-honey-300 to-berry-500 sm:aspect-[4/3]">
+                        {b.image_url ? (
+                          <Image
+                            src={b.image_url}
+                            alt={lang === "en" ? b.name_en : b.name_id}
+                            fill
+                            sizes="(max-width: 640px) 50vw, 33vw"
+                            className="object-cover transition duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 grid place-items-center bg-grain">
+                            <Gift className="size-12 text-white/50" />
+                          </div>
+                        )}
+                        <span className="absolute left-3 top-3 chip bg-honey-400/95 text-cocoa-900 shadow">
+                          <Sparkles className="size-3 fill-current" />
+                          {t.menu.bundleLabel}
+                        </span>
+                        <span className="absolute right-3 top-3 chip bg-white/95 text-cocoa-800 shadow tabular">
+                          {formatIDR(b.price, lang)}
+                        </span>
+                      </div>
+                      <div className="flex flex-1 flex-col p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-display text-lg leading-tight font-bold text-cocoa-900">
+                            {lang === "en" ? b.name_en : b.name_id}
+                          </h3>
+                          {inCart > 0 ? (
+                            <span className="chip shrink-0 bg-matcha-500 text-white">
+                              {inCart}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-[12px] font-bold text-matcha-700">
+                          {t.menu.bundleIncludes.replace("{n}", String(b.required_qty))}
+                        </p>
+                      </div>
+                    </article>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
 
-          return (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => setOpenId(c.id)}
-                className="group flex w-full items-center gap-3.5 rounded-2xl border-2 border-cocoa-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-matcha-400 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99] sm:p-3.5"
-              >
-                <span
-                  className={`relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl sm:size-16 ${
-                    c.image_url
-                      ? "bg-cocoa-100"
-                      : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
-                  }`}
+      {/* ---------- Section kategori (item satuan) ---------- */}
+      {withFlavors.length > 0 ? (
+        <ul className="density-category-list grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+          {withFlavors.map((c) => {
+            const name = lang === "en" ? c.name_en : c.name_id;
+            const desc = lang === "en" ? c.desc_en : c.desc_id;
+            // Total pcs kategori ini yang sudah masuk keranjang.
+            const inCart = (c.flavors ?? []).reduce(
+              (s, f) => s + (quantities[String(f.id)] ?? 0),
+              0
+            );
+
+            return (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => setOpenCategoryId(c.id)}
+                  className="group flex w-full items-center gap-3.5 rounded-2xl border-2 border-cocoa-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-matcha-400 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99] sm:p-3.5"
                 >
-                  {c.image_url ? (
-                    <Image
-                      src={c.image_url}
-                      alt=""
-                      fill
-                      sizes="64px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <LayoutGrid className="size-7 text-white/70" />
-                  )}
-                </span>
+                  <span
+                    className={`cat-photo relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl sm:size-16 ${
+                      c.image_url
+                        ? "bg-cocoa-100"
+                        : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
+                    }`}
+                  >
+                    {c.image_url ? (
+                      <Image
+                        src={c.image_url}
+                        alt=""
+                        fill
+                        sizes="64px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <LayoutGrid className="size-7 text-white/70" />
+                    )}
+                  </span>
 
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate font-display text-base font-bold text-cocoa-900 sm:text-lg">
-                      {name}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate font-display text-base font-bold text-cocoa-900 sm:text-lg">
+                        {name}
+                      </span>
+                      {inCart > 0 ? (
+                        <span className="chip shrink-0 bg-matcha-500 text-white">
+                          {inCart}
+                        </span>
+                      ) : null}
                     </span>
-                    {inCart > 0 ? (
-                      <span className="chip shrink-0 bg-matcha-500 text-white">
-                        {inCart}
+                    <span className="cat-meta mt-0.5 block text-xs text-cocoa-400">
+                      {c.flavors?.length} {t.menu.flavors}
+                    </span>
+                    {desc ? (
+                      <span className="cat-desc mt-0.5 line-clamp-1 block text-[12px] text-cocoa-500">
+                        {desc}
                       </span>
                     ) : null}
                   </span>
-                  <span className="mt-0.5 block text-xs text-cocoa-400">
-                    {c.flavors?.length} {t.menu.flavors}
-                  </span>
-                  {desc ? (
-                    <span className="mt-0.5 line-clamp-1 block text-[12px] text-cocoa-500">
-                      {desc}
-                    </span>
-                  ) : null}
-                </span>
 
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-matcha-50 text-matcha-600 transition group-hover:bg-matcha-500 group-hover:text-white sm:size-11">
-                  <Plus className="size-4 sm:size-5" />
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                  <span className="cat-plus grid size-10 shrink-0 place-items-center rounded-xl bg-matcha-50 text-matcha-600 transition group-hover:bg-matcha-500 group-hover:text-white sm:size-11">
+                    <Plus className="size-4 sm:size-5" />
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
 
       <OrderCategoryModal
-        category={active}
-        open={active !== null}
-        onClose={() => setOpenId(null)}
+        category={activeCategory}
+        open={activeCategory !== null}
+        onClose={() => setOpenCategoryId(null)}
         remainingStock={remainingStock}
         soldCounts={soldCounts}
       />
+
+      {activeBundle ? (
+        <OrderBundleModal
+          // Pakai `key` agar state `slots` di dalam modal otomatis reset
+          // ketika bundle yang dibuka berbeda (id / required_qty berubah).
+          key={activeBundle.id}
+          bundle={activeBundle}
+          categories={withFlavors}
+          open={activeBundle !== null}
+          onClose={() => setOpenBundleId(null)}
+          soldCounts={soldCounts}
+        />
+      ) : null}
     </>
   );
 }
@@ -353,7 +455,7 @@ function BundleCard({
             {name}
           </h3>
           {desc ? (
-            <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-cocoa-500">
+            <p className="bundle-desc mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-cocoa-500">
               {desc}
             </p>
           ) : null}

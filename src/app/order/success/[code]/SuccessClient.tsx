@@ -42,6 +42,15 @@ import {
 import type { InvoiceLineItem } from "@/lib/types";
 
 /**
+ * Helper yang merender children langsung (no wrapper element) sehingga
+ * bisa menyisipkan beberapa <tr> ke dalam <tbody> tanpa menambah level
+ * DOM yang tidak valid (mis. nested <tbody>).
+ */
+function FragmentTable({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+/**
  * RPC publik mengembalikan item flat (satu baris per rasa). Helper ini
  * membungkusnya jadi format `InvoiceLineItem[]` (satu blok per kategori)
  * yang dipakai oleh InvoiceSummary & InvoiceDocument. Karena RPC publik
@@ -356,6 +365,31 @@ function InvoiceSummary({
             </div>
           </div>
         ))}
+
+        {/* Bundle entries — pakai list yang sama dengan invoice flat. */}
+        {(invoice.bundles ?? []).map((bg) => (
+          <div key={`b-${bg.bundle_id}`} className="px-4 py-3">
+            <p className="mb-1 text-[10px] font-bold tracking-wide text-berry-600 uppercase">
+              {t.menu.bundleLabel}
+            </p>
+            <p className="font-bold text-cocoa-900">{bg.bundle_name}</p>
+            <ul className="mt-1.5 space-y-1">
+              {bg.slots.map((s) => (
+                <li
+                  key={s.slot}
+                  className="flex justify-between gap-3 text-cocoa-700"
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="font-bold text-cocoa-500">
+                      {s.slot}.
+                    </span>{" "}
+                    {s.flavor_name}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
 
       <div className="space-y-1.5 border-t border-cocoa-100 bg-cocoa-50 px-4 py-3 text-sm">
@@ -549,7 +583,7 @@ function InvoiceDocument({
         </thead>
         <tbody>
           {resolveItems(invoice).map((it, i) => (
-            <tbody key={i} className="contents">
+            <FragmentTable key={i}>
               {it.flavors.map((f, j) => (
                 <tr key={`${i}-${j}`} className="border-b border-cocoa-100">
                   <td className="py-1.5">
@@ -579,7 +613,33 @@ function InvoiceDocument({
                   {formatIDR(it.line_total, lang)}
                 </td>
               </tr>
-            </tbody>
+            </FragmentTable>
+          ))}
+          {/* Bundle rows — flat di tbody utama, colspan 4 untuk merentang
+              semua kolom karena item bundle tidak punya qty/harga satuan
+              (sudah termasuk dalam harga paket). */}
+          {(invoice.bundles ?? []).map((bg) => (
+            <tr key={`b-${bg.bundle_id}`} className="border-b border-cocoa-100 align-top">
+              <td className="py-1.5" colSpan={4}>
+                <span className="block text-[10px] font-bold tracking-wide text-berry-600 uppercase">
+                  {t.menu.bundleLabel}
+                </span>
+                <span className="font-semibold">{bg.bundle_name}</span>
+                <span className="ml-2 text-cocoa-500">
+                  ({bg.slots.length} pcs)
+                </span>
+                <ul className="ml-3 mt-0.5 list-disc text-cocoa-600">
+                  {bg.slots.map((s) => (
+                    <li key={s.slot}>
+                      <span className="font-bold text-cocoa-400">
+                        {s.slot}.
+                      </span>{" "}
+                      {s.flavor_name}
+                    </li>
+                  ))}
+                </ul>
+              </td>
+            </tr>
           ))}
         </tbody>
         <tfoot>

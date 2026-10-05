@@ -6,6 +6,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { LANG_COOKIE, langFromCookie } from "@/lib/i18n/shared";
 import { CartProvider } from "@/components/customer/CartProvider";
 import { ToastProvider } from "@/components/ui/Toast";
+import { FontSizeProvider } from "@/components/ui/FontSizeProvider";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -83,9 +84,11 @@ export default async function RootLayout({
     >
       <body className="min-h-dvh antialiased">
         <I18nProvider initialLang={lang}>
-          <ToastProvider>
-            <CartProvider>{children}</CartProvider>
-          </ToastProvider>
+          <FontSizeProvider>
+            <ToastProvider>
+              <CartProvider>{children}</CartProvider>
+            </ToastProvider>
+          </FontSizeProvider>
         </I18nProvider>
       </body>
     </html>

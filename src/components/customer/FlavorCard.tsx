@@ -154,7 +154,7 @@ export function FlavorCard({
     >
       {/* Foto / placeholder */}
       <div
-        className={`relative aspect-[5/3] overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)} sm:aspect-[4/3]`}
+        className={`flavor-photo relative aspect-[5/3] overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)} sm:aspect-[4/3]`}
       >
         {flavor.image_url ? (
           <Image
@@ -215,7 +215,7 @@ export function FlavorCard({
         </div>
 
         {!compact && desc ? (
-          <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-cocoa-500">
+          <p className="flavor-desc mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-cocoa-500">
             {desc}
           </p>
         ) : null}
@@ -252,7 +252,7 @@ export function FlavorCard({
 
         {/* Baris 'terjual' + like (mode lihat di beranda, read-only di pre-order) */}
         {showSocial ? (
-          <div className="mt-3 flex items-center justify-between border-t border-cocoa-100 pt-3 text-xs">
+          <div className="flavor-social mt-3 flex items-center justify-between border-t border-cocoa-100 pt-3 text-xs">
             <div className="flex items-center gap-3 text-cocoa-500">
               <span>
                 <span className="font-bold text-cocoa-700 tabular">

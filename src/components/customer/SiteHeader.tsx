@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Menu, X, ShoppingBag } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
+import { FontSizeToggle } from "@/components/ui/FontSizeToggle";
 
 export function SiteHeader({
   storeName = "Rumakomugi",
@@ -92,6 +93,7 @@ export function SiteHeader({
         </nav>
 
         <div className="flex items-center gap-2">
+          <FontSizeToggle />
           <LanguageToggle />
           <Link
             href="/order"
@@ -125,6 +127,13 @@ export function SiteHeader({
                 {l.label}
               </Link>
             ))}
+            <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-cocoa-200 bg-white px-3 py-2.5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-cocoa-700">
+                <FontSizeToggle />
+                <span>{t.common.fontSize}</span>
+              </div>
+              <LanguageToggle />
+            </div>
             <Link
               href="/order"
               onClick={() => setOpen(false)}

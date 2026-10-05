@@ -37,6 +37,10 @@ export const id: Dict = {
     language: "Bahasa",
     switchLang: "English",
     empty: "Belum ada data",
+    fontSize: "Ukuran teks",
+    fontSizeNormal: "Normal",
+    fontSizeCompact: "Kecil",
+    fontSizeToggleLabel: "Perkecil teks & tampilan",
   },
   cart: {
     title: "Keranjangmu",
@@ -93,6 +97,18 @@ export const id: Dict = {
     likeRemove: "Hapus suka",
     bundleLabel: "Bundle",
     bundleIncludes: "Pilih {n} rasa untuk paket ini",
+    /** Bundle di langkah 'Pilih Rasa' (halaman /order). */
+    bundleAddToCart: "Pilih {n} rasa",
+    bundleInCart: "{n} paket di keranjang",
+    bundleEmpty: "Pilih {n} rasa",
+    bundleSlotN: "Rasa {n}",
+    bundleSlotEmpty: "Pilih rasa",
+    bundlePickFlavors: "Pilih {n} rasa untuk paket {name}",
+    bundlePickFlavorsDesc:
+      "Tiap slot harus diisi. Stok mengikuti rasa yang kamu pilih.",
+    bundlePickFromCategory: "Hanya rasa dari: {name}",
+    bundleSection: "Paket hemat",
+    bundleAnyCategory: "Bebas pilih dari semua rasa",
   },
   howItWorks: {
     title: "Cara Pre-order",

@@ -9,6 +9,7 @@ import {
   Building2,
   Check,
   Copy,
+  Gift,
   Loader2,
   MapPin,
   ShoppingBag,
@@ -18,6 +19,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type {
+  Bundle,
   CartLine,
   Category,
   StoreSettings,
@@ -37,9 +39,12 @@ type Step = (typeof STEPS)[number];
 
 export function OrderFlow({
   categories,
+  bundles = [],
   settings,
 }: {
   categories: Category[];
+  /** Bundle berdiri sendiri / per-kategori yang dijual. */
+  bundles?: Bundle[];
   settings: StoreSettings;
 }) {
   const { t, lang } = useI18n();
@@ -48,6 +53,7 @@ export function OrderFlow({
   const {
     quantities,
     notes,
+    bundles: cartBundles,
     draft,
     totalItems,
     updateDraft,
@@ -105,8 +111,9 @@ export function OrderFlow({
   }, []);
 
   // Stok per-kategori — total pcs dari kategori ini tidak boleh
-  // melebihi sisa stok kategori. Bundle (iterasi berikut) akan
-  // mengurangi stok kategori-nya sendiri.
+  // melebihi sisa stok kategori. Bundle dihitung dari slot yang dipilih
+  // (tiap slot = 1 pcs fisik, dari kategori bundle atau bebas kalau
+  // bundle berdiri sendiri).
   const stockByCategory = useMemo(() => {
     const m = new Map<number, { enabled: boolean; left: number }>();
     for (const c of categories) {
@@ -135,7 +142,9 @@ export function OrderFlow({
   }, [quantities, flavorById]);
 
   // Kelompokkan baris keranjang per JENIS MAKANAN untuk tampilan ringkasan.
-  // Subtotal = harga satuan * qty (tanpa paket otomatis).
+  // Subtotal = harga satuan * qty (tanpa paket otomatis). Bundle dihitung
+  // sebagai 1 baris di kategori bundle (kalau terkait kategori) atau di
+  // grup khusus "Bundle berdiri sendiri".
   const groups = useMemo(() => {
     const byCategory = new Map<number, { category: Category | null; lines: CartLine[] }>();
 
@@ -156,8 +165,65 @@ export function OrderFlow({
     });
   }, [cartLines, categories]);
 
-  const subtotal = groups.reduce((sum, g) => sum + g.total, 0);
+  // Group khusus bundle — dikelompokkan per bundle.id (bukan kategori)
+  // supaya di review step kita bisa menampilkan "Bundle A x 2, Bundle B x 1".
+  const bundleGroups = useMemo(() => {
+    const m = new Map<number, { bundle: Bundle; entries: typeof cartBundles; count: number }>();
+    for (const entry of cartBundles) {
+      const prev = m.get(entry.bundle.id);
+      if (prev) {
+        prev.entries.push(entry);
+        prev.count += 1;
+      } else {
+        m.set(entry.bundle.id, { bundle: entry.bundle, entries: [entry], count: 1 });
+      }
+    }
+    return [...m.values()];
+  }, [cartBundles]);
+
+  // Subtotal item satuan + bundle.
+  const subtotalFromItems = groups.reduce((sum, g) => sum + g.total, 0);
+  const subtotalFromBundles = bundleGroups.reduce(
+    (sum, bg) => sum + bg.bundle.price * bg.count,
+    0
+  );
+  const subtotal = subtotalFromItems + subtotalFromBundles;
   const saving = 0;
+
+  // Total pcs yang dihitung terhadap stok per-kategori: item satuan + slot
+  // bundle (tiap slot = 1 pcs). Bundle berdiri sendiri dengan flavor
+  // dari kategori tertentu akan menambah ke kategori flavor tsb.
+  const stockContribution = useMemo(() => {
+    // key: categoryId -> total pcs
+    const m = new Map<number, number>();
+    for (const line of cartLines) {
+      if (line.flavor.category_id == null) continue;
+      m.set(line.flavor.category_id, (m.get(line.flavor.category_id) ?? 0) + line.qty);
+    }
+    for (const entry of cartBundles) {
+      // Tentukan kategori tiap slot dari flavor. Bundle terkait kategori
+      // memaksa semua slot dari kategori itu; bundle berdiri sendiri
+      // mengikuti flavor masing-masing.
+      for (const flavorId of entry.slots) {
+        if (flavorId == null) continue;
+        const line = cartLines.find((l) => l.flavor.id === flavorId);
+        // Kita tidak tahu flavor di sini (cuma id), ambil dari categories.
+        // Cari di categories[].flavors[].
+        let foundCategoryId: number | null = null;
+        for (const c of categories) {
+          if ((c.flavors ?? []).some((f) => f.id === flavorId)) {
+            foundCategoryId = c.id;
+            break;
+          }
+        }
+        if (foundCategoryId == null) continue;
+        m.set(foundCategoryId, (m.get(foundCategoryId) ?? 0) + 1);
+        // line sengaja tidak dipakai — hanya untuk men-suppress unused warning.
+        void line;
+      }
+    }
+    return m;
+  }, [cartLines, cartBundles, categories]);
 
   // Daftar zona delivery dari settings — selalu ada 1+ (fallback ke pickup).
   const deliveryZones =
@@ -210,20 +276,18 @@ export function OrderFlow({
   }
 
   function validateMenu(): boolean {
-    if (cartLines.length === 0 || totalItems < settings.min_order) {
+    if ((cartLines.length === 0 && cartBundles.length === 0) || totalItems < settings.min_order) {
       toast.warning(
         t.order.menu.cartEmpty,
         t.order.menu.minOrderWarning.replace("{n}", String(settings.min_order))
       );
       return false;
     }
-    // Stok per-kategori: total pcs tiap kategori tidak boleh melebihi
-    // sisa stok kategori itu. Bundle menyusul di iterasi berikut.
-    for (const g of groups) {
-      const catId = g.category?.id;
-      if (!catId) continue;
+    // Stok per-kategori: total pcs tiap kategori (item + slot bundle) tidak
+    // boleh melebihi sisa stok kategori itu.
+    for (const [catId, pcs] of stockContribution.entries()) {
       const s = stockByCategory.get(catId);
-      if (s?.enabled && g.qty > s.left) {
+      if (s?.enabled && pcs > s.left) {
         toast.error(t.errors.insufficient_stock);
         return false;
       }
@@ -286,6 +350,12 @@ export function OrderFlow({
           quantity: l.qty,
           note: notes[String(l.flavor.id)] || null,
         })),
+        // Bundle: backend (create_order) menerima array {bundle_id, slots:[{flavor_id}]}
+        // dengan panjang slots == bundle.required_qty.
+        p_bundles: cartBundles.map((entry) => ({
+          bundle_id: entry.bundle.id,
+          slots: entry.slots.map((flavorId) => ({ flavor_id: flavorId })),
+        })),
       });
 
       if (error) {
@@ -325,6 +395,39 @@ export function OrderFlow({
             unit_price: l.flavor.price,
             line_total: l.flavor.price * l.qty,
           })),
+        })),
+        bundles: bundleGroups.map((bg) => ({
+          bundle_id: bg.bundle.id,
+          bundle_name: lang === "en" ? bg.bundle.name_en : bg.bundle.name_id,
+          // Untuk snapshot lokal, satukan semua slot dari semua entri
+          // bundle yang sama, plus info flavor-nya supaya halaman sukses
+          // bisa menampilkan tanpa lookup lagi. Backend hanya menerima
+          // entry yang semua slot-nya terisi, jadi null seharusnya tidak
+          // sampai di sini — kita filter keluar untuk type safety.
+          slots: bg.entries
+            .flatMap((entry, entryIdx) =>
+              entry.slots.map((flavorId, slotIdx) => {
+                if (flavorId == null) return null;
+                // Cari nama flavor dari categories.
+                let flavorName = "";
+                for (const c of categories) {
+                  const f = (c.flavors ?? []).find((x) => x.id === flavorId);
+                  if (f) {
+                    flavorName = lang === "en" ? f.name_en : f.name_id;
+                    break;
+                  }
+                }
+                return {
+                  slot: entryIdx * bg.bundle.required_qty + slotIdx + 1,
+                  flavor_id: flavorId,
+                  flavor_name: flavorName,
+                };
+              })
+            )
+            .filter(
+              (s): s is { slot: number; flavor_id: number; flavor_name: string } =>
+                s !== null
+            ),
         })),
         subtotal,
         delivery_fee: deliveryFee,
@@ -411,6 +514,27 @@ export function OrderFlow({
                 title={t.order.identity.title}
                 subtitle={t.order.identity.subtitle}
               />
+
+              {/* Info paket hemat — tampil di langkah identitas supaya
+                  pembeli tahu ada pilihan bundle. Tidak wajib; kalau tidak
+                  ada bundle, section ini di-skip. */}
+              {bundles.length > 0 ? (
+                <div className="mt-4 flex items-center gap-3 rounded-2xl border border-berry-200 bg-berry-500/5 p-3.5">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-berry-500/15 text-berry-600">
+                    <Gift className="size-4" />
+                  </span>
+                  <p className="text-[13px] leading-snug text-cocoa-700">
+                    <span className="font-bold text-berry-700">
+                      {t.menu.bundleSection}
+                    </span>{" "}
+                    —{" "}
+                    {lang === "en"
+                      ? `${bundles.length} bundle${bundles.length > 1 ? "s" : ""} available. Pick flavors in the next step.`
+                      : `${bundles.length} paket tersedia. Pilih rasa di langkah berikutnya.`}
+                  </p>
+                </div>
+              ) : null}
+
               <div className="mt-6 space-y-5">
                 <div>
                   <label htmlFor="name" className="label">
@@ -531,11 +655,12 @@ export function OrderFlow({
               </div>
 
               {/* Rincian item: klik kategori dulu, lalu rasa-rasanya */}
-              {categories.length === 0 ? (
+              {categories.length === 0 && bundles.length === 0 ? (
                 <p className="card p-8 text-center text-cocoa-400 sm:p-10">{t.menu.empty}</p>
               ) : (
                 <OrderMenuBrowser
                   categories={categories}
+                  bundles={bundles}
                   remainingStock={null}
                   soldCounts={soldCounts}
                 />
@@ -812,6 +937,28 @@ export function OrderFlow({
                         </div>
                       </li>
                     ))}
+                    {bundleGroups.map((bg) => {
+                      const bundleName = lang === "en" ? bg.bundle.name_en : bg.bundle.name_id;
+                      return (
+                        <li key={`bundle-${bg.bundle.id}`}>
+                          <p className="text-[10px] font-bold tracking-wide text-berry-600 uppercase">
+                            {t.menu.bundleLabel}
+                          </p>
+                          <div className="flex justify-between gap-4">
+                            <span className="min-w-0">
+                              <span className="font-bold text-cocoa-800">{bundleName}</span>
+                              <span className="ml-1.5 text-cocoa-400">× {bg.count}</span>
+                            </span>
+                            <span className="tabular text-cocoa-500">
+                              {formatIDR(bg.bundle.price * bg.count, lang)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-cocoa-500">
+                            {t.menu.bundleIncludes.replace("{n}", String(bg.bundle.required_qty))}
+                          </p>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </ReviewRow>
               </div>

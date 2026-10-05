@@ -22,6 +22,7 @@ export default async function OrderPage() {
     getI18nDict(),
   ]);
   const categories = menu.categories;
+  const bundles = menu.bundles;
 
   // Selalu mulai dari langkah identitas (nama + telepon), apa pun URL-nya.
   // Pembeli tidak bisa melompat ke langkah pembayaran/konfirmasi.
@@ -56,6 +57,7 @@ export default async function OrderPage() {
 
         <OrderFlow
           categories={categories}
+          bundles={bundles}
           settings={settings as StoreSettings}
         />
       </main>

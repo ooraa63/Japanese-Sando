@@ -87,7 +87,7 @@ export function OrderCategoryModal({
           {t.menu.empty}
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className="density-flavor-grid grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           {flavors.map((f) => (
             <FlavorCard
               key={f.id}

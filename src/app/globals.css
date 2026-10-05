@@ -204,6 +204,88 @@
 /* Angka tabel rata-rata */
 .tabular { font-variant-numeric: tabular-nums; }
 
+/* =============================================================================
+ *  Density: mode "compact" untuk layar kecil
+ *  Dipasang oleh <FontSizeProvider> lewat data-density di <html>.
+ *  Hanya memengaruhi mobile (< sm: 640px). Di desktop tidak ada perubahan
+ *  supaya tidak merusak layout yang sudah pas.
+ * ========================================================================== */
+@media (max-width: 639px) {
+  html[data-density="compact"] body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Kartu flavor di homepage / order: dari 1 kolom jadi 2 kolom. */
+  html[data-density="compact"] .density-flavor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+  html[data-density="compact"] .density-flavor-grid > article {
+    /* kecilkan aspect ratio & padding supaya muat 2 kolom di HP */
+  }
+  html[data-density="compact"] .density-flavor-grid > article .flavor-photo {
+    aspect-ratio: 1 / 1 !important;
+  }
+  html[data-density="compact"] .density-flavor-grid > article .p-4 {
+    padding: 0.625rem !important;
+  }
+  html[data-density="compact"] .density-flavor-grid > article h3 {
+    font-size: 0.85rem !important;
+  }
+  html[data-density="compact"] .density-flavor-grid > article .flavor-desc,
+  html[data-density="compact"] .density-flavor-grid > article .flavor-social {
+    display: none !important;
+  }
+
+  /* Kartu bundle: tetap 2 kolom. */
+  html[data-density="compact"] .density-bundle-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+  html[data-density="compact"] .density-bundle-grid > li > article {
+    border-radius: 0.875rem;
+  }
+  html[data-density="compact"] .density-bundle-grid > li > article .p-4 {
+    padding: 0.625rem !important;
+  }
+  html[data-density="compact"] .density-bundle-grid > li > article h3 {
+    font-size: 0.85rem !important;
+  }
+  html[data-density="compact"] .density-bundle-grid > li > article p {
+    font-size: 0.7rem !important;
+    line-height: 1.2;
+  }
+  html[data-density="compact"] .density-bundle-grid > li > article .bundle-desc {
+    display: none !important;
+  }
+
+  /* Kartu kategori di /order: dari 1 kolom jadi 2 kolom. */
+  html[data-density="compact"] .density-category-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  html[data-density="compact"] .density-category-list > li > button {
+    padding: 0.5rem !important;
+    gap: 0.5rem !important;
+    border-radius: 0.875rem !important;
+  }
+  html[data-density="compact"] .density-category-list > li > button > .cat-photo {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+  }
+  html[data-density="compact"] .density-category-list > li > button > .cat-meta {
+    font-size: 0.7rem !important;
+  }
+  html[data-density="compact"] .density-category-list > li > button > .cat-desc {
+    display: none !important;
+  }
+  html[data-density="compact"] .density-category-list > li > button > .cat-plus {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

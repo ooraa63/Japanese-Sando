@@ -39,6 +39,10 @@ export const en = {
     language: "Language",
     switchLang: "Bahasa Indonesia",
     empty: "Nothing here yet",
+    fontSize: "Text size",
+    fontSizeNormal: "Normal",
+    fontSizeCompact: "Compact",
+    fontSizeToggleLabel: "Smaller text & layout",
   },
   cart: {
     title: "Your cart",
@@ -95,6 +99,18 @@ export const en = {
     likeRemove: "Remove like",
     bundleLabel: "Bundle",
     bundleIncludes: "Pick {n} flavors for this bundle",
+    /** Bundle shown on the order page (step 'Pick flavors'). */
+    bundleAddToCart: "Pick {n} flavors",
+    bundleInCart: "{n} bundle in cart",
+    bundleEmpty: "Pick {n} flavors",
+    bundleSlotN: "Flavor {n}",
+    bundleSlotEmpty: "Choose a flavor",
+    bundlePickFlavors: "Pick {n} flavors for {name}",
+    bundlePickFlavorsDesc:
+      "Fill every slot. Stock follows the flavors you choose.",
+    bundlePickFromCategory: "Only from: {name}",
+    bundleSection: "Value bundles",
+    bundleAnyCategory: "Pick from any flavor",
   },
   howItWorks: {
     title: "How pre-ordering works",
