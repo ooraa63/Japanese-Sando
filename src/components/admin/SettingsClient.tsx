@@ -13,7 +13,6 @@ import {
   MapPin,
   MessageCircle,
   Plus,
-  QrCode,
   Save,
   Store,
   Trash2,
@@ -458,32 +457,7 @@ export function SettingsClient({
             )}
           </div>
 
-          {/* QRIS */}
-          <div className="rounded-2xl border border-cocoa-200 p-4">
-            <label className="flex cursor-pointer items-center justify-between gap-3">
-              <span className="flex items-center gap-2.5">
-                <QrCode className="size-4.5 text-cocoa-400" />
-                <span className="text-sm font-bold text-cocoa-800">
-                  {t.admin.settings.qrisEnabled}
-                </span>
-              </span>
-              <Switch
-                checked={form.qris_enabled}
-                onChange={(v) => patch({ qris_enabled: v })}
-              />
-            </label>
-
-            {form.qris_enabled ? (
-              <div className="mt-4">
-                <QrisField
-                  url={form.qris_image_url}
-                  onChange={(url) => patch({ qris_image_url: url })}
-                  labels={{ upload: t.admin.settings.uploadQris, remove: t.admin.menu.removeImage }}
-                />
-              </div>
-            ) : null}
           </div>
-        </div>
       </Section>
 
       {/* ============ Aturan & ongkir ============ */}
@@ -1008,94 +982,3 @@ function HeroImageField({
   );
 }
 
-function QrisField({
-  url,
-  onChange,
-  labels,
-}: {
-  url: string | null;
-  onChange: (url: string | null) => void;
-  labels: { upload: string; remove: string };
-}) {
-  const toast = useToast();
-  const { t } = useI18n();
-  const [busy, setBusy] = useState(false);
-
-  const failMessage = t.errors.proof_upload_failed;
-
-  async function upload(file: File) {
-    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
-      toast.error(failMessage);
-      return;
-    }
-    setBusy(true);
-    try {
-      const supabase = createClient();
-      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-      const path = `qris/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage
-        .from("flavor-images")
-        .upload(path, file, { contentType: file.type, upsert: false });
-      if (error) throw error;
-      const { data } = supabase.storage.from("flavor-images").getPublicUrl(path);
-      onChange(data.publicUrl);
-    } catch {
-      toast.error(failMessage);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div>
-      {url ? (
-        <div className="flex items-center gap-3">
-          <div className="relative size-24 shrink-0 overflow-hidden rounded-xl border border-cocoa-200 bg-white">
-            <Image src={url} alt="QRIS" fill sizes="96px" className="object-contain p-1" />
-          </div>
-          <div className="flex gap-1.5">
-            <label className="cursor-pointer rounded-lg border border-cocoa-200 px-2.5 py-1.5 text-[12px] font-bold text-cocoa-600 transition hover:bg-cocoa-50">
-              {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
-              {labels.upload}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="sr-only"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void upload(f);
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => onChange(null)}
-              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-berry-500 transition hover:bg-berry-500/10"
-            >
-              <X className="size-3.5" />
-              {labels.remove}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-cocoa-200 bg-cocoa-50/50 px-4 py-6 text-center transition hover:border-matcha-400">
-          {busy ? (
-            <Loader2 className="size-6 animate-spin text-matcha-500" />
-          ) : (
-            <ImagePlus className="size-6 text-cocoa-400" />
-          )}
-          <span className="text-sm font-bold text-cocoa-700">{labels.upload}</span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void upload(f);
-            }}
-          />
-        </label>
-      )}
-    </div>
-  );
-}

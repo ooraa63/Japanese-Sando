@@ -4,6 +4,105 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-05 — Hapus QRIS Statis (sekarang cuma Transfer Bank + QRIS Midtrans)
+
+**Mengubah:**
+
+- `src/components/customer/OrderFlow.tsx`:
+  - Hapus `ChoiceCard` untuk `qris_static` dari payment options.
+  - Hapus `<option value="QRIS">QRIS</option>` dari transfer-method dropdown.
+  - Hapus block static-QR (`<QrImage src={settings.qris_image_url} />` + heading).
+  - Hapus helper `QrImage` + import `QrCode` dari lucide-react.
+  - Update PaymentMethod cast type: `"transfer" | "qris_static" | "qris_midtrans"` → `"transfer" | "qris_midtrans"`.
+  - Update review-row display: hapus branch `qris_static`.
+  - Update fallback `bank_accounts.length === 0`: hapus `&& !settings.qris_enabled` (gak relevan lagi).
+  - Update komentar dari "// Cabang transfer / qris_static" jadi "// Cabang transfer".
+- `src/lib/types.ts`:
+  - `PaymentMethod` = `"transfer" | "qris_midtrans"` (hapus `qris_static`).
+  - StoreSettings masih punya `qris_enabled` & `qris_image_url` (DB compat — kolom gak di-drop).
+- `src/lib/i18n/{id,en}.ts`:
+  - Hapus `payment.qris`, `payment.qrisStatic`, `payment.qrisStaticDesc` (dead strings).
+  - Hapus `admin.settings.qrisEnabled`, `admin.settings.qrisImage`, `admin.settings.uploadQris`.
+  - Keep `payment.qrisUnavailable` (masih dipakai sebagai fallback kalau `bank_accounts` kosong).
+- `src/components/admin/SettingsClient.tsx`:
+  - Hapus section "QRIS" (toggle + image field) — admin gak perlu enable static QR lagi.
+  - Hapus helper `QrisField` + import `QrCode`.
+  - `qris_enabled` & `qris_image_url` tetap ada di form Draft (initial values) supaya nilai di DB gak ke-overwrite saat save.
+
+**Mengapa:**
+
+User minta: "QRIS statis hapus aja, next ga pakai statis". Alasan: QRIS Statis admin-upload manual confirm-nya ribet (admin harus cek WA manual tiap order), dan sekarang sudah ada QRIS Dinamis via Midtrans yang auto-confirm. Statis jadi gak perlu.
+
+**Tidak diubah (DB compat):**
+
+- Kolom `store_settings.qris_enabled` & `store_settings.qris_image_url` masih ada di schema (gak di-drop via migration). Kalau nanti mau dimatiin total, butuh migration baru.
+- Migration-18 masih allow `payment_method='qris_static'` di constraint. Old orders dengan value itu masih valid di DB; cuma gak ada cara bikin baru dari UI.
+- Kolom `orders.qris_*` (transaction_id, status, qr_url, expires_at) tetap — itu untuk Midtrans.
+
+**Verifikasi:**
+
+- `npx tsc --noEmit` — zero errors
+- `npx eslint src` — zero errors / warnings
+- `npx next build` — sukses, semua route ter-generate
+- `/order` payment step sekarang cuma muncul 2 opsi: **Transfer Bank** + (kalau env Midtrans ada) **QRIS via Midtrans**.
+
+---
+
+## 2026-10-05 — Midtrans QRIS Dinamis (DORMANT, menunggu credentials)
+
+> **Update 23:46** — Steven input Sandbox credentials (Server + Client Key) ke
+> `.env.local`. `isMidtransConfigured()` sekarang return `true` di local.
+> Production Vercel masih dormant (env belum di-set di Vercel dashboard).
+> Kedua key sudah masuk chat history; akan di-regenerate sebelum go-live.
+
+**Scope:** feat: payment qris midtrans (code-ready, env belum di-set)
+
+**Scope:** feat: payment qris midtrans (code-ready, env belum di-set)
+
+**Status:** Code sudah committed ke `main`, tapi **belum aktif di production** karena:
+
+- `MIDTRANS_SERVER_KEY` belum di-set di `.env.local` maupun Vercel
+- `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY` belum di-set
+- `MIDTRANS_IS_PRODUCTION` default `false` (sandbox), belum relevan
+
+**Efek:** `isMidtransConfigured()` return false → `midtransReady` prop di `OrderFlow` = false → opsi **"QRIS via Midtrans"** otomatis tersembunyi dari payment step. Customer cuma melihat **Transfer Bank** + **QRIS Statis**. Tidak ada HTTP call ke Midtrans API. Webhook route `/api/midtrans/webhook` ada tapi idle.
+
+**Mengubah (sudah di-commit):**
+
+- `supabase/migration-18.sql` — kolom `orders.qris_*` + RPC `set_order_qris_charge`, `set_order_qris_status`, `public_order_qris_status`.
+- `src/lib/midtrans/server.ts` — `chargeQris`, `getOrderStatus`, `mapMidtransStatus`, `verifyWebhookSignatureAsync`, `isMidtransConfigured`.
+- `src/app/account/qris-actions.ts` — `createQrisOrderAction`, `checkQrisStatusAction`.
+- `src/app/api/midtrans/webhook/route.ts` — POST handler verify signature + update status.
+- `src/components/customer/QrisPaymentModal.tsx` — QR display + countdown + polling 5s.
+- `src/lib/types.ts` — tambah `QrisInfo` type.
+- `src/lib/i18n/{id,en}.ts` — string QRIS Midtrans (id/en).
+- `src/components/customer/OrderFlow.tsx` — radio QRIS Midtrans + QR modal + polling.
+- `src/app/order/success/[code]/SuccessClient.tsx` + `src/app/order/track/[code]/TrackClient.tsx` — tampilkan status QRIS.
+- `.env.example` — 3 vars Midtrans: `MIDTRANS_SERVER_KEY`, `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY`, `MIDTRANS_IS_PRODUCTION`.
+- `docs/MIDTRANS.md` — setup guide lengkap (sudah di-commit).
+- `MEMORY/decisions.md` — Tambah D12 (Midtrans QRIS integration).
+
+**Mengapa dormant:** Steven (developer) ingin pakai akun Midtrans-nya sendiri untuk development & testing, tapi aktivasi menunggu keputusan klien. Akun Midtrans yang sudah terdaftar = akun developer (sandbox). Klien nanti akan swap credentials saat production.
+
+**Cara aktivasi (3 langkah manual di dashboard):**
+
+1. **Login ke** https://dashboard.midtrans.com → pastikan environment = **Sandbox** dulu.
+3. **Settings → AccessKeys** → copy:
+   - `MIDTRANS_SERVER_KEY` (prefix `SB-Mid-server-...`)
+   - `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY` (prefix `SB-Mid-client-...`)
+4. **Settings → Configuration → Payment** → set **Payment Notification URL**:
+   ```
+   https://<domain>/api/midtrans/webhook
+   ```
+5. **Set env di project:**
+   - `.env.local`: paste 2 keys di atas, `MIDTRANS_IS_PRODUCTION=false`
+   - Vercel → Project Settings → Environment Variables → paste Production env yang sama (saat go-live set `MIDTRANS_IS_PRODUCTION=true`)
+6. **Test end-to-end** via https://simulator.sandbox.midtrans.com sebelum flip production.
+
+Setelah env di-set → Vercel auto-redeploy → opsi QRIS Midtrans otomatis muncul di payment step.
+
+---
+
 ## 2026-10-05 — Akun buyer: DOB wajib, verifikasi email, skip identitas kalau login
 
 **Mengubah:**

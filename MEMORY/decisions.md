@@ -239,3 +239,65 @@ dan `auth.uid() = null`; backend tidak error.
 - Kalau guest register dengan email yang sama dengan order sebelumnya,
   order lama tidak akan muncul di `/account` customer baru. Backfill
   manual bisa ditambahkan jika perlu.
+
+---
+
+## D12 — Midtrans QRIS Dinamis sebagai payment method opsional
+
+**Keputusan:** Integrasi Midtrans (QRIS Dinamis via Snap API) sudah
+di-commit, tapi **dorman secara default**. Opsi "QRIS via Midtrans" di
+payment step hanya muncul bila `isMidtransConfigured()` return true
+(env `MIDTRANS_SERVER_KEY` ter-set).
+
+**Alasan:**
+
+- Payment lain sudah jalan (Transfer Bank manual + QRIS Statis dari admin).
+  Midtrans adalah **upgrade opsional**, bukan hard dependency.
+- Aktivasi menunggu **keputusan klien** (apakah mau lanjut pakai Midtrans,
+  atau ganti gateway lain seperti Xendit/Tripay).
+- Akun Midtrans yang sudah ada = akun developer (sandbox). Klien akan
+  swap credentials saat production.
+
+**Konsekuensi:**
+
+- Code dormant tidak bocor: tidak ada HTTP call ke Midtrans API, opsi
+  tidak muncul di UI, webhook route idle.
+- Saat aktivasi nanti: tinggal set env + set webhook URL di dashboard
+  Midtrans, tidak perlu code change.
+- Status order Midtrans (settlement/expire/cancel/deny) di-map ke enum
+  internal `pending | paid | expired | failed`. Webhook = source of truth,
+  polling 5s sebagai backup.
+
+---
+
+
+---
+
+## D13 — QRIS Statis dihapus dari UI (sekarang hanya Transfer Bank + QRIS Midtrans)
+
+**Keputusan:** Hapus semua referensi UI untuk metode `"qris_static"`. User
+sekarang cuma melihat **Transfer Bank** (BCA/Mandiri/dll) + **QRIS via
+Midtrans** (dynamic, auto-confirm).
+
+**Alasan:**
+
+- QRIS Statis butuh admin upload gambar + konfirmasi manual tiap order
+  via WA — overhead operasional gak sebanding dengan conversion.
+- QRIS Dinamis auto-confirm via Midtrans webhook + polling, gak perlu
+  admin intervensi.
+- Simplify: 2 metode doang, lebih jelas untuk customer.
+
+**Konsekuensi:**
+
+- `PaymentMethod` type = `"transfer" | "qris_midtrans"` (sebelumnya
+  termasuk `qris_static`).
+- Customer tidak bisa pilih static QR di `/order` lagi.
+- Admin tidak bisa enable `qris_enabled` toggle di `/admin/settings` lagi.
+- DB masih allow `payment_method='qris_static'` di constraint (backward
+  compat untuk old orders); gak ada cara bikin order baru dengan value
+  itu dari UI.
+- Store_settings masih punya kolom `qris_enabled` & `qris_image_url`
+  (gak di-drop, biar gak perlu migration). Kalau klien mau bener-bener
+  bersih, butuh migration ALTER TABLE ... DROP COLUMN.
+
+---

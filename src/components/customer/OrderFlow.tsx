@@ -11,7 +11,6 @@ import {
   Copy,
   Loader2,
   MapPin,
-  QrCode,
   ShoppingBag,
   Sparkles,
   Store,
@@ -422,7 +421,7 @@ export function OrderFlow({
       return;
     }
 
-    // ===== Cabang transfer / qris_static =====
+    // ===== Cabang transfer (qris_midtrans sudah di-handle di atas) =====
     setSubmitting(true);
     try {
       const supabase = createClient();
@@ -469,7 +468,6 @@ export function OrderFlow({
         note: draft.note.trim(),
         payment_method: (draft.paymentMethod ?? "transfer") as
           | "transfer"
-          | "qris_static"
           | "qris_midtrans",
         transfer_method: draft.transferMethod || null,
         qris_status: null,
@@ -791,7 +789,7 @@ export function OrderFlow({
                 subtitle={t.order.payment.subtitle}
               />
 
-              {/* Pembayaran: transfer / qris_static / qris_midtrans */}
+              {/* Pembayaran: transfer / qris_midtrans */}
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <ChoiceCard
                   selected={draft.paymentMethod === "transfer"}
@@ -800,15 +798,6 @@ export function OrderFlow({
                   title={t.order.payment.transfer}
                   desc={t.order.payment.transferDesc}
                 />
-                {settings.qris_enabled && settings.qris_image_url ? (
-                  <ChoiceCard
-                    selected={draft.paymentMethod === "qris_static"}
-                    onClick={() => updateDraft({ paymentMethod: "qris_static" })}
-                    icon={<QrCode className="size-5" />}
-                    title={t.order.payment.qrisStatic}
-                    desc={t.order.payment.qrisStaticDesc}
-                  />
-                ) : null}
                 {midtransReady ? (
                   <ChoiceCard
                     selected={draft.paymentMethod === "qris_midtrans"}
@@ -965,21 +954,11 @@ export function OrderFlow({
                             {acc.bank}
                           </option>
                         ))}
-                        {settings.qris_enabled ? <option value="QRIS">QRIS</option> : null}
                       </select>
                     </div>
                   ) : null}
 
-                  {settings.qris_enabled && settings.qris_image_url ? (
-                    <div>
-                      <h3 className="text-base font-bold text-cocoa-800">
-                        {t.order.payment.qris}
-                      </h3>
-                      <QrImage src={settings.qris_image_url} />
-                    </div>
-                  ) : null}
-
-                  {settings.bank_accounts.length === 0 && !settings.qris_enabled ? (
+                  {settings.bank_accounts.length === 0 ? (
                     <p className="rounded-xl bg-honey-300/20 p-4 text-sm font-semibold text-honey-500">
                       {t.order.payment.qrisUnavailable}
                     </p>
@@ -1023,11 +1002,9 @@ export function OrderFlow({
                 <ReviewRow label={t.order.review.paymentLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
                   {draft.paymentMethod === "qris_midtrans"
                     ? t.order.payment.qrisMidtrans
-                    : draft.paymentMethod === "qris_static"
-                      ? t.order.payment.qrisStatic
-                      : `${t.order.payment.transfer}${
-                          draft.transferMethod ? ` · ${draft.transferMethod}` : ""
-                        }`}
+                    : `${t.order.payment.transfer}${
+                        draft.transferMethod ? ` · ${draft.transferMethod}` : ""
+                      }`}
                 </ReviewRow>
                 <ReviewRow label={t.order.review.deliveryLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
                   {draft.deliveryMethod === "delivery"
@@ -1515,15 +1492,6 @@ function AccountCard({
       <span className="sr-only" aria-live="polite">
         {copied ? copiedLabel : ""}
       </span>
-    </div>
-  );
-}
-
-function QrImage({ src }: { src: string }) {
-  return (
-    <div className="mt-3 inline-flex rounded-2xl border border-cocoa-200 bg-white p-3">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="QRIS" className="size-40 object-contain" />
     </div>
   );
 }

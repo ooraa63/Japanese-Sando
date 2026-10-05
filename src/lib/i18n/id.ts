@@ -194,11 +194,7 @@ export const id: Dict = {
       lng: "Longitude",
       transferAccount: "Transfer ke",
       copyAccount: "Salin nomor",
-      qris: "Atau scan QRIS",
       qrisUnavailable: "Metode pembayaran belum diatur oleh penjual.",
-      qrisStatic: "QRIS (QR statis)",
-      qrisStaticDesc:
-        "Scan QR di bawah. Nominal tetap, konfirmasi manual dari penjual.",
       qrisMidtrans: "QRIS via Midtrans (dinamis)",
       qrisMidtransDesc:
         "QR unik di-generate sesuai total kamu. Auto-terkonfirmasi via Midtrans.",
@@ -777,9 +773,6 @@ export const id: Dict = {
       bankName: "Nama bank atau e-wallet",
       accountNumber: "Nomor rekening",
       accountHolder: "Atas nama",
-      qrisEnabled: "Terima pembayaran QRIS",
-      qrisImage: "Gambar QRIS",
-      uploadQris: "Upload QRIS",
       orderRules: "Aturan pesanan",
       minOrder: "Minimal item per pesanan",
       maxPerOrder: "Maksimal item per rasa",

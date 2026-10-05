@@ -196,11 +196,7 @@ export const en = {
       lng: "Longitude",
       transferAccount: "Transfer to",
       copyAccount: "Copy number",
-      qris: "Or scan QRIS",
       qrisUnavailable: "No payment method has been set up yet.",
-      qrisStatic: "QRIS (static QR)",
-      qrisStaticDesc:
-        "Scan the QR code below. Total is fixed, manual confirmation.",
       qrisMidtrans: "QRIS via Midtrans (dynamic)",
       qrisMidtransDesc:
         "A unique QR is generated for your exact total. Auto-confirmed by Midtrans.",
@@ -778,9 +774,6 @@ export const en = {
       bankName: "Bank or e-wallet",
       accountNumber: "Account number",
       accountHolder: "Account holder",
-      qrisEnabled: "Accept QRIS payment",
-      qrisImage: "QRIS image",
-      uploadQris: "Upload QRIS",
       orderRules: "Order rules",
       minOrder: "Minimum items per order",
       maxPerOrder: "Maximum items per flavor",

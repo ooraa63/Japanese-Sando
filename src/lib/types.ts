@@ -14,9 +14,9 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
-/** Metode pembayaran. 'transfer' = bukti manual, 'qris_static' = image QR
- *  statis (manual confirm), 'qris_midtrans' = dynamic QR via Midtrans. */
-export type PaymentMethod = "transfer" | "qris_static" | "qris_midtrans";
+/** Metode pembayaran. 'transfer' = bukti transfer manual (BCA/Mandiri/dll),
+ *  'qris_midtrans' = dynamic QR via Midtrans (auto-confirm + webhook). */
+export type PaymentMethod = "transfer" | "qris_midtrans";
 
 /** Status internal transaksi QRIS Midtrans. */
 export type QrisStatus =
