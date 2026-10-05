@@ -12,6 +12,8 @@ import {
 import type { CustomerProfile } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 
+export type AuthModalMode = "login" | "register";
+
 interface CustomerAuthValue {
   /** null = belum login / sesi tidak valid. */
   profile: CustomerProfile | null;
@@ -24,6 +26,18 @@ interface CustomerAuthValue {
   refresh: () => Promise<void>;
   /** Hapus sesi di client + Supabase cookies. Redirect dilakukan oleh caller. */
   signOutClient: () => Promise<void>;
+
+  /* ---------------------------------------------------------------------
+   * Modal kontrol — dipakai oleh SiteHeader & komponen lain untuk membuka
+   * popup login/register tanpa harus navigate ke /login atau /register.
+   * ------------------------------------------------------------------- */
+  authModalOpen: boolean;
+  authModalMode: AuthModalMode;
+  /** Buka modal dengan mode tertentu. Idempotent. */
+  openAuthModal: (mode?: AuthModalMode) => void;
+  closeAuthModal: () => void;
+  /** Ganti mode tanpa menutup modal (link 'Belum punya akun?'). */
+  setAuthModalMode: (mode: AuthModalMode) => void;
 }
 
 const CustomerAuthContext = createContext<CustomerAuthValue | null>(null);
@@ -52,6 +66,16 @@ export function CustomerAuthProvider({
 }) {
   const [profile, setProfile] = useState<CustomerProfile | null>(initialProfile);
   const [loading, setLoading] = useState(true);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<AuthModalMode>("login");
+
+  const openAuthModal = useCallback((mode: AuthModalMode = "login") => {
+    setAuthModalMode(mode);
+    setAuthModalOpen(true);
+  }, []);
+  const closeAuthModal = useCallback(() => {
+    setAuthModalOpen(false);
+  }, []);
 
   const fetchProfile = useCallback(async (): Promise<CustomerProfile | null> => {
     try {
@@ -134,6 +158,8 @@ export function CustomerAuthProvider({
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         void refresh();
+        // Auto-close modal login saat user berhasil login (mis. tab lain).
+        setAuthModalOpen(false);
       } else {
         setProfile(null);
         try {
@@ -147,8 +173,27 @@ export function CustomerAuthProvider({
   }, [refresh]);
 
   const value = useMemo<CustomerAuthValue>(
-    () => ({ profile, loading, refresh, signOutClient }),
-    [profile, loading, refresh, signOutClient]
+    () => ({
+      profile,
+      loading,
+      refresh,
+      signOutClient,
+      authModalOpen,
+      authModalMode,
+      openAuthModal,
+      closeAuthModal,
+      setAuthModalMode,
+    }),
+    [
+      profile,
+      loading,
+      refresh,
+      signOutClient,
+      authModalOpen,
+      authModalMode,
+      openAuthModal,
+      closeAuthModal,
+    ]
   );
 
   return (

@@ -19,7 +19,7 @@ export function SiteHeader({
   brandLine?: string;
 }) {
   const { t } = useI18n();
-  const { profile } = useCustomerAuth();
+  const { profile, openAuthModal } = useCustomerAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -110,13 +110,14 @@ export function SiteHeader({
               </span>
             </Link>
           ) : (
-            <Link
-              href="/login?next=/order"
+            <button
+              type="button"
+              onClick={() => openAuthModal("login")}
               className="hidden h-10 items-center gap-1.5 rounded-full border border-cocoa-200 bg-white px-3 text-[13px] font-bold text-cocoa-700 transition hover:bg-cocoa-100 sm:inline-flex"
             >
               <LogIn className="size-4" />
               <span>{t.customerAuth.loginCta}</span>
-            </Link>
+            </button>
           )}
           <Link
             href="/order"
@@ -160,14 +161,17 @@ export function SiteHeader({
                 {profile.full_name.split(" ")[0]}
               </Link>
             ) : (
-              <Link
-                href="/login?next=/order"
-                onClick={() => setOpen(false)}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  openAuthModal("login");
+                }}
                 className="mt-2 flex items-center justify-center gap-2 rounded-xl border border-cocoa-200 bg-white px-3 py-3 text-sm font-bold text-cocoa-700"
               >
                 <LogIn className="size-4" />
                 {t.customerAuth.loginCta}
-              </Link>
+              </button>
             )}
             <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-cocoa-200 bg-white px-3 py-2.5">
               <div className="flex items-center gap-2 text-sm font-semibold text-cocoa-700">

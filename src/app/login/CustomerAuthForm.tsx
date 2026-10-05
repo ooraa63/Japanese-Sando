@@ -26,10 +26,23 @@ export function CustomerAuthForm({
   mode,
   nextPath,
   dict,
+  onSwitchMode,
+  onSuccess,
+  formAttr,
 }: {
   mode: "login" | "register";
   nextPath?: string;
   dict: AuthDict;
+  /**
+   * Dipakai oleh AuthModal: buka modal dengan mode lain saat user klik
+   * "Belum punya akun?" / "Sudah punya akun?". Tidak dipakai di
+   * halaman /login & /register (link biasa ke /register / /login).
+   */
+  onSwitchMode?: (mode: "login" | "register") => void;
+  /** Dipanggil setelah login/register sukses — biasanya tutup modal. */
+  onSuccess?: () => void;
+  /** Set di <form> supaya listener keyboard di AuthModal bisa akses form. */
+  formAttr?: string;
 }) {
   const router = useRouter();
   const [state, setState] = useState<CustomerActionResult | null>(null);
@@ -88,8 +101,10 @@ export function CustomerAuthForm({
           // Email verifikasi dikirim — tampilkan banner "cek inbox",
           // JANGAN redirect (sesi belum aktif).
           setVerifyBannerShown(true);
+          onSuccess?.();
           return;
         }
+        onSuccess?.();
         const target = nextPath && nextPath.startsWith("/") ? nextPath : "/account";
         router.replace(target);
         router.refresh();
@@ -122,7 +137,11 @@ export function CustomerAuthForm({
         </div>
       </div>
 
-      <form action={submit} className="space-y-4">
+      <form
+        action={submit}
+        className="space-y-4"
+        {...(formAttr ? { [formAttr]: "true" } : {})}
+      >
         {mode === "register" && r ? (
           <div>
             <label htmlFor="fullName" className="label">
@@ -283,6 +302,20 @@ export function CustomerAuthForm({
           <Link href="/track" className="font-bold text-cocoa-500 hover:text-cocoa-700">
             {dict.login.trackOrder}
           </Link>
+        </p>
+      ) : null}
+
+      {/* Saat dipakai dari AuthModal: ganti mode tanpa navigate. */}
+      {onSwitchMode ? (
+        <p className="mt-4 text-center text-sm text-cocoa-500">
+          {mode === "login" ? dict.login.haveNoAccount : dict.register.haveAccount}{" "}
+          <button
+            type="button"
+            onClick={() => onSwitchMode(mode === "login" ? "register" : "login")}
+            className="font-bold text-matcha-700 underline-offset-2 hover:underline"
+          >
+            {mode === "login" ? dict.login.registerLink : dict.register.loginLink}
+          </button>
         </p>
       ) : null}
     </div>
