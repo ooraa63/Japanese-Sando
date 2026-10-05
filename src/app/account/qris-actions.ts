@@ -129,25 +129,37 @@ export async function createQrisOrderAction(
   // 1. Buat order dengan payment_method='qris_midtrans'. Backend create_order
   //    sudah support nilai ini (lihat migration-18). Bukti transfer di-skip
   //    karena QRIS tidak butuh upload bukti.
-  const { data: rpcResult, error: rpcErr } = await supabase.rpc("create_order", {
-    p_customer_name: data.customerName,
-    p_customer_email: data.customerEmail ?? null,
-    p_instagram: data.instagram,
-    p_phone: data.phone,
-    p_payment_method: "qris_midtrans",
-    p_delivery_method: data.deliveryMethod,
-    p_delivery_zone: data.deliveryZone ?? (data.deliveryMethod === "delivery" ? "other" : "pickup"),
-    p_address: data.address ?? null,
-    p_address_note: data.addressNote ?? null,
-    p_lat: data.lat ?? null,
-    p_lng: data.lng ?? null,
-    p_payment_proof: null,
-    p_note: data.note ?? null,
-    p_language: data.language,
-    p_items: data.items,
-    p_bundles: data.bundles,
-    p_user_id: data.userId ?? null,
-  });
+  let rpcResult: { order_code: string; order_id: number } | null = null;
+  let rpcErr: { message: string } | null = null;
+  try {
+    const result = await supabase.rpc("create_order", {
+      p_customer_name: data.customerName,
+      p_customer_email: data.customerEmail ?? null,
+      p_instagram: data.instagram,
+      p_phone: data.phone,
+      p_payment_method: "qris_midtrans",
+      p_delivery_method: data.deliveryMethod,
+      p_delivery_zone: data.deliveryZone ?? (data.deliveryMethod === "delivery" ? "other" : "pickup"),
+      p_address: data.address ?? null,
+      p_address_note: data.addressNote ?? null,
+      p_lat: data.lat ?? null,
+      p_lng: data.lng ?? null,
+      p_payment_proof: null,
+      p_note: data.note ?? null,
+      p_language: data.language,
+      p_items: data.items,
+      p_bundles: data.bundles,
+      p_user_id: data.userId ?? null,
+    });
+    rpcResult = result.data as { order_code: string; order_id: number } | null;
+    rpcErr = result.error;
+  } catch (e) {
+    // Supabase rpc() bisa throw alih-alih rt/nil + error (mis. network,
+    // JWT expired, abort). Tangkap dan log supaya gak silent-fail ke outer catch.
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[qris-actions] create_order THREW:", msg, { stack: e instanceof Error ? e.stack : undefined });
+    rpcErr = { message: msg };
+  }
 
   if (rpcErr || !rpcResult) {
     const msg = rpcErr?.message ?? "rpc_failed";
