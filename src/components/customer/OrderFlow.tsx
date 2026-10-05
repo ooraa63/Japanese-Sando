@@ -11,7 +11,9 @@ import {
   Copy,
   Loader2,
   MapPin,
+  QrCode,
   ShoppingBag,
+  Sparkles,
   Store,
   Truck,
   User,
@@ -31,6 +33,7 @@ import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
 import { AddressPicker } from "@/components/customer/AddressPicker";
 import { CartDrawer } from "@/components/customer/CartDrawer";
+import { QrisPaymentModal } from "@/components/customer/QrisPaymentModal";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
 import { formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
 
@@ -41,11 +44,15 @@ export function OrderFlow({
   categories,
   bundles = [],
   settings,
+  midtransReady = false,
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri / per-kategori yang dijual. */
   bundles?: Bundle[];
   settings: StoreSettings;
+  /** True kalau MIDTRANS_SERVER_KEY sudah di-set. Dikirim dari server
+   *  component (page.tsx) supaya kita tidak perlu expose env ke client. */
+  midtransReady?: boolean;
 }) {
   const { t, lang } = useI18n();
   const router = useRouter();
@@ -96,6 +103,10 @@ export function OrderFlow({
   const [submitting, setSubmitting] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [soldCounts, setSoldCounts] = useState<Record<number, number>>({});
+  /** Payload untuk QrisPaymentModal — diset saat user submit dengan
+   *  paymentMethod=qris_midtrans. Modal akan generate QR via Midtrans. */
+  const [qrisPayload, setQrisPayload] = useState<Record<string, unknown> | null>(null);
+  const [qrisModalOpen, setQrisModalOpen] = useState(false);
 
   // Tarik counter 'terjual' per-flavor saat halaman dibuka.
   useEffect(() => {
@@ -351,43 +362,89 @@ export function OrderFlow({
       return;
     }
 
+    // Bentuk payload sekali — dipakai untuk kedua cabang (transfer &
+    // qris_midtrans) supaya tidak perlu kode dobel.
+    const payload = {
+      pCustomerName: draft.name.trim(),
+      pCustomerEmail: draft.email.trim(),
+      pInstagram: draft.instagram.trim(),
+      pPhone: draft.phone.trim(),
+      pPaymentMethod: draft.paymentMethod,
+      pDeliveryMethod: draft.deliveryMethod,
+      pDeliveryZone: draft.deliveryZone,
+      pAddress:
+        draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
+      pAddressNote:
+        draft.deliveryMethod === "delivery" ? draft.addressNote.trim() : null,
+      pLat: draft.lat,
+      pLng: draft.lng,
+      pTransferMethod: draft.transferMethod || null,
+      pPaymentProof: draft.proofPath,
+      pNote: draft.note.trim(),
+      pLanguage: lang,
+      pItems: cartLines.map((l) => ({
+        flavor_id: l.flavor.id,
+        quantity: l.qty,
+        note: notes[String(l.flavor.id)] || null,
+      })),
+      pBundles: cartBundles.map((entry) => ({
+        bundle_id: entry.bundle.id,
+        slots: entry.slots.map((flavorId) => ({ flavor_id: flavorId })),
+        note: entry.note ?? null,
+      })),
+      pUserId: profile?.user_id ?? null,
+    };
+
+    // ===== Cabang QRIS Midtrans =====
+    // Modal QrisPaymentModal yang akan panggil createQrisOrderAction,
+    // generate QR via Midtrans, polling status, redirect saat paid.
+    if (draft.paymentMethod === "qris_midtrans") {
+      // Payload untuk QrisPaymentModal pakai struktur yang diharapkan
+      // server action `createQrisOrderAction` (lihat qris-actions.ts).
+      setQrisPayload({
+        customerName: payload.pCustomerName,
+        customerEmail: payload.pCustomerEmail || null,
+        instagram: payload.pInstagram,
+        phone: payload.pPhone,
+        deliveryMethod: payload.pDeliveryMethod,
+        deliveryZone: payload.pDeliveryZone,
+        address: payload.pAddress,
+        addressNote: payload.pAddressNote,
+        lat: payload.pLat,
+        lng: payload.pLng,
+        note: payload.pNote,
+        items: payload.pItems,
+        bundles: payload.pBundles,
+        language: payload.pLanguage,
+        userId: payload.pUserId,
+      });
+      setQrisModalOpen(true);
+      return;
+    }
+
+    // ===== Cabang transfer / qris_static =====
     setSubmitting(true);
     try {
       const supabase = createClient();
       const { data, error } = await supabase.rpc("create_order", {
-        p_customer_name: draft.name.trim(),
-        p_customer_email: draft.email.trim(),
-        p_instagram: draft.instagram.trim(),
-        p_phone: draft.phone.trim(),
-        p_payment_method: "transfer",
-        p_delivery_method: draft.deliveryMethod,
-        p_delivery_zone: draft.deliveryZone,
-        p_address:
-          draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
-        p_address_note:
-          draft.deliveryMethod === "delivery" ? draft.addressNote.trim() : null,
-        p_lat: draft.lat,
-        p_lng: draft.lng,
-        p_transfer_method: draft.transferMethod || null,
-        p_payment_proof: draft.proofPath,
-        p_note: draft.note.trim(),
-        p_language: lang,
-        p_items: cartLines.map((l) => ({
-          flavor_id: l.flavor.id,
-          quantity: l.qty,
-          note: notes[String(l.flavor.id)] || null,
-        })),
-        // Bundle: backend (create_order) menerima array {bundle_id, slots:[{flavor_id}], note?}
-        // dengan panjang slots == bundle.required_qty.
-        p_bundles: cartBundles.map((entry) => ({
-          bundle_id: entry.bundle.id,
-          slots: entry.slots.map((flavorId) => ({ flavor_id: flavorId })),
-          note: entry.note ?? null,
-        })),
-        // user_id: kalau customer login, tautkan order ke akun mereka
-        // supaya muncul di halaman /account. Guest checkout: null.
-        // Backend akan override dengan auth.uid() kalau ada (lebih trustworthy).
-        p_user_id: profile?.user_id ?? null,
+        p_customer_name: payload.pCustomerName,
+        p_customer_email: payload.pCustomerEmail,
+        p_instagram: payload.pInstagram,
+        p_phone: payload.pPhone,
+        p_payment_method: payload.pPaymentMethod,
+        p_delivery_method: payload.pDeliveryMethod,
+        p_delivery_zone: payload.pDeliveryZone,
+        p_address: payload.pAddress,
+        p_address_note: payload.pAddressNote,
+        p_lat: payload.pLat,
+        p_lng: payload.pLng,
+        p_transfer_method: payload.pTransferMethod,
+        p_payment_proof: payload.pPaymentProof,
+        p_note: payload.pNote,
+        p_language: payload.pLanguage,
+        p_items: payload.pItems,
+        p_bundles: payload.pBundles,
+        p_user_id: payload.pUserId,
       });
 
       if (error) {
@@ -410,8 +467,13 @@ export function OrderFlow({
         phone: draft.phone.trim(),
         address: draft.deliveryMethod === "delivery" ? draft.address.trim() : null,
         note: draft.note.trim(),
-        payment_method: "transfer" as const,
+        payment_method: (draft.paymentMethod ?? "transfer") as
+          | "transfer"
+          | "qris_static"
+          | "qris_midtrans",
         transfer_method: draft.transferMethod || null,
+        qris_status: null,
+        qris_paid_at: null,
         delivery_method: draft.deliveryMethod,
         created_at: new Date().toISOString(),
         language: lang,
@@ -729,15 +791,33 @@ export function OrderFlow({
                 subtitle={t.order.payment.subtitle}
               />
 
-              {/* Pembayaran: hanya transfer (cash dihapus) */}
+              {/* Pembayaran: transfer / qris_static / qris_midtrans */}
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <ChoiceCard
-                  selected
+                  selected={draft.paymentMethod === "transfer"}
                   onClick={() => updateDraft({ paymentMethod: "transfer" })}
                   icon={<Building2 className="size-5" />}
                   title={t.order.payment.transfer}
                   desc={t.order.payment.transferDesc}
                 />
+                {settings.qris_enabled && settings.qris_image_url ? (
+                  <ChoiceCard
+                    selected={draft.paymentMethod === "qris_static"}
+                    onClick={() => updateDraft({ paymentMethod: "qris_static" })}
+                    icon={<QrCode className="size-5" />}
+                    title={t.order.payment.qrisStatic}
+                    desc={t.order.payment.qrisStaticDesc}
+                  />
+                ) : null}
+                {midtransReady ? (
+                  <ChoiceCard
+                    selected={draft.paymentMethod === "qris_midtrans"}
+                    onClick={() => updateDraft({ paymentMethod: "qris_midtrans" })}
+                    icon={<Sparkles className="size-5" />}
+                    title={t.order.payment.qrisMidtrans}
+                    desc={t.order.payment.qrisMidtransDesc}
+                  />
+                ) : null}
               </div>
 
               {/* Cara penerimaan — 2 tingkat: Ambil di toko / Diantar -> pilih zona spesifik */}
@@ -941,9 +1021,13 @@ export function OrderFlow({
                   <span dir="ltr">{formatPhone(draft.phone)}</span>
                 </ReviewRow>
                 <ReviewRow label={t.order.review.paymentLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
-                  {`${t.order.payment.transfer}${
-                    draft.transferMethod ? ` · ${draft.transferMethod}` : ""
-                  }`}
+                  {draft.paymentMethod === "qris_midtrans"
+                    ? t.order.payment.qrisMidtrans
+                    : draft.paymentMethod === "qris_static"
+                      ? t.order.payment.qrisStatic
+                      : `${t.order.payment.transfer}${
+                          draft.transferMethod ? ` · ${draft.transferMethod}` : ""
+                        }`}
                 </ReviewRow>
                 <ReviewRow label={t.order.review.deliveryLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
                   {draft.deliveryMethod === "delivery"
@@ -1212,6 +1296,19 @@ export function OrderFlow({
         onContinue={handleNext}
         continueDisabled={totalItems === 0}
       />
+
+      {qrisPayload ? (
+        <QrisPaymentModal
+          payload={qrisPayload}
+          open={qrisModalOpen}
+          onClose={() => {
+            setQrisModalOpen(false);
+            // Kalau user menutup modal sebelum paid, redirect ke /track
+            // supaya mereka bisa cek status order.
+            router.push("/track");
+          }}
+        />
+      ) : null}
     </div>
   );
 }

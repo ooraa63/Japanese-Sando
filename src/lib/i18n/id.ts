@@ -196,6 +196,15 @@ export const id: Dict = {
       copyAccount: "Salin nomor",
       qris: "Atau scan QRIS",
       qrisUnavailable: "Metode pembayaran belum diatur oleh penjual.",
+      qrisStatic: "QRIS (QR statis)",
+      qrisStaticDesc:
+        "Scan QR di bawah. Nominal tetap, konfirmasi manual dari penjual.",
+      qrisMidtrans: "QRIS via Midtrans (dinamis)",
+      qrisMidtransDesc:
+        "QR unik di-generate sesuai total kamu. Auto-terkonfirmasi via Midtrans.",
+      qrisMidtransNotConfigured:
+        "Midtrans belum dikonfigurasi. Hubungi penjual atau pilih metode lain.",
+      qrisMidtransCta: "Bayar dengan QRIS",
       proofTitle: "Upload bukti transfer",
       proofHint: "JPG, PNG, atau WEBP. Maksimal 5 MB.",
       proofRequired: "Mohon upload bukti transfer kamu.",
@@ -204,6 +213,27 @@ export const id: Dict = {
       proofRemove: "Hapus",
       transferMethod: "Transfer lewat",
       chooseMethod: "Pilih bank atau e-wallet",
+    },
+
+      // ---- Halaman QRIS Midtrans (muncul setelah order dibuat) ----
+    qrisPay: {
+      title: "Scan QRIS untuk membayar",
+      amountLabel: "Total bayar",
+      orderLabel: "Kode pesanan",
+      scanHint:
+        "Buka aplikasi e-wallet kamu (GoPay, OVO, Dana, ShopeePay, ...) lalu scan QR di atas.",
+      expiresIn: "Kedaluwarsa dalam",
+      waiting: "Menunggu konfirmasi pembayaran...",
+      paid: "Pembayaran terkonfirmasi. Mengalihkan...",
+      expired: "QR sudah kedaluwarsa. Coba refresh atau pilih metode lain.",
+      failed: "Pembayaran gagal. Coba lagi.",
+      cancelled: "Pembayaran dibatalkan.",
+      close: "Tutup",
+      refresh: "Generate QR baru",
+      refreshSuccess: "QR baru dibuat. Scan lagi untuk membayar.",
+      copyOrder: "Salin kode pesanan",
+      openApp: "Atau buka aplikasi e-wallet kamu",
+      poweredBy: "Pembayaran oleh Midtrans",
     },
     review: {
       title: "Periksa pesananmu",

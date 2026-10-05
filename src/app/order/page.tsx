@@ -59,6 +59,7 @@ export default async function OrderPage() {
           categories={categories}
           bundles={bundles}
           settings={settings as StoreSettings}
+          midtransReady={Boolean(process.env.MIDTRANS_SERVER_KEY)}
         />
       </main>
       <SiteFooter settings={settings} />

@@ -198,6 +198,15 @@ export const en = {
       copyAccount: "Copy number",
       qris: "Or scan QRIS",
       qrisUnavailable: "No payment method has been set up yet.",
+      qrisStatic: "QRIS (static QR)",
+      qrisStaticDesc:
+        "Scan the QR code below. Total is fixed, manual confirmation.",
+      qrisMidtrans: "QRIS via Midtrans (dynamic)",
+      qrisMidtransDesc:
+        "A unique QR is generated for your exact total. Auto-confirmed by Midtrans.",
+      qrisMidtransNotConfigured:
+        "Midtrans is not set up. Please contact the seller or choose another payment method.",
+      qrisMidtransCta: "Pay with QRIS",
       proofTitle: "Upload payment receipt",
       proofHint: "JPG, PNG or WEBP. Max 5 MB.",
       proofRequired: "Please upload your transfer receipt.",
@@ -206,6 +215,27 @@ export const en = {
       proofRemove: "Remove",
       transferMethod: "Transfer via",
       chooseMethod: "Choose a bank or e-wallet",
+    },
+
+      // ---- Halaman QRIS Midtrans (muncul setelah order dibuat) ----
+    qrisPay: {
+      title: "Scan QRIS to pay",
+      amountLabel: "Total to pay",
+      orderLabel: "Order code",
+      scanHint:
+        "Open your e-wallet app (GoPay, OVO, Dana, ShopeePay, ...) and scan the QR above.",
+      expiresIn: "Expires in",
+      waiting: "Waiting for payment confirmation...",
+      paid: "Payment confirmed. Redirecting...",
+      expired: "QR has expired. Please refresh or try another payment method.",
+      failed: "Payment failed. Please try again.",
+      cancelled: "Payment was cancelled.",
+      close: "Close",
+      refresh: "Generate new QR",
+      refreshSuccess: "New QR generated. Scan again to pay.",
+      copyOrder: "Copy order code",
+      openApp: "Or open your e-wallet app",
+      poweredBy: "Payments powered by Midtrans",
     },
     review: {
       title: "Check your order",

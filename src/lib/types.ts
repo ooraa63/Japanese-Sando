@@ -14,7 +14,19 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
-export type PaymentMethod = "transfer";
+/** Metode pembayaran. 'transfer' = bukti manual, 'qris_static' = image QR
+ *  statis (manual confirm), 'qris_midtrans' = dynamic QR via Midtrans. */
+export type PaymentMethod = "transfer" | "qris_static" | "qris_midtrans";
+
+/** Status internal transaksi QRIS Midtrans. */
+export type QrisStatus =
+  | "pending"
+  | "paid"
+  | "expired"
+  | "failed"
+  | "refunded"
+  | "cancelled";
+
 export type DeliveryMethod = "pickup" | "delivery";
 
 export interface Category {
@@ -291,6 +303,9 @@ export interface InvoiceSnapshot {
   delivery_method: DeliveryMethod;
   created_at: string;
   language: Language;
+  /** Status Midtrans (untuk QRIS Midtrans). Null untuk metode lain. */
+  qris_status?: QrisStatus | null;
+  qris_paid_at?: string | null;
   /** Item dikelompokkan per kategori (format lengkap, dari sessionStorage). */
   items?: InvoiceLineItem[];
   /** Item flat (dari RPC publik). Opsional: jika `items` tidak ada, gunakan ini. */
