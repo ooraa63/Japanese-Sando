@@ -266,10 +266,13 @@ begin
     v_user_id,
     case when v_item_notes = '[]'::jsonb and v_bundle_notes = '[]'::jsonb then null
          else jsonb_build_object('items', v_item_notes, 'bundles', v_bundle_notes) end,
-    -- Untuk non-QRIS Midtrans, kolom QR tetap NULL. Webhook / server
-    -- action QR akan meng-update via RPC `mark_order_qris_*` setelah
-    -- Midtrans charge sukses.
-    case when v_payment_method = 'qris_midtrans' then 'pending' else null end
+    -- Untuk QRIS Midtrans: transaction_id, qr_url, expires_at di-update
+    -- nanti via RPC `set_order_qris_charge` setelah Midtrans charge sukses.
+    -- qris_status di-set 'pending' dulu supaya ada di DB.
+    null,  -- qris_transaction_id
+    case when v_payment_method = 'qris_midtrans' then 'pending' else null end,  -- qris_status
+    null,  -- qris_qr_url
+    null   -- qris_expires_at
   )
   returning id into v_order_id;
 
