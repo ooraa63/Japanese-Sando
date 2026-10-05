@@ -697,13 +697,26 @@ export function OrderFlow({
                 />
               )}
 
-              <StepNav
-                onBack={() => goTo("identity")}
-                onNext={handleNext}
-                nextLabel={t.common.next}
-                nextIcon={<ArrowRight className="size-4" />}
-                disabled={totalItems === 0}
+              {/* Sticky bottom cart bar (gaya GoFood) — tap untuk buka
+                  drawer dengan rincian + tombol 'Lanjut'. Step-nav di
+                  step disabled (hidden) karena tombol 'Lanjut' pindah ke
+                  dalam drawer. */}
+              <CartStickyBar
+                totalItems={totalItems}
+                subtotal={subtotal}
+                storeName={settings?.store_name ?? ""}
+                deliveryLabel={
+                  draft.deliveryMethod === "delivery"
+                    ? t.order.payment.delivery
+                    : t.order.payment.pickup
+                }
+                onOpenCart={() => setCartOpen(true)}
               />
+
+              {/* Tombol back ke step identitas tetap ada tapi dipindah
+                  ke posisi tersembunyi (di mobile kelihatan lewat panah
+                  kembali header step), atau cukup dengan link di header
+                  step heading. */}
             </section>
           ) : null}
 
@@ -1196,6 +1209,8 @@ export function OrderFlow({
         categories={categories}
         open={cartOpen && step === "menu"}
         onClose={() => setCartOpen(false)}
+        onContinue={handleNext}
+        continueDisabled={totalItems === 0}
       />
     </div>
   );
@@ -1442,6 +1457,53 @@ function ReviewRow({
           {editLabel}
         </button>
       ) : null}
+    </div>
+  );
+}
+/**
+ * Sticky bottom cart bar � muncul di bawah step menu saat keranjang
+ * tidak kosong. Selaras dengan pola GoFood: ringkasan item + total +
+ * tombol lanjut (yang membuka CartDrawer, di dalamnya ada tombol
+ * 'Lanjut' final). Tap seluruh bar untuk membuka drawer.
+ */
+function CartStickyBar({
+  totalItems,
+  subtotal,
+  storeName,
+  deliveryLabel,
+  onOpenCart,
+}: {
+  totalItems: number;
+  subtotal: number;
+  storeName: string;
+  deliveryLabel: string;
+  onOpenCart: () => void;
+}) {
+  const { t, lang } = useI18n();
+  if (totalItems <= 0) return null;
+  return (
+    <div className="sticky bottom-0 z-30 -mx-4 mt-6 border-t border-cocoa-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] backdrop-blur sm:-mx-6 sm:px-6">
+      <button
+        type="button"
+        onClick={onOpenCart}
+        className="flex w-full items-center gap-3 rounded-2xl bg-cocoa-800 px-4 py-3 text-left text-cream-50 transition hover:bg-cocoa-900 active:scale-[0.99]"
+      >
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-matcha-500">
+          <ShoppingBag className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-base leading-tight font-extrabold tabular">
+            {totalItems} {t.common.qty}
+          </p>
+          <p className="mt-0.5 truncate text-[12px] text-cream-200">
+            {storeName} � {deliveryLabel}
+          </p>
+        </div>
+        <span className="text-lg leading-none font-extrabold tabular">
+          {formatIDR(subtotal, lang)}
+        </span>
+        <ArrowRight className="size-5 shrink-0 text-cream-200" />
+      </button>
     </div>
   );
 }

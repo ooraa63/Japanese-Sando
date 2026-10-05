@@ -1,7 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { Gift, MessageSquare, Minus, Plus, ShoppingBag, X, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  Gift,
+  MessageSquare,
+  Minus,
+  Plus,
+  ShoppingBag,
+  X,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
 import type { Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -25,10 +34,21 @@ export function CartDrawer({
   categories,
   open,
   onClose,
+  onContinue,
+  continueLabel,
+  continueDisabled,
 }: {
   categories: Category[];
   open: boolean;
   onClose: () => void;
+  /**
+   * Dipakai oleh OrderFlow step 'menu': tombol 'Lanjut' di dalam drawer
+   * yang menutup drawer dan maju ke step berikutnya (payment). Kalau tidak
+   * di-pass, drawer tidak punya tombol continue (cukup close).
+   */
+  onContinue?: () => void;
+  continueLabel?: string;
+  continueDisabled?: boolean;
 }) {
   const { t, lang } = useI18n();
   const cart = useCart();
@@ -281,6 +301,22 @@ export function CartDrawer({
               {formatIDR(subtotal, lang)}
             </span>
           </div>
+          {onContinue ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                // Panggil onContinue setelah drawer mulai menutup supaya
+                // tidak terjadi double-render yang terlihat patah.
+                requestAnimationFrame(() => onContinue());
+              }}
+              disabled={continueDisabled}
+              className="btn-primary mt-3 w-full !py-3 text-[15px]"
+            >
+              {continueLabel ?? t.common.next}
+              <ArrowRight className="size-4" />
+            </button>
+          ) : null}
         </footer>
       </aside>
     </div>
