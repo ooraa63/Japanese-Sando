@@ -50,7 +50,7 @@ const qrisOrderSchema = z.object({
   bundles: z.array(
     z.object({
       bundle_id: z.number().int().positive(),
-      slots: z.array(z.object({ flavor_id: z.number().int().positive() })),
+      slots: z.array(z.object({ flavor_id: z.number().int().positive() })).min(1).max(20),
       note: z.string().trim().max(200).optional().nullable(),
     })
   ),
@@ -86,9 +86,43 @@ export async function createQrisOrderAction(
 
   const parsed = qrisOrderSchema.safeParse(payload);
   if (!parsed.success) {
+    console.error("[qris-actions] zod failed:", parsed.error.flatten());
     return { ok: false, error: "invalid_payload" };
   }
   const data = parsed.data;
+
+  // Pre-validate bundle slots length vs bundle.required_qty dari DB.
+  // RPC `create_order` raise `invalid_quantity` kalau slots.length != required_qty
+  // dan bundle gak punya qty yg valid. Pre-check ini biar error-nya lebih jelas.
+  if (data.bundles.length > 0) {
+    const supabaseForBundles = await createClient();
+    const bundleIds = Array.from(new Set(data.bundles.map((b) => b.bundle_id)));
+    const { data: bundleRows } = await supabaseForBundles
+      .from("bundles")
+      .select("id, required_qty, is_active")
+      .in("id", bundleIds);
+    const requiredByBundle = new Map<number, { required_qty: number; is_active: boolean }>();
+    for (const row of bundleRows ?? []) {
+      requiredByBundle.set(row.id, { required_qty: row.required_qty, is_active: row.is_active });
+    }
+    for (const b of data.bundles) {
+      const info = requiredByBundle.get(b.bundle_id);
+      if (!info) {
+        return { ok: false, error: "bundle_not_found" };
+      }
+      if (!info.is_active) {
+        return { ok: false, error: "bundle_unavailable" };
+      }
+      if (b.slots.length !== info.required_qty) {
+        console.error("[qris-actions] bundle slots length mismatch:", {
+          bundle_id: b.bundle_id,
+          slots_length: b.slots.length,
+          required_qty: info.required_qty,
+        });
+        return { ok: false, error: "bundle_incomplete" };
+      }
+    }
+  }
 
   const supabase = await createClient();
 

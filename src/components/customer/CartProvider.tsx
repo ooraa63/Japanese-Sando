@@ -164,7 +164,15 @@ function readStorage(): CartStore {
             typeof b.id === "string" &&
             b.bundle &&
             typeof b.bundle.id === "number" &&
-            Array.isArray(b.slots)
+            typeof b.bundle.required_qty === "number" &&
+            Array.isArray(b.slots) &&
+            // Sanitasi: drop bundle dari localStorage kalau slots.length tidak
+            // match bundle.required_qty (mis. bundle config berubah atau
+            // storage corrupt). RPC create_order raise invalid_quantity kalau
+            // length-nya salah, jadi lebih baik drop di sini.
+            b.slots.length === b.bundle.required_qty &&
+            // Tiap slot harus flavorId positif (atau null).
+            b.slots.every((s: unknown) => s === null || (typeof s === "number" && s > 0))
         )
       : ([] as CartBundleEntry[]);
     return {
