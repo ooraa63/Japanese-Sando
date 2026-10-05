@@ -8,8 +8,9 @@ import {
   Check,
   AlertTriangle,
   Plus,
-  X,
+  Minus,
   Heart,
+  MessageSquare,
 } from "lucide-react";
 import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -34,14 +35,13 @@ function gradientFor(slug: string) {
 
 /**
  * Modal untuk memilih isi bundle. Layout: kartu sandwich-style
- * (gambar + nama + harga + tombol "Pilih") seperti OrderCategoryModal
- * (Sando Sandwich picker). Klik kartu untuk toggle pilih/hapus dari
- * bundle. Maks = bundle.required_qty — duplikat diperbolehkan.
+ * (gambar + nama + harga + +/- stepper) seperti OrderCategoryModal +
+ * FlavorCard. Klik + untuk menambah slot, - untuk mengurangi. Catatan
+ * bundle di bawah (1 note per bundle, berlaku untuk semua slot).
  *
- * Backend `create_order` menerima array `{bundle_id, slots: [{flavor_id} * N]}`
- * dengan N = bundle.required_qty. Tiap slot diisi dengan flavor aktif dan
- * (kalau bundle terkait kategori) dari kategori yang sama. Backend yang
- * cek stok; validasi klien hanya sebatas pilih flavor yang allowed.
+ * Backend create_order menerima array `{bundle_id, slots: [{flavor_id} * N],
+ * note}` dengan N = bundle.required_qty. Backend cek stok; validasi klien
+ * hanya untuk memilih flavor yang allowed.
  */
 export function OrderBundleModal({
   bundle,
@@ -62,10 +62,10 @@ export function OrderBundleModal({
 
   // Daftar slot rasa (Array<flavorId>). Boleh ada flavor yang sama
   // muncul beberapa kali — yaitu cara user pesan bundle "2x Cookies".
-  // State ini di-reset otomatis oleh React karena parent (MenuBrowser)
-  // memberikan `key={activeBundle.id}` ke modal ini, sehingga mount/unmount
-  // terjadi setiap bundle yang dibuka berbeda.
+  // Reset otomatis oleh React karena parent (MenuBrowser) memberikan
+  // `key={activeBundle.id}` ke modal ini.
   const [slots, setSlots] = useState<Array<number>>([]);
+  const [note, setNote] = useState<string>("");
 
   // Rasa yang boleh dipilih.
   const allowedFlavors: Array<Flavor & { categoryName: string }> = useMemo(() => {
@@ -97,24 +97,37 @@ export function OrderBundleModal({
       : scopeCategory.name_id
     : "";
 
-  function pickFlavor(flavorId: number) {
+  function addOne(flavorId: number) {
     setSlots((prev) => {
       if (prev.length >= requiredQty) return prev;
       return [...prev, flavorId];
     });
   }
-
-  function removePicked(index: number) {
-    setSlots((prev) => prev.filter((_, i) => i !== index));
+  function removeOne(flavorId: number) {
+    setSlots((prev) => {
+      // Hapus instance terakhir dari flavor tsb (mulai dari belakang)
+      // supaya kalau ada 2x Cookies & Cream, klik - kurangi 1 dulu.
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i] === flavorId) {
+          const next = prev.slice();
+          next.splice(i, 1);
+          return next;
+        }
+      }
+      return prev;
+    });
+  }
+  function countOf(flavorId: number): number {
+    return slots.reduce((s, id) => (id === flavorId ? s + 1 : s), 0);
   }
 
-  function addBundle() {
+  function addBundleToCart() {
     if (!bundle) return;
     if (!allFilled) {
       toast.warning(name, t.menu.bundleEmpty.replace("{n}", String(requiredQty)));
       return;
     }
-    cart.addBundle(bundle, slots);
+    cart.addBundle(bundle, slots, note || undefined);
     toast.success(name, t.menu.addToCart);
     onClose();
   }
@@ -135,7 +148,7 @@ export function OrderBundleModal({
           </div>
           <button
             type="button"
-            onClick={addBundle}
+            onClick={addBundleToCart}
             disabled={!allFilled}
             className="btn-matcha disabled:opacity-50"
           >
@@ -202,19 +215,15 @@ export function OrderBundleModal({
             const f = allowedFlavors.find((x) => x.id === flavorId);
             if (!f) return null;
             return (
-              <button
-                type="button"
+              <span
                 key={`${idx}-${flavorId}`}
-                onClick={() => removePicked(idx)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-matcha-500/15 px-2.5 py-1 text-[12px] font-bold text-matcha-700 transition hover:bg-berry-500/10 hover:text-berry-600"
-                title={lang === "en" ? "Remove" : "Hapus"}
+                className="inline-flex items-center gap-1.5 rounded-full bg-matcha-500/15 px-2.5 py-1 text-[12px] font-bold text-matcha-700"
               >
                 <span className="tabular">#{idx + 1}</span>
                 <span className="max-w-[10rem] truncate">
                   {lang === "en" ? f.name_en : f.name_id}
                 </span>
-                <X className="size-3" />
-              </button>
+              </span>
             );
           })}
         </div>
@@ -228,9 +237,8 @@ export function OrderBundleModal({
       ) : (
         <div className="density-flavor-grid grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           {allowedFlavors.map((f) => {
-            const picked = slots.filter((id) => id === f.id).length;
+            const picked = countOf(f.id);
             const remaining = requiredQty - filledCount;
-            const disabled = remaining <= 0;
             return (
               <article
                 key={f.id}
@@ -238,16 +246,8 @@ export function OrderBundleModal({
                   picked > 0
                     ? "border-matcha-500 shadow-md"
                     : "border-cocoa-200 hover:border-cocoa-300"
-                } ${disabled ? "opacity-60" : ""}`}
+                }`}
               >
-                {picked > 0 ? (
-                  <span
-                    aria-hidden
-                    className="absolute top-2 right-2 z-10 grid size-7 place-items-center rounded-full bg-matcha-500 text-xs font-extrabold text-white shadow"
-                  >
-                    {picked}
-                  </span>
-                ) : null}
                 <div
                   className={`relative aspect-[4/3] overflow-hidden bg-gradient-to-br ${gradientFor(f.slug)}`}
                 >
@@ -296,36 +296,70 @@ export function OrderBundleModal({
                       <span className="tabular">0</span>
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => pickFlavor(f.id)}
-                    disabled={disabled}
-                    className={`mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition ${
-                      picked > 0
-                        ? "bg-matcha-500 text-white hover:bg-matcha-600"
-                        : "bg-cocoa-700 text-cream-50 hover:bg-cocoa-800"
-                    } disabled:cursor-not-allowed disabled:bg-cocoa-300 disabled:text-cocoa-500`}
+                  {/* +/- stepper (gaya FlavorCard) */}
+                  <div
+                    className="mt-3 inline-flex w-full items-stretch overflow-hidden rounded-xl border-2 border-matcha-500 shadow-sm"
+                    role="group"
+                    aria-label={name}
                   >
-                    {picked > 0 ? (
-                      <>
-                        <Check className="size-4" />
-                        {picked > 1
-                          ? `${t.common.picked} ${picked}x`
-                          : t.common.confirm}
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="size-4" />
-                        {t.common.pick}
-                      </>
-                    )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => removeOne(f.id)}
+                      disabled={picked <= 0}
+                      aria-label={`-1 ${name}`}
+                      className="grid w-12 shrink-0 place-items-center text-matcha-600 transition hover:bg-matcha-50 active:scale-95 disabled:text-cocoa-300 disabled:hover:bg-transparent"
+                    >
+                      <Minus className="size-4" />
+                    </button>
+                    <div className="flex flex-1 items-center justify-center font-display text-base font-extrabold text-cocoa-900 tabular">
+                      {picked}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (remaining <= 0) {
+                          toast.warning(
+                            name,
+                            t.order.menu.maxReached.replace(
+                              "{n}",
+                              String(requiredQty)
+                            )
+                          );
+                          return;
+                        }
+                        addOne(f.id);
+                      }}
+                      disabled={remaining <= 0}
+                      aria-label={`+1 ${name}`}
+                      className="grid w-12 shrink-0 place-items-center bg-matcha-500 text-white transition hover:bg-matcha-600 active:scale-95 disabled:bg-cocoa-300"
+                    >
+                      <Plus className="size-4" />
+                    </button>
+                  </div>
                 </div>
               </article>
             );
           })}
         </div>
       )}
+
+      {/* Catatan bundle (1 note per bundle, berlaku untuk semua slot) */}
+      <div className="mt-5">
+        <label htmlFor="bundle-note" className="label">
+          <MessageSquare className="mr-1 inline size-3.5" />
+          {t.menu.bundleNoteLabel}
+        </label>
+        <input
+          id="bundle-note"
+          type="text"
+          maxLength={120}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={t.menu.notePlaceholder}
+          className="input"
+        />
+        <p className="mt-1.5 text-xs text-cocoa-400">{t.menu.bundleNoteHint}</p>
+      </div>
     </Modal>
   );
 }

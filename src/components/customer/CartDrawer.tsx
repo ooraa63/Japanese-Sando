@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Gift, Minus, Plus, ShoppingBag, X, Trash2 } from "lucide-react";
+import { Gift, MessageSquare, Minus, Plus, ShoppingBag, X, Trash2 } from "lucide-react";
 import Image from "next/image";
 import type { Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -251,6 +251,21 @@ export function CartDrawer({
                       >
                         <Trash2 className="size-3.5" />
                       </button>
+                    </div>
+                    {/* Catatan bundle (opsional). Pakai ID entry (bukan
+                        bundleId) supaya user bisa edit per-bundle-entry. */}
+                    <div className="relative mt-2">
+                      <MessageSquare className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-cocoa-400" />
+                      <input
+                        type="text"
+                        maxLength={120}
+                        placeholder={t.menu.bundleNoteLabel}
+                        value={entry.note ?? ""}
+                        onChange={(e) =>
+                          cart.setBundleNote(entry.id, e.target.value)
+                        }
+                        className="input !py-2 !pl-9 !text-[12px]"
+                      />
                     </div>
                   </li>
                 );

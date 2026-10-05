@@ -228,6 +228,8 @@ export interface CartBundleEntry {
   bundle: Bundle;
   /** Isi slot: untuk slot 1..N, simpan flavorId yang dipilih. */
   slots: Array<number | null>;
+  /** Catatan opsional untuk bundle ini (mis. "jangan pakai cabe"). */
+  note?: string;
 }
 
 /**
@@ -274,6 +276,8 @@ export interface InvoiceBundleEntry {
     flavor_id: number;
     flavor_name: string;
   }>;
+  /** Catatan opsional untuk bundle (mis. "jangan pakai cabe"). */
+  note?: string | null;
 }
 
 export interface InvoiceSnapshot {

@@ -59,10 +59,13 @@ interface CartContextValue {
   setNote: (flavorId: number, note: string) => void;
   /**
    * Tambah bundle ke keranjang. `slots` harus berisi `required_qty`
-   * flavorId (sudah tervalidasi di UI sebelum dipanggil).
+   * flavorId (sudah tervalidasi di UI sebelum dipanggil). `note` opsional,
+   * mis. "jangan pakai cabe" — berlaku untuk semua slot.
    */
-  addBundle: (bundle: Bundle, slots: number[]) => string;
+  addBundle: (bundle: Bundle, slots: number[], note?: string) => string;
   removeBundle: (entryId: string) => void;
+  /** Set catatan untuk satu bundle entry (entryId, bukan bundleId). */
+  setBundleNote: (entryId: string, note: string) => void;
   /** Kosongkan semuanya (keranjang + data). */
   clear: () => void;
   /** Kosongkan keranjang tapi pertahankan data pengirim. */
@@ -217,16 +220,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const remove = useCallback((flavorId: number) => setQuantity(flavorId, 0), [setQuantity]);
 
-  const addBundle = useCallback((bundle: Bundle, slots: number[]): string => {
-    const id = `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    const entry: CartBundleEntry = { id, bundle, slots };
-    write({ ...store, bundles: [...store.bundles, entry] });
-    return id;
-  }, []);
+  const addBundle = useCallback(
+    (bundle: Bundle, slots: number[], note?: string): string => {
+      const id = `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const trimmedNote = note?.trim();
+      const entry: CartBundleEntry = {
+        id,
+        bundle,
+        slots,
+        ...(trimmedNote ? { note: trimmedNote } : {}),
+      };
+      write({ ...store, bundles: [...store.bundles, entry] });
+      return id;
+    },
+    []
+  );
 
   const removeBundle = useCallback((entryId: string) => {
     const next = store.bundles.filter((b) => b.id !== entryId);
     if (next.length === store.bundles.length) return;
+    write({ ...store, bundles: next });
+  }, []);
+
+  const setBundleNote = useCallback((entryId: string, note: string) => {
+    const next = store.bundles.map((b) => {
+      if (b.id !== entryId) return b;
+      const trimmed = note.trim();
+      const copy: CartBundleEntry = { ...b };
+      if (trimmed) copy.note = trimmed;
+      else delete copy.note;
+      return copy;
+    });
+    if (
+      next.every((b, i) => b.note === store.bundles[i].note && b.id === store.bundles[i].id)
+    ) {
+      return;
+    }
     write({ ...store, bundles: next });
   }, []);
 
@@ -292,6 +321,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setNote,
     addBundle,
     removeBundle,
+    setBundleNote,
     clear,
     reset,
     clearIdentity,

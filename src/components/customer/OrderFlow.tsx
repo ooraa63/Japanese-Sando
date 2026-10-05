@@ -377,11 +377,12 @@ export function OrderFlow({
           quantity: l.qty,
           note: notes[String(l.flavor.id)] || null,
         })),
-        // Bundle: backend (create_order) menerima array {bundle_id, slots:[{flavor_id}]}
+        // Bundle: backend (create_order) menerima array {bundle_id, slots:[{flavor_id}], note?}
         // dengan panjang slots == bundle.required_qty.
         p_bundles: cartBundles.map((entry) => ({
           bundle_id: entry.bundle.id,
           slots: entry.slots.map((flavorId) => ({ flavor_id: flavorId })),
+          note: entry.note ?? null,
         })),
         // user_id: kalau customer login, tautkan order ke akun mereka
         // supaya muncul di halaman /account. Guest checkout: null.

@@ -116,6 +116,8 @@ export const en = {
     bundlePickFromCategory: "Only from: {name}",
     bundleSection: "Value bundles",
     bundleAnyCategory: "Pick from any flavor",
+    bundleNoteLabel: "Note for this bundle",
+    bundleNoteHint: "Optional. Applies to every slot in this bundle.",
   },
   howItWorks: {
     title: "How pre-ordering works",

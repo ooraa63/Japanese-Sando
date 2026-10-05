@@ -114,6 +114,8 @@ export const id: Dict = {
     bundlePickFromCategory: "Hanya rasa dari: {name}",
     bundleSection: "Paket hemat",
     bundleAnyCategory: "Bebas pilih dari semua rasa",
+    bundleNoteLabel: "Catatan untuk paket ini",
+    bundleNoteHint: "Opsional. Berlaku untuk semua slot di paket ini.",
   },
   howItWorks: {
     title: "Cara Pre-order",
