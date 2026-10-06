@@ -18,6 +18,8 @@ export interface CustomerActionResult<T = undefined> {
    * sesi belum aktif (Confirm email ON). UI menampilkan "cek email kamu".
    */
   requiresVerification?: boolean;
+  /** URL untuk OAuth redirect (Google, dsb). Browser yang navigasi ke sini. */
+  redirectUrl?: string;
 }
 
 function humanize(error: string | undefined): string {
@@ -261,4 +263,44 @@ export async function updateCustomerProfileAction(
   revalidatePath("/", "layout");
   revalidatePath("/account");
   return { ok: true };
+}
+
+/* =============================================================================
+ *  OAUTH (Google sign-in)
+ * ========================================================================== */
+
+/**
+ * Mulai OAuth flow (mis. Google). Sign-in & sign-up pakai flow yang sama —
+ * Supabase akan otomatis buat akun kalau email belum terdaftar (kalau
+ * "Confirm email" OFF) atau kirim link verifikasi (kalau ON).
+ *
+ * Return `redirectUrl` untuk di-navigate oleh client (`window.location`).
+ * Kalau dipanggil dari server langsung (mis. link HTML biasa), pakai
+ * `redirect()` ke URL.
+ */
+export async function signInWithOAuthAction(
+  provider: "google" | "github" | "apple" | "facebook"
+): Promise<CustomerActionResult<{ url: string }>> {
+  const supabase = await createClient();
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (typeof process.env.VERCEL_URL === "string"
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: `${origin}/account?oauth=1`,
+      queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
+    },
+  });
+
+  if (error) {
+    return { ok: false, error: humanize(error.message) };
+  }
+  if (!data?.url) {
+    return { ok: false, error: "oauth_unavailable" };
+  }
+  return { ok: true, data: { url: data.url } };
 }

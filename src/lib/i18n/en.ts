@@ -383,6 +383,13 @@ export const en = {
   customerAuth: {
     loginCta: "Sign in",
     accountChip: "My account",
+    orWith: "or continue with",
+    withGoogle: "Continue with Google",
+    withGithub: "Continue with GitHub",
+    withApple: "Continue with Apple",
+    withFacebook: "Continue with Facebook",
+    oauthUnavailable:
+      "This provider isn't enabled yet. Please use email & password.",
     login: {
       title: "Sign in",
       subtitle: "Sign in to auto-fill your details on the next pre-order.",

@@ -558,20 +558,18 @@ export function SettingsClient({
         </div>
       </Section>
 
-      {/* Tombol simpan melayang */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-cocoa-200 bg-cream-50/95 p-4 backdrop-blur-md lg:pl-64">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
-          <p className="hidden text-xs text-cocoa-400 sm:block">{t.admin.settings.subtitle}</p>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="btn-primary ml-auto w-full sm:w-auto sm:min-w-44"
-          >
-            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            {saving ? t.common.saving : t.common.save}
-          </button>
-        </div>
+      {/* Tombol simpan di akhir (bukan fixed, supaya tidak menutupi section lain). */}
+      <div className="flex items-center justify-end gap-3 border-t border-cocoa-200 pt-4">
+        <p className="text-xs text-cocoa-400">{t.admin.settings.subtitle}</p>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="btn-primary shrink-0"
+        >
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          {saving ? t.common.saving : t.common.save}
+        </button>
       </div>
     </div>
   );

@@ -39,7 +39,6 @@ export function SiteHeader({
 
   const links = [
     { href: "/#menu", label: t.nav.menu },
-    { href: "/#how", label: t.nav.howItWorks },
     { href: "/track", label: t.nav.track },
     { href: "/#contact", label: t.nav.contact },
   ];
