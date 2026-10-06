@@ -404,6 +404,8 @@ export const en = {
         emailNotVerified:
           "Please verify your email first. Check your inbox for the link.",
         emailTaken: "This email is already used.",
+        phoneTaken:
+          "This phone number is already registered to another account. Try signing in instead.",
         signupFailed:
           "We could not finish signing you up. Please contact us if it keeps happening.",
         notAuthenticated: "Please sign in to continue.",
@@ -447,6 +449,8 @@ export const en = {
         nameTooLong: "That name is too long.",
         invalidDateOfBirth: "Please enter a valid date (you must be at least 13).",
         emailTaken: "This email is already used. Try signing in instead.",
+        phoneTaken:
+          "This phone number is already registered to another account. Try signing in instead.",
         signupFailed:
           "We could not finish signing you up. Please contact us if it keeps happening.",
         notAuthenticated: "Please sign in to continue.",

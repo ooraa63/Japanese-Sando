@@ -31,10 +31,12 @@ function humanize(error: string | undefined): string {
     "name_too_long",
     "weak_password",
     "email_taken",
+    "phone_taken",
     "user_not_found",
     "signup_failed",
     "not_authenticated",
     "invalid_date_of_birth",
+    "phone_already_registered",
     "generic",
   ];
   return known.includes(code) ? code : "generic";
@@ -92,6 +94,19 @@ export async function signUpCustomerAction(
   if (dobRaw && !dob) return { ok: false, error: "invalid_date_of_birth" };
 
   const supabase = await createClient();
+
+  // Pre-check: phone sudah dipakai customer lain? Kalau ya, tolak sebelum
+  // create auth.users — supaya tidak ada akun yatim yang harus dihapus.
+  const { data: phoneOk, error: phoneCheckErr } = await supabase.rpc(
+    "is_phone_available",
+    { p_phone: phone }
+  );
+  if (phoneCheckErr) {
+    return { ok: false, error: "generic" };
+  }
+  if (phoneOk === false) {
+    return { ok: false, error: "phone_taken" };
+  }
 
   // 1. Daftar user di Supabase Auth. Field identitas disimpan ke
   //    raw_user_meta_data supaya bisa di-bootstrap setelah verifikasi

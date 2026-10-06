@@ -403,6 +403,8 @@ export const id: Dict = {
         emailNotVerified:
           "Verifikasi email dulu. Cek kotak masuk untuk link verifikasi.",
         emailTaken: "Email ini sudah dipakai. Coba masuk saja.",
+        phoneTaken:
+          "Nomor telepon ini sudah terdaftar di akun lain. Coba masuk saja.",
         signupFailed:
           "Pendaftaran gagal. Hubungi kami kalau terus muncul pesan ini.",
         notAuthenticated: "Silakan masuk untuk lanjut.",
@@ -447,6 +449,8 @@ export const id: Dict = {
         invalidDateOfBirth:
           "Tanggal lahir tidak valid (usia minimal 13 tahun).",
         emailTaken: "Email ini sudah dipakai. Coba masuk saja.",
+        phoneTaken:
+          "Nomor telepon ini sudah terdaftar di akun lain. Coba masuk saja.",
         signupFailed:
           "Pendaftaran gagal. Hubungi kami kalau terus muncul pesan ini.",
         notAuthenticated: "Silakan masuk untuk lanjut.",
