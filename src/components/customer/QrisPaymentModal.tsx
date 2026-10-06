@@ -144,6 +144,18 @@ export function QrisPaymentModal({ payload, open, onClose }: QrisPaymentModalPro
   const ss = (secondsLeft % 60).toString().padStart(2, "0");
   const expired = order ? secondsLeft <= 0 : false;
 
+  // Auto-close modal setelah 5 menit (countdown habis). Kita tunggu 2 detik biar
+  // user lihat status 'expired' dulu sebelum modal nutup sendiri.
+  useEffect(() => {
+    if (!open || !order || !expired) return;
+    if (status === "paid") return;  // jangan close kalau sudah paid
+    const t = setTimeout(() => {
+      onClose();
+    }, 2000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expired, status]);
+
   // Kalau status paid, paksa tutup otomatis.
   // (Sudah di-handle di useEffect polling di atas.)
 

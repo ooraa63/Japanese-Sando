@@ -185,6 +185,8 @@ export async function createQrisOrderAction(
         email: data.customerEmail ?? undefined,
         phone: data.phone,
       },
+      // QR expired setelah 5 menit — biar gak ngegantungin QR yang udah hangus.
+      expiryMinutes: 5,
     });
 
     // 3. Simpan transaction_id + QR URL + expiry ke order via RPC.
