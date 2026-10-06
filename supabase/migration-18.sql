@@ -53,6 +53,7 @@ declare
   v_settings   public.store_settings%rowtype;
   v_item       jsonb;
   v_flavor     public.flavors%rowtype;
+  v_category   public.categories%rowtype;  -- pisah dari v_flavor biar gak salah assignment saat SELECT INTO
   v_bundle_rec public.bundles%rowtype;
   v_order_id   bigint;
   v_flavor_id  bigint;
@@ -231,12 +232,12 @@ begin
   for v_cat_id, v_cat_pcs in
     select (k.key)::bigint, (k.value)::int from jsonb_each(v_per_cat) as k(key, value)
   loop
-    select * into v_flavor from public.categories where id = v_cat_id for update;
+    select * into v_category from public.categories where id = v_cat_id for update;
     if not found then continue; end if;
-    if v_flavor.stock_enabled and v_cat_pcs > v_flavor.stock then
+    if v_category.stock_enabled and v_cat_pcs > v_category.stock then
       raise exception 'insufficient_stock' using errcode = '22023';
     end if;
-    if v_flavor.stock_enabled then
+    if v_category.stock_enabled then
       update public.categories set stock = greatest(0, stock - v_cat_pcs) where id = v_cat_id;
     end if;
   end loop;
