@@ -115,6 +115,30 @@ try {
     await client.query(part.sql);
     console.log(`✓ ${part.name} selesai.`);
   }
+
+  // Bersihkan overload create_order yang gak nyangkut lagi. Tiap migration
+  // dengan signature beda bikin overload baru (gak postgreseret), lama
+  // numpuk. Kita keep yang paling punya banyak parameter (signature lengkap),
+  // drop sisanya. lihat quantity overload vs signature.
+  console.log("\n→ Bersihkan overload create_order yang usang...");
+  const overloads = await client.query(`
+    SELECT pg_get_function_identity_arguments(p.oid) AS args, p.pronargs
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE p.proname = 'create_order' AND n.nspname = 'public'
+    ORDER BY p.pronargs DESC
+  `);
+  if (overloads.rows.length > 1) {
+    // Keep yang paling banyak args-nya (signature terlengkap = migration terbaru)
+    for (let i = 1; i < overloads.rows.length; i++) {
+      const row = overloads.rows[i];
+      await client.query(`DROP FUNCTION public.create_order(${row.args}) CASCADE`);
+      console.log(`  ✓ Dropped create_order(${row.args.slice(0, 60)}...)`);
+    }
+  } else {
+    console.log("  (hanya 1 overload, gak perlu dibersihkan)");
+  }
+
   console.log("\n✅ Semua file SQL berhasil dijalankan.");
 
   // Minta PostgREST memuat ulang definisi fungsi (kalau tidak, RPC baru
