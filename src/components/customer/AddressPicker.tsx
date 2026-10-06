@@ -12,13 +12,15 @@ type PickerDict = Dict["order"]["payment"];
  * Picker alamat dengan peta OSM.
  *
  * Alur:
- *  - User ketik alamat (mis. "Jalan Asia Afrika 100, Bandung") di search box.
+ *  - User ketik alamat (nama jalan / tempat spesifik, mis. "Starbucks
+ *    Dago", "Jl. Asia Afrika 100") di search box.
  *  - Klik tombol cari -> Nominatim forward-geocode -> dapat {lat, lng, display_name}.
  *  - Pilih dari hasil pencarian -> set alamat + koordinat.
  *  - Bisa edit alamat teks & patokan (catatan alamat).
  *
- * OpenStreetMap embed iframe tidak mengirim event klik ke host, jadi
- * user mengetik nama jalan (lebih akurat) daripada klik acak di peta.
+ * OSM embed default tidak punya zoom control; ukuran iframe sudah cukup
+ * kecil untuk HP. Customer tidak perlu zoom manual — preview menampilkan
+ * area ±0.01° (~1.1 km) dari titik yang dipilih.
  */
 const DEFAULT_CENTER = { lat: -6.917, lng: 107.619 };
 const NOMINATIM_SEARCH = "https://nominatim.openstreetmap.org/search";
@@ -27,6 +29,8 @@ type SearchResult = {
   display_name: string;
   lat: string;
   lon: string;
+  type?: string;
+  category?: string;
 };
 
 export function AddressPicker({
@@ -51,8 +55,9 @@ export function AddressPicker({
     [draft.lat, draft.lng, hasLocation]
   );
 
+  // Preview ringkas: ±0.01° (~1.1 km) — cukup untuk HP, tidak perlu zoom.
   const bbox = useMemo(() => {
-    const delta = 0.02;
+    const delta = 0.01;
     return {
       west: center.lng - delta,
       north: center.lat + delta,
@@ -88,13 +93,13 @@ export function AddressPicker({
         onChange={(e) => updateDraft({ address: e.target.value })}
       />
 
-      {/* Preview peta ringkas (kalau sudah ada koordinat) */}
+      {/* Preview peta ringkas (kalau sudah ada koordinat) — tanpa zoom controls. */}
       {hasLocation ? (
         <div className="overflow-hidden rounded-2xl border border-cocoa-200">
           <iframe
             title="map-preview"
             src={iframeSrc}
-            className="h-40 w-full"
+            className="h-44 w-full"
             loading="lazy"
           />
           <div className="flex items-center justify-between gap-2 border-t border-cocoa-100 bg-cream-50 px-3 py-1.5 text-[11px] text-cocoa-500">
@@ -148,8 +153,10 @@ export function AddressPicker({
 }
 
 /**
- * Modal pilih lokasi — search box dengan Nominatim + preview peta.
- * Alih-alih input angka lat/lng, user ketik nama jalan/alamat.
+ * Modal pilih lokasi — search box Nominatim + preview peta.
+ *
+ * Pakai limit=8 supaya hasil lebih kaya (nama jalan, POI, tempat umum
+ * seperti Starbucks, mall, dsb.). Beda dengan dulu yang limit=3.
  */
 function MapSearchModal({
   center,
@@ -171,7 +178,8 @@ function MapSearchModal({
     label: string;
   }>({ lat: center.lat, lng: center.lng, label: "" });
 
-  const delta = 0.05;
+  // Preview peta di modal: ±0.02° (~2.2 km) — cukup untuk pilih titik, gak perlu zoom.
+  const delta = 0.02;
   const iframeSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${preview.lng - delta}%2C${preview.lat - delta}%2C${preview.lng + delta}%2C${preview.lat + delta}&layer=mapnik&marker=${preview.lat}%2C${preview.lng}`;
 
   async function search(e: React.FormEvent) {
@@ -180,8 +188,10 @@ function MapSearchModal({
     if (!q) return;
     setBusy(true);
     try {
+      // Limit 8 hasil. Pakai addressdetails=1 supaya bisa sortir 'amenity'
+      // (POI seperti Starbucks, restaurant, mall).
       const r = await fetch(
-        `${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=3&countrycodes=id`,
+        `${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=8&addressdetails=1&countrycodes=id`,
         {
           headers: { "Accept-Language": "id,en" },
         }
@@ -192,7 +202,6 @@ function MapSearchModal({
       }
       const data = (await r.json()) as SearchResult[];
       setResults(data);
-      // Preview ke hasil pertama
       if (data.length > 0) {
         const first = data[0];
         setPreview({
@@ -259,19 +268,19 @@ function MapSearchModal({
             </button>
           </form>
 
-          {/* Preview peta */}
+          {/* Preview peta — tanpa zoom control, cukup ±0.02° */}
           <div className="overflow-hidden rounded-2xl border border-cocoa-200">
             <iframe
               title="map-preview"
               src={iframeSrc}
-              className="h-48 w-full"
+              className="h-52 w-full"
               loading="lazy"
             />
           </div>
 
-          {/* Hasil pencarian */}
+          {/* Hasil pencarian — limit 8 supaya lebih kaya */}
           {results.length > 0 ? (
-            <ul className="max-h-40 overflow-y-auto rounded-2xl border border-cocoa-200 bg-cocoa-50">
+            <ul className="max-h-48 overflow-y-auto rounded-2xl border border-cocoa-200 bg-cocoa-50">
               {results.map((r, i) => (
                 <li
                   key={`${r.lat}-${r.lon}-${i}`}

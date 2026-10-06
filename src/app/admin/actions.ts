@@ -8,6 +8,7 @@ import type {
   AdminUser,
   Category,
   DashboardStats,
+  DeliveryZone,
   Order,
   OrderStatus,
   SalesSummary,
@@ -301,6 +302,109 @@ export async function getMutasiAction(params: {
       total: payload.total ?? 0,
     },
   };
+}
+
+/* ============================================================================
+ *  DELIVERY ZONES (admin CRUD)
+ * ========================================================================== */
+
+export interface AdminDeliveryZone extends DeliveryZone {
+  lat: number | null;
+  lng: number | null;
+  radius_km: number | null;
+  requires_address: boolean;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export async function getDeliveryZonesAction(): Promise<ActionResult<AdminDeliveryZone[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_zones");
+  if (error) return { ok: false, error: humanize(error.message) };
+  return { ok: true, data: (data as AdminDeliveryZone[]) ?? [] };
+}
+
+export async function saveDeliveryZoneAction(
+  payload: Record<string, unknown>
+): Promise<ActionResult<AdminDeliveryZone>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_upsert_zone", {
+    p_payload: payload,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+  return { ok: true, data: data as AdminDeliveryZone };
+}
+
+export async function deleteDeliveryZoneAction(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_delete_zone", { p_id: id });
+  if (error) return { ok: false, error: humanize(error.message) };
+  revalidatePath("/admin/settings");
+  return { ok: true };
+}
+
+/* ============================================================================
+ *  VOUCHERS (admin CRUD)
+ * ========================================================================== */
+
+export async function getVouchersAction(params: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<
+  ActionResult<{
+    vouchers: Array<{
+      id: number;
+      code: string;
+      customer_id: string | null;
+      type: "percent" | "amount" | "free_shipping" | "free_item";
+      value: Record<string, unknown>;
+      label_id: string;
+      label_en: string;
+      expires_at: string | null;
+      is_active: boolean;
+      used_at: string | null;
+      order_id: number | null;
+      created_at: string;
+    }>;
+    total: number;
+  }>
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_vouchers", {
+    p_search: params.search?.trim() || null,
+    p_limit: params.limit ?? 50,
+    p_offset: params.offset ?? 0,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+  return {
+    ok: true,
+    data: {
+      vouchers: (data?.vouchers as never) ?? [],
+      total: (data?.total as number) ?? 0,
+    },
+  };
+}
+
+export async function saveVoucherAction(
+  payload: Record<string, unknown>
+): Promise<ActionResult<{ id: number }>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_upsert_voucher", {
+    p_payload: payload,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+  revalidatePath("/admin/vouchers");
+  return { ok: true, data: { id: (data as { id: number }).id } };
+}
+
+export async function deleteVoucherAction(id: number): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_delete_voucher", { p_id: id });
+  if (error) return { ok: false, error: humanize(error.message) };
+  revalidatePath("/admin/vouchers");
+  return { ok: true };
 }
 
 export async function getAdminsAction(): Promise<ActionResult<AdminUser[]>> {

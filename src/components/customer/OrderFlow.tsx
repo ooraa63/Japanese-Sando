@@ -22,6 +22,7 @@ import type {
   Bundle,
   CartLine,
   Category,
+  DeliveryZone,
   StoreSettings,
 } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -43,12 +44,15 @@ export function OrderFlow({
   categories,
   bundles = [],
   settings,
+  deliveryZones,
   midtransReady = false,
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri / per-kategori yang dijual. */
   bundles?: Bundle[];
   settings: StoreSettings;
+  /** Daftar zona delivery (server-fetched). */
+  deliveryZones: DeliveryZone[];
   /** True kalau MIDTRANS_SERVER_KEY sudah di-set. Dikirim dari server
    *  component (page.tsx) supaya kita tidak perlu expose env ke client. */
   midtransReady?: boolean;
@@ -270,22 +274,7 @@ export function OrderFlow({
     return m;
   }, [cartLines, cartBundles, categories]);
 
-  // Daftar zona delivery dari settings — selalu ada 1+ (fallback ke pickup).
-  const deliveryZones =
-    settings.delivery_zones && settings.delivery_zones.length > 0
-      ? settings.delivery_zones
-      : [
-          {
-            id: "pickup",
-            name_id: "Ambil di toko",
-            name_en: "Pickup in store",
-            fee: 0,
-            note_id: "",
-            note_en: "",
-          },
-        ];
-
-  // Ongkir dari zona delivery (kalau pickup = 0). Ambil dari settings.delivery_zones.
+  // Ongkir dari zona delivery (kalau pickup = 0).
   const currentZone = deliveryZones.find((z) => z.id === draft.deliveryZone);
   const deliveryFee =
     draft.deliveryMethod === "delivery" && currentZone ? currentZone.fee : 0;
@@ -919,13 +908,31 @@ export function OrderFlow({
                 </div>
               ) : null}
 
-              {/* Alamat + map picker — hanya untuk delivery (zone != 'pickup') */}
-              {draft.deliveryMethod === "delivery" ? (
+              {/* Alamat + map picker — hanya untuk zona yang requires_address. */}
+              {draft.deliveryMethod === "delivery" && currentZone?.requires_address ? (
                 <AddressPicker
                   draft={draft}
                   updateDraft={updateDraft}
                   dict={t.order.payment}
                 />
+              ) : draft.deliveryMethod === "delivery" && currentZone ? (
+                /* Zona fix (Vihara/UVERS) — customer tidak perlu pilih map. */
+                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-matcha-300 bg-matcha-50 p-4">
+                  <MapPin className="mt-0.5 size-5 shrink-0 text-matcha-700" />
+                  <div>
+                    <p className="text-[11px] font-bold tracking-wide text-matcha-700 uppercase">
+                      {t.order.payment.deliveryZoneTitle}
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold text-cocoa-800">
+                      {lang === "en" ? currentZone.name_en : currentZone.name_id}
+                    </p>
+                    {currentZone.lat && currentZone.lng ? (
+                      <p className="mt-0.5 text-[11px] text-cocoa-500 tabular">
+                        {currentZone.lat.toFixed(4)}, {currentZone.lng.toFixed(4)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
               ) : settings.address ? (
                 <div className="mt-4 flex items-start gap-3 rounded-2xl border border-cocoa-200 bg-cocoa-50 p-4">
                   <Store className="mt-0.5 size-5 shrink-0 text-cocoa-400" />

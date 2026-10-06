@@ -135,6 +135,16 @@ export interface DeliveryZone {
   fee: number;
   note_id?: string;
   note_en?: string;
+  /** Pusat zona (untuk display map di admin). Null = "antar ke titik kamu". */
+  lat?: number | null;
+  lng?: number | null;
+  /** Radius dalam km. Null = unlimited. */
+  radius_km?: number | null;
+  /** Kalau true, customer wajib isi alamat+koordinat. Kalau false (mis.
+   *  Vihara/UVERS fix), customer tidak perlu set lokasi. */
+  requires_address?: boolean;
+  sort_order?: number;
+  is_active?: boolean;
 }
 
 /**

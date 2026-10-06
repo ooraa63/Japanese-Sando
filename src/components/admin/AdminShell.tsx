@@ -11,6 +11,7 @@ import {
   Megaphone,
   Menu,
   Settings,
+  Ticket,
   TrendingUp,
   Users,
   UtensilsCrossed,
@@ -27,6 +28,7 @@ const NAV = [
   { href: "/admin/sales", key: "sales" as const, icon: TrendingUp, exact: false },
   { href: "/admin/menu", key: "menu" as const, icon: UtensilsCrossed, exact: false },
   { href: "/admin/customers", key: "customers" as const, icon: Users, exact: false },
+  { href: "/admin/vouchers", key: "vouchers" as const, icon: Ticket, exact: false },
   { href: "/admin/announcements", key: "announcements" as const, icon: Megaphone, exact: false },
   { href: "/admin/settings", key: "settings" as const, icon: Settings, exact: false },
 ];
@@ -52,6 +54,7 @@ export function AdminShell({
     announcements: string;
     settings: string;
     sales: string;
+    vouchers: string;
     viewSite: string;
     signOut: string;
   };
