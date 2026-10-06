@@ -119,7 +119,12 @@ export function CustomerAuthForm({
   async function oauthWithGoogle() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      setState({ ok: false, error: "oauth_unavailable" });
+      // Build-time env not set — ini terjadi kalau NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      // belum di-set di Vercel / .env.local atau belum di-redeploy.
+      setState({
+        ok: false,
+        error: "Google Client ID belum diset di server (NEXT_PUBLIC_GOOGLE_CLIENT_ID). Hubungi admin.",
+      });
       return;
     }
     setState(null);
@@ -135,19 +140,31 @@ export function CustomerAuthForm({
         if (res.ok) {
           onSuccess?.();
           const target = nextPath && nextPath.startsWith("/") ? nextPath : "/account";
-          router.replace(target);
+          // Pakai router.push (bukan replace) supaya page baru re-render
+          // dengan auth state baru. Lalu router.refresh() supaya server
+          // component re-fetch data dengan cookie baru.
+          router.push(target);
           router.refresh();
           return;
         }
-        setState({ ok: false, error: res.error ?? "generic" });
+        // Server action gagal — tampilkan error message kalau ada.
+        const message = res.error ?? "generic";
+        setState({ ok: false, error: message });
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Google login failed";
-        if (/popup_closed_by_user|User cancelled/i.test(message)) {
+        if (
+          /popup_closed_by_user|User cancelled|popup_closed/i.test(message)
+        ) {
           // User tutup popup — diem aja, jangan tampilkan error.
           return;
         }
-        setState({ ok: false, error: "generic" });
+        // Tampilkan error asli supaya bisa di-debug.
+        console.error("[Google OAuth]", err);
+        setState({
+          ok: false,
+          error: `Google login gagal: ${message.slice(0, 160)}`,
+        });
       }
     });
   }

@@ -52,6 +52,8 @@ function humanize(error: string | undefined): string {
     "not_authenticated",
     "invalid_date_of_birth",
     "phone_already_registered",
+    "oauth_unavailable",
+    "oauth_failed",
     "generic",
   ];
   return known.includes(code) ? code : "generic";
