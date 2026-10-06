@@ -4,6 +4,54 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-06 — 7 fitur baru diminta user
+
+**Mengubah:**
+
+1. **#7 QRIS Download** (sudah selesai):
+   - `QrisPaymentModal.tsx`: tambah tombol `<Download>` + `downloadQr()` dengan `<a download>` anchor.
+   - `i18n`: tambah `download` & `downloaded` strings.
+
+2. **#4 Cart step persistence + reset on leave**:
+   - `OrderFlow.tsx`: state `step` di-persist ke `sessionStorage` (bukan localStorage). Pakai sessionStorage biar gak ke-carry antar-tab. Refresh di step "Pilih rasa" tetap di sana. Saat user leave page (component unmount), `cart.reset()` + hapus session key.
+   - Karena pakai sessionStorage (gak persist), privacy aman — gak ada identitas yg nyangkut.
+
+3. **#5 Mobile bottom menu bar**:
+   - `src/components/customer/MobileBottomNav.tsx` (baru): Home / Order / Account, hidden di md+, hidden di route admin/login/register/account/order/success/order/track (jadi gak ganggu flow order).
+   - Di-import di `src/app/layout.tsx`.
+
+4. **#1 Halaman Mutasi Penjual** (sales ledger):
+   - `supabase/migration-20.sql`: RPC `admin_list_mutasi(p_from_date, p_to_date, p_flavor_id, p_search, p_limit, p_offset)`. Filter per-rasa via EXISTS di order_items. Revenue dihitung dari status `accepted | ready | delivered`. Output `{summary, transactions, total}`.
+   - `src/app/admin/(dashboard)/sales/page.tsx`: baca query string `?from=&to=&flavor=&q=`, panggil action, pass ke client.
+   - `src/components/admin/SalesClient.tsx`: 4 summary cards (revenue / today / orders / pcs), top 5 rasa, filter bar (tanggal + rasa + search + reset), tabel transaksi dgn expand per item, CSV export.
+   - `AdminShell.tsx`: icon `TrendingUp` + entry `sales: dicts.admin.nav.sales`.
+   - `src/lib/types.ts`: `SalesSummary` & `SalesTransaction` interfaces.
+   - `src/app/admin/actions.ts`: `getMutasiAction(params)`.
+
+6. **#6 Review/Comment system**:
+   - `supabase/migration-21.sql`: tabel `order_reviews (id, order_id FK UNIQUE, customer_name, rating 1-5, comment, is_visible, created_at)`. RPC `submit_review`, `list_reviews`, `has_review`.
+   - `src/app/review-actions.ts`: `submitReviewAction`, `hasReviewAction`, `listReviewsAction`.
+   - `src/components/customer/ReviewModal.tsx`: pop-up dgn star rating + textarea, success screen.
+   - `src/components/customer/ReviewsSection.tsx`: server component, tampilkan avg rating + 6 review terbaru.
+   - `src/components/customer/TrackForm.tsx`: jika status `delivered` & `has_review=false`, auto-open modal (dan tombol "Tulis ulasan" eksplisit).
+   - `src/app/page.tsx`: tambah section reviews antara "Cara Pesan" dan CTA.
+
+2. **#2 Dedup customer_profiles** (DB):
+   - `supabase/migration-22.sql`: tambah kolom `phone_normalized`, backfill dari `normalize_phone(phone)`, HAPUS baris duplicate (keep oldest by created_at), UNIQUE index pada `phone_normalized` (WHERE not null). Trigger auto-populate phone_normalized saat INSERT/UPDATE.
+
+3. **#3 Signup validation** (1 email + 1 phone):
+   - `supabase/migration-23.sql`: RPC `is_phone_available(p_phone, p_exclude_user_id)` (security definer, stable). Trigger `customer_profiles_guard_phone_unique` tolak baris yang penalti phone_normalized bentrok dengan user berbeda.
+   - `src/app/account/actions.ts`: pre-check `is_phone_available` sebelum signup. Kalau false → return `phone_taken`. Map error `phone_already_registered` ke `phone_taken`.
+   - `i18n`: tambah `auth.errors.phoneTaken` di id & en.
+
+**Mengapa:** User request original 7 sekaligus.
+
+**Tidak diubah:**
+- `auth.users.email` sudah UNIQUE di DB level. Supabase Auth akan reject signup kedua → "already registered" → di-handle `email_taken` (sudah ada).
+- `orders.customer_email` & `customer_phone` tidak di-dedup — satu customer bisa memesan berkali-kali (ini by design).
+
+---
+
 ## 2026-10-05 — Hapus QRIS Statis (sekarang cuma Transfer Bank + QRIS Midtrans)
 
 **Mengubah:**

@@ -301,3 +301,116 @@ Midtrans** (dynamic, auto-confirm).
   bersih, butuh migration ALTER TABLE ... DROP COLUMN.
 
 ---
+
+## D14 — Cart step pakai sessionStorage (bukan localStorage)
+
+**Keputusan:** `OrderFlow.tsx` simpan state `step` (`identity | menu |
+payment | review`) di sessionStorage. Cart items tetap di localStorage
+(key `js_cart_v1`).
+
+**Alasan:**
+
+- sessionStorage scoped per-tab dan auto-cleared saat tab ditutup.
+  Kalau pakai localStorage, lalu user buka tab baru, mereka akan
+  tiba-tiba di step "Payment" padahal baru buka pertama kali — confusing.
+- Cart items perlu persist antar-tab (buyer minta supaya keranjang gak
+  hilang kalau accidentally close tab), jadi tetap di localStorage.
+
+**Konsekuensi:**
+
+- `useEffect` pertama di OrderFlow: `sessionStorage.getItem('js_order_step')`
+  → setStep kalau ada. Setiap step change, `setItem('js_order_step', step)`.
+- Saat component unmount (route change), `removeItem` + `cart.reset()`.
+  Privacy: data identitas (nama, telepon, IG) gak kesimpan ke pre-order
+  berikutnya.
+
+---
+
+## D15 — Mobile bottom nav disembunyikan di flow tertentu
+
+**Keputusan:** `MobileBottomNav` hidden di route
+`/admin`, `/login`, `/register`, `/account`, `/order/success`,
+`/order/track`.
+
+**Alasan:**
+
+- Bottom nav adalah "selalu terlihat" — kalau muncul di flow
+  registrasi / login, user bisa salah tap & kehilangan state.
+- Track & success pages biasanya auto-focus ke kode pesanan — bottom
+  nav nganggu. Seller dashboard juga hidden karena admin punya
+  sidebar sendiri.
+
+**Konsekuensi:** Kalau mau reach halaman detail yang butuh nav (mis.
+  halaman admin), buka lewat sidebar admin atau URL langsung.
+
+---
+
+## D16 — Sales mutasi dihitung hanya untuk status accepted/ready/delivered
+
+**Keputusan:** RPC `admin_list_mutasi` hitung revenue + summary hanya
+dari pesanan berstatus `accepted`, `ready`, atau `delivered`.
+
+**Alasan:**
+
+- `pending` = belum dikonfirmasi penjual, jangan dihitung sebagai revenue.
+- `rejected` & `cancelled` = pesanan batal, stok dikembalikan.
+- `accepted` = penjual sudah konfirmasi, stok dipesan.
+- `ready` = sudah dimasak, tinggal diambil.
+- `delivered` = sudah selesai.
+
+**Konsekuensi:**
+
+- Halaman Mutasi cocok untuk laporan keuangan & analisis penjualan.
+- Tidak ada "double counting" dari order yang ditolak lalu dibuat baru.
+- Filter per-rasa pakai EXISTS di order_items.flavor_id (bukan join),
+  supaya order dengan 0 items (semua bundle) tetap masuk perhitungan
+  revenue. Kalau pakai INNER JOIN, order bundle-only akan tersembunyi.
+
+---
+
+## D17 — Review system: 1 review per pesanan, publik visible
+
+**Keputusan:** Tabel `order_reviews` punya `UNIQUE(order_id)`. RPC
+`submit_review` raise `already_reviewed` kalau order sudah pernah
+direview. RPC `list_reviews` hanya return row `is_visible = true`.
+
+**Alasan:**
+
+- 1 review per order = anti-spam, sederhana.
+- Seller bisa hide review (`is_visible=false`) tanpa hapus (untuk
+  moderation kalau ada ujaran kebencian).
+- Default `is_visible=true` saat insert.
+
+**Konsekuensi:**
+
+- Kalau ada bug dan order sama di-review 2x, akan raise Postgres
+  error 23505 — di handle di review-actions.ts → "Generic error".
+- TrackForm auto-buka ReviewModal kalau order.status=delivered AND
+  has_review(order_code)=false. Dismissed state disimpan di
+  useState Set supaya gak ngepop-up lagi di session yang sama.
+
+---
+
+## D18 — Signup enforcement: pre-check phone availability
+
+**Keputusan:** Sebelum `supabase.auth.signUp()`, action call RPC
+`is_phone_available(p_phone)`. Kalau false, return `phone_taken`
+tanpa bikin auth.users row.
+
+**Alasan:**
+
+- Kalau langung signup lalu gagal create profil karena phone
+  bentrok, kita punya auth.users yatim (akun tanpa profil).
+  Membersihkan auth.users butuh service_role, ribet.
+- Pre-check lebih cepat (no signup failed rollback).
+
+**Konsekuensi:**
+
+- Email tetap di-check saat `signUp()` (Supabase Auth reject
+  `already registered`). Ditangani di `humanize()` → `email_taken`.
+- Phone uniqueness enforced dua lapis: (a) pre-check di action,
+  (b) trigger DB `customer_profiles_guard_phone_unique` sebagai
+  safety net kalau ada bypass.
+- Customer_profiles sekarang UNIQUE(phone_normalized) — bukan UNIQUE
+  per (user_id) (PK tetap user_id). Migration-22 Hapus duplikat
+  terlama (created_at asc).
