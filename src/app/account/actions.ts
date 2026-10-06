@@ -290,6 +290,10 @@ export async function updateCustomerProfileAction(
  * Return `redirectUrl` untuk di-navigate oleh client (`window.location`).
  * Kalau dipanggil dari server langsung (mis. link HTML biasa), pakai
  * `redirect()` ke URL.
+ *
+ * Catatan: Fallback `localhost:3000` sudah dihapus — kalau env gak ada,
+ * kita fail dgn `oauth_unavailable` daripada risk ngarah ke localhost di
+ * production.
  */
 export async function signInWithOAuthAction(
   provider: "google" | "github" | "apple" | "facebook"
@@ -299,7 +303,11 @@ export async function signInWithOAuthAction(
     process.env.NEXT_PUBLIC_SITE_URL ??
     (typeof process.env.VERCEL_URL === "string"
       ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+      : null);
+
+  if (!origin) {
+    return { ok: false, error: "oauth_unavailable" };
+  }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
