@@ -19,6 +19,8 @@ import { HeroCarousel } from "@/components/customer/HeroCarousel";
 import { AnnouncementPopup } from "@/components/customer/AnnouncementPopup";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
+import { ReviewsSection } from "@/components/customer/ReviewsSection";
+import { getLang } from "@/lib/i18n-server";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
@@ -35,7 +37,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [settings, menu] = await Promise.all([getSettings(), getPublicMenu()]);
+  const [settings, menu, lang] = await Promise.all([
+    getSettings(),
+    getPublicMenu(),
+    getLang(),
+  ]);
   const categories = menu.categories;
   const bundles = menu.bundles;
   const dicts = await getI18nDict();
@@ -190,6 +196,13 @@ export default async function HomePage() {
                 );
               })}
             </ol>
+          </div>
+        </section>
+
+        {/* ===================== REVIEWS ===================== */}
+        <section className="border-y border-cocoa-200/60 bg-cream-100/40 py-16 lg:py-24">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <ReviewsSection lang={lang} />
           </div>
         </section>
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Search, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Search, Star, XCircle } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime, formatIDR } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { OrderStatusTimeline } from "@/components/customer/OrderStatusTimeline";
+import { ReviewModal } from "@/components/customer/ReviewModal";
 
 export function TrackForm({
   initialCode = "",
@@ -46,6 +47,10 @@ export function TrackForm({
     }>;
   } | null>(null);
   const [error, setError] = useState<"notFound" | "code" | null>(null);
+  // Auto-open review modal ketika status delivered & belum ada review.
+  const [reviewOpen, setReviewOpen] = useState(false);
+  // Supaya pop-up tidak muncul lagi kalau user sudah menutup (ditrack this session).
+  const [reviewDismissed, setReviewDismissed] = useState<Set<string>>(new Set());
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,8 +64,6 @@ export function TrackForm({
 
     setBusy(true);
     try {
-      // Cukup kode — RPC publik `track_by_code` (security definer) supaya
-      // pembeli tidak perlu menuliskan nomor telepon lagi.
       const supabase = createClient();
       const { data, error: rpcError } = await supabase.rpc("track_by_code", {
         p_code: code.trim(),
@@ -80,6 +83,32 @@ export function TrackForm({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Cek apakah order delivered + belum pernah di-review. Buka modal otomatis.
+  useEffect(() => {
+    if (!order) return;
+    if (order.status !== "delivered") return;
+    if (reviewDismissed.has(order.order_code)) return;
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.rpc("has_review", {
+        p_order_code: order.order_code,
+      });
+      if (cancelled) return;
+      if (!data) setReviewOpen(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [order, reviewDismissed]);
+
+  function closeReview() {
+    if (order) {
+      setReviewDismissed((prev) => new Set(prev).add(order.order_code));
+    }
+    setReviewOpen(false);
   }
 
   return (
@@ -164,7 +193,26 @@ export function TrackForm({
               value={formatDateTime(order.updated_at, lang)}
             />
           </dl>
+
+          {order.status === "delivered" ? (
+            <button
+              type="button"
+              onClick={() => setReviewOpen(true)}
+              className="btn-primary mt-5 w-full"
+            >
+              <Star className="size-4" />
+              {t.reviews.writeYour}
+            </button>
+          ) : null}
         </div>
+      ) : null}
+
+      {order && reviewOpen ? (
+        <ReviewModal
+          orderCode={order.order_code}
+          initialOpen={reviewOpen}
+          onClose={closeReview}
+        />
       ) : null}
     </div>
   );

@@ -366,6 +366,23 @@ export interface SalesTransaction {
   }>;
 }
 
+/** Ulasan pembeli yang tampil di homepage & halaman track. */
+export interface OrderReview {
+  id: number;
+  customer_name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  order_code?: string;
+}
+
+/** Hasil RPC list_reviews: agregat + list. */
+export interface ReviewListResult {
+  avg_rating: number;
+  total_count: number;
+  reviews: OrderReview[];
+}
+
 /** Buyer opsional — kalau customer login, profil ini tersedia untuk auto-fill. */
 export interface CustomerProfile {
   user_id: string;
