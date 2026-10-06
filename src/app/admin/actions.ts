@@ -10,6 +10,8 @@ import type {
   DashboardStats,
   Order,
   OrderStatus,
+  SalesSummary,
+  SalesTransaction,
   StoreSettings,
 } from "@/lib/types";
 
@@ -241,6 +243,64 @@ export async function getSettingsAction(): Promise<ActionResult<StoreSettings>> 
 
   if (sErr) return { ok: false, error: "generic" };
   return { ok: true, data: settings as StoreSettings };
+}
+
+/**
+ * Halaman Mutasi — daftar transaksi (sales history) + ringkasan revenue.
+ *
+ * Filter:
+ *   - p_from_date / p_to_date (UTC, inclusive end-to-date = akhir hari)
+ *   - p_flavor_id (null = semua rasa)
+ *   - p_search (kode pesanan, nama, telepon)
+ *
+ * Hanya menghitung pesanan berstatus `accepted`, `ready`, `delivered`
+ * sebagai revenue (lihat RPC admin_list_mutasi).
+ */
+export async function getMutasiAction(params: {
+  fromDate?: string | null;
+  toDate?: string | null;
+  flavorId?: number | null;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<
+  ActionResult<{
+    summary: SalesSummary;
+    transactions: SalesTransaction[];
+    total: number;
+  }>
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_mutasi", {
+    p_from_date: params.fromDate || null,
+    p_to_date: params.toDate || null,
+    p_flavor_id: params.flavorId ?? null,
+    p_search: params.search?.trim() || null,
+    p_limit: params.limit ?? 50,
+    p_offset: params.offset ?? 0,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  const payload = (data ?? {}) as {
+    summary: SalesSummary;
+    transactions: SalesTransaction[];
+    total: number;
+  };
+  return {
+    ok: true,
+    data: {
+      summary: payload.summary ?? {
+        revenue_total: 0,
+        orders_count: 0,
+        pcs_sold: 0,
+        revenue_today: 0,
+        orders_today: 0,
+        top_flavors: [],
+      },
+      transactions: payload.transactions ?? [],
+      total: payload.total ?? 0,
+    },
+  };
 }
 
 export async function getAdminsAction(): Promise<ActionResult<AdminUser[]>> {

@@ -336,6 +336,36 @@ export interface DashboardStats {
   sales_by_flavor: Array<{ flavor_name: string; qty: number }>;
 }
 
+/** Ringkasan revenue untuk halaman Mutasi (admin). */
+export interface SalesSummary {
+  revenue_total: number;
+  orders_count: number;
+  pcs_sold: number;
+  revenue_today: number;
+  orders_today: number;
+  top_flavors: Array<{ flavor_name: string; qty: number }>;
+}
+
+/** Satu baris transaksi di halaman Mutasi (admin). */
+export interface SalesTransaction {
+  id: number;
+  order_code: string;
+  customer_name: string;
+  phone: string;
+  status: OrderStatus;
+  payment_method: PaymentMethod;
+  total_price: number;
+  subtotal: number;
+  delivery_fee: number;
+  created_at: string;
+  items: Array<{
+    flavor_name: string;
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+  }>;
+}
+
 /** Buyer opsional — kalau customer login, profil ini tersedia untuk auto-fill. */
 export interface CustomerProfile {
   user_id: string;

@@ -11,6 +11,7 @@ import {
   Megaphone,
   Menu,
   Settings,
+  TrendingUp,
   Users,
   UtensilsCrossed,
   X,
@@ -23,6 +24,7 @@ import { signOutAction } from "@/app/admin/actions";
 const NAV = [
   { href: "/admin", key: "dashboard" as const, icon: LayoutDashboard, exact: true },
   { href: "/admin/orders", key: "orders" as const, icon: ClipboardList, exact: false },
+  { href: "/admin/sales", key: "sales" as const, icon: TrendingUp, exact: false },
   { href: "/admin/menu", key: "menu" as const, icon: UtensilsCrossed, exact: false },
   { href: "/admin/customers", key: "customers" as const, icon: Users, exact: false },
   { href: "/admin/announcements", key: "announcements" as const, icon: Megaphone, exact: false },
@@ -49,6 +51,7 @@ export function AdminShell({
     customers: string;
     announcements: string;
     settings: string;
+    sales: string;
     viewSite: string;
     signOut: string;
   };
