@@ -531,7 +531,7 @@ begin
             'bundle_name', case when ord.language = 'en' then bg.bundle_name_en else bg.bundle_name_id end,
             'slots', bg.slots,
             'note', (
-              select n.note from jsonb_array_elements(coalesce(ord.notes -> 'bundles', '[]'::jsonb)) n
+              select n ->> 'note' from jsonb_array_elements(coalesce(ord.notes -> 'bundles', '[]'::jsonb)) n
               where (n ->> 'bundle_id')::bigint = bg.bundle_id limit 1
             )
           ) as b
