@@ -62,6 +62,7 @@ export const en = {
     track: "Track order",
     contact: "Contact",
     admin: "Seller dashboard",
+    account: "Account",
   },
   hero: {
     eyebrow: "Freshly made, pre-order only",
@@ -230,6 +231,8 @@ export const en = {
       refresh: "Generate new QR",
       refreshSuccess: "New QR generated. Scan again to pay.",
       copyOrder: "Copy order code",
+      download: "Download QR",
+      downloaded: "QR downloaded",
       openApp: "Or open your e-wallet app",
       poweredBy: "Payments powered by Midtrans",
     },

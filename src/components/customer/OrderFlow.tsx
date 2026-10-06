@@ -97,7 +97,15 @@ export function OrderFlow({
   // Catatan: useState initial hanya jalan sekali, jadi user yang logout
   // setelah halaman dimuat akan tetap di step dia sekarang sampai dia
   // refresh. Itu acceptable — Guest UX di tengah flow = friction.
-  const [step, setStep] = useState<Step>(profile ? "menu" : "identity");
+  const [step, setStep] = useState<Step>(() => {
+    // Restore step dari sessionStorage (kalau ada), supaya refresh di step
+    // 'menu' (pilih rasa) gak balik ke 'identity'. Penting untuk UX mobile.
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("js_order_step") as Step | null;
+      if (saved && ["identity", "menu", "payment", "review"].includes(saved)) return saved;
+    }
+    return profile ? "menu" : "identity";
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
@@ -286,6 +294,28 @@ export function OrderFlow({
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
 
   const stepIndex = STEPS.indexOf(step);
+
+  // Simpan step ke sessionStorage setiap user pindah step — biar refresh
+  // (mis. user pilih flavor lalu accidentally refresh) tetap di step itu.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem("js_order_step", step);
+  }, [step]);
+
+  // Reset cart + step saat user meninggalkan halaman /order. Tujuannya:
+  //   1. Privacy — data identitas (nama, telepon, IG) gak kesimpan ke pre-order
+  //      berikutnya.
+  //   2. UX bersih — next visit selalu mulai dari awal, gak ada leftover.
+  useEffect(() => {
+    return () => {
+      if (typeof window === "undefined") return;
+      // window unmount = user leaving page (route change). Bersihin.
+      sessionStorage.removeItem("js_order_step");
+      reset();
+    };
+  }, []);
+
+  // Reset cart setelah orderan berhasil (di-handle via router.push to success).
 
   function goTo(target: Step) {
     setErrors({});

@@ -60,6 +60,7 @@ export const id: Dict = {
     track: "Cek Pesanan",
     contact: "Kontak",
     admin: "Dashboard Penjual",
+    account: "Akun",
   },
   hero: {
     eyebrow: "Dibuat fresh, khusus pre-order",
@@ -228,6 +229,8 @@ export const id: Dict = {
       refresh: "Generate QR baru",
       refreshSuccess: "QR baru dibuat. Scan lagi untuk membayar.",
       copyOrder: "Salin kode pesanan",
+      download: "Unduh QR",
+      downloaded: "QR diunduh",
       openApp: "Atau buka aplikasi e-wallet kamu",
       poweredBy: "Pembayaran oleh Midtrans",
     },
