@@ -8,6 +8,9 @@ import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider";
 import { AccountClient } from "./AccountClient";
+import { VouchersSection } from "@/components/customer/VouchersSection";
+import { ContactSection } from "@/components/customer/ContactSection";
+import { getMyVouchersAction } from "@/app/review-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +30,8 @@ export default async function AccountPage() {
   if (!profile) {
     redirect("/login?next=/account");
   }
+
+  const vouchers = await getMyVouchersAction();
 
   const storeName = settings?.store_name ?? "Rumakomugi";
   const logoUrl = settings?.logo_url ?? null;
@@ -56,11 +61,20 @@ export default async function AccountPage() {
           </Link>
         </div>
 
-        <AccountClient
-          initialProfile={profile}
-          initialOrders={orders}
-          dict={dicts.account}
-        />
+        <div className="space-y-8">
+          <AccountClient
+            initialProfile={profile}
+            initialOrders={orders}
+            dict={dicts.account}
+          />
+
+          <VouchersSection vouchers={vouchers} />
+
+          <ContactSection
+            settings={settings ?? null}
+            dict={dicts.account.contact}
+          />
+        </div>
       </main>
       <SiteFooter settings={settings} />
     </CustomerAuthProvider>

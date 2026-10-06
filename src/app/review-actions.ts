@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { OrderReview, ReviewListResult } from "@/lib/types";
+import type { OrderReview, ReviewListResult, VoucherList } from "@/lib/types";
 
 export interface ReviewActionResult<T = undefined> {
   ok: boolean;
@@ -70,4 +70,10 @@ export async function listReviewsAction(): Promise<ReviewListResult> {
     p_offset: 0,
   });
   return (data as ReviewListResult) ?? { avg_rating: 0, total_count: 0, reviews: [] };
+}
+
+export async function getMyVouchersAction(): Promise<VoucherList> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("list_my_vouchers");
+  return (data as VoucherList) ?? { active: [], used: [], expired: [] };
 }

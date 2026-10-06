@@ -84,6 +84,7 @@ export function CustomerAuthForm({
     if (code === "invalid_name") return registerErrors.invalidName;
     if (code === "name_too_long") return registerErrors.nameTooLong;
     if (code === "invalid_date_of_birth") return registerErrors.invalidDateOfBirth;
+    if (code === "phone_taken") return registerErrors.phoneTaken;
     return d.errors.generic;
   }
 

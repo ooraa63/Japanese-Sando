@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, User } from "lucide-react";
+import { Home, Receipt, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 /**
@@ -30,8 +30,8 @@ export function MobileBottomNav() {
 
   const items = [
     { href: "/", label: t.nav.home, icon: Home },
-    { href: "/order", label: t.nav.order, icon: ShoppingBag },
-    { href: "/account", label: t.nav.account, icon: User },
+    { href: "/account", label: t.nav.myOrder, icon: Receipt },
+    { href: "/account#contact", label: t.nav.account, icon: User },
   ];
 
   return (

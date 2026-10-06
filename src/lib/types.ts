@@ -383,6 +383,28 @@ export interface ReviewListResult {
   reviews: OrderReview[];
 }
 
+/** Voucher yang ditampilkan di /account customer. */
+export type VoucherType = "percent" | "amount" | "free_shipping" | "free_item";
+
+export interface Voucher {
+  id: number;
+  code: string;
+  type: VoucherType;
+  /** Detail nilai: {percent}, {amount} (Rp), {flavor_id, qty} (free_item), atau {} (free_shipping). */
+  value: Record<string, number | string | null>;
+  label_id: string;
+  label_en: string;
+  expires_at: string | null;
+  used_at: string | null;
+  created_at: string;
+}
+
+export interface VoucherList {
+  active: Voucher[];
+  used: Voucher[];
+  expired: Voucher[];
+}
+
 /** Buyer opsional — kalau customer login, profil ini tersedia untuk auto-fill. */
 export interface CustomerProfile {
   user_id: string;

@@ -5,9 +5,6 @@ import {
   MessageCircle,
   ShoppingBag,
   Sparkles,
-  Timer,
-  Truck,
-  Wallet,
 } from "lucide-react";
 import { getPublicMenu, getSettings } from "@/lib/data";
 import { getI18nDict } from "@/lib/i18n-server";
@@ -155,47 +152,6 @@ export default async function HomePage() {
                 sort_order: number;
               }>) ?? []}
             />
-          </div>
-        </section>
-
-        {/* ===================== CARA PESAN ===================== */}
-        <section
-          id="how"
-          className="scroll-mt-20 border-y border-cocoa-200/60 bg-cream-100/70 py-16 lg:py-24"
-        >
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <div className="max-w-2xl">
-              <p className="text-xs font-bold tracking-[0.2em] text-berry-500 uppercase">
-                {dicts.nav.howItWorks}
-              </p>
-              <h2 className="mt-2 text-3xl font-extrabold text-cocoa-900 sm:text-4xl">
-                {dicts.howItWorks.title}
-              </h2>
-              <p className="mt-2 text-base text-cocoa-500">{dicts.howItWorks.subtitle}</p>
-            </div>
-
-            <ol className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {dicts.howItWorks.steps.map((step, i) => {
-                const icons = [Wallet, ShoppingBag, Timer, Truck];
-                const Icon = icons[i] ?? Sparkles;
-                return (
-                  <li key={step.title} className="relative">
-                    <div className="flex items-center gap-3">
-                      <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-cocoa-800 text-cream-50 shadow-lg shadow-cocoa-900/15">
-                        <Icon className="size-5" />
-                      </span>
-                      <span className="font-display text-4xl font-bold text-cocoa-200 select-none">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-                    <h3 className="mt-4 text-base font-bold text-cocoa-900">{step.title}</h3>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-cocoa-500">
-                      {step.desc}
-                    </p>
-                  </li>
-                );
-              })}
-            </ol>
           </div>
         </section>
 

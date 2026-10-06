@@ -124,16 +124,16 @@ export function SalesClient({
   function exportCsv() {
     if (transactions.length === 0) return;
     const header = [
-      lang === "en" ? "Order code" : "Kode pesanan",
-      lang === "en" ? "Date" : "Tanggal",
-      lang === "en" ? "Customer" : "Pelanggan",
-      lang === "en" ? "Phone" : "Telepon",
-      lang === "en" ? "Items" : "Item",
-      lang === "en" ? "Subtotal" : "Subtotal",
-      lang === "en" ? "Delivery" : "Ongkir",
-      lang === "en" ? "Total" : "Total",
-      lang === "en" ? "Payment" : "Bayar",
-      lang === "en" ? "Status" : "Status",
+      t.admin.sales.csv.code,
+      t.admin.sales.csv.date,
+      t.admin.sales.csv.customer,
+      t.admin.sales.csv.phone,
+      t.admin.sales.csv.items,
+      t.admin.sales.csv.subtotal,
+      t.admin.sales.csv.delivery,
+      t.admin.sales.csv.total,
+      t.admin.sales.csv.payment,
+      t.admin.sales.csv.status,
     ];
     const rows = transactions.map((tr) => {
       const items = tr.items.map((i) => `${i.flavor_name} x${i.quantity}`).join(" | ");
@@ -278,7 +278,7 @@ export function SalesClient({
       <section className="rounded-2xl border border-cocoa-200 bg-cream-50 p-4">
         <div className="flex items-center gap-2 mb-3 text-sm font-bold text-cocoa-700">
           <Filter className="size-4" />
-          {lang === "en" ? "Filters" : "Filter"}
+          {t.admin.sales.filtersLabel}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="space-y-1">
@@ -336,7 +336,7 @@ export function SalesClient({
           <label className="space-y-1">
             <span className="block text-[11px] font-semibold uppercase tracking-wide text-cocoa-500">
               <Search className="mr-1 inline size-3" />
-              {lang === "en" ? "Search" : "Cari"}
+              {t.admin.sales.searchLabel}
             </span>
             <input
               type="search"
@@ -344,11 +344,7 @@ export function SalesClient({
               onChange={(e) =>
                 applyFilters({ ...filters, search: e.target.value })
               }
-              placeholder={
-                lang === "en"
-                  ? "Code, name, phone…"
-                  : "Kode, nama, telepon…"
-              }
+              placeholder={t.admin.sales.searchPlaceholder}
               className="w-full rounded-lg border border-cocoa-200 bg-cream-100 px-3 py-2 text-sm focus:border-matcha-600 focus:outline-none"
             />
           </label>
@@ -463,14 +459,14 @@ export function SalesClient({
                             </li>
                           ))}
                           <li className="flex items-center justify-between border-t border-cocoa-200/70 pt-1 font-bold text-cocoa-900">
-                            <span>{lang === "en" ? "Subtotal" : "Subtotal"}</span>
+                            <span>{t.admin.sales.itemSubtotal}</span>
                             <span className="font-mono">
                               {formatIDR(tr.subtotal, lang)}
                             </span>
                           </li>
                           {tr.delivery_fee > 0 ? (
                             <li className="flex items-center justify-between text-cocoa-600">
-                              <span>{lang === "en" ? "Delivery" : "Ongkir"}</span>
+                              <span>{t.admin.sales.itemDelivery}</span>
                               <span className="font-mono">
                                 {formatIDR(tr.delivery_fee, lang)}
                               </span>
