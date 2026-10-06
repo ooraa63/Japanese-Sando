@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import {
   signInCustomerAction,
-  signInWithOAuthAction,
+  signInWithGoogleIdTokenAction,
   signUpCustomerAction,
   type CustomerActionResult,
 } from "@/app/account/actions";
@@ -116,19 +116,39 @@ export function CustomerAuthForm({
     });
   }
 
-  async function oauth(
-    provider: "google" | "github" | "apple" | "facebook"
-  ) {
+  async function oauthWithGoogle() {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setState({ ok: false, error: "oauth_unavailable" });
+      return;
+    }
     setState(null);
     startTransition(async () => {
-      const res = await signInWithOAuthAction(provider);
-      if (res.ok && res.data) {
-        // Browser navigasi ke provider OAuth. Session cookie di-set
-        // Supabase setelah callback di /account?oauth=1.
-        window.location.href = res.data.url;
-        return;
+      try {
+        // Pakai GIS popup → user pilih akun → dapet Google id_token (JWT).
+        // URL Supabase tidak muncul di consent screen Google.
+        const { requestGoogleIdToken } = await import("@/lib/googleAuth");
+        const idToken = await requestGoogleIdToken(clientId);
+
+        // Exchange Google JWT → auth.users row + session cookie.
+        const res = await signInWithGoogleIdTokenAction(idToken);
+        if (res.ok) {
+          onSuccess?.();
+          const target = nextPath && nextPath.startsWith("/") ? nextPath : "/account";
+          router.replace(target);
+          router.refresh();
+          return;
+        }
+        setState({ ok: false, error: res.error ?? "generic" });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Google login failed";
+        if (/popup_closed_by_user|User cancelled/i.test(message)) {
+          // User tutup popup — diem aja, jangan tampilkan error.
+          return;
+        }
+        setState({ ok: false, error: "generic" });
       }
-      setState({ ok: false, error: res.error ?? "generic" });
     });
   }
 
@@ -325,7 +345,7 @@ export function CustomerAuthForm({
         <div className="mt-3 space-y-2">
           <button
             type="button"
-            onClick={() => oauth("google")}
+            onClick={oauthWithGoogle}
             disabled={pending}
             className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-cocoa-200 bg-white px-3 py-2.5 text-sm font-bold text-cocoa-800 transition hover:bg-cocoa-50 disabled:opacity-40"
           >

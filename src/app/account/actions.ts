@@ -22,6 +22,19 @@ export interface CustomerActionResult<T = undefined> {
   redirectUrl?: string;
 }
 
+export interface CustomerActionResult<T = undefined> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+  /**
+   * True kalau signup berhasil & Supabase mengirim email verifikasi, dan
+   * sesi belum aktif (Confirm email ON). UI menampilkan "cek email kamu".
+   */
+  requiresVerification?: boolean;
+  /** URL untuk OAuth redirect (Google, dsb). Browser yang navigasi ke sini. */
+  redirectUrl?: string;
+}
+
 function humanize(error: string | undefined): string {
   if (!error) return "generic";
   const code = error.trim();
@@ -303,4 +316,49 @@ export async function signInWithOAuthAction(
     return { ok: false, error: "oauth_unavailable" };
   }
   return { ok: true, data: { url: data.url } };
+}
+
+/**
+ * Exchange Google id_token (JWT) jadi Supabase session.
+ *
+ * Dipakai oleh GoogleLoginButton yang pakai Google Identity Services
+ * popup flow — hasilnya Google consent screen menampilkan nama app,
+ * BUKAN URL `<project-ref>.supabase.co`.
+ *
+ * Supabase akan otomatis:
+ *   - Buat auth.users row kalau email belum terdaftar (kalau "Confirm
+ *     email" OFF — direct session; kalau ON — kirim verification)
+ *   - Trigger `on_first_user_created` cuma untuk admin, customer lewat
+ *     RPC `customer_bootstrap_from_metadata` setelah first login
+ */
+export async function signInWithGoogleIdTokenAction(
+  idToken: string
+): Promise<CustomerActionResult<{ userId: string; email: string | null }>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithIdToken({
+    provider: "google",
+    token: idToken,
+  });
+
+  if (error || !data?.user) {
+    return {
+      ok: false,
+      error: error?.message ? humanize(error.message) : "oauth_failed",
+    };
+  }
+
+  // Kalau customer belum punya customer_profiles, bootstrap dari
+  // raw_user_meta_data (Google name + email sudah ada di situ).
+  // RPC `customer_bootstrap_from_metadata` adalah idempotent.
+  try {
+    await supabase.rpc("customer_bootstrap_from_metadata");
+  } catch {
+    // Bootstrap mungkin gagal kalau profile sudah ada — itu OK, diem aja.
+  }
+
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    data: { userId: data.user.id, email: data.user.email ?? null },
+  };
 }
