@@ -4,6 +4,53 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-07 — Fix /account blank karena redirect loop (post-OAuth-hapus)
+
+**Bug:** Setelah commit `da8b090` (hapus Google OAuth) + migration-29
+(`customer_bootstrap_from_metadata` jadi strict require phone), user yang
+login pertama kali tapi `customer_profiles` row tidak dibuat akan loop:
+
+```
+/account → (getCustomerProfile() = null) → redirect /login?next=/account
+/login  → (user masih login)         → redirect /account
+/account → ...                       → LOOP (ERR_TOO_MANY_REDIRECTS, blank)
+```
+
+`MEMORY/CHANGELOG.md` lama (entry 94) sebenarnya sudah pernah memfix ini dengan
+`CompleteProfileCard.tsx` + `customer_profile_needs_completion()` — tapi file
+component dihapus saat Google OAuth dihapus.
+
+**Fix:**
+
+1. **Restore `src/components/customer/CompleteProfileCard.tsx`** dengan
+   teks yang sudah disesuaikan (gak sebut Google lagi, tapi "akun kamu sudah
+   aktif, data identitas belum lengkap" — relevan untuk edge case signup dengan
+   Confirm email ON + metadata tidak lengkap).
+3. **Refactor `src/app/account/page.tsx`:**
+   - Cek `supabase.auth.getUser()` lebih dulu. Kalau tidak ada user →
+     `redirect("/login?next=/account")`.
+   - Kalau ada user tapi profile null → coba `customer_bootstrap_from_metadata`
+     best-effort, lalu re-fetch profile.
+   - Kalau masih null → render `CompleteProfileCard` (form "Lengkapi profil"
+     yang submit via `updateCustomerProfileAction`). BUKAN redirect.
+   - Kalau bootstrap berhasil → render halaman /account normal.
+4. Extract helper `renderAccount()` supaya dua branch (profile ada vs
+   bootstrap baru jadi ada) gak duplicate JSX.
+
+**Mengapa perlu:** meskipun flow saat ini `/register → /account` idealnya
+selalu bikin profile (Confirm email OFF + `customer_upsert_own_profile`
+sync), kalau Confirm email ON atau RPC gagal, login jalan → bootstrap
+best-effort jalan di `signInCustomerAction` — kalau itu gagal, tanpa fix
+ini user stuck.
+
+**File diubah:**
+
+- `src/components/customer/CompleteProfileCard.tsx` — dibuat ulang.
+- `src/app/account/page.tsx` — logika redirect diganti, render fallback
+  saat profile null + user login.
+
+---
+
 ## 2026-10-07 — Hapus Google OAuth total
 
 **Mengubah (commit `da8b090`):**
