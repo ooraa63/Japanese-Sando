@@ -4,6 +4,91 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-07 — 13 perbaikan dari review Word "Perbaikan Ruma Komugi"
+
+Steven kirim Word berisi 13 feedback + screenshot. Semuanya dikerjakan dalam satu
+commit (`5039600`) plus 3 migration SQL (34/35/36).
+
+### Hapus pengumuman (item 1)
+Hapus total: `AnnouncementPopup`, `AnnouncementBar`, halaman
+`/admin/announcements`, `AnnouncementsClient`, item sidebar `Megaphone`, 3
+server action (`getAnnouncementsAction`/`saveAnnouncementAction`/
+`deleteAnnouncementAction`), field `announcement_id`/`announcement_en` di
+SettingsClient + `StoreSettings`, dan semua key i18n. Tabel DB `announcements`
+dibiarkan (data lama aman, cuma gak ada UI-nya).
+
+### Kontak pindah ke /contact (item 2, 3, 4, 5)
+- `ShopInfo` (hero): chip WA/IG/alamat dihapus. Sisa jam buka + batas pre-order
+  + 2 shortcut (`/contact#faq`, `/contact`).
+- `SiteFooter`: kolom "Hubungi kami" jadi link ke `/contact#faq` & `/contact`.
+  Nomor/IG/alamat pindah ke sana. WA & IG tetap sebagai link teks di baris
+  copyright.
+- Halaman baru `src/app/contact/page.tsx`: section Kontak (WA, IG, jam buka,
+  batas pre-order, alamat + link peta), FAQ accordion 6 Q&A hardcoded bilingual,
+  Brand Story (dari `store_settings.description_*`), CTA WhatsApp.
+- `MobileBottomNav`: 3 -> 4 item, tambah `Headphones` = Kontak.
+- `SiteHeader`: link Kontak desktop & mobile -> `/contact` (sebelumnya `/#contact`).
+- `/account`: blok baru "Butuh bantuan?" berisi 3 baris menu (FAQ / Kontak /
+  Cerita kami) ala Pizza Hut, plus `ContactSection` yang sudah ada tetap.
+
+Key i18n baru: `contactPage.*` + `account.contact.helpTitle`.
+
+### Bundle: harga coret (item 7)
+Tiga migration baru:
+- **34** - `bundles.compare_price integer` + RPC `expire_stale_qris_orders()`.
+- **35** - `public_menu()` dibuat ulang, kirim `compare_price` untuk bundle di
+  dalam kategori DAN bundle standalone.
+- **36** - `admin_save_bundle()` terima/simpan `compare_price` (invalid kalau
+  `<= price` -> disimpan NULL; key yang tidak dikirim pertahankan nilai lama
+  supaya toggle cepat admin aman), `admin_list_bundles()` kirim `compare_price`.
+
+Komponen baru `src/components/customer/PriceTag.tsx`: badge diskon (`-25%`) +
+harga asal dicoret + harga jual. Dipakai di kartu bundle (beranda & `/order`),
+`OrderBundleModal`, dan `FlavorCard`. `MenuClient` dapat input "Harga coret"
+opsional dengan validasi.
+
+### Harga & stok (item 8, 10)
+- `FlavorCard`: chip harga dihapus dari atas foto -> `PriceTag` di bawah foto,
+  ukuran `lg`. Badge diskon tetap di foto. Sisa tinggi kartu tetap balance
+  karena stepper masih `mt-auto`.
+- **Akar masalah "Selalu tersedia"**: `OrderFlow` mengirim
+  `remainingStock={null}` ke `OrderMenuBrowser`, padahal stok itu PER KATEGORI
+  (`categories.stock`, dipakai `create_order`). Sekarang `MenuBrowser` menghitung
+  sendiri dari `c.stock_enabled` / `c.stock` dan mengurangi isian keranjang,
+  jadi kartu menampilkan sisa pcs sebenarnya dan otomatis sold-out.
+
+### QRIS: unpaid tidak masuk antrian produksi (item 6)
+- `vercel.json` (baru) - cron `* * * * *` -> `/api/cron/qris-expire`.
+- `src/app/api/cron/qris-expire/route.ts` (baru) - proteksi `CRON_SECRET`,
+  panggil RPC pakai `SUPABASE_SERVICE_ROLE_KEY`.
+- RPC `expire_stale_qris_orders()`: `FOR UPDATE SKIP LOCKED` + pagar
+  `stock_restored=false` (aman cron paralel & idempoten). Restock
+  **per-kategori** (`categories.stock`) pakai `sum(order_items.quantity)` -
+  persis kebalikan dari `create_order`.
+- `qris_status='expired'` + `status='cancelled'` -> `admin_list_orders` tetap
+  menyembunyikannya dari dashboard.
+- `QrisPaymentModal`: panel "Tunggu pembayaran" menjelaskan menutup modal bukan
+  membatalkan pesanan; auto-close 2s -> 4s.
+
+### Bug & layout (item 9, 11, 12, 13)
+- **Bug keranjang**: `CartStickyBar` `sticky bottom-0` menimpa kartu Flavor
+  terakhir (terlihat di screenshot). Section menu step 2 diberi `pb-28`.
+- **SalesClient**: kolom "TRANSFER BANK" terpotong - kolom terakhir cuma 100px.
+  Sekarang `minmax(150px,auto)` + `whitespace-nowrap`; `minmax(0,1fr)` untuk
+  kolom customer/items supaya tidak robek; spacing baris & panel detail dirapikan.
+- Beranda: `py-16 lg:py-24` -> `py-12 lg:py-16` di 3 section, CTA `py-14` ->
+  `py-10`, `mt-8` -> `mt-6`; footer `mt-20` -> `mt-14`, `py-14` -> `py-12`.
+
+### Fix bonus: db:push idempoten
+`migration-25` gagal di-re-run dengan `42P13 cannot change return type of
+existing function` karena `list_active_zones()` / `admin_list_zones()` sudah
+di-recreate `migration-32` (kolom `kind`) dan `create or replace` tidak boleh
+ganti return type. Ditambah `drop function if exists` sebelum keduanya.
+
+### Env yang perlu ditambahkan di Vercel
+`SUPABASE_SERVICE_ROLE_KEY` + `CRON_SECRET` (cron Route Handler butuh keduanya).
+
+---
 ## 2026-10-07 — Migration-30: restore customer_profiles.date_of_birth + fix trigger order
 
 **Bug:** Steven (steven07.zgy@gmail.com) register + login tapi profile gak
