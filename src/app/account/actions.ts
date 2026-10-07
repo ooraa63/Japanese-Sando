@@ -14,6 +14,12 @@ export interface CustomerActionResult<T = undefined> {
   data?: T;
   error?: string;
   /**
+   * Kode error mentah dari server (Postgres SQLSTATE, dll) untuk debugging
+   * UI. BUKAN untuk ditampilkan langsung ke user — UI harus pakai `error`
+   * yang sudah di-humanize.
+   */
+  errorDebug?: string;
+  /**
    * True kalau signup berhasil & Supabase mengirim email verifikasi, dan
    * sesi belum aktif (Confirm email ON). UI menampilkan "cek email kamu".
    */
@@ -31,9 +37,19 @@ const _oauthCodes = ["oauth_unavailable", "oauth_failed"] as const;
 // Helper error code lama untuk OAuth — sekarang gak dipakai (lihat blok
 // "OAUTH — DISABLED" di bawah). Tapi dipertahankan kalau ada RPC lama
 // yang masih return string ini — biar humanize() gak throw.
-function humanize(error: string | undefined): string {
-  if (!error) return "generic";
-  const code = error.trim();
+//
+// Terima PostgrestError (punya `.code` SQLSTATE) atau string message saja
+// (untuk backward-compat). Postgres SQLSTATE dipakai untuk mendeteksi
+// unique violation (23505), not-null violation (23502), dll — yang gak
+// raise dengan `raise exception 'code'` jadi gak bisa di-match dari
+// message saja.
+function humanize(err: { message?: string; code?: string } | string | undefined | null): string {
+  if (!err) return "generic";
+
+  const message = typeof err === "string" ? err : (err.message ?? "");
+  const sqlstate = typeof err === "string" ? undefined : err.code;
+  const code = message.trim();
+
   const known = [
     "invalid_email",
     "invalid_instagram",
@@ -50,9 +66,32 @@ function humanize(error: string | undefined): string {
     "phone_already_registered",
     "oauth_unavailable",
     "oauth_failed",
-    "generic",
   ];
-  return known.includes(code) ? code : "generic";
+  if (known.includes(code)) return code;
+
+  // Postgres SQLSTATE mapping untuk error yang gak raise secara eksplisit.
+  // Lihat https://www.postgresql.org/docs/current/errcodes-appendix.html
+  if (sqlstate === "23505") {
+    // unique_violation — biasanya phone yang sudah dipakai customer lain.
+    if (/phone/i.test(message) || /customer_profiles_phone/i.test(message)) {
+      return "phone_taken";
+    }
+    return "duplicate_value";
+  }
+  if (sqlstate === "23502") {
+    // not_null_violation — field wajib gak diisi.
+    return "missing_required_field";
+  }
+  if (sqlstate === "23514") {
+    // check_violation — biasanya validasi internal RPC.
+    return "check_violation";
+  }
+  if (sqlstate === "42501") {
+    // insufficient_privilege — RLS atau permission.
+    return "not_authorized";
+  }
+
+  return "generic";
 }
 
 /**
@@ -166,7 +205,7 @@ export async function signUpCustomerAction(
 
     if (profileErr) {
       await supabase.auth.signOut();
-      return { ok: false, error: humanize(profileErr.message) };
+      return { ok: false, error: humanize(profileErr) };
     }
     revalidatePath("/", "layout");
     return { ok: true };
@@ -269,7 +308,18 @@ export async function updateCustomerProfileAction(
     p_date_of_birth: dob,
   });
 
-  if (error) return { ok: false, error: humanize(error.message) };
+  if (error) {
+    console.error(
+      "updateCustomerProfileAction gagal:",
+      error.code,
+      error.message
+    );
+    return {
+      ok: false,
+      error: humanize(error),
+      errorDebug: `${error.code ?? "?"}: ${error.message}`,
+    };
+  }
 
   revalidatePath("/", "layout");
   revalidatePath("/account");

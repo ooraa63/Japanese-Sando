@@ -82,7 +82,18 @@ export function CompleteProfileCard({
         ? "Nomor telepon tidak valid."
         : state.error === "invalid_name"
           ? "Nama tidak valid."
-          : "Gagal menyimpan. Coba lagi nanti."
+          : state.error === "name_too_long"
+            ? "Nama terlalu panjang (maks 80 karakter)."
+            : state.error === "phone_taken" ||
+                state.error === "phone_already_registered"
+              ? "Nomor telepon ini sudah dipakai akun lain. Coba ganti atau keluar dulu."
+              : state.error === "duplicate_value"
+                ? "Data kamu bentrok dengan akun lain (mungkin nomor telepon). Coba ganti."
+                : state.error === "not_authorized"
+                  ? "Sesi login kamu sudah berakhir. Coba keluar lalu masuk lagi."
+                  : state.error === "missing_required_field"
+                    ? "Ada field wajib yang belum diisi."
+                    : "Gagal menyimpan. Coba lagi nanti."
     : null;
 
   return (
@@ -193,9 +204,16 @@ export function CompleteProfileCard({
         </div>
 
         {errorMessage ? (
-          <p className="sm:col-span-2 rounded-xl bg-berry-500/10 px-3.5 py-2.5 text-sm font-semibold text-berry-600">
-            {errorMessage}
-          </p>
+          <div className="sm:col-span-2 space-y-1.5">
+            <p className="rounded-xl bg-berry-500/10 px-3.5 py-2.5 text-sm font-semibold text-berry-600">
+              {errorMessage}
+            </p>
+            {state?.errorDebug && process.env.NODE_ENV !== "production" ? (
+              <p className="px-1 font-mono text-[11px] text-cocoa-400">
+                {state.errorDebug}
+              </p>
+            ) : null}
+          </div>
         ) : null}
 
         <div className="sm:col-span-2 flex items-center justify-between gap-3">
