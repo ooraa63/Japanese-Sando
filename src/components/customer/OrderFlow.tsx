@@ -585,20 +585,60 @@ export function OrderFlow({
     <div className="mx-auto max-w-5xl">
       {/* ---------- Progress ---------- */}
       <div className="mb-8">
-        <ol className="flex items-center gap-1.5 sm:gap-3">
+        {/* Mobile: pill style dengan step name + bar progres */}
+        <div className="flex items-center justify-between gap-3 sm:hidden">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 items-center rounded-full bg-cocoa-100 px-2.5 text-[11px] font-extrabold tracking-wider text-cocoa-700 uppercase tabular-nums">
+              {String(stepIndex + 1).padStart(2, "0")} / {String(STEPS.length).padStart(2, "0")}
+            </span>
+            <span className="font-display text-base font-bold text-cocoa-900">
+              {stepTitles[step]}
+            </span>
+          </div>
+          <span className="text-[10px] font-bold tracking-wider text-cocoa-400 uppercase">
+            {stepTitles[STEPS[Math.min(stepIndex + 1, STEPS.length - 1)]]} →
+          </span>
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-cocoa-100">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-matcha-500 to-cocoa-700 transition-all duration-500 ease-out"
+            style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }}
+          />
+        </div>
+        {/* Desktop: numbered stepper dengan connector */}
+        <ol className="mt-6 hidden items-start gap-3 sm:flex">
           {STEPS.map((s, i) => {
             const done = i < stepIndex;
             const active = i === stepIndex;
             return (
               <li key={s} className="flex flex-1 flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`grid size-7 place-items-center rounded-full text-xs font-extrabold transition ${
+                      done
+                        ? "bg-matcha-500 text-white"
+                        : active
+                          ? "bg-cocoa-900 text-cream-50 ring-4 ring-cocoa-100"
+                          : "bg-cocoa-100 text-cocoa-400"
+                    }`}
+                  >
+                    {done ? "✓" : i + 1}
+                  </span>
+                  {i < STEPS.length - 1 ? (
+                    <span
+                      className={`h-px flex-1 transition-colors ${
+                        done ? "bg-matcha-500" : "bg-cocoa-200"
+                      }`}
+                    />
+                  ) : null}
+                </div>
                 <span
-                  className={`h-1.5 rounded-full transition-colors ${
-                    done ? "bg-matcha-500" : active ? "bg-cocoa-800" : "bg-cocoa-200"
-                  }`}
-                />
-                <span
-                  className={`hidden text-[11px] font-bold tracking-wide uppercase sm:block ${
-                    active ? "text-cocoa-800" : done ? "text-matcha-600" : "text-cocoa-300"
+                  className={`text-[11px] font-bold tracking-wide uppercase ${
+                    active
+                      ? "text-cocoa-900"
+                      : done
+                        ? "text-matcha-700"
+                        : "text-cocoa-400"
                   }`}
                 >
                   {stepTitles[s]}
@@ -607,15 +647,8 @@ export function OrderFlow({
             );
           })}
         </ol>
-        <p className="mt-3 text-xs font-bold text-cocoa-400 sm:hidden">
-          {t.order.stepOf
-            .replace("{n}", String(stepIndex + 1))
-            .replace("{total}", String(STEPS.length))}{" "}
-          Ã‚Â· {stepTitles[step]}
-        </p>
       </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem] lg:items-start">
+<div className="grid gap-6 lg:grid-cols-[1fr_20rem] lg:items-start">
         <div className="min-w-0">
           {/* ============ LANGKAH 1: IDENTITAS ============ */}
           {step === "identity" ? (

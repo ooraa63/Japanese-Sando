@@ -17,6 +17,7 @@ import { AnnouncementPopup } from "@/components/customer/AnnouncementPopup";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
+import { FeaturedShowcase } from "@/components/customer/FeaturedShowcase";
 import { getLang } from "@/lib/i18n-server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -42,6 +43,27 @@ export default async function HomePage() {
   const categories = menu.categories;
   const bundles = menu.bundles;
   const dicts = await getI18nDict();
+
+  // Kumpulkan featured flavors dari menu untuk strip showcase di hero.
+  const featuredFlavors = categories
+    .flatMap((c) => (c.flavors ?? []).filter((f) => f.is_active))
+    .sort((a, b) => {
+      // Featured rasa muncul lebih dulu, lalu sort_order
+      if (a.is_featured && !b.is_featured) return -1;
+      if (b.is_featured && !a.is_featured) return 1;
+      return a.sort_order - b.sort_order;
+    })
+    .slice(0, 3)
+    .map((f) => ({
+      id: f.id,
+      slug: f.slug,
+      name_id: f.name_id,
+      name_en: f.name_en,
+      desc_id: f.desc_id,
+      desc_en: f.desc_en,
+      image_url: f.image_url,
+      price: f.price,
+    }));
 
   const open = settings?.is_preorder_open ?? true;
 
@@ -111,6 +133,15 @@ export default async function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* ===================== FEATURED SHOWCASE ===================== */}
+        {featuredFlavors.length > 0 ? (
+          <FeaturedShowcase
+            flavors={featuredFlavors}
+            lang={lang}
+            ctaLabel={dicts.menu.orderNow}
+          />
+        ) : null}
 
         {/* ===================== MENU ===================== */}
         <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6 lg:py-24">
