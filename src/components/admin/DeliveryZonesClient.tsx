@@ -17,6 +17,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/components/ui/Toast";
 import { formatIDR } from "@/lib/utils";
+import { InlineMapPicker } from "./InlineMapPicker";
 
 interface ZoneDraft {
   id: string;
@@ -330,25 +331,18 @@ function EditZoneModal({
           </label>
 
           {draft.lat || draft.lng || !draft.requires_address ? (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="block">
-                <span className="label">{t.admin.deliveryZones.latLabel}</span>
-                <input
-                  className="input font-mono"
-                  value={draft.lat}
-                  onChange={(e) => patch({ lat: e.target.value })}
-                  placeholder="-6.917"
-                />
-              </label>
-              <label className="block">
-                <span className="label">{t.admin.deliveryZones.lngLabel}</span>
-                <input
-                  className="input font-mono"
-                  value={draft.lng}
-                  onChange={(e) => patch({ lng: e.target.value })}
-                  placeholder="107.619"
-                />
-              </label>
+            <div className="space-y-3">
+              <InlineMapPicker
+                lat={draft.lat ? Number(draft.lat) : null}
+                lng={draft.lng ? Number(draft.lng) : null}
+                onChange={(lat, lng) =>
+                  patch({
+                    lat: lat.toFixed(6),
+                    lng: lng.toFixed(6),
+                  })
+                }
+                placeholder="Cari tempat (mis. Universitas UVERS)"
+              />
               <label className="block">
                 <span className="label">
                   {t.admin.deliveryZones.radiusLabel}
