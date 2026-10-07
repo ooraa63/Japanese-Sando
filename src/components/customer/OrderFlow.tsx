@@ -22,6 +22,7 @@ import type {
   Bundle,
   CartLine,
   Category,
+  CustomerProfile,
   DeliveryZone,
   StoreSettings,
 } from "@/lib/types";
@@ -37,8 +38,19 @@ import { QrisPaymentModal } from "@/components/customer/QrisPaymentModal";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
 import { formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
 
-const STEPS = ["identity", "menu", "payment", "review"] as const;
-type Step = (typeof STEPS)[number];
+const FULL_STEPS = ["identity", "menu", "payment", "review"] as const;
+const LOGGED_IN_STEPS = ["menu", "payment", "review"] as const;
+type Step = (typeof FULL_STEPS)[number];
+/** Step list untuk user yang sudah login + profile lengkap — skip identity.
+ *  Guest (= tanpa profile) tetap melewati identity dulu. */
+function stepsFor(profileComplete: boolean): readonly Step[] {
+  return profileComplete ? LOGGED_IN_STEPS : FULL_STEPS;
+}
+/** True kalau customer sudah punya profile lengkap (boleh skip identity).
+ *  Profile.user_id otomatis ada saat login Google OAuth — full_name & phone
+ *  adalah minimum yang harus ter-isi. */
+const isProfileComplete = (p: CustomerProfile | null | undefined) =>
+  !!(p?.user_id && p.full_name && p.phone);
 
 export function OrderFlow({
   categories,
@@ -96,19 +108,26 @@ export function OrderFlow({
     };
   }, []);
 
-  // Kalau customer sudah login & punya profil, identitas sudah ke-isi
-  // otomatis. Tidak perlu step "identity" — langsung ke "menu".
+  // Profil lengkap? Skip identity step — auto-fill dari profil, langsung
+  // ke menu. Kalau belum lengkap (guest / OAuth tanpa phone), tetap
+  // melalui identity dulu.
+  const profileComplete = isProfileComplete(profile);
+  const steps = useMemo(() => stepsFor(profileComplete), [profileComplete]);
+
   // Catatan: useState initial hanya jalan sekali, jadi user yang logout
   // setelah halaman dimuat akan tetap di step dia sekarang sampai dia
   // refresh. Itu acceptable — Guest UX di tengah flow = friction.
   const [step, setStep] = useState<Step>(() => {
     // Restore step dari sessionStorage (kalau ada), supaya refresh di step
     // 'menu' (pilih rasa) gak balik ke 'identity'. Penting untuk UX mobile.
+    // Filter: kalau step yang tersimpan tidak ada di steps user saat ini
+    // (mis. saved 'identity' tapi sekarang login), fallback ke langkah
+    // pertama yang applicable.
     if (typeof window !== "undefined") {
       const saved = sessionStorage.getItem("js_order_step") as Step | null;
-      if (saved && ["identity", "menu", "payment", "review"].includes(saved)) return saved;
+      if (saved && steps.includes(saved)) return saved;
     }
-    return profile ? "menu" : "identity";
+    return steps[0];
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -283,7 +302,7 @@ export function OrderFlow({
 
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
 
-  const stepIndex = STEPS.indexOf(step);
+  const stepIndex = steps.indexOf(step);
 
   // Simpan step ke sessionStorage setiap user pindah step — biar refresh
   // (mis. user pilih flavor lalu accidentally refresh) tetap di step itu.
@@ -371,7 +390,7 @@ export function OrderFlow({
     if (step === "identity" && !validateIdentity()) return;
     if (step === "menu" && !validateMenu()) return;
     if (step === "payment" && !validatePayment()) return;
-    const next = STEPS[Math.min(stepIndex + 1, STEPS.length - 1)];
+    const next = steps[Math.min(stepIndex + 1, steps.length - 1)];
     goTo(next);
   }
 
@@ -590,25 +609,27 @@ export function OrderFlow({
         <div className="flex items-center justify-between gap-3 sm:hidden">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-7 items-center rounded-full bg-cocoa-100 px-2.5 text-[11px] font-extrabold tracking-wider text-cocoa-700 uppercase tabular-nums">
-              {String(stepIndex + 1).padStart(2, "0")} / {String(STEPS.length).padStart(2, "0")}
+              {String(stepIndex + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
             </span>
             <span className="font-display text-base font-bold text-cocoa-900">
               {stepTitles[step]}
             </span>
           </div>
-          <span className="text-[10px] font-bold tracking-wider text-cocoa-400 uppercase">
-            {stepTitles[STEPS[Math.min(stepIndex + 1, STEPS.length - 1)]]} →
-          </span>
+          {stepIndex < steps.length - 1 ? (
+            <span className="text-[10px] font-bold tracking-wider text-cocoa-400 uppercase">
+              {stepTitles[steps[stepIndex + 1]]} →
+            </span>
+          ) : null}
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-cocoa-100">
           <div
             className="h-full rounded-full bg-gradient-to-r from-matcha-500 to-cocoa-700 transition-all duration-500 ease-out"
-            style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }}
+            style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
           />
         </div>
         {/* Desktop: numbered stepper dengan connector */}
         <ol className="mt-6 hidden items-start gap-3 sm:flex">
-          {STEPS.map((s, i) => {
+          {steps.map((s, i) => {
             const done = i < stepIndex;
             const active = i === stepIndex;
             return (
@@ -625,7 +646,7 @@ export function OrderFlow({
                   >
                     {done ? "✓" : i + 1}
                   </span>
-                  {i < STEPS.length - 1 ? (
+                  {i < steps.length - 1 ? (
                     <span
                       className={`h-px flex-1 transition-colors ${
                         done ? "bg-matcha-500" : "bg-cocoa-200"
@@ -1058,14 +1079,14 @@ export function OrderFlow({
               <div className="mt-6 divide-y divide-cocoa-100">
                 <ReviewRow
                   label={t.order.review.nameLabel}
-                  onEdit={() => goTo("identity")}
+                  onEdit={profileComplete ? () => router.push("/account") : () => goTo("identity")}
                   editLabel={t.order.review.editDetails}
                 >
                   {draft.name}
                 </ReviewRow>
                 <ReviewRow
                   label={t.order.review.phoneLabel}
-                  onEdit={() => goTo("identity")}
+                  onEdit={profileComplete ? () => router.push("/account") : () => goTo("identity")}
                   editLabel={t.order.review.editDetails}
                 >
                   <span dir="ltr">{formatPhone(draft.phone)}</span>
