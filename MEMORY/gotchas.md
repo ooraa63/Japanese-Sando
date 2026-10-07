@@ -185,3 +185,22 @@ yang tidak di tabel `admins` akan ditolak dari dashboard admin.
 Tabel `customer_profiles` terpisah dari `admins`. Tidak ada shared
 tabel "users" di project ini — Supabase `auth.users` adalah sumber
 kebenaran tunggal untuk siapa yang bisa sign in.
+
+
+## 16. Midtrans dormant sampai env di-set
+
+Integrasi Midtrans sudah complete di code (run server.ts, webhook,
+modal, polling) tapi **tidak akan trigger Midtrans API call** kecuali
+`MIDTRANS_SERVER_KEY` di-set.
+
+Saat ini tidak ada masalah produksi karena:
+
+- UI payment step filter opsi berdasarkan `midtransReady` (server-side
+  check dari `process.env.MIDTRANS_SERVER_KEY`).
+- API route `/api/midtrans/webhook` return 503 kalau env missing
+  (lihat `isMidtransConfigured()`).
+- Tidak ada env yang partial-set: kalau server key ada tapi client key
+  tidak, `midtransReady` masih false.
+
+Untuk aktivasi: lihat `docs/MIDTRANS.md` atau entry CHANGELOG
+"2026-10-05 — Midtrans QRIS Dinamis (DORMANT, menunggu credentials)".

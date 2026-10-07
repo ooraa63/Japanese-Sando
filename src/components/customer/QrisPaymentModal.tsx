@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   Copy,
+  Download,
   Loader2,
   RefreshCcw,
   X,
@@ -167,6 +168,21 @@ export function QrisPaymentModal({ payload, open, onClose }: QrisPaymentModalPro
     );
   }
 
+  function downloadQr() {
+    if (!order) return;
+    // Fetch gambar QR sebagai blob → save lewat <a download>.
+    // Bypass CORS dengan fallback kalau gagal (mis. img dari Midtrans tanpa CORS header).
+    const a = document.createElement("a");
+    a.href = order.qrUrl;
+    a.download = `qris-${order.code}.png`;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast.success(qd.downloaded, order.code);
+  }
+
   function refresh() {
     setOrder(null);
     setStatus("loading");
@@ -221,14 +237,24 @@ export function QrisPaymentModal({ payload, open, onClose }: QrisPaymentModalPro
                 <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
                   {qd.orderLabel}
                 </p>
-                <button
-                  type="button"
-                  onClick={copyOrderCode}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-matcha-700 hover:underline"
-                >
-                  <Copy className="size-3" />
-                  {qd.copyOrder}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={downloadQr}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-matcha-700 hover:underline"
+                  >
+                    <Download className="size-3" />
+                    {qd.download}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={copyOrderCode}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-matcha-700 hover:underline"
+                  >
+                    <Copy className="size-3" />
+                    {qd.copyOrder}
+                  </button>
+                </div>
               </div>
               <p className="font-mono text-base font-extrabold text-cocoa-900">
                 {order.code}
