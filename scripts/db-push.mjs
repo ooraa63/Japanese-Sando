@@ -58,6 +58,7 @@ const migration26Path = path.resolve(process.cwd(), "supabase/migration-26.sql")
 const migration27Path = path.resolve(process.cwd(), "supabase/migration-27.sql");
 const migration28Path = path.resolve(process.cwd(), "supabase/migration-28.sql");
 const migration29Path = path.resolve(process.cwd(), "supabase/migration-29.sql");
+const migration30Path = path.resolve(process.cwd(), "supabase/migration-30.sql");
 const sql =
   schemaSql +
   "\n\n" +
@@ -113,7 +114,9 @@ const sql =
   "\n\n" +
   (existsSync(migration28Path) ? readFileSync(migration28Path, "utf8") : "") +
   "\n\n" +
-  (existsSync(migration29Path) ? readFileSync(migration29Path, "utf8") : "");
+  (existsSync(migration29Path) ? readFileSync(migration29Path, "utf8") : "") +
+  "\n\n" +
+  (existsSync(migration30Path) ? readFileSync(migration30Path, "utf8") : "");
 
 const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
 
@@ -152,6 +155,7 @@ try {
     { name: "migration-27.sql", sql: existsSync(migration27Path) ? readFileSync(migration27Path, "utf8") : "" },
     { name: "migration-28.sql", sql: existsSync(migration28Path) ? readFileSync(migration28Path, "utf8") : "" },
     { name: "migration-29.sql", sql: existsSync(migration29Path) ? readFileSync(migration29Path, "utf8") : "" },
+    { name: "migration-30.sql", sql: existsSync(migration30Path) ? readFileSync(migration30Path, "utf8") : "" },
   ].filter((p) => p.sql.trim().length > 0);
 
   for (const part of parts) {
