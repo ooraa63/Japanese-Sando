@@ -338,16 +338,15 @@ export function OrderFlow({
     if (draft.name.trim().length < 2) next.name = t.order.identity.nameError;
     const digits = draft.phone.replace(/\D/g, "");
     if (digits.length < 9) next.phone = t.order.identity.phoneError;
-    // Email wajib (format sederhana).
+    // Email & Instagram OPTIONAL untuk guest — kalau diisi, validasi format.
+    // Kalau kosong, OK. Kalau format salah, error. Tujuannya: gak halangi
+    // guest checkout cuma karena lupa email/IG.
     const email = draft.email.trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       next.email = t.order.identity.emailError;
     }
-    // Instagram wajib (username saja, tanpa @).
-    const ig = draft.instagram.trim().replace(/^@/, "");
-    if (!ig) {
-      next.instagram = t.order.identity.instagramError;
-    }
+    // Instagram dibiarkan bebas (username apa pun → tanpa "@"). Validasi
+    // format tidak ketat supaya guest gak terblokir.
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -745,7 +744,9 @@ export function OrderFlow({
                   <div>
                     <label htmlFor="email" className="label">
                       {t.order.identity.email}
-                      <span className="ml-1 text-berry-500">*</span>
+                      <span className="ml-1 text-cocoa-400">
+                        ({lang === "en" ? "optional" : "opsional"})
+                      </span>
                     </label>
                     <input
                       id="email"
@@ -768,7 +769,9 @@ export function OrderFlow({
                   <div>
                     <label htmlFor="instagram" className="label">
                       {t.order.identity.instagram}
-                      <span className="ml-1 text-berry-500">*</span>
+                      <span className="ml-1 text-cocoa-400">
+                        ({lang === "en" ? "optional" : "opsional"})
+                      </span>
                     </label>
                     <div className="relative">
                       <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">

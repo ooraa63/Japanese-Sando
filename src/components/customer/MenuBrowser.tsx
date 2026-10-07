@@ -361,7 +361,7 @@ export function OrderMenuBrowser({
                     const fid = String(f.id);
                     const q = quantities[fid] ?? 0;
                     return (
-                      <li key={f.id}>
+                      <li key={f.id} className="flex">
                         <FlavorCard
                           flavor={f}
                           inCart={q}

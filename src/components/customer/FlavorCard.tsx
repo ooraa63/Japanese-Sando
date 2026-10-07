@@ -146,7 +146,7 @@ export function FlavorCard({
 
   return (
     <article
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition ${
+      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
         soldOut
           ? "border-cocoa-100 opacity-70"
           : "border-cocoa-200/70 hover:-translate-y-1 hover:border-cocoa-300 hover:shadow-xl hover:shadow-cocoa-900/10"
@@ -154,7 +154,7 @@ export function FlavorCard({
     >
       {/* Foto / placeholder */}
       <div
-        className={`flavor-photo relative aspect-[5/3] overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)} sm:aspect-[4/3]`}
+        className={`flavor-photo relative aspect-square overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)} sm:aspect-[4/3]`}
       >
         {flavor.image_url ? (
           <Image
@@ -181,7 +181,7 @@ export function FlavorCard({
           ) : (
             <span />
           )}
-          <span className="chip bg-white/95 text-cocoa-800 shadow tabular">
+          <span className="chip whitespace-nowrap bg-white/95 text-cocoa-800 shadow tabular">
             {formatIDR(flavor.price, lang)}
           </span>
         </div>
@@ -206,7 +206,7 @@ export function FlavorCard({
           <h3 className="font-display text-lg leading-tight font-bold text-cocoa-900">
             {name}
           </h3>
-          {!selectable && inCart > 0 ? (
+          {selectable && inCart > 0 ? (
             <span className="chip shrink-0 bg-matcha-100 text-matcha-700">
               <ShoppingBag className="size-3" />
               {inCart}
@@ -242,12 +242,14 @@ export function FlavorCard({
         </div>
 
         {selectable ? (
-          <FlavorCardStepper
-            flavor={flavor}
-            soldOut={soldOut}
-            stockEnabled={stockEnabled}
-            left={left}
-          />
+          <div className="mt-auto pt-3">
+            <FlavorCardStepper
+              flavor={flavor}
+              soldOut={soldOut}
+              stockEnabled={stockEnabled}
+              left={left}
+            />
+          </div>
         ) : null}
 
         {/* Baris 'terjual' + like (mode lihat di beranda, read-only di pre-order) */}
