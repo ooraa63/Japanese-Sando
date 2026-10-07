@@ -25,7 +25,7 @@ export function SiteHeader({
   brandLine?: string;
 }) {
   const { t, lang } = useI18n();
-  const { profile, openAuthModal } = useCustomerAuth();
+  const { profile, loading, openAuthModal } = useCustomerAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -101,7 +101,14 @@ export function SiteHeader({
 
         <div className="flex items-center gap-2">
           <LanguageToggle />
-          {profile ? (
+          {/* Loading awal: tampilkan placeholder biar gak flash "Masuk"
+              selagi session token lagi di-refresh. */}
+          {loading && !profile ? (
+            <span
+              aria-hidden="true"
+              className="hidden h-10 w-10 animate-pulse rounded-full bg-cocoa-100 sm:inline-flex"
+            />
+          ) : profile ? (
             <Link
               href="/account"
               className="hidden h-10 items-center gap-1.5 rounded-full bg-matcha-500 px-3.5 text-[13px] font-bold text-white shadow-sm shadow-matcha-900/20 transition hover:bg-matcha-600 sm:inline-flex"
