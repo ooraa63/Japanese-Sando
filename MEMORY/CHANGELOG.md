@@ -4,6 +4,41 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-07 — Skip identity step (logged-in) + hapus Top laris + QRIS hidden
+
+**Mengubah:**
+
+1. **Pre-order skip identity step untuk user login** (commit `4fe5c47`):
+   - `OrderFlow.tsx` — `STEPS` jadi `FULL_STEPS=[identity, menu, payment, review]` & `LOGGED_IN_STEPS=[menu, payment, review]`. Step list dipilih via `stepsFor(profileComplete)`.
+   - `isProfileComplete(p)` = `!!(p?.user_id && p.full_name && p.phone)` — kalau ada field kosong (mis. OAuth user belum lengkapi phone), tetap lewat identity dulu.
+   - sessionStorage restore: filter supaya saved step yang tidak applicable (mis. "identity" setelah login) di-drop, fallback ke `steps[0]`.
+   - Tombol "Edit" di review row name/phone: redirect ke `/account` kalau login, ke step identity kalau guest.
+   - Stepper UI (mobile pill + progress bar + desktop numbered circles) pakai `steps.length` yang dinamis (3 atau 4).
+
+2. **Hapus FeaturedShowcase** (commit `4fe5c47`):
+   - `page.tsx` — hapus import & featuredFlavors computation & render block.
+   - File `FeaturedShowcase.tsx` di-trash.
+   - User: "Top laris dihapus aja itu tidak terlalu butuh".
+
+3. **QRIS unpaid disembunyikan dari antrian seller** (commit `4fe5c47`):
+   - `migration-28.sql`:
+     - `admin_list_orders`: filter `payment_method != 'qris_midtrans' OR qris_status = 'paid'`.
+     - `admin_dashboard_stats`: `pending_orders` & `total_orders` exclude QRIS unpaid.
+     - Index `orders_payment_qris_status_idx` untuk performa.
+   - Aturan flow:
+     - Transfer → order masuk dashboard → seller manual accept/reject (sudah ada).
+     - QRIS Midtrans → order dibuat `pending` + `qris_status='pending'` → invisible di seller → Midtrans webhook → `set_order_qris_status('paid')` → status auto `accepted` → seller lihat di dashboard.
+     - QRIS expired/failed/cancelled → status auto `rejected` (sudah ada di migration-16).
+
+**Verifikasi flow:**
+- `npx tsc --noEmit` → **0 errors**.
+- `npx next build` → **19 routes compile**.
+- Dev server smoke test (`localhost:3099`): `/`, `/order`, `/admin`, `/admin/orders` semua 200.
+
+**Migrasi DB baru:** `supabase/migration-28.sql` (admin_list_orders & admin_dashboard_stats filter + index).
+
+---
+
 ## 2026-10-07 — Cleanup pass: mojibake + font-size mobile-only + OAuth complete-profile
 
 **Mengubah:**
