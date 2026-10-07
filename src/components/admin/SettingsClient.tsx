@@ -218,7 +218,7 @@ export function SettingsClient({
                   className="input"
                   value={form.brand_line}
                   onChange={(e) => patch({ brand_line: e.target.value })}
-                  placeholder="Japanese Bake &amp; Pastry"
+                  placeholder="Japanese Bake & Pastry"
                 />
                 <p className="mt-1.5 text-xs text-cocoa-400">
                   {t.admin.settings.brandLineHint}

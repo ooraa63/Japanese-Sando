@@ -236,9 +236,9 @@ export function DashboardClient({
                         ) : null}
                       </div>
                       <p className="mt-0.5 truncate text-[13px] text-cocoa-600">
-                        {o.customer_name} Â·{" "}
+                        {o.customer_name} ·{" "}
                         {o.items
-                          .map((it) => `${it.quantity}Ã— ${it.flavor_name}`)
+                          .map((it) => `${it.quantity}× ${it.flavor_name}`)
                           .join(", ")}
                       </p>
                       <p className="mt-0.5 text-[11px] text-cocoa-400">

@@ -258,14 +258,14 @@ export function FlavorCard({
                 <span className="font-bold text-cocoa-700 tabular">
                   {soldCount}
                 </span>{" "}
-                {t.menu.soldCount.replace("{n}", "")}
+                {t.menu.soldCount}
               </span>
               <span className="text-cocoa-300">·</span>
               <span>
                 <span className="font-bold text-berry-500 tabular">
                   {likesCount}
                 </span>{" "}
-                {t.menu.likesCount.replace("{n}", "")}
+                {t.menu.likesCount}
               </span>
             </div>
             <button

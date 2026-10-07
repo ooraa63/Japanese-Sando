@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
-import { FontSizeToggle } from "@/components/ui/FontSizeToggle";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
 
 export function SiteHeader({
@@ -101,9 +100,6 @@ export function SiteHeader({
         </nav>
 
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex">
-            <FontSizeToggle />
-          </div>
           <LanguageToggle />
           {profile ? (
             <Link
@@ -216,10 +212,7 @@ export function SiteHeader({
 
             {/* Settings row */}
             <div className="mt-6 flex items-center justify-between rounded-xl border border-cocoa-200 bg-white px-4 py-3">
-              <div className="flex items-center gap-3">
-                <FontSizeToggle />
-                <LanguageToggle />
-              </div>
+              <LanguageToggle />
             </div>
 
             <p className="mt-auto pt-6 text-center text-[10px] text-cocoa-400">

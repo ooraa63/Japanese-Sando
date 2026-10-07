@@ -6,7 +6,6 @@ import { I18nProvider } from "@/lib/i18n";
 import { LANG_COOKIE, langFromCookie } from "@/lib/i18n/shared";
 import { CartProvider } from "@/components/customer/CartProvider";
 import { ToastProvider } from "@/components/ui/Toast";
-import { FontSizeProvider } from "@/components/ui/FontSizeProvider";
 import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider";
 import { AuthModal } from "@/components/customer/AuthModal";
 import { MobileBottomNav } from "@/components/customer/MobileBottomNav";
@@ -95,17 +94,15 @@ export default async function RootLayout({
     >
       <body className="min-h-dvh antialiased">
         <I18nProvider initialLang={lang}>
-          <FontSizeProvider>
-            <ToastProvider>
-              <CartProvider>
-                <CustomerAuthProvider initialProfile={initialProfile}>
-                  {children}
-                  <AuthModal />
-                  <MobileBottomNav />
-                </CustomerAuthProvider>
-              </CartProvider>
-            </ToastProvider>
-          </FontSizeProvider>
+          <ToastProvider>
+            <CartProvider>
+              <CustomerAuthProvider initialProfile={initialProfile}>
+                {children}
+                <AuthModal />
+                <MobileBottomNav />
+              </CustomerAuthProvider>
+            </CartProvider>
+          </ToastProvider>
         </I18nProvider>
       </body>
     </html>

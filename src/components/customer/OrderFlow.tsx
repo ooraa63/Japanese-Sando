@@ -73,7 +73,7 @@ export function OrderFlow({
   } = useCart();
 
   // Jangan biarkan nama & nomor telepon tertinggal di browser kalau pembeli
-  // meninggalkan halaman ini Ã¢â‚¬â€ baik lewat navigasi dalam aplikasi (komponen
+  // meninggalkan halaman ini — baik lewat navigasi dalam aplikasi (komponen
   // di-unmount) maupun menutup / memuat ulang tab.
   //
   // `clearIdentity` disimpan di ref supaya listener tidak dibuat ulang tiap
@@ -150,6 +150,7 @@ export function OrderFlow({
     const patch: Partial<typeof draft> = {};
     if (!draft.name.trim() && profile.full_name) patch.name = profile.full_name;
     if (!draft.phone.trim() && profile.phone) patch.phone = profile.phone;
+    if (!draft.email.trim() && profile.email) patch.email = profile.email;
     if (!draft.instagram.trim() && profile.instagram) {
       patch.instagram = profile.instagram;
     }
@@ -157,7 +158,7 @@ export function OrderFlow({
       updateDraft(patch);
     }
     autoFilledFromRef.current = profile.user_id;
-  }, [profile, draft.name, draft.phone, draft.instagram, updateDraft]);
+  }, [profile, draft.name, draft.phone, draft.email, draft.instagram, updateDraft]);
 
   // Stok per-kategori — total pcs dari kategori ini tidak boleh
   // melebihi sisa stok kategori. Bundle dihitung dari slot yang dipilih
@@ -1078,8 +1079,8 @@ export function OrderFlow({
                 </ReviewRow>
                 <ReviewRow label={t.order.review.deliveryLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
                   {draft.deliveryMethod === "delivery"
-                    ? `${t.order.payment.delivery} Ã¢â‚¬â€ ${draft.address}`
-                    : `${t.order.payment.pickup}${settings.address ? ` Ã¢â‚¬â€ ${settings.address}` : ""}`}
+                    ? `${t.order.payment.delivery} — ${draft.address}`
+                    : `${t.order.payment.pickup}${settings.address ? ` — ${settings.address}` : ""}`}
                 </ReviewRow>
                 <ReviewRow
                   label={t.order.review.itemsLabel}
@@ -1596,7 +1597,7 @@ function ReviewRow({
   );
 }
 /**
- * Sticky bottom cart bar � muncul di bawah step menu saat keranjang
+ * Sticky bottom cart bar — muncul di bawah step menu saat keranjang
  * tidak kosong. Selaras dengan pola GoFood: ringkasan item + total +
  * tombol lanjut (yang membuka CartDrawer, di dalamnya ada tombol
  * 'Lanjut' final). Tap seluruh bar untuk membuka drawer.
@@ -1631,7 +1632,7 @@ function CartStickyBar({
             {totalItems} {t.common.qty}
           </p>
           <p className="mt-0.5 truncate text-[12px] text-cream-200">
-            {storeName} � {deliveryLabel}
+            {storeName} · {deliveryLabel}
           </p>
         </div>
         <span className="text-lg leading-none font-extrabold tabular">

@@ -22,19 +22,6 @@ export interface CustomerActionResult<T = undefined> {
   redirectUrl?: string;
 }
 
-export interface CustomerActionResult<T = undefined> {
-  ok: boolean;
-  data?: T;
-  error?: string;
-  /**
-   * True kalau signup berhasil & Supabase mengirim email verifikasi, dan
-   * sesi belum aktif (Confirm email ON). UI menampilkan "cek email kamu".
-   */
-  requiresVerification?: boolean;
-  /** URL untuk OAuth redirect (Google, dsb). Browser yang navigasi ke sini. */
-  redirectUrl?: string;
-}
-
 function humanize(error: string | undefined): string {
   if (!error) return "generic";
   const code = error.trim();
