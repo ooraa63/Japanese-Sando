@@ -75,7 +75,6 @@ export default async function AdminSalesPage({
       initialFilters={{
         fromDate: fromDate ?? "",
         toDate: toDate ?? "",
-        flavorId: flavorId,
         search: sp.q ?? "",
       }}
     />

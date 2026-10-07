@@ -31,7 +31,6 @@ interface FlavorLite {
 interface SalesFilters {
   fromDate: string;
   toDate: string;
-  flavorId: number | null;
   search: string;
 }
 
@@ -75,7 +74,6 @@ export function SalesClient({
       const params = new URLSearchParams();
       if (next.fromDate) params.set("from", next.fromDate);
       if (next.toDate) params.set("to", next.toDate);
-      if (next.flavorId != null) params.set("flavor", String(next.flavorId));
       if (next.search) params.set("q", next.search);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
@@ -83,7 +81,7 @@ export function SalesClient({
   );
 
   function resetFilters() {
-    applyFilters({ fromDate: "", toDate: "", flavorId: null, search: "" });
+    applyFilters({ fromDate: "", toDate: "", search: "" });
   }
 
   function reload() {
@@ -91,7 +89,6 @@ export function SalesClient({
       const res = await getMutasiAction({
         fromDate: filters.fromDate || null,
         toDate: filters.toDate || null,
-        flavorId: filters.flavorId,
         search: filters.search,
         limit: 50,
         offset: 0,
@@ -308,7 +305,7 @@ export function SalesClient({
           <Filter className="size-4" />
           {t.admin.sales.filtersLabel}
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="space-y-1">
             <span className="block text-[11px] font-semibold uppercase tracking-wide text-cocoa-500">
               <Calendar className="mr-1 inline size-3" />
@@ -336,30 +333,6 @@ export function SalesClient({
               }
               className="w-full rounded-lg border border-cocoa-200 bg-cream-100 px-3 py-2 text-sm focus:border-matcha-600 focus:outline-none"
             />
-          </label>
-          <label className="space-y-1">
-            <span className="block text-[11px] font-semibold uppercase tracking-wide text-cocoa-500">
-              {t.admin.sales.filterFlavor}
-            </span>
-            <select
-              value={filters.flavorId ?? ""}
-              onChange={(e) =>
-                applyFilters({
-                  ...filters,
-                  flavorId: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-              className="w-full rounded-lg border border-cocoa-200 bg-cream-100 px-3 py-2 text-sm focus:border-matcha-600 focus:outline-none"
-            >
-              <option value="">{t.admin.sales.filterFlavorAll}</option>
-              {flavors
-                .filter((f) => f.is_active)
-                .map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {lang === "en" ? f.name_en : f.name_id}
-                  </option>
-                ))}
-            </select>
           </label>
           <label className="space-y-1">
             <span className="block text-[11px] font-semibold uppercase tracking-wide text-cocoa-500">
