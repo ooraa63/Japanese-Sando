@@ -366,6 +366,7 @@ export function OrderMenuBrowser({
                           flavor={f}
                           inCart={q}
                           remainingStock={remainingStock}
+                          selectable
                         />
                       </li>
                     );
