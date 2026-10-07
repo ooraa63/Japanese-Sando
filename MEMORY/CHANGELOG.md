@@ -4,6 +4,64 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-07 — Migration-30: restore customer_profiles.date_of_birth + fix trigger order
+
+**Bug:** Steven (steven07.zgy@gmail.com) register + login tapi profile gak
+terbentuk. UI di `/account` nampilin "Lengkapi profil" card → error "gagal
+menyimpan". Semua error kelihatan sebagai "generic" di UI.
+
+Investigasi via DATABASE_URL + `pg`:
+
+1. **Tabel `customer_profiles` di production GAK PUNYA kolom `date_of_birth`.**
+   - Schema: `user_id, full_name, phone, instagram, created_at, updated_at, phone_normalized`.
+   - Padahal `migration-16.sql` membuat kolom `date_of_birth date check (...)` dan
+     semua RPC `customer_upsert_own_profile`, `customer_bootstrap_from_metadata`
+     INSERT ke kolom itu → **raise `column "date_of_birth" does not exist`
+     (SQLSTATE 42703)**.
+   - Kemungkinan: kolom di-drop manual tanpa nyanggun SQL DROP, atau basis
+     SQL yang dipakai restore cuma dari `schema.sql` lama (snapshot sebelum
+     migration-16 — schema.sql gak menyebut customer_profiles sama sekali).
+
+2. **Trigger `trg_customer_profiles_guard_phone_unique` punya bug fire-order**
+   - Comment migration-23: *"Normalisasi selalu di-set oleh trigger sebelumnya"*.
+   - Tapi Postgres BEFORE triggers fire alphabetical. 'guard' < 'set' →
+     guard duluan dengan `phone_normalized` masih NULL → raise `invalid_phone`.
+   - Sebelumnya gak ke-expose karena (1) sudah block duluan dengan error
+     kolom date_of_birth.
+
+3. **Customer lama & baru kena dampak:**
+   - Signup dengan Confirm email OFF: `customer_upsert_own_profile` selalu fail
+     di kolom date_of_birth → `signOut` + return `generic`. User bingung.
+   - Signup dengan Confirm email ON: `signUp.session null` → return
+     `requiresVerification`, profile gak dibuat. Setelah verifikasi + login,
+     bootstrap best-effort gagal juga → no profile. `/account` redirect loop
+     (sudah di-fix e02ac68 → CompleteProfileCard), submit CompleteProfileCard
+     juga gagal.
+
+**Fix `supabase/migration-30.sql`:**
+
+1. `ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS date_of_birth date CHECK (... <= current_date)`
+2. Backfill `date_of_birth` dari `auth.users.raw_user_meta_data->>'date_of_birth'`
+   untuk row existing (kalau format ISO valid).
+4. `CREATE OR REPLACE FUNCTION customer_profiles_guard_phone_unique()` —
+   self-sufficient: hitung `phone_normalized := normalize_phone(phone)` --
+   sendiri kalau belum di-set, jadi gak bergantung fire-order trigger lain.
+
+`scripts/db-push.mjs` di-update agar `migration-30.sql` terdaftar.
+
+**Verifikasi langsung via DB:**
+
+- `ALTER TABLE` sukses, kolom `date_of_birth (date)` muncul di info_schema.
+- `CREATE OR REPLACE FUNCTION` sukses, trigger `customer_profiles_guard_phone_unique`
+  prosrc mengandung baris `new.phone_normalized := public.normalize_phone(new.phone)`.
+- Manual `INSERT INTO customer_profiles` dengan data Steven →
+  `phone_normalized` auto-set ke `6289614128890`, row tersimpan.
+
+Setelah ini user Steven bisa login → `/account` langsung render profile
+normal karena customer_profiles row sudah ada.
+
+---
+
 ## 2026-10-07 — Fix /account blank karena redirect loop (post-OAuth-hapus)
 
 **Bug:** Setelah commit `da8b090` (hapus Google OAuth) + migration-29
