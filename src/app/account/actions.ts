@@ -22,6 +22,15 @@ export interface CustomerActionResult<T = undefined> {
   redirectUrl?: string;
 }
 
+/** Kode error lama untuk OAuth — saat ini gak dipakai (lihat blok
+ *  "OAUTH — DISABLED" di bawah). Tapi dipertahankan sebagai opsi
+ *  type system untuk kompatibilitas mundur kalau RPC lama masih
+ *  return string ini. */
+const _oauthCodes = ["oauth_unavailable", "oauth_failed"] as const;
+
+// Helper error code lama untuk OAuth — sekarang gak dipakai (lihat blok
+// "OAUTH — DISABLED" di bawah). Tapi dipertahankan kalau ada RPC lama
+// yang masih return string ini — biar humanize() gak throw.
 function humanize(error: string | undefined): string {
   if (!error) return "generic";
   const code = error.trim();
@@ -268,94 +277,16 @@ export async function updateCustomerProfileAction(
 }
 
 /* =============================================================================
- *  OAUTH (Google sign-in)
+ *  OAUTH — DISABLED
  * ========================================================================== */
-
-/**
- * Mulai OAuth flow (mis. Google). Sign-in & sign-up pakai flow yang sama —
- * Supabase akan otomatis buat akun kalau email belum terdaftar (kalau
- * "Confirm email" OFF) atau kirim link verifikasi (kalau ON).
+/*
+ * Dulu ada `signInWithOAuthAction` (redirect flow) & `signInWithGoogleIdTokenAction`
+ * (GIS popup flow). Sudah dihapus karena:
+ *   1. Flow saat ini single: signup dengan email+password+identitas lengkap
+ *      (nama, phone, dob, IG) di /register, lalu login email+password di /login.
+ *   2. Setiap email & phone hanya boleh didaftarkan sekali (lihat migration-22
+ *      & 23). OAuth user yang signup otomatis tanpa password = orphan account.
  *
- * Return `redirectUrl` untuk di-navigate oleh client (`window.location`).
- * Kalau dipanggil dari server langsung (mis. link HTML biasa), pakai
- * `redirect()` ke URL.
- *
- * Catatan: Fallback `localhost:3000` sudah dihapus — kalau env gak ada,
- * kita fail dgn `oauth_unavailable` daripada risk ngarah ke localhost di
- * production.
+ * Kalau suatu saat mau aktifkan OAuth lagi, tambahkan kembali function-nya
+ * (lihat git log: commit ff2c308 atau 570c6ec untuk implementasi terakhirnya).
  */
-export async function signInWithOAuthAction(
-  provider: "google" | "github" | "apple" | "facebook"
-): Promise<CustomerActionResult<{ url: string }>> {
-  const supabase = await createClient();
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    (typeof process.env.VERCEL_URL === "string"
-      ? `https://${process.env.VERCEL_URL}`
-      : null);
-
-  if (!origin) {
-    return { ok: false, error: "oauth_unavailable" };
-  }
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: {
-      redirectTo: `${origin}/account?oauth=1`,
-      queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
-    },
-  });
-
-  if (error) {
-    return { ok: false, error: humanize(error.message) };
-  }
-  if (!data?.url) {
-    return { ok: false, error: "oauth_unavailable" };
-  }
-  return { ok: true, data: { url: data.url } };
-}
-
-/**
- * Exchange Google id_token (JWT) jadi Supabase session.
- *
- * Dipakai oleh GoogleLoginButton yang pakai Google Identity Services
- * popup flow — hasilnya Google consent screen menampilkan nama app,
- * BUKAN URL `<project-ref>.supabase.co`.
- *
- * Supabase akan otomatis:
- *   - Buat auth.users row kalau email belum terdaftar (kalau "Confirm
- *     email" OFF — direct session; kalau ON — kirim verification)
- *   - Trigger `on_first_user_created` cuma untuk admin, customer lewat
- *     RPC `customer_bootstrap_from_metadata` setelah first login
- */
-export async function signInWithGoogleIdTokenAction(
-  idToken: string
-): Promise<CustomerActionResult<{ userId: string; email: string | null }>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithIdToken({
-    provider: "google",
-    token: idToken,
-  });
-
-  if (error || !data?.user) {
-    return {
-      ok: false,
-      error: error?.message ? humanize(error.message) : "oauth_failed",
-    };
-  }
-
-  // Kalau customer belum punya customer_profiles, bootstrap dari
-  // raw_user_meta_data (Google name + email sudah ada di situ).
-  // RPC `customer_bootstrap_from_metadata` adalah idempotent.
-  try {
-    await supabase.rpc("customer_bootstrap_from_metadata");
-  } catch {
-    // Bootstrap mungkin gagal kalau profile sudah ada — itu OK, diem aja.
-  }
-
-  revalidatePath("/", "layout");
-  return {
-    ok: true,
-    data: { userId: data.user.id, email: data.user.email ?? null },
-  };
-}

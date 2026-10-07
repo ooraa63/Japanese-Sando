@@ -47,8 +47,9 @@ function stepsFor(profileComplete: boolean): readonly Step[] {
   return profileComplete ? LOGGED_IN_STEPS : FULL_STEPS;
 }
 /** True kalau customer sudah punya profile lengkap (boleh skip identity).
- *  Profile.user_id otomatis ada saat login Google OAuth — full_name & phone
- *  adalah minimum yang harus ter-isi. */
+ *  profile lengkap = user_id + full_name + phone. Saat signup via /register
+ *  ketiga field ini wajib diisi, jadi user yang berhasil register = profile
+ *  lengkap = bisa skip identity di OrderFlow. */
 const isProfileComplete = (p: CustomerProfile | null | undefined) =>
   !!(p?.user_id && p.full_name && p.phone);
 

@@ -381,13 +381,6 @@ export const id: Dict = {
   customerAuth: {
     loginCta: "Masuk",
     accountChip: "Akun saya",
-    orWith: "atau lanjut dengan",
-    withGoogle: "Lanjut dengan Google",
-    withGithub: "Lanjut dengan GitHub",
-    withApple: "Lanjut dengan Apple",
-    withFacebook: "Lanjut dengan Facebook",
-    oauthUnavailable:
-      "Login dengan provider ini belum diaktifkan. Coba email & kata sandi dulu.",
     login: {
       title: "Masuk",
       subtitle:
