@@ -389,6 +389,74 @@ direview. RPC `list_reviews` hanya return row `is_visible = true`.
   has_review(order_code)=false. Dismissed state disimpan di
   useState Set supaya gak ngepop-up lagi di session yang sama.
 
+## D23 — Google OAuth user langsung dibuat profil partial (phone NULL)
+
+**Keputusan:** `customer_bootstrap_from_metadata` tidak raise `invalid_phone`
+kalau `raw_user_meta_data.phone` kosong. Insert row dengan `phone = NULL`
+dari name fallback Google (`full_name` atau `name`). `customer_profiles.phone`
+jadi nullable (migration-27).
+
+**Alasan:**
+
+- Google OAuth tidak kirim nomor telepon. Sebelumnya, bootstrap raise
+  exception → profile tidak dibuat → /account redirect ke /login → user
+  stuck di loop.
+- Profile partial lebih bersih: customer_profiles row ada, /account bisa
+  render form "Lengkapi profil" yang minta phone + IG + DOB. Submit →
+  `customer_upsert_own_profile` (yang tetap require phone) → profile lengkap.
+
+**Konsekuensi:**
+
+- Tambah RPC helper `customer_profile_needs_completion()` untuk deteksi
+  "login tapi profile belum lengkap" dari client.
+- /account page: kalau `getCustomerProfile()` null + `supabase.auth.getUser()` ada user → tampilkan CompleteProfileCard, BUKAN redirect ke /login.
+- Halaman /order tetap require phone (validateIdentity → phone min 9 digit) — guest + OAuth user yg belum lengkap harus isi phone sebelum lanjut.
+
+
+---
+
+## D22 — Mobile font-size tidak toggle, otomatis compact di HP
+
+**Keputusan:** Layout compact (font 14px, kartu flavor 2 kolom, dsb.) selalu
+aktif di mobile (< 640px). Tidak ada toggle. Hapus `FontSizeToggle`,
+`FontSizeProvider`, dan selector `html[data-density="compact"]`.
+
+**Alasan:**
+
+- User: "fitur ini dihapus, semua pakai yang kecil aja (di hp)". Toggle
+  2-state lebih ribet dari yang dibutuhkan — HP cukup compact, desktop
+  cukup normal, gak perlu user pilih.
+- Layout mobile compact sebenarnya sudah lebih pas dari awal; toggle
+  cuma nge-undo-nya di mode "normal".
+
+**Konsekuensi:**
+
+- CSS rule compact selalu aktif di mobile (tidak bergantung data-density).
+- Kalau suatu saat butuh mode lain (mis. accessibility large font), tambah
+  di tempat lain — mungkin `body.lg` utility + tombol di SiteHeader.
+
+
+---
+
+## D21 — Migration `migration-27.sql` merelaksasi phone constraint
+
+**Keputusan:** `customer_profiles.phone` dibuat nullable. Index `phone_normalized`
+tetap ada untuk dedup. Backend `customer_upsert_own_profile` TETAP require
+phone — cuma bootstrap yang boleh insert NULL.
+
+**Alasan:** Lihat D23. Customer via form (signup + lengkapi profil) harus
+selalu punya phone karena dipakai untuk kontak & invoice. OAuth users
+boleh temporary NULL karena mereka akan diminta melengkapi.
+
+**Konsekuensi:**
+
+- DB constraint: `phone text` (tidak `not null`).
+- Index `customer_profiles_phone_idx` masih ada dan valid untuk query
+  WHERE phone IS NOT NULL.
+- Validation di RPC `customer_upsert_own_profile` tetap raise `invalid_phone`
+  kalau NULL/short.
+
+
 ---
 
 ## D18 — Signup enforcement: pre-check phone availability

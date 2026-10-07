@@ -4,6 +4,41 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-07 — Cleanup pass: mojibake + font-size mobile-only + OAuth complete-profile
+
+**Mengubah:**
+
+1. **Fix karakter rusak (mojibake UTF-8)**:
+     - `DashboardClient.tsx:241` — `Â·` → `·`, `Ã—` → `×`.
+     - `OrderFlow.tsx:76, 1081-1082, 1634, 1783` — `Ã¢â‚¬â€` → `—`, `�` → `·`.
+   - Sumber: file di-edit di editor yang salah encoding (Windows-1252 / Latin-1) sebelumnya. Sekarang sudah bersih — `grep -P 'Ã|â€|Â'` di seluruh `src/` return 0.
+
+2. **Simplify font-size: mobile-only** (commit `dfc022d`):
+   - Hapus `FontSizeToggle` & `FontSizeProvider` (toggle 2 state: normal / compact).
+   - `globals.css` `@media (max-width: 639px)` sekarang selalu pakai mode compact (font-size 14px, kartu flavor 2 kolom, dsb.). Selector `html[data-density="compact"]` dihapus.
+   - User: "fitur ini dihapus, semua pakai yang kecil aja (di hp)".
+   - `SiteHeader.tsx` dihapus import + 2 instance FontSizeToggle.
+
+3. **/account blank state fix** (commit `dfc022d`):
+   - Sebelumnya: user login Google → `customer_bootstrap_from_metadata` raise `invalid_phone` (Google gak kirim phone) → customer_profiles row tidak dibuat → /account `getCustomerProfile()` return null → redirect ke /login.
+   - `migration-27.sql`: `customer_profiles.phone` jadi nullable, bootstrap lebih toleran (skip validasi phone, tetap insert dengan phone NULL), RPC helper `customer_profile_needs_completion()` untuk deteksi.
+   - `src/components/customer/CompleteProfileCard.tsx` (baru): form "Lengkapi profil" yang muncul di /account kalau user login tapi profile.phone NULL. Auto-fill nama dari Google `user_metadata.full_name`/`name`. Submit → `customer_upsert_own_profile` → profile lengkap.
+   - `src/app/account/page.tsx`: kalau `getCustomerProfile()` null tapi `supabase.auth.getUser()` ada user → render CompleteProfileCard, bukan redirect.
+
+4. **Misc cleanup**:
+   - `FlavorCard.tsx`: hapus `replace("{n}", "")` yang sia-sia di soldCount/likesCount (template sudah tidak punya placeholder).
+   - `SettingsClient.tsx`: `placeholder="Japanese Bake &amp; Pastry"` → `"Japanese Bake & Pastry"` (HTML-encoded ampersand di JSX).
+   - `OrderFlow.tsx`: auto-fill email dari `profile.email` di samping name/phone/IG.
+   - `account/actions.ts`: hapus duplicate `CustomerActionResult` interface.
+
+**Verifikasi flow:**
+- Build `next build` lulus — 19 routes compile.
+- Dev server `next dev -p 3099`: `/`, `/order`, `/login`, `/track`, `/register`, `/admin/*`, `/account` (307 → /login, benar) semua return 200.
+
+**Migrasi DB baru:** `supabase/migration-27.sql` (phone nullable + bootstrap toleran + helper RPC).
+
+---
+
 ## 2026-10-06 — 7 fitur baru diminta user
 
 **Mengubah:**
