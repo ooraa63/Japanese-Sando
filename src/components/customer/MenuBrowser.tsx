@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { ChevronRight, Gift, LayoutGrid, Plus, Sparkles, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, Gift, LayoutGrid, Sparkles, UtensilsCrossed } from "lucide-react";
 import type { Bundle, Category } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
 import { cheapestBundle, formatIDR } from "@/lib/utils";
-import { OrderCategoryModal } from "./OrderCategoryModal";
 import { OrderBundleModal } from "./OrderBundleModal";
 import { useCart } from "./CartProvider";
 
@@ -315,83 +314,68 @@ export function OrderMenuBrowser({
         </div>
       ) : null}
 
-      {/* ---------- Section kategori (item satuan) ---------- */}
+      {/* ---------- Section kategori (item satuan) — rasa inline, gak perlu klik kategori dulu ---------- */}
       {withFlavors.length > 0 ? (
-        <ul className="density-category-list grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className="space-y-8">
           {withFlavors.map((c) => {
             const name = lang === "en" ? c.name_en : c.name_id;
             const desc = lang === "en" ? c.desc_en : c.desc_id;
-            // Total pcs kategori ini yang sudah masuk keranjang.
             const inCart = (c.flavors ?? []).reduce(
               (s, f) => s + (quantities[String(f.id)] ?? 0),
               0
             );
-
             return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => setOpenCategoryId(c.id)}
-                  className="group flex w-full items-center gap-3.5 rounded-2xl border-2 border-cocoa-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-matcha-400 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99] sm:p-3.5"
-                >
-                  <span
-                    className={`cat-photo relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl sm:size-16 ${
-                      c.image_url
-                        ? "bg-cocoa-100"
-                        : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
-                    }`}
-                  >
+              <div key={c.id} id={`category-${c.id}`} className="scroll-mt-24">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-cocoa-100">
                     {c.image_url ? (
                       <Image
                         src={c.image_url}
                         alt=""
-                        fill
-                        sizes="64px"
-                        className="object-cover"
+                        width={36}
+                        height={36}
+                        className="size-9 object-cover"
                       />
                     ) : (
-                      <LayoutGrid className="size-7 text-white/70" />
+                      <LayoutGrid className="size-5 text-cocoa-500" />
                     )}
                   </span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate font-display text-base font-bold text-cocoa-900 sm:text-lg">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display text-base font-extrabold text-cocoa-900 sm:text-lg">
                         {name}
-                      </span>
+                      </h3>
                       {inCart > 0 ? (
                         <span className="chip shrink-0 bg-matcha-500 text-white">
                           {inCart}
                         </span>
                       ) : null}
-                    </span>
-                    <span className="cat-meta mt-0.5 block text-xs text-cocoa-400">
-                      {c.flavors?.length} {t.menu.flavors}
-                    </span>
+                    </div>
                     {desc ? (
-                      <span className="cat-desc mt-0.5 line-clamp-1 block text-[12px] text-cocoa-500">
-                        {desc}
-                      </span>
+                      <p className="line-clamp-1 text-xs text-cocoa-500">{desc}</p>
                     ) : null}
-                  </span>
-
-                  <span className="cat-plus grid size-10 shrink-0 place-items-center rounded-xl bg-matcha-50 text-matcha-600 transition group-hover:bg-matcha-500 group-hover:text-white sm:size-11">
-                    <Plus className="size-4 sm:size-5" />
-                  </span>
-                </button>
-              </li>
+                  </div>
+                </div>
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {(c.flavors ?? []).map((f) => {
+                    const fid = String(f.id);
+                    const q = quantities[fid] ?? 0;
+                    return (
+                      <li key={f.id}>
+                        <FlavorCard
+                          flavor={f}
+                          inCart={q}
+                          remainingStock={remainingStock}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             );
           })}
-        </ul>
+        </div>
       ) : null}
-
-      <OrderCategoryModal
-        category={activeCategory}
-        open={activeCategory !== null}
-        onClose={() => setOpenCategoryId(null)}
-        remainingStock={remainingStock}
-        soldCounts={soldCounts}
-      />
 
       {activeBundle ? (
         <OrderBundleModal

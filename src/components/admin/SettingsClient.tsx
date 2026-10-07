@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Plus,
   Save,
+  Settings as SettingsIcon,
   Store,
   Trash2,
   Truck,
@@ -36,6 +37,16 @@ type Draft = Omit<StoreSettings, "id" | "updated_at" | "bank_accounts"> & {
   bank_accounts: BankAccount[];
 };
 
+/** Tab key untuk navigation settings. */
+type TabKey =
+  | "identity"
+  | "contact"
+  | "hours"
+  | "shipping"
+  | "payment"
+  | "availability"
+  | "admin";
+
 function toDraft(s: StoreSettings | null): Draft {
   return {
     store_name: s?.store_name ?? "Japanese Sando",
@@ -52,8 +63,6 @@ function toDraft(s: StoreSettings | null): Draft {
     hours_en: s?.hours_en ?? "",
     deadline_id: s?.deadline_id ?? "",
     deadline_en: s?.deadline_en ?? "",
-    min_order: s?.min_order ?? 1,
-    max_per_order: s?.max_per_order ?? 20,
     delivery_fee: s?.delivery_fee ?? 0,
     free_shipping_min: s?.free_shipping_min ?? 0,
     bank_accounts: s?.bank_accounts ?? [],
@@ -98,6 +107,7 @@ export function SettingsClient({
   const toast = useToast();
   const [form, setForm] = useState<Draft>(() => toDraft(initialSettings));
   const [saving, startSaving] = useTransition();
+  const [tab, setTab] = useState<TabKey>("identity");
 
   function patch(next: Partial<Draft>) {
     setForm((prev) => ({ ...prev, ...next }));
@@ -108,8 +118,6 @@ export function SettingsClient({
       const res = await saveSettingsAction({
         ...form,
         whatsapp: form.whatsapp.replace(/\D/g, ""),
-        min_order: Number(form.min_order) || 1,
-        max_per_order: Number(form.max_per_order) || 1,
         delivery_fee: Number(form.delivery_fee) || 0,
         free_shipping_min: Number(form.free_shipping_min) || 0,
         bank_accounts: form.bank_accounts.filter((b) => b.number.trim()),
@@ -121,6 +129,19 @@ export function SettingsClient({
   }
 
   const waDigits = form.whatsapp.replace(/\D/g, "");
+
+  const tabs: { key: TabKey; label: string; icon: typeof Store }[] = useMemo(
+    () => [
+      { key: "identity", label: t.admin.settings.identity, icon: Store },
+      { key: "contact", label: t.admin.settings.contact, icon: MessageCircle },
+      { key: "hours", label: t.admin.settings.orderRules, icon: Clock },
+      { key: "shipping", label: t.admin.settings.pickupDeliveryTitle, icon: Truck },
+      { key: "payment", label: t.admin.settings.payments, icon: CreditCard },
+      { key: "availability", label: t.admin.settings.availability, icon: Building2 },
+      { key: "admin", label: t.admin.settings.accountTitle, icon: Users },
+    ],
+    [t]
+  );
 
   return (
     <div className="space-y-5 pb-24">
@@ -137,7 +158,38 @@ export function SettingsClient({
         </button>
       </div>
 
-      {/* ============ Identitas toko ============ */}
+      {/* Tab nav — sticky di HP biar gampang switch antar section. */}
+      <nav
+        aria-label="Settings sections"
+        className="sticky top-16 z-20 -mx-4 overflow-x-auto bg-cream-50/95 px-4 pb-2 pt-1 backdrop-blur sm:top-0 sm:mx-0 sm:px-0"
+      >
+        <div className="flex gap-1 border-b border-cocoa-200 sm:gap-2">
+          {tabs.map((it) => {
+            const active = tab === it.key;
+            const Icon = it.icon;
+            return (
+              <button
+                key={it.key}
+                type="button"
+                onClick={() => setTab(it.key)}
+                aria-current={active ? "page" : undefined}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-t-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition sm:text-sm ${
+                  active
+                    ? "border-b-2 border-cocoa-900 bg-white text-cocoa-900"
+                    : "text-cocoa-500 hover:bg-cocoa-50 hover:text-cocoa-700"
+                }`}
+              >
+                <Icon className="size-3.5" />
+                <span className="hidden sm:inline">{it.label}</span>
+                <span className="sm:hidden">{it.label.split(" ")[0]}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* ============ Tab: Identitas ============ */}
+      {tab === "identity" ? (
       <Section icon={<Store className="size-4.5" />} title={t.admin.settings.identity}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t.admin.settings.storeName} className="sm:col-span-2">
@@ -264,8 +316,10 @@ export function SettingsClient({
           </Field>
         </div>
       </Section>
+      ) : null}
 
-      {/* ============ Kontak ============ */}
+      {/* ============ Tab: Kontak ============ */}
+      {tab === "contact" ? (
       <Section icon={<MapPin className="size-4.5" />} title={t.admin.settings.contact}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
@@ -335,8 +389,10 @@ export function SettingsClient({
           </div>
         </div>
       </Section>
+      ) : null}
 
-      {/* ============ Jam & batas pesanan ============ */}
+      {/* ============ Tab: Jam & batas pesanan ============ */}
+      {tab === "hours" ? (
       <Section icon={<Clock className="size-4.5" />} title={t.admin.settings.orderRules}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t.admin.settings.hoursId}>
@@ -371,8 +427,10 @@ export function SettingsClient({
           </Field>
         </div>
       </Section>
+      ) : null}
 
-      {/* ============ Pembayaran ============ */}
+      {/* ============ Tab: Pembayaran ============ */}
+      {tab === "payment" ? (
       <Section icon={<CreditCard className="size-4.5" />} title={t.admin.settings.payments}>
         <div className="space-y-4">
           <div>
@@ -459,22 +517,12 @@ export function SettingsClient({
 
           </div>
       </Section>
+      ) : null}
 
-      {/* ============ Aturan & ongkir ============ */}
+      {/* ============ Tab: Pengiriman (ongkir) ============ */}
+      {tab === "shipping" ? (
       <Section icon={<Info className="size-4.5" />} title={t.admin.settings.orderRules}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <NumberField
-            label={t.admin.settings.minOrder}
-            value={form.min_order}
-            min={1}
-            onChange={(v) => patch({ min_order: v })}
-          />
-          <NumberField
-            label={t.admin.settings.maxPerOrder}
-            value={form.max_per_order}
-            min={1}
-            onChange={(v) => patch({ max_per_order: v })}
-          />
           <NumberField
             label={t.admin.settings.deliveryFee}
             value={form.delivery_fee}
@@ -485,13 +533,17 @@ export function SettingsClient({
         </div>
         <p className="mt-2 text-xs text-cocoa-400">{t.admin.settings.stockHint}</p>
       </Section>
+      ) : null}
 
-      {/* ============ Account admin ============ */}
+      {/* ============ Tab: Akun Admin ============ */}
+      {tab === "admin" ? (
       <Section icon={<Users className="size-4.5" />} title={t.admin.settings.accountTitle}>
         <AccountManager />
       </Section>
+      ) : null}
 
-      {/* ============ Catatan cara pengambilan ============ */}
+      {/* ============ Tab: Pengiriman (catatan cara) ============ */}
+      {tab === "shipping" ? (
       <Section icon={<Truck className="size-4.5" />} title={t.admin.settings.pickupDeliveryTitle}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -537,8 +589,10 @@ export function SettingsClient({
           </div>
         </div>
       </Section>
+      ) : null}
 
-      {/* ============ Status pre-order ============ */}
+      {/* ============ Tab: Ketersediaan ============ */}
+      {tab === "availability" ? (
       <Section icon={<Building2 className="size-4.5" />} title={t.admin.settings.availability}>
         <div className="flex items-start justify-between gap-4 rounded-2xl border border-cocoa-200 p-4">
           <div>
@@ -557,6 +611,7 @@ export function SettingsClient({
           />
         </div>
       </Section>
+      ) : null}
 
       {/* Tombol simpan di akhir (bukan fixed, supaya tidak menutupi section lain). */}
       <div className="flex items-center justify-end gap-3 border-t border-cocoa-200 pt-4">

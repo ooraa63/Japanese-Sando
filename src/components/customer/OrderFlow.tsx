@@ -353,11 +353,8 @@ export function OrderFlow({
   }
 
   function validateMenu(): boolean {
-    if ((cartLines.length === 0 && cartBundles.length === 0) || totalItems < settings.min_order) {
-      toast.warning(
-        t.order.menu.cartEmpty,
-        t.order.menu.minOrderWarning.replace("{n}", String(settings.min_order))
-      );
+    if (cartLines.length === 0 && cartBundles.length === 0) {
+      toast.warning(t.order.menu.cartEmpty);
       return false;
     }
     // Stok per-kategori: total pcs tiap kategori (item + slot bundle) tidak
@@ -893,16 +890,21 @@ export function OrderFlow({
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <ChoiceCard
                   selected={draft.deliveryMethod === "pickup"}
-                  onClick={() =>
+                  onClick={() => {
+                    // Pilih pickup location default: zona pickup pertama yang aktif,
+                    // fallback ke "pickup" kalau admin belum set lokasi pickup.
+                    const firstPickup = deliveryZones.find(
+                      (z) => z.kind === "pickup"
+                    );
                     updateDraft({
                       deliveryMethod: "pickup",
-                      deliveryZone: "pickup",
+                      deliveryZone: firstPickup?.id ?? "pickup",
                       address: "",
                       addressNote: "",
                       lat: null,
                       lng: null,
-                    })
-                  }
+                    });
+                  }}
                   icon={<Store className="size-5" />}
                   title={t.order.payment.pickup}
                   desc={t.order.payment.pickupDesc}
@@ -926,7 +928,8 @@ export function OrderFlow({
                 />
               </div>
 
-              {/* Tingkat 2: zona spesifik (hanya muncul setelah pilih 'Dantar') */}
+              {/* Tingkat 2a: zona delivery (hanya muncul setelah pilih 'Diantar').
+                  Filter hanya kind='delivery' (kind='pickup' muncul di Tingkat 2b). */}
               {draft.deliveryMethod === "delivery" ? (
                 <div className="mt-4">
                   <p className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
@@ -934,7 +937,7 @@ export function OrderFlow({
                   </p>
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     {deliveryZones
-                      .filter((z) => z.id !== "pickup")
+                      .filter((z) => (z.kind ?? "delivery") === "delivery")
                       .map((z) => {
                         const zName =
                           lang === "en" ? z.name_en : z.name_id;
@@ -957,6 +960,37 @@ export function OrderFlow({
                                   : "Gratis"
                             }
                             note={zNote}
+                          />
+                        );
+                      })}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Tingkat 2b: lokasi pickup (hanya muncul setelah pilih 'Ambil di toko').
+                  Migration-32: admin bisa add/edit/hapus via settings → zona. */}
+              {draft.deliveryMethod === "pickup" &&
+              deliveryZones.filter((z) => z.kind === "pickup").length > 0 ? (
+                <div className="mt-4">
+                  <p className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
+                    {lang === "en" ? "Pickup location" : "Lokasi pengambilan"}
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    {deliveryZones
+                      .filter((z) => z.kind === "pickup")
+                      .map((z) => {
+                        const zName =
+                          lang === "en" ? z.name_en : z.name_id;
+                        return (
+                          <ChoiceCard
+                            key={z.id}
+                            selected={draft.deliveryZone === z.id}
+                            onClick={() =>
+                              updateDraft({ deliveryZone: z.id })
+                            }
+                            icon={<Store className="size-5" />}
+                            title={zName}
+                            desc={lang === "en" ? "Free" : "Gratis"}
                           />
                         );
                       })}
@@ -1349,11 +1383,7 @@ export function OrderFlow({
               </div>
             </div>
 
-            {totalItems > 0 && totalItems < settings.min_order ? (
-              <p className="border-t border-honey-300/40 bg-honey-300/15 px-4 py-2.5 text-center text-xs font-bold text-honey-500">
-                {t.order.menu.minOrderWarning.replace("{n}", String(settings.min_order))}
-              </p>
-            ) : null}
+            {/* min_order rule dihapus (migration-31 settings), gak dipake lagi */}
           </div>
 
           </aside>

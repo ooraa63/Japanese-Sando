@@ -128,7 +128,7 @@ export function OrderBundleModal({
       return;
     }
     cart.addBundle(bundle, slots, note || undefined);
-    toast.success(name, t.menu.addToCart);
+    // Toast removed — see FlavorCard.tsx untuk alasannya.
     onClose();
   }
 

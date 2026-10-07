@@ -85,41 +85,63 @@ export function CustomersClient({
     }
   }
 
-  function exportCsv() {
-    const rows = [
-      [
-        labels.name,
-        labels.phone,
-        labels.email,
-        labels.instagram,
-        labels.totalOrders,
-        labels.totalSpent,
-        labels.lastOrder,
-      ],
-      ...filtered.map((c) => [
-        c.customer_name,
-        c.phone,
-        c.customer_email ?? "",
-        c.instagram ?? "",
-        String(c.order_count),
-        String(c.total_spent),
-        c.created_at,
-      ]),
+  async function exportCsv() {
+    const header = [
+      labels.name,
+      labels.phone,
+      labels.email,
+      labels.instagram,
+      labels.totalOrders,
+      labels.totalSpent,
+      labels.lastOrder,
     ];
-    const csv = rows
-      .map((r) =>
-        r
-          .map((cell) =>
-            /[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell
-          )
-          .join(",")
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const dataRows = filtered.map((c) => [
+      c.customer_name,
+      c.phone,
+      c.customer_email ?? "",
+      c.instagram ?? "",
+      String(c.order_count),
+      String(c.total_spent),
+      c.last_order_at,
+    ]);
+
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Japanese Sando Admin";
+    wb.created = new Date();
+    const ws = wb.addWorksheet("Customers", {
+      views: [{ state: "frozen", ySplit: 1 }],
+    });
+    ws.getRow(1).values = header;
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFEFE5DA" },
+    };
+    ws.columns = [
+      { key: "name", width: 28 },
+      { key: "phone", width: 16 },
+      { key: "email", width: 28 },
+      { key: "instagram", width: 18 },
+      { key: "total_orders", width: 12 },
+      { key: "total_spent", width: 14, style: { numFmt: "#,##0" } },
+      { key: "last_order_at", width: 22 },
+    ];
+    dataRows.forEach((r) => ws.addRow(r));
+    ws.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: header.length },
+    };
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -225,7 +247,7 @@ export function CustomersClient({
                       {formatIDR(c.total_spent, lang)}
                     </td>
                     <td className="px-4 py-3 text-right text-[12px] text-cocoa-500">
-                      {formatDateTime(c.created_at, lang)}
+                      {formatDateTime(c.last_order_at, lang)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1">

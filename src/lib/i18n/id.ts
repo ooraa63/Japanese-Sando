@@ -663,7 +663,7 @@ export const id: Dict = {
       empty: "Belum ada transaksi yang cocok dengan filter.",
       loadMore: "Muat lebih banyak",
       showingOf: "Menampilkan {n} dari {total}",
-      exportCsv: "Ekspor CSV",
+      exportCsv: "Ekspor Excel",
       csv: {
         code: "Kode pesanan",
         date: "Tanggal",
@@ -837,7 +837,7 @@ export const id: Dict = {
       copyWa: "Salin nomor WhatsApp",
       copyAll: "Salin semua",
       copied: "Tersalin!",
-      exportCsv: "Export CSV",
+      exportCsv: "Ekspor Excel",
       empty: "Belum ada pelanggan.",
       name: "Nama",
       phone: "Telepon",
@@ -925,8 +925,6 @@ export const id: Dict = {
       accountNumber: "Nomor rekening",
       accountHolder: "Atas nama",
       orderRules: "Aturan pesanan",
-      minOrder: "Minimal item per pesanan",
-      maxPerOrder: "Maksimal item per rasa",
       deliveryFee: "Ongkos kirim (Rp)",
       stockHint:
         "Stok sekarang diatur per menu. Buka halaman Menu & Stok untuk mengelola stok kategori.",

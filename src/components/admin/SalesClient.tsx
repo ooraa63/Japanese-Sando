@@ -121,7 +121,7 @@ export function SalesClient({
     });
   }
 
-  function exportCsv() {
+  async function exportCsv() {
     if (transactions.length === 0) return;
     const header = [
       t.admin.sales.csv.code,
@@ -150,22 +150,50 @@ export function SalesClient({
         statusLabel(tr.status, lang),
       ];
     });
-    const csv = [header, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => {
-            const s = String(cell ?? "");
-            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-          })
-          .join(",")
-      )
-      .join("\n");
 
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    // Export ke .xlsx (Excel native). Library exceljs adalah pure JS —
+    // jalan di browser tanpa server-side dependency.
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Japanese Sando Admin";
+    wb.created = new Date();
+    const ws = wb.addWorksheet("Mutasi", {
+      views: [{ state: "frozen", ySplit: 1 }],
+    });
+    ws.columns = [
+      { header: header[0], key: "code", width: 18 },
+      { header: header[1], key: "date", width: 22 },
+      { header: header[2], key: "customer", width: 28 },
+      { header: header[3], key: "phone", width: 16 },
+      { header: header[4], key: "items", width: 50 },
+      { header: header[5], key: "subtotal", width: 12, style: { numFmt: "#,##0" } },
+      { header: header[6], key: "delivery", width: 12, style: { numFmt: "#,##0" } },
+      { header: header[7], key: "total", width: 14, style: { numFmt: "#,##0" } },
+      { header: header[8], key: "payment", width: 18 },
+      { header: header[9], key: "status", width: 16 },
+    ];
+    // Tulis header manual (style bold + fill)
+    ws.getRow(1).values = header;
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFEFE5DA" },
+    };
+    rows.forEach((r) => ws.addRow(r));
+    // Auto-filter biar enak di Excel
+    ws.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: header.length },
+    };
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `mutasi-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `mutasi-${new Date().toISOString().slice(0, 10)}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }

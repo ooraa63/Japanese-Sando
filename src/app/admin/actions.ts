@@ -414,17 +414,30 @@ export async function getAdminsAction(): Promise<ActionResult<AdminUser[]>> {
   return { ok: true, data: (data as AdminUser[]) ?? [] };
 }
 
+/**
+ * Customer row dari `admin_list_customers()`. Sudah didedupe by
+ * (email + phone_normalized) — 1 customer = 1 row.
+ * Migration-31.
+ */
 export interface AdminCustomerRow {
-  id: number;
-  order_code: string;
+  /** Synthetic id `email_key|phone_normalized` (gak ada di tabel orders). */
+  id: string;
   customer_name: string;
   customer_email: string | null;
   instagram: string | null;
   phone: string;
   phone_normalized: string;
-  created_at: string;
-  status: OrderStatus;
+  /** Order code paling baru (untuk referensi). */
+  last_order_code: string;
+  /** Status order paling baru. */
+  last_status: OrderStatus;
+  /** ISO timestamp dari order pertama. */
+  first_order_at: string;
+  /** ISO timestamp dari order paling baru (dipakai untuk sorting). */
+  last_order_at: string;
+  /** Total order milik customer ini. */
   order_count: number;
+  /** Total nominal seluruh order milik customer ini. */
   total_spent: number;
 }
 

@@ -93,8 +93,6 @@ export interface StoreSettings {
   hours_en: string;
   deadline_id: string;
   deadline_en: string;
-  min_order: number;
-  max_per_order: number;
   delivery_fee: number;
   free_shipping_min: number;
   bank_accounts: BankAccount[];
@@ -143,6 +141,10 @@ export interface DeliveryZone {
   /** Kalau true, customer wajib isi alamat+koordinat. Kalau false (mis.
    *  Vihara/UVERS fix), customer tidak perlu set lokasi. */
   requires_address?: boolean;
+  /** delivery = zona antaran (fee dihitung). pickup = lokasi pengambilan
+   * (fee selalu 0). Default 'delivery' untuk backward compat.
+   * Migration-32. */
+  kind?: "delivery" | "pickup";
   sort_order?: number;
   is_active?: boolean;
 }

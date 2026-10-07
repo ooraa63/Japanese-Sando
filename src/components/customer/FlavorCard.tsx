@@ -393,7 +393,8 @@ function FlavorCardStepper({
       type="button"
       onClick={() => {
         cart.add(flavor);
-        toast.success(name, t.menu.addToCart);
+        // Toast removed — was interfering with the "Tambah ke keranjang" layer
+        // when user clicks repeatedly. Cart drawer provides its own visual feedback.
       }}
       className="btn-primary mt-4 w-full text-sm"
     >

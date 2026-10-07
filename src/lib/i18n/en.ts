@@ -664,7 +664,7 @@ export const en = {
       empty: "No transactions match these filters.",
       loadMore: "Load more",
       showingOf: "Showing {n} of {total}",
-      exportCsv: "Export CSV",
+      exportCsv: "Export Excel",
       csv: {
         code: "Order code",
         date: "Date",
@@ -838,7 +838,7 @@ export const en = {
       copyWa: "Copy WhatsApp number",
       copyAll: "Copy all",
       copied: "Copied!",
-      exportCsv: "Export CSV",
+      exportCsv: "Export Excel",
       empty: "No customers yet.",
       name: "Name",
       phone: "Phone",
@@ -926,8 +926,6 @@ export const en = {
       accountNumber: "Account number",
       accountHolder: "Account holder",
       orderRules: "Order rules",
-      minOrder: "Minimum items per order",
-      maxPerOrder: "Maximum items per flavor",
       deliveryFee: "Delivery fee (Rp)",
       stockHint:
         "Stock is now set per menu. Open Menu & Stock to manage per-category stock.",
