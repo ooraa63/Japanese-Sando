@@ -46,7 +46,7 @@ export function SiteHeader({
   const links = [
     { href: "/#menu", label: t.nav.menu, desc: "" },
     { href: "/track", label: t.nav.track, desc: "" },
-    { href: "/#contact", label: t.nav.contact, desc: "" },
+    { href: "/contact", label: t.nav.contact, desc: "" },
   ];
 
   return (

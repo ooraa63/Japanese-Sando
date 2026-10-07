@@ -68,8 +68,6 @@ function toDraft(s: StoreSettings | null): Draft {
     bank_accounts: s?.bank_accounts ?? [],
     qris_enabled: s?.qris_enabled ?? false,
     qris_image_url: s?.qris_image_url ?? null,
-    announcement_id: s?.announcement_id ?? "",
-    announcement_en: s?.announcement_en ?? "",
     is_preorder_open: s?.is_preorder_open ?? true,
     hero_image_url: s?.hero_image_url ?? null,
     hero_image_mobile_url: s?.hero_image_mobile_url ?? null,
@@ -227,20 +225,6 @@ export function SettingsClient({
               className="input resize-none"
               value={form.description_en}
               onChange={(e) => patch({ description_en: e.target.value })}
-            />
-          </Field>
-          <Field label={t.admin.settings.announcement} hint={t.admin.settings.announcementHint} className="sm:col-span-2">
-            <input
-              className="input"
-              value={form.announcement_id}
-              onChange={(e) => patch({ announcement_id: e.target.value })}
-              placeholder="Liburan: harga khusus 15k!"
-            />
-            <input
-              className="input mt-2"
-              value={form.announcement_en}
-              onChange={(e) => patch({ announcement_en: e.target.value })}
-              placeholder="Holiday special: 15k!"
             />
           </Field>
 

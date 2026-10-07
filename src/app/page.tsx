@@ -13,7 +13,6 @@ import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { ShopInfo } from "@/components/customer/ShopInfo";
 import { HeroCarousel } from "@/components/customer/HeroCarousel";
-import { AnnouncementPopup } from "@/components/customer/AnnouncementPopup";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
@@ -47,7 +46,6 @@ export default async function HomePage() {
 
   return (
     <>
-      <AnnouncementPopup />
       <SiteHeader
         storeName={settings?.store_name ?? "Rumakomugi"}
         logoUrl={settings?.logo_url ?? null}
@@ -113,7 +111,7 @@ export default async function HomePage() {
         </section>
 
         {/* ===================== MENU ===================== */}
-        <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6 lg:py-24">
+        <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12 sm:px-6 lg:py-16">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-bold tracking-[0.2em] text-berry-500 uppercase">
@@ -156,15 +154,15 @@ export default async function HomePage() {
         </section>
 
         {/* ===================== REVIEWS ===================== */}
-        <section className="border-y border-cocoa-200/60 bg-cream-100/40 py-16 lg:py-24">
+        <section className="border-y border-cocoa-200/60 bg-cream-100/40 py-12 lg:py-16">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <ReviewsSection lang={lang} />
           </div>
         </section>
 
         {/* ===================== CTA PENUTUP ===================== */}
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
-          <div className="relative overflow-hidden rounded-3xl bg-cocoa-900 px-6 py-14 text-center text-cream-50 sm:px-12">
+        <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:py-16">
+          <div className="relative overflow-hidden rounded-3xl bg-cocoa-900 px-6 py-10 text-center text-cream-50 sm:px-12">
             <div className="absolute inset-0 bg-seigaha" />
             <div className="relative">
               <h2 className="text-3xl font-extrabold text-balance sm:text-4xl">
@@ -173,7 +171,7 @@ export default async function HomePage() {
               <p className="mx-auto mt-3 max-w-md text-base text-cream-200/75">
                 {dicts.order.subtitle}
               </p>
-              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <OrderNowLink
                   open={open}
                   whatsapp={settings?.whatsapp}

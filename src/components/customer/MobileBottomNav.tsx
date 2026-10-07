@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Receipt, User } from "lucide-react";
+import { Headphones, Home, Receipt, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 /**
  * Bottom navigation bar untuk mobile (HP). Fixed di bawah viewport, di atas
  * konten. Hidden di desktop (md:hidden).
  *
- * Item: Home, Order, Account.
+ * Item: Home, Pesanan Saya, Kontak, Akun.
  *
  * Hidden di route admin & auth supaya gak ganggu alur login/registrasi.
  */
@@ -31,7 +31,8 @@ export function MobileBottomNav() {
   const items = [
     { href: "/", label: t.nav.home, icon: Home },
     { href: "/account", label: t.nav.myOrder, icon: Receipt },
-    { href: "/account#contact", label: t.nav.account, icon: User },
+    { href: "/contact", label: t.nav.contact, icon: Headphones },
+    { href: "/account#profile", label: t.nav.account, icon: User },
   ];
 
   return (
@@ -39,7 +40,7 @@ export function MobileBottomNav() {
       aria-label="Mobile navigation"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-cocoa-200 bg-cream-50 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <ul className="grid grid-cols-3">
+      <ul className="grid grid-cols-4">
         {items.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           const Icon = item.icon;

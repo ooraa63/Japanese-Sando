@@ -60,6 +60,8 @@ function toFlavorDraft(f: Flavor): FlavorDraft {
  */
 interface BundleDraft extends Omit<Bundle, "price" | "sort_order"> {
   price: string;
+  /** Harga coret — string / kosong = tidak ada harga coret. */
+  compare_price_str: string;
   sort_order: string;
   category_id_str: string; // <select> butuh string
 }
@@ -68,6 +70,7 @@ function toBundleDraft(b: Bundle): BundleDraft {
   return {
     ...b,
     price: String(b.price),
+    compare_price_str: b.compare_price == null ? "" : String(b.compare_price),
     sort_order: String(b.sort_order),
     category_id_str: b.category_id == null ? "" : String(b.category_id),
   };
@@ -452,6 +455,7 @@ export function MenuClient({
       desc_id: "",
       desc_en: "",
       price: "",
+      compare_price_str: "",
       required_qty: 2,
       image_url: null,
       is_active: true,
@@ -475,6 +479,14 @@ export function MenuClient({
       toast.warning(t.admin.menu.priceLabel);
       return;
     }
+    // Harga coret opsional: kosong = tidak ada diskon. Kalau diisi harus lebih
+    // besar dari price, kalau tidak UI akan mengabaikannya.
+    const rawCompare = editingBundle.compare_price_str.replace(/\D/g, "");
+    const comparePrice = rawCompare ? Number(rawCompare) : null;
+    if (comparePrice != null && (!Number.isFinite(comparePrice) || comparePrice <= price)) {
+      toast.warning(t.admin.menu.comparePriceHint);
+      return;
+    }
 
     startSaving(async () => {
       const res = await saveBundleAction({
@@ -484,6 +496,7 @@ export function MenuClient({
         desc_id: editingBundle.desc_id.trim(),
         desc_en: editingBundle.desc_en.trim(),
         price,
+        compare_price: comparePrice,
         required_qty: Math.max(1, editingBundle.required_qty),
         image_url: editingBundle.image_url ?? "",
         is_active: editingBundle.is_active,
@@ -562,6 +575,7 @@ export function MenuClient({
       desc_id: b.desc_id,
       desc_en: b.desc_en,
       price: b.price,
+      compare_price: b.compare_price ?? null,
       required_qty: b.required_qty,
       image_url: b.image_url ?? "",
       is_active: b.is_active,
@@ -591,6 +605,7 @@ export function MenuClient({
       desc_id: b.desc_id,
       desc_en: b.desc_en,
       price: b.price,
+      compare_price: b.compare_price ?? null,
       required_qty: b.required_qty,
       image_url: b.image_url ?? "",
       is_active: !b.is_active,
@@ -1846,6 +1861,34 @@ function BundleForm({
               placeholder="35000"
             />
           </div>
+        </div>
+        {/* Harga coret (opsional) — kalau diisi harus lebih besar dari harga
+            jual, nanti tampil dicoret + badge diskon di kartu bundle. */}
+        <div>
+          <label htmlFor="b-compare-price" className="label">
+            {t.admin.menu.comparePriceLabel}
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm font-bold text-cocoa-400">
+              Rp
+            </span>
+            <input
+              id="b-compare-price"
+              inputMode="numeric"
+              className="input pl-11 tabular"
+              value={bundle.compare_price_str}
+              onChange={(e) =>
+                setBundle({
+                  ...bundle,
+                  compare_price_str: e.target.value.replace(/\D/g, ""),
+                })
+              }
+              placeholder="50000"
+            />
+          </div>
+          <p className="mt-1 text-[11px] text-cocoa-400">
+            {t.admin.menu.comparePriceHint}
+          </p>
         </div>
         <div>
           <label htmlFor="b-qty" className="label">

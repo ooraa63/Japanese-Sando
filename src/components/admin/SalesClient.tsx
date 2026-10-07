@@ -394,13 +394,15 @@ export function SalesClient({
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-cocoa-200 bg-cream-50">
-            <div className="hidden border-b border-cocoa-200 bg-cream-100/70 px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-cocoa-500 lg:grid lg:grid-cols-[120px_140px_1fr_140px_120px_100px]">
+            <div className="hidden border-b border-cocoa-200 bg-cream-100/70 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-cocoa-500 lg:grid lg:grid-cols-[120px_140px_minmax(0,1fr)_minmax(0,1fr)_120px_minmax(150px,auto)] lg:gap-4">
               <div>{t.admin.sales.colDate}</div>
               <div>{t.admin.sales.colCode}</div>
               <div>{t.admin.sales.colCustomer}</div>
               <div>{t.admin.sales.colItems}</div>
               <div className="text-right">{t.admin.sales.colTotal}</div>
-              <div>{t.admin.sales.colPayment}</div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                {t.admin.sales.colPayment}
+              </div>
             </div>
             <ul className="divide-y divide-cocoa-200">
               {transactions.map((tr) => {
@@ -410,7 +412,7 @@ export function SalesClient({
                     <button
                       type="button"
                       onClick={() => toggleExpanded(tr.id)}
-                      className="grid w-full grid-cols-1 gap-1 px-4 py-3 text-left hover:bg-cocoa-100/40 lg:grid-cols-[120px_140px_1fr_140px_120px_100px] lg:items-center lg:gap-3"
+                      className="grid w-full grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3.5 text-left transition hover:bg-cocoa-100/40 lg:grid-cols-[120px_140px_minmax(0,1fr)_minmax(0,1fr)_120px_minmax(150px,auto)] lg:items-center lg:gap-4"
                     >
                       <div className="font-mono text-xs text-cocoa-500">
                         {formatFullDateTime(tr.created_at, lang)}
@@ -421,7 +423,7 @@ export function SalesClient({
                       <div className="truncate text-sm text-cocoa-800">
                         {tr.customer_name}
                       </div>
-                      <div className="text-xs text-cocoa-500">
+                      <div className="text-xs text-cocoa-500 lg:truncate">
                         {tr.items.length === 0
                           ? "—"
                           : tr.items
@@ -435,20 +437,20 @@ export function SalesClient({
                       <div className="text-right font-bold text-cocoa-900">
                         {formatIDR(tr.total_price, lang)}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
                         <StatusBadge status={tr.status} label={statusLabel(tr.status, lang)} size="sm" />
-                        <span className="text-[10px] uppercase tracking-wider text-cocoa-500">
+                        <span className="text-[10px] tracking-wider text-cocoa-500 uppercase">
                           {paymentLabel(tr.payment_method, lang)}
                         </span>
                       </div>
                     </button>
                     {isExpanded ? (
-                      <div className="border-t border-cocoa-200/60 bg-cream-100/40 px-4 py-3 text-xs">
-                        <ul className="space-y-1">
+                      <div className="border-t border-cocoa-200/60 bg-cream-100/40 px-4 py-4 text-xs">
+                        <ul className="space-y-2">
                           {tr.items.map((i, idx) => (
                             <li
                               key={idx}
-                              className="flex items-center justify-between"
+                              className="flex items-center justify-between gap-4"
                             >
                               <span className="text-cocoa-700">
                                 {i.flavor_name}{" "}
@@ -459,14 +461,14 @@ export function SalesClient({
                               </span>
                             </li>
                           ))}
-                          <li className="flex items-center justify-between border-t border-cocoa-200/70 pt-1 font-bold text-cocoa-900">
+                          <li className="flex items-center justify-between gap-4 border-t border-cocoa-200/70 pt-2 font-bold text-cocoa-900">
                             <span>{t.admin.sales.itemSubtotal}</span>
                             <span className="font-mono">
                               {formatIDR(tr.subtotal, lang)}
                             </span>
                           </li>
                           {tr.delivery_fee > 0 ? (
-                            <li className="flex items-center justify-between text-cocoa-600">
+                            <li className="flex items-center justify-between gap-4 text-cocoa-600">
                               <span>{t.admin.sales.itemDelivery}</span>
                               <span className="font-mono">
                                 {formatIDR(tr.delivery_fee, lang)}

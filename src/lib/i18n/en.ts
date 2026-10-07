@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Kamus EN — sumber kebenaran untuk bentuk data (tipe `Dict`).
  * src/lib/i18n/id.ts harus memenuhi tipe yang sama persis.
  */
@@ -251,6 +251,11 @@ export const en = {
       failed: "Payment failed. Please try again.",
       cancelled: "Payment was cancelled.",
       close: "Close",
+      waitPayment: "Wait for payment",
+      stillValid:
+        "If you already scanned but the status has not changed, wait a moment then close this page. The payment keeps processing in the background while the QR is still valid.",
+      orderNotQueued:
+        "If you do not pay, the QR expires automatically and this order will not enter the production queue.",
       refresh: "Generate new QR",
       refreshSuccess: "New QR generated. Scan again to pay.",
       copyOrder: "Copy order code",
@@ -354,6 +359,21 @@ export const en = {
     hours: "Opening hours",
     deadline: "Pre-order deadline",
     instagram: "Instagram",
+  },
+  /** Halaman /contact — FAQ + Kontak + Brand Story. */
+  contactPage: {
+    title: "Contact",
+    subtitle: "Questions before ordering? Everything you need is here.",
+    faqTitle: "FAQ",
+    faqSubtitle: "The questions buyers ask most often.",
+    contactTitle: "Contact us",
+    contactSubtitle: "Chat with us directly — fastest way to get an answer.",
+    storyTitle: "Our story",
+    chatWhatsApp: "Chat on WhatsApp",
+    openInstagram: "Open Instagram",
+    mapTitle: "Find us",
+    otherQuestions: "Didn't find your answer?",
+    otherQuestionsHint: "Send us a message, we usually reply within a few hours.",
   },
   errors: {
     invalid_name: "Please enter your name.",
@@ -504,6 +524,7 @@ export const en = {
     },
     contact: {
       title: "Contact us",
+      helpTitle: "Need help?",
       subtitle: "Got a question about your order or want to order by chat?",
       whatsapp: "WhatsApp",
       instagram: "Instagram",
@@ -567,7 +588,6 @@ export const en = {
       batch: "Batch",
       menu: "Menu & stock",
       customers: "Customers",
-      announcements: "Announcements",
       settings: "Settings",
       viewSite: "View website",
       sales: "Sales ledger",
@@ -786,6 +806,9 @@ export const en = {
       descId: "Description (Indonesian)",
       descEn: "Description (English)",
       priceLabel: "Price (Rp)",
+      comparePriceLabel: "Original price (Rp)",
+      comparePriceHint:
+        "Optional. Fill in the price BEFORE the discount when this bundle is on promo — it must be higher than the selling price. Leave empty if there is no discount.",
       image: "Photo",
       imageHint: "JPG/PNG/WEBP, max 5 MB. Square works best.",
       uploadImage: "Upload photo",
@@ -848,31 +871,6 @@ export const en = {
       totalSpent: "Total",
       lastOrder: "Last order",
     },
-    announcements: {
-      title: "Popup announcements",
-      subtitle:
-        "Show a popup on the homepage with a photo and message. Great for promos or important updates.",
-      add: "Add popup",
-      edit: "Edit",
-      empty: "No popups yet. Add the first one to show it on the homepage.",
-      name: "Title",
-      nameHint: "Short title that catches attention.",
-      body: "Message body",
-      bodyHint: "Brief description of the promo or update.",
-      image: "Image URL",
-      imageHint: "Optional. JPG/PNG. Landscape ratio works best.",
-      ctaLabel: "Button text (CTA)",
-      ctaHref: "Button link (CTA)",
-      sortOrder: "Sort order",
-      active: "Active",
-      saved: "Popup saved.",
-      deleted: "Popup deleted.",
-      confirmDelete: "Delete this popup?",
-      status: "Status",
-      activeLabel: "Active",
-      inactiveLabel: "Inactive",
-      preview: "Preview",
-    },
     settings: {
       title: "Store settings",
       subtitle: "Everything here shows up on the customer's website.",
@@ -906,8 +904,6 @@ export const en = {
       taglineEn: "Tagline (English)",
       descId: "Description (Indonesian)",
       descEn: "Description (English)",
-      announcement: "Announcement banner",
-      announcementHint: "Leave empty to hide the banner on the website.",
       contact: "Contact & location",
       whatsapp: "WhatsApp number",
       whatsappHint: "Format international, digits only. Example: 6281234567890",

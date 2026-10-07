@@ -60,6 +60,11 @@ on conflict (id) do update set
 -- RPC publik `list_active_zones()` — return zones aktif untuk customer.
 -- Keamanan: anyone boleh baca zona aktif (public data, tidak ada privasi).
 -- ---------------------------------------------------------------------------
+-- Catatan idempotensi: `list_active_zones` biasanya sudah ada dengan return
+-- type berbeda (mis. ikut diubah migration-32 yang menambah kolom `kind`).
+-- `create or replace` tidak boleh mengubah return type, jadi drop dulu
+-- signature tanpa argumen supaya file ini aman di-run ulang.
+drop function if exists public.list_active_zones();
 create or replace function public.list_active_zones()
 returns table (
   id text,
@@ -98,6 +103,9 @@ comment on function public.list_active_zones()
 -- ---------------------------------------------------------------------------
 -- RPC admin `admin_list_zones()` — full data dengan lat/lng numeric.
 -- ---------------------------------------------------------------------------
+-- Sama seperti `list_active_zones` di atas: drop dulu supaya return type
+-- boleh berubah saat migration-32 menambah kolom `kind`.
+drop function if exists public.admin_list_zones();
 create or replace function public.admin_list_zones()
 returns table (
   id text,

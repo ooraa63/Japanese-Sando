@@ -59,6 +59,8 @@ export interface Flavor {
   desc_id: string;
   desc_en: string;
   price: number;
+  /** Harga sebelum diskon (opsional) — dipakai FlavorCard untuk coret harga. */
+  compare_price?: number | null;
   image_url: string | null;
   is_active: boolean;
   is_featured: boolean;
@@ -98,8 +100,6 @@ export interface StoreSettings {
   bank_accounts: BankAccount[];
   qris_enabled: boolean;
   qris_image_url: string | null;
-  announcement_id: string;
-  announcement_en: string;
   is_preorder_open: boolean;
   /** Foto background halaman depan */
   hero_image_url: string | null;
@@ -163,6 +163,12 @@ export interface Bundle {
   desc_id: string;
   desc_en: string;
   price: number;
+  /**
+   * Harga sebelum diskon (opsional). Kalau diisi dan lebih besar dari `price`,
+   * UI menampilkan `price` dicoret. NULL = tidak ada harga coret.
+   * Ditambah migration-34, dikirim `public_menu()` sejak migration-35.
+   */
+  compare_price?: number | null;
   /** Jumlah slot rasa yang harus dipilih saat beli. */
   required_qty: number;
   image_url: string | null;

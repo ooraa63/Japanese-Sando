@@ -441,21 +441,10 @@ export interface AdminCustomerRow {
   total_spent: number;
 }
 
-export interface AdminAnnouncement {
-  id: number;
-  title: string;
-  body_md: string;
-  image_url: string | null;
-  cta_label: string | null;
-  cta_href: string | null;
-  is_active: boolean;
-  sort_order: number;
-  created_at: string;
-}
-
 /**
  * Daftar pelanggan unik (phone_normalized) untuk broadcast. RPC publik
- * `admin_list_customers` sudah disiapkan di migration-12.
+ * `admin_list_customers` sudah disiapkan di migration-12 (dan di-group ulang
+ * per identitas di migration-31).
  */
 export async function getCustomersAction(): Promise<
   ActionResult<AdminCustomerRow[]>
@@ -464,49 +453,6 @@ export async function getCustomersAction(): Promise<
   const { data, error } = await supabase.rpc("admin_list_customers");
   if (error) return { ok: false, error: humanize(error.message) };
   return { ok: true, data: (data as AdminCustomerRow[]) ?? [] };
-}
-
-/* =============================================================================
- *  ANNOUNCEMENTS (popup iklan di homepage)
- * ========================================================================== */
-
-export async function getAnnouncementsAction(): Promise<
-  ActionResult<AdminAnnouncement[]>
-> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_list_announcements");
-  if (error) return { ok: false, error: humanize(error.message) };
-  return { ok: true, data: (data as AdminAnnouncement[]) ?? [] };
-}
-
-export async function saveAnnouncementAction(
-  payload: Record<string, unknown>
-): Promise<ActionResult<{ id: number }>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_save_announcement", {
-    p_payload: payload,
-  });
-
-  if (error) return { ok: false, error: humanize(error.message) };
-
-  revalidatePath("/admin/announcements");
-  revalidatePath("/");
-  return { ok: true, data: { id: (data as { id: number }).id } };
-}
-
-export async function deleteAnnouncementAction(
-  id: number
-): Promise<ActionResult<{ deleted: boolean }>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_delete_announcement", {
-    p_id: id,
-  });
-
-  if (error) return { ok: false, error: humanize(error.message) };
-
-  revalidatePath("/admin/announcements");
-  revalidatePath("/");
-  return { ok: true, data: data as { deleted: boolean } };
 }
 
 /* =============================================================================

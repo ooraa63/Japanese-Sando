@@ -6,6 +6,7 @@ import { ChevronRight, Gift, LayoutGrid, Sparkles, UtensilsCrossed } from "lucid
 import type { Bundle, Category } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
+import { PriceTag } from "./PriceTag";
 import { cheapestBundle, formatIDR } from "@/lib/utils";
 import { OrderBundleModal } from "./OrderBundleModal";
 import { useCart } from "./CartProvider";
@@ -183,7 +184,7 @@ export function MenuBrowser({
               <FlavorCard
                 key={f.id}
                 flavor={f}
-                remainingStock={remainingStock}
+                remainingStock={shown.stock_enabled ? shown.stock ?? 0 : null}
                 categoryName={onlyOne ? undefined : lang === "en" ? shown.name_en : shown.name_id}
                 showSocial
                 soldCount={soldCounts[f.id] ?? 0}
@@ -286,9 +287,17 @@ export function OrderMenuBrowser({
                           <Sparkles className="size-3 fill-current" />
                           {t.menu.bundleLabel}
                         </span>
-                        <span className="absolute right-3 top-3 chip bg-white/95 text-cocoa-800 shadow tabular">
-                          {formatIDR(b.price, lang)}
-                        </span>
+                        {b.compare_price != null &&
+                        b.compare_price > b.price ? (
+                          <span className="absolute right-3 top-3 chip bg-berry-500 text-white shadow tabular">
+                            −
+                            {Math.round(
+                              ((b.compare_price - b.price) / b.compare_price) *
+                                100
+                            )}
+                            %
+                          </span>
+                        ) : null}
                       </div>
                       <div className="flex flex-1 flex-col p-4">
                         <div className="flex items-start justify-between gap-2">
@@ -300,6 +309,16 @@ export function OrderMenuBrowser({
                               {inCart}
                             </span>
                           ) : null}
+                        </div>
+                        {/* Harga DI BAWAH foto (bukan chip di atas foto) +
+                            harga asal dicoret kalau bundle ini diskon. */}
+                        <div className="mt-2">
+                          <PriceTag
+                            price={b.price}
+                            comparePrice={b.compare_price}
+                            lang={lang}
+                            size="lg"
+                          />
                         </div>
                         <p className="mt-2 text-[12px] font-bold text-matcha-700">
                           {t.menu.bundleIncludes.replace("{n}", String(b.required_qty))}
@@ -360,12 +379,27 @@ export function OrderMenuBrowser({
                   {(c.flavors ?? []).map((f) => {
                     const fid = String(f.id);
                     const q = quantities[fid] ?? 0;
+                    // Stok itu PER KATEGORI (lihat create_order yang mengurangi
+                    // categories.stock), jadi setiap rasa di kategori ini
+                    // memakai sisa stok kategori yang sama. Sisa dikurangi
+                    // barang yang sudah ada di keranjang supaya angka di kartu
+                    // jujur soal apa yang masih bisa dibeli.
+                    const catLeft = c.stock_enabled
+                      ? Math.max(
+                          0,
+                          (c.stock ?? 0) -
+                            (c.flavors ?? []).reduce(
+                              (s, x) => s + (quantities[String(x.id)] ?? 0),
+                              0
+                            )
+                        )
+                      : null;
                     return (
                       <li key={f.id} className="flex">
                         <FlavorCard
                           flavor={f}
                           inCart={q}
-                          remainingStock={remainingStock}
+                          remainingStock={catLeft}
                           selectable
                         />
                       </li>
@@ -431,9 +465,16 @@ function BundleCard({
             <Sparkles className="size-3 fill-current" />
             {t.menu.bundleLabel}
           </span>
-          <span className="absolute right-3 top-3 chip bg-white/95 text-cocoa-800 shadow tabular">
-            {formatIDR(bundle.price, lang)}
-          </span>
+          {bundle.compare_price != null &&
+          bundle.compare_price > bundle.price ? (
+            <span className="absolute right-3 top-3 chip bg-berry-500 text-white shadow tabular">
+              −
+              {Math.round(
+                ((bundle.compare_price - bundle.price) / bundle.compare_price) * 100
+              )}
+              %
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-1 flex-col p-4">
           <h3 className="font-display text-lg leading-tight font-bold text-cocoa-900">
@@ -444,7 +485,15 @@ function BundleCard({
               {desc}
             </p>
           ) : null}
-          <p className="mt-3 text-[12px] font-bold text-matcha-700">
+          <div className="mt-2">
+            <PriceTag
+              price={bundle.price}
+              comparePrice={bundle.compare_price}
+              lang={lang}
+              size="lg"
+            />
+          </div>
+          <p className="mt-2 text-[12px] font-bold text-matcha-700">
             {t.menu.bundleIncludes
               .replace("{n}", String(bundle.required_qty))}
           </p>

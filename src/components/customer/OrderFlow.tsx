@@ -809,7 +809,10 @@ export function OrderFlow({
 
           {/* ============ LANGKAH 2: PILIH RASA ============ */}
           {step === "menu" ? (
-            <section>
+            /* pb-28 memberi ruang untuk CartStickyBar yang position-nya
+               `sticky bottom-0`. Tanpa padding ini, kartu Flavor baris
+               terakhir ketutup bar keranjang (bug yang Steven laporkan). */
+            <section className="pb-28">
               <div className="card mb-6 p-6 sm:p-8">
                 <StepHeading
                   icon={<ShoppingBag className="size-5" />}

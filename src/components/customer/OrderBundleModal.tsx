@@ -18,6 +18,7 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import { formatIDR } from "@/lib/utils";
+import { PriceTag } from "./PriceTag";
 
 /** Gradient fallback per flavor (sama dengan FlavorCard). */
 const GRADIENTS = [
@@ -189,9 +190,14 @@ export function OrderBundleModal({
               .replace("{n}", String(requiredQty))
               .replace("{name}", "")}
           </p>
-          <p className="text-xs font-bold text-cocoa-800 tabular">
-            {formatIDR(bundle.price, lang)}
-          </p>
+          <div className="mt-1.5">
+            <PriceTag
+              price={bundle.price}
+              comparePrice={bundle.compare_price}
+              lang={lang}
+              size="lg"
+            />
+          </div>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { UserCircle } from "lucide-react";
+import { ChevronRight, HelpCircle, MessageCircle, Sparkles, UserCircle } from "lucide-react";
 import { getI18nDict } from "@/lib/i18n-server";
 import { getCustomerOrders, getCustomerProfile, getSettings } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
@@ -189,6 +189,56 @@ function renderAccount({
           />
 
           {vouchers ? <VouchersSection vouchers={vouchers} /> : null}
+
+          {/* Menu singkat ala aplikasi: FAQ / Kontak / Brand Story. Detailnya
+              ada di halaman /contact supaya /account tetap ringkas. */}
+          <section id="profile" className="card scroll-mt-20 overflow-hidden p-0">
+            <h2 className="px-6 pt-6 pb-1 text-lg font-bold text-cocoa-900">
+              {dicts.account.contact.helpTitle}
+            </h2>
+            <ul className="divide-y divide-cocoa-100">
+              {[
+                {
+                  href: "/contact#faq",
+                  icon: HelpCircle,
+                  label: dicts.contactPage.faqTitle,
+                  hint: dicts.contactPage.faqSubtitle,
+                },
+                {
+                  href: "/contact",
+                  icon: MessageCircle,
+                  label: dicts.contactPage.contactTitle,
+                  hint: dicts.contactPage.contactSubtitle,
+                },
+                {
+                  href: "/contact#story",
+                  icon: Sparkles,
+                  label: dicts.contactPage.storyTitle,
+                  hint: settings?.brand_line ?? dicts.contactPage.subtitle,
+                },
+              ].map((row) => (
+                <li key={row.href}>
+                  <Link
+                    href={row.href}
+                    className="flex items-center gap-3 px-6 py-4 transition hover:bg-cream-100"
+                  >
+                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-cocoa-100 text-cocoa-600">
+                      <row.icon className="size-4.5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-bold text-cocoa-900">
+                        {row.label}
+                      </span>
+                      <span className="block truncate text-xs text-cocoa-500">
+                        {row.hint}
+                      </span>
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-cocoa-300" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
 
           <ContactSection
             settings={settings ?? null}

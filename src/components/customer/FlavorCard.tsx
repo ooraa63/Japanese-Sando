@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { formatIDR } from "@/lib/utils";
+import { PriceTag } from "./PriceTag";
 import type { Flavor } from "@/lib/types";
 
 /** Warna fallback per rasa, dipakai kalau produk belum punya foto. */
@@ -70,6 +71,16 @@ export function FlavorCard({
   const isActive = flavor.is_active ?? true;
   const soldOut = !isActive || (stockEnabled && left <= 0);
   const low = stockEnabled && left > 0 && left <= 5;
+
+  // Badge diskon di foto (kalau rasa ini punya harga coret).
+  const discountPercent =
+    flavor.compare_price != null &&
+    Number.isFinite(flavor.compare_price) &&
+    flavor.compare_price > flavor.price
+      ? Math.round(
+          ((flavor.compare_price - flavor.price) / flavor.compare_price) * 100
+        )
+      : null;
 
   // Session-id per-device untuk tracking like di server. localStorage agar
 // konsisten antar reload. Server pakai tabel flavor_likes dengan
@@ -181,9 +192,13 @@ export function FlavorCard({
           ) : (
             <span />
           )}
-          <span className="chip whitespace-nowrap bg-white/95 text-cocoa-800 shadow tabular">
-            {formatIDR(flavor.price, lang)}
-          </span>
+          {/* Badge diskon (kalau ada) tetap nempel di foto; harga aslinya
+              dipindah ke bawah gambar supaya tidak menutupi foto. */}
+          {!soldOut && discountPercent !== null ? (
+            <span className="chip bg-berry-500 text-white shadow tabular">
+              −{discountPercent}%
+            </span>
+          ) : null}
         </div>
 
         {soldOut ? (
@@ -219,6 +234,17 @@ export function FlavorCard({
             {desc}
           </p>
         ) : null}
+
+        {/* Harga DI BAWAH foto — jadi lebih besar & mencolok supaya pembeli
+            cepat lihat harga tanpa harus menebak dari chip kecil. */}
+        <div className="mt-2">
+          <PriceTag
+            price={flavor.price}
+            comparePrice={flavor.compare_price}
+            lang={lang}
+            size="lg"
+          />
+        </div>
 
         <div className="mt-3 flex items-center gap-1.5 text-[11px] font-bold">
           {soldOut ? (

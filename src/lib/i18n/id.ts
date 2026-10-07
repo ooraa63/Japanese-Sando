@@ -1,4 +1,4 @@
-import type { Dict } from "./en";
+﻿import type { Dict } from "./en";
 
 export const id: Dict = {
   common: {
@@ -249,6 +249,11 @@ export const id: Dict = {
       failed: "Pembayaran gagal. Coba lagi.",
       cancelled: "Pembayaran dibatalkan.",
       close: "Tutup",
+      waitPayment: "Tunggu pembayaran",
+      stillValid:
+        "Kalau sudah scan tapi status belum berubah, tunggu sebentar lalu tutup halaman ini. Pembayaran tetap diproses di belakang layar selama QR masih valid.",
+      orderNotQueued:
+        "Kalau tidak jadi dibayar, QR akan otomatis kedaluwarsa dan pesanan ini tidak masuk ke daftar produksi.",
       refresh: "Generate QR baru",
       refreshSuccess: "QR baru dibuat. Scan lagi untuk membayar.",
       copyOrder: "Salin kode pesanan",
@@ -352,6 +357,21 @@ export const id: Dict = {
     hours: "Jam buka",
     deadline: "Batas pre-order",
     instagram: "Instagram",
+  },
+  /** Halaman /contact — FAQ + Kontak + Brand Story. */
+  contactPage: {
+    title: "Kontak",
+    subtitle: "Ada pertanyaan sebelum pesan? Semua jawabannya ada di sini.",
+    faqTitle: "FAQ",
+    faqSubtitle: "Pertanyaan yang paling sering masuk dari pembeli.",
+    contactTitle: "Hubungi kami",
+    contactSubtitle: "Chat langsung ke kami — cara tercepat dapat jawaban.",
+    storyTitle: "Cerita kami",
+    chatWhatsApp: "Chat WhatsApp",
+    openInstagram: "Buka Instagram",
+    mapTitle: "Lokasi kami",
+    otherQuestions: "Belum menemukan jawabannya?",
+    otherQuestionsHint: "Kirim pesan ke kami, biasanya dibalas dalam beberapa jam.",
   },
   errors: {
     invalid_name: "Mohon isi namamu dulu.",
@@ -504,6 +524,7 @@ export const id: Dict = {
     },
     contact: {
       title: "Hubungi kami",
+      helpTitle: "Butuh bantuan?",
       subtitle: "Kalau ada pertanyaan soal pesanan atau mau order langsung.",
       whatsapp: "WhatsApp",
       instagram: "Instagram",
@@ -566,7 +587,6 @@ export const id: Dict = {
       batch: "Batch",
       menu: "Menu & Stok",
       customers: "Pelanggan",
-      announcements: "Pengumuman",
       settings: "Pengaturan",
       viewSite: "Lihat website",
       sales: "Mutasi",
@@ -780,6 +800,9 @@ export const id: Dict = {
       descId: "Deskripsi (Indonesia)",
       descEn: "Deskripsi (Inggris)",
       priceLabel: "Harga (Rp)",
+      comparePriceLabel: "Harga coret (Rp)",
+      comparePriceHint:
+        "Opsional. Isi harga SEBELUM diskon kalau bundle ini lagi promo — harus lebih besar dari harga jual. Kosongkan kalau tidak ada diskon.",
       image: "Foto",
       imageHint: "JPG/PNG/WEBP, maksimal 5 MB. Rasio persegi paling bagus.",
       uploadImage: "Upload foto",
@@ -847,31 +870,6 @@ export const id: Dict = {
       totalSpent: "Total",
       lastOrder: "Pesanan terakhir",
     },
-    announcements: {
-      title: "Popup Pengumuman",
-      subtitle:
-        "Tampilkan popup di beranda dengan foto & tulisan. Berguna untuk iklan promo atau info penting.",
-      add: "Tambah popup",
-      edit: "Edit",
-      empty: "Belum ada popup. Tambah popup pertama untuk menampilkannya di beranda.",
-      name: "Judul",
-      nameHint: "Judul singkat yang menarik perhatian pembeli.",
-      body: "Isi pesan",
-      bodyHint: "Penjelasan singkat tentang promo atau info.",
-      image: "URL foto",
-      imageHint: "Opsional. JPG/PNG. Rasio landscape paling bagus.",
-      ctaLabel: "Teks tombol (CTA)",
-      ctaHref: "Link tombol (CTA)",
-      sortOrder: "Urutan tampil",
-      active: "Aktif",
-      saved: "Popup tersimpan.",
-      deleted: "Popup dihapus.",
-      confirmDelete: "Hapus popup ini?",
-      status: "Status",
-      activeLabel: "Aktif",
-      inactiveLabel: "Nonaktif",
-      preview: "Pratinjau",
-    },
     settings: {
       title: "Pengaturan Toko",
       subtitle: "Semua yang diisi di sini akan muncul di website pembeli.",
@@ -905,8 +903,6 @@ export const id: Dict = {
       taglineEn: "Tagline (Inggris)",
       descId: "Deskripsi (Indonesia)",
       descEn: "Deskripsi (Inggris)",
-      announcement: "Spanduk pengumuman",
-      announcementHint: "Kosongkan untuk menyembunyikan spanduk.",
       contact: "Kontak & lokasi",
       whatsapp: "Nomor WhatsApp",
       whatsappHint: "Format internasional, hanya angka. Contoh: 6281234567890",

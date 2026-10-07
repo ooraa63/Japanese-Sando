@@ -145,14 +145,15 @@ export function QrisPaymentModal({ payload, open, onClose }: QrisPaymentModalPro
   const ss = (secondsLeft % 60).toString().padStart(2, "0");
   const expired = order ? secondsLeft <= 0 : false;
 
-  // Auto-close modal setelah 5 menit (countdown habis). Kita tunggu 2 detik biar
-  // user lihat status 'expired' dulu sebelum modal nutup sendiri.
+  // Auto-close modal setelah countdown habis. Kita tunggu 4 detik supaya user
+  // sempat membaca status 'expired' sebelum modal nutup sendiri. Menutup modal
+  // ini TIDAK membatalkan pesanan — status hanya berubah kalau memang dibayar.
   useEffect(() => {
     if (!open || !order || !expired) return;
-    if (status === "paid") return;  // jangan close kalau sudah paid
+    if (status === "paid") return; // jangan close kalau sudah paid
     const t = setTimeout(() => {
       onClose();
-    }, 2000);
+    }, 4000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expired, status]);
@@ -308,6 +309,23 @@ export function QrisPaymentModal({ payload, open, onClose }: QrisPaymentModalPro
             <p className="text-[12px] leading-snug text-cocoa-500">
               {qd.scanHint}
             </p>
+
+            {/* Penjelasan bahwa menutup modal BUKAN membatalkan pesanan.
+                Pemesanan tetap menunggu 5 menit; kalau tidak dibayar, cron
+                akan menandainya expired dan pesanan tidak masuk produksi. */}
+            {status === "pending" && !expired ? (
+              <div className="w-full space-y-1.5 rounded-2xl bg-honey-50 px-4 py-3 text-left">
+                <p className="text-[11px] font-bold tracking-wide text-honey-700 uppercase">
+                  {qd.waitPayment}
+                </p>
+                <p className="text-[11.5px] leading-relaxed text-cocoa-600">
+                  {qd.stillValid}
+                </p>
+                <p className="text-[11.5px] leading-relaxed text-cocoa-600">
+                  {qd.orderNotQueued}
+                </p>
+              </div>
+            ) : null}
 
             {/* Refresh button (kalau expired/failed) */}
             {(expired || status === "failed" || status === "cancelled" || status === "expired") ? (
