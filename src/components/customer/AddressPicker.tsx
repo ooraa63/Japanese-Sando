@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, MapPin, Search, X } from "lucide-react";
+import { useState } from "react";
+import { MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
 import type { Dict } from "@/lib/types";
 import type { CartDraft } from "@/components/customer/CartProvider";
@@ -10,48 +10,17 @@ import type { CartDraft } from "@/components/customer/CartProvider";
 type PickerDict = Dict["order"]["payment"];
 
 /**
- * Picker alamat dengan peta Leaflet (OSM tile) + Photon autocomplete.
- *
- * Alur:
- *  - User klik tombol "Pilih di peta" → modal Leaflet full-screen terbuka.
- *  - Search box: Photon (photon.komoot.io) free OSM-based autocomplete
- *    (POI, jalan, kota, desa di Indonesia — lebih kaya dari Nominatim).
- *  - Hasil search → list + panning map. Klik hasil ATAU klik di peta langsung
- *    → set koordinat (lat, lng).
- *  - Klik "Simpan" → updateDraft({lat, lng, address}).
- *
- * Library:
- *  - leaflet@1.9 (UI map: zoom, pan, marker, scale control)
- *  - react-leaflet@5 (React wrapper untuk Leaflet)
- *  - Tile: OpenStreetMap (free, no API key)
- *  - Geocoding: Photon (free, OSM-based) — lebih kaya dari Nominatim untuk
- *    autocomplete
+ * Picker alamat dengan Leaflet (OSM tile) + Photon autocomplete (free).
  *
  * Leaflet butuh `window` — di-load dinamis dengan next/dynamic + ssr:false.
  */
-const DEFAULT_CENTER = { lat: -6.917, lng: 107.619 };
-const PHOTON_SEARCH = "https://photon.komoot.io/api";
-const DEFAULT_ZOOM = 14;
-
-type SearchResult = {
-  display_name: string;
-  lat: number;
-  lng: number;
-  type?: string;
-  category?: string;
-};
-
-/**
- * Modal peta — di-load dinamis supaya Leaflet (yang akses window) gak
- * nyala di server. ssr:false → gak ke-bundle di server build.
- */
-const LeafletMapModal = dynamic(
+const AddressPickerModal = dynamic(
   () => import("./LeafletMapModal").then((m) => m.LeafletMapModal),
   {
     ssr: false,
     loading: () => (
       <div className="flex h-full items-center justify-center bg-cocoa-50">
-        <Loader2 className="size-6 animate-spin text-cocoa-400" />
+        <MapPin className="size-6 animate-pulse text-cocoa-400" />
       </div>
     ),
   }
@@ -70,14 +39,6 @@ export function AddressPicker({
 
   const hasLocation =
     typeof draft.lat === "number" && typeof draft.lng === "number";
-
-  const center = useMemo(
-    () =>
-      hasLocation
-        ? { lat: draft.lat as number, lng: draft.lng as number }
-        : DEFAULT_CENTER,
-    [draft.lat, draft.lng, hasLocation]
-  );
 
   return (
     <div className="mt-4 space-y-3">
@@ -117,7 +78,7 @@ export function AddressPicker({
               className="rounded-md p-1 text-cocoa-400 transition hover:bg-cocoa-100 hover:text-berry-500"
               aria-label="Hapus lokasi"
             >
-              <X className="size-3.5" />
+              ×
             </button>
           </div>
           <p className="px-3 py-1.5 text-[11px] tabular text-cocoa-400">
@@ -144,9 +105,12 @@ export function AddressPicker({
       </div>
 
       {open ? (
-        <LeafletMapModal
+        <AddressPickerModal
           open={open}
-          center={center}
+          center={{
+            lat: typeof draft.lat === "number" ? draft.lat : -6.917,
+            lng: typeof draft.lng === "number" ? draft.lng : 107.619,
+          }}
           initialLabel={draft.address}
           onClose={() => setOpen(false)}
           onPick={(lat, lng, label) => {
@@ -159,7 +123,3 @@ export function AddressPicker({
     </div>
   );
 }
-
-// Re-export default center supaya LeafletMapModal bisa pakai.
-export { DEFAULT_CENTER, DEFAULT_ZOOM, PHOTON_SEARCH };
-export type { SearchResult };
