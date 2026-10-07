@@ -389,6 +389,82 @@ direview. RPC `list_reviews` hanya return row `is_visible = true`.
   has_review(order_code)=false. Dismissed state disimpan di
   useState Set supaya gak ngepop-up lagi di session yang sama.
 
+
+## D25 — Guest vs logged-in pre-order: beda flow identitas
+
+**Keputusan:**
+
+- Guest: 4 step `[identity, menu, payment, review]`. Step 1 wajib isi
+  nama/phone/email/IG.
+- Logged-in + profile lengkap: 3 step `[menu, payment, review]`. Identitas
+  auto-fill dari profil, langsung pilih menu.
+- Logged-in + profile TIDAK lengkap (mis. OAuth user baru tanpa phone):
+  tetap 4 step (lewat identity dulu) supaya mereka isi field kosong.
+
+**Alasan:**
+
+- User: "Account itu ... nanti untuk pre-order bisa ada 2, ada akun atau
+  login as guest ... Setelah daftar dia sign in akun dia maka artinya dia
+  udh ada identitynya maka pada pre-order dia tidak perlu tahap pertama lg
+  tak perlu isi ulg, bisa lgsng pilih menu."
+- Identitas pre-order = identitas akanda (untuk user login) = field yang
+  sama dengan profile. Tidak ada gunanya minta user isi ulang.
+
+**Konsekuensi:**
+
+- `STEPS` di OrderFlow jadi dinamis via `profileComplete` flag.
+- Stepper/progress bar render pakai `steps.length` (3 atau 4).
+- sessionStorage restore harus handle: kalau saved "identity" tapi sekarang
+  login → drop, fallback ke `steps[0]`.
+- Tombol "Edit" di review name/phone: kalau login → ke `/account`, kalau
+  guest → ke step identity.
+
+
+---
+
+## D24 — Order QRIS Midtrans invisible sampai customer bayar
+
+**Keputusan:** Order QRIS Midtrans yang `qris_status='pending'` (= customer
+belum bayar) **tidak muncul** di dashboard seller. Auto-accept saat `paid`
+sudah ada di `set_order_qris_status` (migration-16).
+
+**Filter rule (migration-28):**
+
+```
+admin_list_orders:
+  and not (payment_method = 'qris_midtrans' and qris_status is distinct from 'paid')
+admin_dashboard_stats:
+  pending_orders: status='pending' AND payment_method != 'qris_midtrans'
+  total_orders: exclude QRIS unpaid
+```
+
+**Aturan lengkap (semua metode):**
+
+| Metode | Saat order dibuat | Saat terlihat seller | Accept |
+|---|---|---|---|
+| Transfer | status=pending, langsung masuk | Ya, sebagai "pending" | Manual |
+| QRIS Midtrans | status=pending, invisible | Setelah qris_status=paid | Auto (status→accepted) |
+| QRIS Midtrans expired/failed/cancelled | invisible | Setelah status jadi rejected | Auto (status→rejected) |
+
+**Alasan:**
+
+- User: "Pre-order hanya akan masuk ketika 1.Jika QRIS, dia sudah bayar baru
+  masuk ke penjual 2. Jika tf, Dia langsung upload itu masuk ke penjual tpi
+  penjual harus konfirmasi dulu pesanannya diterima atau reject, jika qris
+  auto terima."
+- QRIS unpaid masuk dashboard seller sebelumnya → spam karena seller harus
+  manual cek payment status. Sekarang seller hanya lihat order yang siap
+  untuk diproses.
+
+**Konsekuensi:**
+
+- Seller dashboard stat counter "pending" = hanya order yang BUTUH aksi.
+- Mutasi (admin_list_mutasi) sudah exclude `pending` by design — tidak
+  berubah.
+
+
+---
+
 ## D23 — Google OAuth user langsung dibuat profil partial (phone NULL)
 
 **Keputusan:** `customer_bootstrap_from_metadata` tidak raise `invalid_phone`
