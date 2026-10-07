@@ -4,9 +4,46 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
-## 2026-10-07 — Skip identity step (logged-in) + hapus Top laris + QRIS hidden
+## 2026-10-07 — Hapus Google OAuth total
 
-**Mengubah:**
+**Mengubah (commit `da8b090`):**
+
+1. **Google OAuth dihapus total.** Site pakai single signup/login flow:
+     - `/register` → nama + phone + email + dob + IG + password (semua wajib)
+     - `/login` → email + password
+   - Alasan: Google OAuth di flow Steven = orphan account (auth.users row dibuat tanpa password, customer_profiles row dengan phone NULL). Setiap email & phone hanya boleh didaftarkan sekali (migration-22/23), jadi OAuth user gak fit di flow itu.
+
+2. **File dihapus:**
+   - `src/lib/googleAuth.ts` (GIS client-side helper)
+   - `src/components/customer/CompleteProfileCard.tsx` (workaround OAuth — "Lengkapi profil kamu" form)
+
+3. **File diubah:**
+   - `src/app/login/CustomerAuthForm.tsx` — hapus tombol "Lanjut dengan Google", `GoogleGlyph` component, `oauthWithGoogle` function. Ganti dengan komentar menjelaskan kenapa gak ada OAuth.
+   - `src/app/account/actions.ts` — hapus `signInWithOAuthAction` & `signInWithGoogleIdTokenAction`. Kode error `oauth_unavailable`/`oauth_failed` dipertahankan untuk kompat mundur di `humanize()`.
+   - `src/app/account/page.tsx` — revert: kalau profile null → redirect ke `/login?next=/account` (gak ada branch CompleteProfileCard lagi).
+   - `src/lib/i18n/{id,en}.ts` — hapus `withGoogle`, `withGithub`, `withApple`, `withFacebook`, `orWith`, `oauthUnavailable`.
+   - `.env.example` — hapus section Google OAuth, fix `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (nama baru).
+   - `src/components/customer/OrderFlow.tsx` — ganti komentar referensi Google OAuth jadi "signup via /register".
+   - `scripts/db-push.mjs` — include migration-29.
+
+4. **DB migration baru:**
+   - `supabase/migration-29.sql` — revert migration-27:
+     - `customer_profiles.phone` jadi NOT NULL lagi
+     - `customer_bootstrap_from_metadata()` strict: raise `invalid_phone` kalau phone kosong
+     - DROP RPC `customer_profile_needs_completion()`
+     - Pre-step: `delete from customer_profiles where phone is null` (cleanup baris orphan dari testing OAuth).
+
+**Verifikasi flow:**
+- `npx tsc --noEmit` → **0 errors**
+- `npx next build` → **19 routes compile**
+- Dev server smoke test: `/`, `/register`, `/login`, `/order` 200; `/account` 307 → `/login?next=/account`.
+
+**Action manual yang perlu Steven:**
+- `npm run db:push` (apply migration-29 ke Supabase DB)
+
+---
+
+## 2026-10-07 — Skip identity step (logged-in) + hapus Top laris + QRIS hidden
 
 1. **Pre-order skip identity step untuk user login** (commit `4fe5c47`):
    - `OrderFlow.tsx` — `STEPS` jadi `FULL_STEPS=[identity, menu, payment, review]` & `LOGGED_IN_STEPS=[menu, payment, review]`. Step list dipilih via `stepsFor(profileComplete)`.

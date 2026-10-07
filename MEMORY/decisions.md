@@ -390,6 +390,39 @@ direview. RPC `list_reviews` hanya return row `is_visible = true`.
   useState Set supaya gak ngepop-up lagi di session yang sama.
 
 
+## D26 — Hapus Google OAuth, single signup/login flow
+
+**Keputusan:** Hapus total Google OAuth dari /login & /register. Site
+pakai satu flow:
+
+- /register → nama + phone + email + dob + IG + password (semua wajib)
+- /login → email + password
+- Setiap email & phone hanya boleh didaftarkan sekali (lihat D13-D18)
+
+**Alasan:**
+
+- User: "Kita hapus dulu deh versi itu [Google OAuth], karena agak susah,
+  nanti next update baru kita pelan-pelan bahas."
+- Single flow paling simpel & sesuai expected UX user: signup dengan
+  identitas lengkap → login email+pass → bukan guest.
+- Google OAuth di flow ini = orphan account (auth.users row dibuat
+  tanpa password, customer_profiles.phone NULL). Bentrok dengan
+  email/phone-uniqueness constraint.
+
+**Konsekuensi:**
+
+- `src/lib/googleAuth.ts` dihapus
+- `src/components/customer/CompleteProfileCard.tsx` dihapus
+- `signInWithOAuthAction` & `signInWithGoogleIdTokenAction` dihapus
+- migration-29 revert migration-27: phone NOT NULL + strict bootstrap
+- Kalau suatu saat mau aktifkan OAuth lagi, tambahkan kembali function-nya
+  (lihat git log: commit ff2c308 atau 570c6ec untuk implementasi terakhirnya).
+  Pertimbangkan juga: bikin OAuth hanya "link to existing account" (jangan
+  signup baru via OAuth), atau pakai password-less flow dengan magic link.
+
+
+---
+
 ## D25 — Guest vs logged-in pre-order: beda flow identitas
 
 **Keputusan:**
