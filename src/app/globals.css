@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "leaflet/dist/leaflet.css";
+@import "mapbox-gl/dist/mapbox-gl.css";
 
 @theme {
   /* Palet: hangat seperti kayu_roti + matcha + stroberi */
@@ -204,6 +204,80 @@
 
 /* Angka tabel rata-rata */
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* =============================================================================
+ *  Mapbox GL JS — styling kustom biar nyatu sama brand (warm/honey/cocoa)
+ *  - attribution footer dipadatkan & semi-transparan
+ *  - control buttons dibikin rounded-xl & matching palette
+ *  - center pin (kita pakai HTML element marker, bukan default blue)
+ * ========================================================================== */
+.mapboxgl-ctrl-attrib {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  padding: 0 4px;
+}
+.mapboxgl-ctrl-attrib a { color: var(--color-cocoa-600); }
+.mapboxgl-ctrl-group {
+  border-radius: 0.75rem !important;
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgba(26, 17, 10, 0.06),
+    0 4px 12px -4px rgba(26, 17, 10, 0.15) !important;
+  border: 1px solid var(--color-cocoa-200) !important;
+  background: var(--color-cream-50) !important;
+}
+.mapboxgl-ctrl-group button {
+  width: 32px !important;
+  height: 32px !important;
+  background-color: var(--color-cream-50) !important;
+}
+.mapboxgl-ctrl-group button + button {
+  border-top: 1px solid var(--color-cocoa-200) !important;
+}
+.mapboxgl-ctrl-group button:hover {
+  background-color: var(--color-cream-100) !important;
+}
+.mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+  filter: invert(28%) sepia(13%) saturate(800%) hue-rotate(357deg) brightness(95%) contrast(88%);
+}
+
+/* Center pin (custom HTML marker) */
+.mapbox-center-pin {
+  width: 32px;
+  height: 44px;
+  transform: translate(-16px, -44px);
+  cursor: pointer;
+  pointer-events: none; /* biar event klik jatuh ke map, bukan pin */
+}
+.mapbox-center-pin svg { display: block; }
+
+/* Result marker (search alternatives) */
+.mapbox-result-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--color-cocoa-700);
+  border: 2px solid #fff;
+  box-shadow:
+    0 1px 2px rgba(26, 17, 10, 0.3),
+    0 2px 6px rgba(26, 17, 10, 0.25);
+  cursor: pointer;
+  transform: translate(-2px, -2px);
+  transition: transform 0.15s ease;
+}
+.mapbox-result-marker:hover {
+  transform: translate(-2px, -2px) scale(1.25);
+  background: var(--color-honey-500);
+}
+.mapbox-result-marker.is-selected {
+  background: var(--color-honey-500);
+  transform: translate(-2px, -2px) scale(1.4);
+}
+
+/* Geolocate control (kita pakai custom button di luar, tapi kalau sewaktu-waktu
+   ditambah control bawaan Mapbox, samain stylenya). */
+.mapboxgl-ctrl-geolocate { background: var(--color-cream-50) !important; }
 
 /* =============================================================================
  *  Density: layout ringkas untuk HP (< sm: 640px).

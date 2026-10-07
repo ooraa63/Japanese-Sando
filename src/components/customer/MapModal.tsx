@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { X } from "lucide-react";
 import dynamic from "next/dynamic";
 import type { Dict } from "@/lib/types";
@@ -13,8 +12,8 @@ const DEFAULT_CENTER = { lat: -6.917, lng: 107.619 };
 
 /**
  * Modal pilih lokasi — full-screen di HP. Body modal render peta Enhanced
- * (Photon autocomplete + multi-marker + reverse geocoding) yang di-load
- * secara dinamis (Leaflet butuh `window`).
+ * (Mapbox GL JS + Geocoding API) yang di-load secara dinamis karena
+ * mapbox-gl butuh `window`.
  */
 const InnerPicker = dynamic(
   () => import("./EnhancedMapPicker").then((m) => m.EnhancedMapPicker),
@@ -28,7 +27,7 @@ const InnerPicker = dynamic(
   }
 );
 
-export function LeafletMapModal({
+export function MapModal({
   open,
   center,
   initialLabel,

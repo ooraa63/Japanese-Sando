@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  MapContainer,
-  Marker,
-  TileLayer,
-  useMap,
-  useMapEvents,
-} from "react-leaflet";
-import L from "leaflet";
+import mapboxgl from "mapbox-gl";
 import {
   Building,
   Coffee,
@@ -21,191 +14,167 @@ import {
   X,
 } from "lucide-react";
 
-const PHOTON_SEARCH = "https://photon.komoot.io/api";
-const OVERPASS_API = "https://overpass-api.de/api/interpreter";
-const DEFAULT_CENTER = { lat: -6.917, lng: 107.619 };
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+const MAPBOX_GEOCODE = "https://api.mapbox.com/geocoding/v5/mapbox.places";
+const DEFAULT_CENTER: [number, number] = [107.619, -6.917]; // [lng, lat]
 const DEFAULT_ZOOM = 13;
 
-const SelectedIcon = L.icon({
-  iconUrl:
-    "data:image/svg+xml;base64," +
-    btoa(
-      `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 44' fill='%23b76e00'><path d='M16 0C7.2 0 0 7.2 0 16c0 12 16 28 16 28s16-16 16-28c0-8.8-7.2-16-16-16zm0 22a6 6 0 110-12 6 6 0 010 12z'/></svg>`
-    ),
-  iconSize: [32, 44],
-  iconAnchor: [16, 44],
-});
-const ResultIcon = L.icon({
-  iconUrl:
-    "data:image/svg+xml;base64," +
-    btoa(
-      `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32' fill='%2378716c'><path d='M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20c0-6.6-5.4-12-12-12zm0 16a4 4 0 110-8 4 4 0 010 8z'/></svg>`
-    ),
-  iconSize: [22, 30],
-  iconAnchor: [11, 30],
-});
+if (MAPBOX_TOKEN) {
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+}
 
+/** Hasil search/geocode dari Mapbox Places API. */
 export type SearchResult = {
   display_name: string;
   lat: number;
   lng: number;
-  osm_key?: string;
-  type?: string;
+  /** Mapbox `properties.category` (mis. "Coffee Shop", "Restaurant", "Mall").
+   *  Dipakai buat icon + warna. */
   category?: string;
+  /** Mapbox `place_type[0]` (mis. "poi", "address", "place", "neighborhood"). */
+  type?: string;
+  name?: string;
   street?: string;
   city?: string;
   country?: string;
-  name?: string;
   postcode?: string;
-  /** Kalau true, hasil ini hanya berisi nama brand/POI yg cocok dengan query
-   *  (matched by Overpass query). Bisa dipilih untuk auto-navigate. */
-  matchedName?: boolean;
 };
 
-function categoryIcon(osmKey?: string) {
-  const k = (osmKey ?? "").toLowerCase();
+interface GeocodeFeature {
+  id: string;
+  place_name: string;
+  text: string;
+  center: [number, number];
+  properties?: { category?: string; short_code?: string };
+  place_type?: string[];
+  context?: Array<{ text?: string; id?: string }>;
+}
+
+function categoryIcon(category?: string) {
+  const c = (category ?? "").toLowerCase();
   if (
-    k.includes("cafe") ||
-    k.includes("restaurant") ||
-    k.includes("food") ||
-    k.includes("amenity")
+    c.includes("cafe") ||
+    c.includes("coffee") ||
+    c.includes("restaurant") ||
+    c.includes("food")
   )
     return Coffee;
   if (
-    k.includes("shop") ||
-    k.includes("store") ||
-    k.includes("mall")
+    c.includes("shop") ||
+    c.includes("store") ||
+    c.includes("mall") ||
+    c.includes("grocery")
   )
     return ShoppingBag;
-  if (k.includes("park") || k.includes("garden") || k.includes("forest"))
+  if (c.includes("park") || c.includes("garden") || c.includes("recreation"))
     return Trees;
   return Building;
 }
 
-function categoryColor(osmKey?: string): string {
-  const k = (osmKey ?? "").toLowerCase();
-  if (k.includes("cafe") || k.includes("restaurant")) return "text-honey-500";
-  if (k.includes("shop") || k.includes("store") || k.includes("mall"))
+function categoryColor(category?: string): string {
+  const c = (category ?? "").toLowerCase();
+  if (c.includes("cafe") || c.includes("coffee") || c.includes("restaurant"))
+    return "text-honey-500";
+  if (c.includes("shop") || c.includes("store") || c.includes("mall"))
     return "text-berry-500";
-  if (k.includes("park") || k.includes("garden")) return "text-matcha-600";
+  if (c.includes("park") || c.includes("garden")) return "text-matcha-600";
   return "text-cocoa-700";
 }
 
-function ClickCapture({
-  onPick,
-}: {
-  onPick: (lat: number, lng: number) => void;
-}) {
-  useMapEvents({
-    click(e) {
-      onPick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
-
-function PrimaryMarker({ picked }: { picked: { lat: number; lng: number } }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo([picked.lat, picked.lng], Math.max(map.getZoom(), 15), {
-      duration: 0.5,
-    });
-  }, [picked.lat, picked.lng, map]);
-  return <Marker position={[picked.lat, picked.lng]} icon={SelectedIcon} />;
-}
-
-/**
- * Query Overpass (OSM) untuk POI tertentu dalam radius 5km dari titik
- * tertentu. Overpass lebih kaya untuk POI tags (amenity, cafe, shop) dan
- * bisa query by name filter.
- *
- * Refs: https://wiki.openstreetmap.org/wiki/Overpass_API
- */
-async function overpassSearch(
+/** Forward-geocode query (Starbucks, jalan, dsb). */
+async function mapboxGeocode(
   query: string,
-  lat: number,
-  lng: number
+  proximity?: [number, number]
 ): Promise<SearchResult[]> {
-  // Cari POI berdasarkan nama mirip `query` di sekitar titik. Radius 5km.
-  // Nama cocok baik di name maupun brand.
-  const escaped = query.replace(/"/g, '\\"');
-  const overpassQL = `
-    [out:json][timeout:8];
-    (
-      node["name"~"${escaped}",i](around:5000,${lat},${lng});
-      way["name"~"${escaped}",i](around:5000,${lat},${lng});
-      node["brand"~"${escaped}",i](around:5000,${lat},${lng});
-      way["brand"~"${escaped}",i](around:5000,${lat},${lng});
-    );
-    out center 20;
-  `;
-  try {
-    const r = await fetch(OVERPASS_API, {
-      method: "POST",
-      body: "data=" + encodeURIComponent(overpassQL),
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
-    if (!r.ok) return [];
-    const data = (await r.json()) as {
-      elements: Array<{
-        id: number;
-        lat?: number;
-        lon?: number;
-        center?: { lat: number; lon: number };
-        tags?: Record<string, string>;
-      }>;
-    };
-    return data.elements
-      .map((el) => {
-        const lat2 = el.lat ?? el.center?.lat;
-        const lng2 = el.lon ?? el.center?.lon;
-        if (lat2 == null || lng2 == null) return null;
-        const t = el.tags ?? {};
-        const name = t.name || t.brand || "(tanpa nama)";
-        const addrParts = [
-          t["addr:street"],
-          t["addr:housenumber"],
-          t["addr:suburb"],
-          t["addr:city"],
-          t["addr:postcode"],
-        ].filter(Boolean);
-        const display_name = [name, ...addrParts].join(", ");
-        return {
-          display_name,
-          lat: lat2,
-          lng: lng2,
-          osm_key: Object.keys(t).find((k) =>
-            /^(amenity|shop|leisure|tourism|office)$/.test(k)
-          ),
-          name,
-          street: t["addr:street"],
-          city: t["addr:city"],
-          country: t["addr:country"],
-          postcode: t["addr:postcode"],
-          type: t.cuisine ?? t.amenity ?? t.shop,
-          matchedName: true,
-        } as SearchResult;
-      })
-      .filter(Boolean) as SearchResult[];
-  } catch {
-    return [];
+  if (!MAPBOX_TOKEN || !query.trim()) return [];
+  const url = new URL(
+    `${MAPBOX_GEOCODE}/${encodeURIComponent(query.trim())}.json`
+  );
+  url.searchParams.set("access_token", MAPBOX_TOKEN);
+  url.searchParams.set("limit", "8");
+  url.searchParams.set("language", "id");
+  url.searchParams.set("country", "id");
+  // Bias ke POI (Starbucks, McD, dll) supaya cepat muncul. Address/neighborhood
+  // tetap bisa muncul karena Mapbox nge-rank multi-type.
+  url.searchParams.set("types", "poi,address,place,neighborhood,locality");
+  if (proximity) {
+    url.searchParams.set("proximity", `${proximity[0]},${proximity[1]}`);
   }
+  const r = await fetch(url.toString());
+  if (!r.ok) return [];
+  const data = (await r.json()) as { features: GeocodeFeature[] };
+  return data.features.map(featureToResult);
+}
+
+/** Reverse-geocode koordinat jadi label alamat. */
+async function mapboxReverse(lng: number, lat: number): Promise<string> {
+  if (!MAPBOX_TOKEN) return "";
+  const url = new URL(`${MAPBOX_GEOCODE}/${lng},${lat}.json`);
+  url.searchParams.set("access_token", MAPBOX_TOKEN);
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("language", "id");
+  const r = await fetch(url.toString());
+  if (!r.ok) return "";
+  const data = (await r.json()) as { features: GeocodeFeature[] };
+  return data.features[0]?.place_name ?? "";
+}
+
+/** "Tempat populer di sekitar" — cafe, restaurant, mall, dll dalam 1.5km.
+ *  Query-nya gabungan kategori supaya Mapbox balikin mix POI. */
+async function mapboxNearbyPOIs(
+  lng: number,
+  lat: number
+): Promise<SearchResult[]> {
+  if (!MAPBOX_TOKEN) return [];
+  const url = new URL(`${MAPBOX_GEOCODE}/cafe restaurant mall shop.json`);
+  url.searchParams.set("access_token", MAPBOX_TOKEN);
+  url.searchParams.set("types", "poi");
+  url.searchParams.set("limit", "12");
+  url.searchParams.set("language", "id");
+  url.searchParams.set("country", "id");
+  url.searchParams.set("proximity", `${lng},${lat}`);
+  const r = await fetch(url.toString());
+  if (!r.ok) return [];
+  const data = (await r.json()) as { features: GeocodeFeature[] };
+  return data.features.map(featureToResult);
+}
+
+function featureToResult(f: GeocodeFeature): SearchResult {
+  const ctx = f.context ?? [];
+  const findCtx = (prefix: string) =>
+    ctx.find((c) => c.id?.startsWith(prefix))?.text;
+  return {
+    display_name: f.place_name,
+    name: f.text,
+    lat: f.center[1],
+    lng: f.center[0],
+    category: f.properties?.category,
+    type: f.place_type?.[0],
+    street: findCtx("street") || findCtx("address"),
+    city:
+      findCtx("place") ||
+      findCtx("locality") ||
+      findCtx("region") ||
+      findCtx("district"),
+    country: findCtx("country"),
+    postcode: findCtx("postcode"),
+  };
 }
 
 /**
- * Map picker kaya dengan multi-source (Photon autocomplete + Overpass POI
- * search) + browser geolocation + reverse geocoding.
- *
- * - Search: Photon dulu. Kalau nama brand/POI spesifik (gak ada di OSM),
- *   fallback ke Overpass query untuk POI yang namanya mirip dalam radius 5km.
- * - "Pakai lokasi saya": request browser geolocation → recenter map ke
- *   posisi user.
- * - "Tempat populer di sekitar": kalau search kosong, Overpass query
- *   cafe/restaurant/mall dalam radius 1km dari titik user.
+ * Map picker kaya dengan Mapbox GL JS:
+ *  - Geocoding API untuk search (POI + alamat, di-bias ke `proximity`).
+ *  - Geocoding API reverse untuk label alamat saat user geser peta.
+ *  - "Tempat populer di sekitar" — cafe/restaurant/mall dalam radius.
+ *  - Browser geolocation untuk "📍 Lokasi saya".
+ *  - Center pin (custom HTML marker) yang stay di tengah layar dan ngikut
+ *    saat user pan/zoom — kordinat = `map.getCenter()`.
+ *  - Result markers kecil untuk alternatif hasil search.
  *
  * Props:
- *   - lat/lng: koordinat saat ini
- *   - onChange(lat, lng, label?): callback saat titik dipilih
+ *  - lat/lng: koordinat saat ini (null = pakai default Bandung/Jakarta).
+ *  - onChange(lat, lng, label?): callback saat titik berubah.
+ *  - placeholder: search input placeholder.
  */
 export function EnhancedMapPicker({
   lat,
@@ -231,11 +200,87 @@ export function EnhancedMapPicker({
 
   const picked = useMemo(() => {
     if (lat != null && lng != null) return { lat, lng };
-    return DEFAULT_CENTER;
+    return { lat: DEFAULT_CENTER[1], lng: DEFAULT_CENTER[0] };
+  }, [lat, lng]);
+
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const resultMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  // Flag ini mencegah feedback loop: kalau onChange dipanggil dari moveend
+  // yang dipicu flyTo programmatic, parent gak perlu dikabari lagi.
+  const isProgrammaticRef = useRef(false);
+
+  // ---------- Init map ----------
+  useEffect(() => {
+    if (!mapContainerRef.current || !MAPBOX_TOKEN) return;
+    if (mapRef.current) return; // already initialized
+
+    const initialCenter: [number, number] = [picked.lng, picked.lat];
+
+    const m = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: initialCenter,
+      zoom: DEFAULT_ZOOM,
+      attributionControl: true,
+    });
+    m.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+
+    m.on("load", () => {
+      // First reverse-geocode untuk initial label
+      void doReverse(initialCenter[0], initialCenter[1]);
+    });
+
+    // Saat user selesai nge-geser peta → koordinat = map.getCenter().
+    m.on("moveend", () => {
+      if (isProgrammaticRef.current) {
+        isProgrammaticRef.current = false;
+        return;
+      }
+      const c = m.getCenter();
+      onChange(c.lat, c.lng);
+      void doReverse(c.lng, c.lat);
+    });
+
+    // Klik di peta → flyTo titik itu. Tapi skip kalau yang diklik marker
+    // hasil (handler marker sudah flyTo duluan).
+    m.on("click", (e) => {
+      const target = e.originalEvent.target as HTMLElement | null;
+      if (target?.closest?.(".mapbox-result-marker")) return;
+      isProgrammaticRef.current = true;
+      m.flyTo({
+        center: e.lngLat,
+        zoom: Math.max(m.getZoom(), 15),
+        duration: 600,
+      });
+    });
+
+    mapRef.current = m;
+
+    return () => {
+      m.remove();
+      mapRef.current = null;
+      resultMarkersRef.current = [];
+    };
+    // picked.lat/lng sebagai initial center; sengaja kosong dependencies
+    // supaya map cuma di-init sekali.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---------- Sync map center kalau lat/lng berubah dari luar (search/geolocation) ----------
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || lat == null || lng == null) return;
+    const cur = m.getCenter();
+    // Threshold ~10 meter biar gak flyTo kalau parent cuma emit onChange
+    // dari moveend yang baru aja kita trigger.
+    if (Math.abs(cur.lat - lat) > 0.0001 || Math.abs(cur.lng - lng) > 0.0001) {
+      isProgrammaticRef.current = true;
+      m.flyTo({ center: [lng, lat], zoom: Math.max(m.getZoom(), 15), duration: 600 });
+    }
   }, [lat, lng]);
 
   // ---------- Search ----------
-  // Multi-source: Photon → kalau hasil < 3, fallback Overpass query.
   useEffect(() => {
     const q = query.trim();
     if (!q) {
@@ -246,80 +291,9 @@ export function EnhancedMapPicker({
     debounceRef.current = setTimeout(async () => {
       setBusy(true);
       try {
-        // Source 1: Photon (basis OSM, lengkap untuk jalan/POI generic)
-        const params = new URLSearchParams({
-          q,
-          lang: "id",
-          lat: String(picked.lat),
-          lon: String(picked.lng),
-          limit: "8",
-        });
-        const r = await fetch(`${PHOTON_SEARCH}?${params.toString()}`);
-        const data = r.ok
-          ? ((await r.json()) as { features: never[] })
-          : { features: [] };
-
-        const photonItems: SearchResult[] = data.features.map((f) => {
-          // ... (sama seperti sebelumnya)
-          const ff = f as unknown as {
-            geometry: { coordinates: [number, number] };
-            properties: {
-              osm_key?: string;
-              osm_value?: string;
-              type?: string;
-              name?: string;
-              street?: string;
-              city?: string;
-              country?: string;
-              postcode?: string;
-            };
-          };
-          const [lng2, lat2] = ff.geometry.coordinates;
-          const p = ff.properties;
-          const parts = [
-            p.name,
-            p.street,
-            p.city,
-            p.country,
-          ].filter(Boolean);
-          return {
-            display_name: parts.join(", ") || "(tanpa nama)",
-            lat: lat2,
-            lng: lng2,
-            osm_key: p.osm_key,
-            type: p.osm_value ?? p.type,
-            category: p.type,
-            street: p.street,
-            city: p.city,
-            country: p.country,
-            name: p.name,
-            postcode: p.postcode,
-          };
-        });
-
-        let combined = photonItems;
-
-        // Source 2: Overpass (basis OSM, lengkap untuk POI tags).
-        // Dipakai kalau Photon gak nemu (mis. Starbucks yg belum
-        // di-tag di OSM Indonesia).
-        if (photonItems.length < 3) {
-          const overpass = await overpassSearch(q, picked.lat, picked.lng);
-          // Dedupe by (lat, lng) approx
-          const seen = new Set(
-            photonItems.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`)
-          );
-          const merged = [...photonItems];
-          for (const o of overpass) {
-            const key = `${o.lat.toFixed(4)},${o.lng.toFixed(4)}`;
-            if (!seen.has(key)) {
-              merged.push(o);
-              seen.add(key);
-            }
-          }
-          combined = merged;
-        }
-
-        setResults(combined);
+        const proximity: [number, number] = [picked.lng, picked.lat];
+        const items = await mapboxGeocode(q, proximity);
+        setResults(items);
       } catch {
         setResults([]);
       } finally {
@@ -331,7 +305,7 @@ export function EnhancedMapPicker({
     };
   }, [query, picked.lat, picked.lng]);
 
-  // ---------- Nearby POIs (muncul saat search box kosong & ada lokasi) ----------
+  // ---------- Nearby POIs (muncul saat search box kosong) ----------
   useEffect(() => {
     if (query.trim()) {
       setNearby([]);
@@ -340,56 +314,7 @@ export function EnhancedMapPicker({
     const debounce = setTimeout(async () => {
       setNearbyLoading(true);
       try {
-        // Overpass query: amenity in [cafe, restaurant, fast_food, food_court]
-        // + shop in [mall, supermarket]
-        const overpassQL = `
-          [out:json][timeout:10];
-          (
-            node["amenity"~"cafe|restaurant|fast_food|food_court|bar|pub"](around:1500,${picked.lat},${picked.lng});
-            way["amenity"~"cafe|restaurant|fast_food|food_court|bar|pub"](around:1500,${picked.lat},${picked.lng});
-            node["shop"~"mall|supermarket|department_store"](around:1500,${picked.lat},${picked.lng});
-            way["shop"~"mall|supermarket|department_store"](around:1500,${picked.lat},${picked.lng});
-          );
-          out center 12;
-        `;
-        const r = await fetch(OVERPASS_API, {
-          method: "POST",
-          body: "data=" + encodeURIComponent(overpassQL),
-        });
-        if (!r.ok) {
-          setNearby([]);
-          return;
-        }
-        const data = (await r.json()) as {
-          elements: Array<{
-            lat?: number;
-            lon?: number;
-            center?: { lat: number; lon: number };
-            tags?: Record<string, string>;
-          }>;
-        };
-        const items: SearchResult[] = data.elements
-          .map((el) => {
-            const lat2 = el.lat ?? el.center?.lat;
-            const lng2 = el.lon ?? el.center?.lon;
-            if (lat2 == null || lng2 == null) return null;
-            const t = el.tags ?? {};
-            const osmKey = t.amenity ?? t.shop ?? t.leisure;
-            const name = t.name || osmKey || "Tempat terdekat";
-            return {
-              display_name: name,
-              lat: lat2,
-              lng: lng2,
-              osm_key: osmKey,
-              name,
-              type: t.cuisine ?? osmKey,
-              street: t["addr:street"],
-              city: t["addr:city"],
-              country: t["addr:country"],
-              postcode: t["addr:postcode"],
-            } as SearchResult;
-          })
-          .filter(Boolean) as SearchResult[];
+        const items = await mapboxNearbyPOIs(picked.lng, picked.lat);
         setNearby(items);
       } catch {
         setNearby([]);
@@ -400,40 +325,42 @@ export function EnhancedMapPicker({
     return () => clearTimeout(debounce);
   }, [query, picked.lat, picked.lng]);
 
+  // ---------- Render result markers di peta ----------
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m) return;
+    // Hapus marker lama
+    for (const mk of resultMarkersRef.current) mk.remove();
+    resultMarkersRef.current = [];
+
+    const list = query.trim() ? results : nearby;
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      // Skip kalau result-nya sama dgn koordinat picked (center pin udah di sana)
+      if (r.lat === picked.lat && r.lng === picked.lng) continue;
+      const el = document.createElement("div");
+      el.className = "mapbox-result-marker";
+      el.title = r.display_name;
+      el.setAttribute("aria-label", r.display_name);
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        pickResult(r);
+      });
+      const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+        .setLngLat([r.lng, r.lat])
+        .addTo(m);
+      resultMarkersRef.current.push(marker);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, nearby, query, picked.lat, picked.lng]);
+
   // ---------- Reverse geocode ----------
-  async function reverseGeocode(lat: number, lng: number) {
+  async function doReverse(lng: number, lat: number) {
     setReverseLoading(true);
     try {
-      const params = new URLSearchParams({
-        lat: String(lat),
-        lon: String(lng),
-        lang: "id",
-        limit: "1",
-      });
-      const r = await fetch(
-        `https://photon.komoot.io/reverse?${params.toString()}`
-      );
-      if (!r.ok) return;
-      const data = (await r.json()) as {
-        features: Array<{
-          properties: {
-            name?: string;
-            street?: string;
-            city?: string;
-            country?: string;
-            postcode?: string;
-          };
-        }>;
-      };
-      if (data.features[0]) {
-        const p = data.features[0].properties;
-        const parts = [p.name, p.street, p.city, p.country, p.postcode].filter(
-          Boolean
-        );
-        setReverseLabel(parts.join(", "));
-      } else {
-        setReverseLabel(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-      }
+      const label = await mapboxReverse(lng, lat);
+      if (label) setReverseLabel(label);
+      else setReverseLabel(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
     } catch {
       setReverseLabel(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
     } finally {
@@ -454,6 +381,12 @@ export function EnhancedMapPicker({
         setLocating(false);
         const lat2 = pos.coords.latitude;
         const lng2 = pos.coords.longitude;
+        isProgrammaticRef.current = true;
+        mapRef.current?.flyTo({
+          center: [lng2, lat2],
+          zoom: 16,
+          duration: 800,
+        });
         onChange(lat2, lng2);
         setReverseLabel("Lokasi kamu……");
       },
@@ -470,15 +403,43 @@ export function EnhancedMapPicker({
   }
 
   function pickResult(r: SearchResult) {
+    isProgrammaticRef.current = true;
+    mapRef.current?.flyTo({
+      center: [r.lng, r.lat],
+      zoom: Math.max(mapRef.current?.getZoom() ?? 15, 15),
+      duration: 600,
+    });
     onChange(r.lat, r.lng, r.display_name);
-  }
-
-  function pickPoint(lat: number, lng: number) {
-    onChange(lat, lng);
-    reverseGeocode(lat, lng);
+    setReverseLabel(r.display_name);
   }
 
   const showingResults = query.trim() ? results : nearby;
+
+  // ---------- Guard: token belum di-set ----------
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="rounded-xl border border-berry-200 bg-berry-50 p-4 text-xs text-berry-700">
+        <p className="font-bold">Mapbox token belum disetel</p>
+        <p className="mt-1.5 leading-relaxed">
+          Tambahkan{" "}
+          <code className="rounded bg-berry-100 px-1 py-0.5 font-mono text-[11px]">
+            NEXT_PUBLIC_MAPBOX_TOKEN
+          </code>{" "}
+          ke <code className="font-mono text-[11px]">.env.local</code> lalu
+          restart dev server. Token publik gratis di{" "}
+          <a
+            href="https://account.mapbox.com/access-tokens/"
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            mapbox.com
+          </a>{" "}
+          (gak butuh kartu kredit).
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -532,8 +493,8 @@ export function EnhancedMapPicker({
       {showingResults.length > 0 ? (
         <ul className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-cocoa-200 bg-cream-50 p-1.5">
           {showingResults.map((r, i) => {
-            const Icon = categoryIcon(r.osm_key);
-            const color = categoryColor(r.osm_key);
+            const Icon = categoryIcon(r.category);
+            const color = categoryColor(r.category);
             return (
               <li key={`${r.lat}-${r.lng}-${i}`}>
                 <button
@@ -553,7 +514,7 @@ export function EnhancedMapPicker({
                     ) : null}
                   </span>
                   <span className="shrink-0 self-center rounded bg-cocoa-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-cocoa-600">
-                    {r.osm_key ?? r.type ?? "place"}
+                    {r.type ?? "place"}
                   </span>
                 </button>
               </li>
@@ -588,41 +549,27 @@ export function EnhancedMapPicker({
         ) : null}
       </div>
 
-      {/* Peta Leaflet */}
-      <div className="overflow-hidden rounded-xl border border-cocoa-200">
-        <MapContainer
-          center={[picked.lat, picked.lng]}
-          zoom={DEFAULT_ZOOM}
-          style={{ height: "320px", width: "100%" }}
-          scrollWheelZoom
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> · <a href="https://photon.komoot.io">Photon</a> · <a href="https://overpass-api.de">Overpass</a>'
-            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maxZoom={19}
-          />
-          <ClickCapture onPick={pickPoint} />
-          {/* Multi-marker: search results + nearby. */}
-          {showingResults.map((r, i) =>
-            r.lat === picked.lat && r.lng === picked.lng ? null : (
-              <Marker
-                key={`r-${i}-${r.lat}-${r.lng}`}
-                position={[r.lat, r.lng]}
-                icon={ResultIcon}
-                eventHandlers={{
-                  click: () => pickResult(r),
-                }}
-              />
-            )
-          )}
-          <PrimaryMarker picked={picked} />
-        </MapContainer>
+      {/* Peta Mapbox — center pin adalah child absolute, ngikut map center */}
+      <div className="relative h-80 overflow-hidden rounded-xl border border-cocoa-200">
+        <div ref={mapContainerRef} className="absolute inset-0" />
+
+        {/* Center pin — anchor di tengah visual. Koordinat = map.getCenter(). */}
+        <div className="mapbox-center-pin" aria-hidden>
+          <svg viewBox="0 0 32 44" width="32" height="44">
+            <path
+              d="M16 0C7.2 0 0 7.2 0 16c0 12 16 28 16 28s16-16 16-28c0-8.8-7.2-16-16-16zm0 22a6 6 0 110-12 6 6 0 010 12z"
+              fill="#d18d1c"
+              stroke="#fff"
+              strokeWidth="1.5"
+            />
+          </svg>
+        </div>
       </div>
 
       <p className="px-1 text-[11px] text-cocoa-500">
-        💡 Ketik POI / jalan di kolom atas (Starbucks, Vihara, dll). Atau klik
-        <strong> Lokasi saya</strong> untuk pakai GPS kamu. Place di bawah
-        adalah POI terdekat otomatis dari Overpass (basis OSM).
+        💡 Ketik POI / jalan di kolom atas (Starbucks, Vihara, dll). Atau klik{" "}
+        <strong>Lokasi saya</strong> untuk pakai GPS. Pin di tengah peta adalah
+        titik yang akan dipilih — geser peta untuk pindahin.
       </p>
     </div>
   );

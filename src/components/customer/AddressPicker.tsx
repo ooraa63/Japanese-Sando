@@ -10,12 +10,12 @@ import type { CartDraft } from "@/components/customer/CartProvider";
 type PickerDict = Dict["order"]["payment"];
 
 /**
- * Picker alamat dengan Leaflet (OSM tile) + Photon autocomplete (free).
- *
- * Leaflet butuh `window` — di-load dinamis dengan next/dynamic + ssr:false.
+ * Picker alamat dengan Mapbox GL JS + Geocoding API (free, gak perlu kartu
+ * kredit). mapbox-gl butuh `window` — di-load dinamis dengan next/dynamic +
+ * ssr:false.
  */
 const AddressPickerModal = dynamic(
-  () => import("./LeafletMapModal").then((m) => m.LeafletMapModal),
+  () => import("./MapModal").then((m) => m.MapModal),
   {
     ssr: false,
     loading: () => (
