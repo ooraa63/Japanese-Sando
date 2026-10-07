@@ -73,15 +73,14 @@ parent — akan throw `"useCart harus dipakai di dalam <CartProvider>"`.
 Layout `src/app/layout.tsx` membungkus semua dengan `<CartProvider>`,
 jadi aman di semua route customer.
 
-## 7. `data-density` di `<html>`
+## 7. Mobile layout ringkas (compact) aktif otomatis di < sm
 
-`FontSizeProvider` set atribut `data-density` di `<html>`. CSS di
-`src/app/globals.css` punya aturan `@media (max-width: 639px)` yang
-hanya aktif di mobile. **Di desktop (≥ 640px), mode compact tidak
-mempengaruhi apa-apa** — by design supaya tidak merusak layout
-desktop yang sudah pas.
+Tidak ada `FontSizeProvider` / `data-density` lagi (lihat D22 di
+`decisions.md`). Mobile layout compact (font 14px, kartu flavor 2 kolom,
+date barcode, dsb.) sekarang SELALU aktif di `@media (max-width: 639px)` di
+`src/app/globals.css`. Tidak ada toggle, tidak ada mode "large".
 
-Kalau menambah styling yang harus ikut berubah di mode compact,
+Kalau menambah styling yang harus ikut berubah di mode compact mobile,
 pakai class hook (`density-flavor-grid`, `density-bundle-grid`,
 `density-category-list`, `flavor-photo`, `flavor-desc`,
 `flavor-social`, `cat-photo`, `cat-meta`, `cat-desc`, `cat-plus`)
@@ -159,6 +158,30 @@ CATATAN: Admin signup juga akan kena edurmend verifikasi karena pakai
 pola `auth.signUp()` yang sama. Setelah admin signup, admin perlu cek
 email dan login ulang. Tidak perlu update kode admin.
 
+
+## 17. Migration-29 menghapus baris `customer_profiles` dengan phone NULL
+
+`migration-29.sql` revert `migration-27` (yang pernah membuat `phone`
+nullable untuk workaround Google OAuth). Saat apply `migration-29`,
+baris SQL `delete from public.customer_profiles where phone is null`
+akan jalan duluan — **ini menghapus akun customer yang dibuat via OAuth
+sebelumnya (testing) yang gak pernah lengkapi phone**.
+
+Kalau Anda ingin audit dulu sebelum hapus, run manual di SQL Editor:
+
+```sql
+select user_id, cp.created_at, u.email
+from public.customer_profiles cp
+left join auth.users u on u.id = cp.user_id
+where cp.phone is null;
+```
+
+Untuk enable kembali Google OAuth di masa depan, lihat D26 (decisions.md) —
+jangan revert migration-29 tanpa plan: bikin OAuth yang link ke existing
+account, bukan bikin akun otomatis tanpa password.
+
+
+---
 
 ## 14. Migration-16 harus dijalankan manual setelah deploy
 
