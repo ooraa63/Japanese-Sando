@@ -591,3 +591,33 @@ tanpa bikin auth.users row.
 - Customer_profiles sekarang UNIQUE(phone_normalized) — bukan UNIQUE
   per (user_id) (PK tetap user_id). Migration-22 Hapus duplikat
   terlama (created_at asc).
+
+
+## Zona pengambilan & pengantaran: satu tabel, bukan dua (2026-10-08)
+
+Steven meminta menu admin baru berlabel `Catatan Pengambilan & Pengiriman` dengan
+dua bagian: `Ambil di toko` (titik toko + catatan jam ambil) dan `Pengantaran`
+(zona antaran + ongkir).
+
+**Keputusan: tidak membuat tabel baru.**
+
+`delivery_zones` sudah membedakan jenis lewat kolom `kind` (`delivery` |`pickup`, migration-32).
+Steven sendiri yang memilih opsi `tabel baru`, tapi saat implementasi baru
+terbukti tabel itu hanya akan:
+
+- menduplikasi data yang sama (nama + lat/lng + aktif), dan
+- memaksa sisi pembeli (`OrderFlow`) membaca DUA sumber untuk satu
+  layar pilih lokasi.
+
+Jadi tabel yang sama diperluas dengan kolom `note_id` / `note_en`, dan
+menu admin-nya dipisah per jenis lewat tab.
+
+**Konsekuensi:**
+
+- `kind` jadi satu-satunya penentu jenis, bukan tebakan dari fee/lat.
+- Titik ambil dipaksa `fee = 0` dan `requires_address = false` di level
+  database (`admin_upsert_zone`), jadi data tidak bisa salah jenis.
+- Catatan per titik menggantikan catatan pickup global di `store_settings`
+  (`pickup_note_id`) — yang isinya masih daftar nama toko lama.
+- Satu sumber data untuk keranjang, picker admin, dan picker pembeli.
+

@@ -149,7 +149,9 @@ export function InlineMapPicker({
   useEffect(() => {
     const q = query.trim();
     if (!q) {
-      setResults([]);
+      // Daftar hasil sudah diturunkan lewat `visibleResults` (lihat di
+      // bawah), jadi state `results` tidak perlu dikosongkan di sini.
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -178,6 +180,10 @@ export function InlineMapPicker({
     });
     onChange(r.lat, r.lng);
   }
+
+  //Diturunkan saat render, bukan dibersihkan lewat effect: begitu input
+  // dikosongkan, hasil search lama langsung hilang dari UI.
+  const visibleResults = query.trim() ? results : [];
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -227,9 +233,9 @@ export function InlineMapPicker({
       </div>
 
       {/* Hasil search */}
-      {results.length > 0 ? (
+      {visibleResults.length > 0 ? (
         <ul className="max-h-40 space-y-1 rounded-xl border border-cocoa-200 bg-cream-50 p-1.5">
-          {results.map((r, i) => (
+          {visibleResults.map((r, i) => (
             <li key={i}>
               <button
                 type="button"

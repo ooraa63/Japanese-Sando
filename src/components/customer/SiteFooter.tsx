@@ -65,7 +65,9 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
                 { href: "/#how", label: t.nav.howItWorks },
                 { href: "/order", label: t.nav.order },
                 { href: "/track", label: t.nav.track },
-                { href: "/contact", label: t.nav.contact },
+                // "Kontak" dihapus dari daftar tautan (dokumen "Perbaikan Ruma
+                // Komugi 2", item 2): kontak sekarang hidup di halaman /account
+                // — tekan "Kontak" di sana untuk membuka popup info kontak.
               ].map((l) => (
                 <li key={l.href}>
                   <Link
@@ -121,7 +123,10 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
         </div>
 
         <div className="border-t border-cream-50/10">
-          <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 py-6 text-xs text-cream-200/50 sm:flex-row sm:justify-between sm:px-6">
+          {/* md:pb-20 memberi ruang untuk BottomNav fixed di bawah (desktop).
+              Tanpa ini, baris copyright ketimpa nav. Di HP nav bawah sudah
+              dihapus (item 1 dokumen perbaikan), jadi padding hanya desktop. */}
+          <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 py-6 text-xs text-cream-200/50 sm:flex-row sm:justify-between sm:px-6 md:pb-20">
             <p>
               © {new Date().getFullYear()} {storeName}. {t.footer.rights}
             </p>

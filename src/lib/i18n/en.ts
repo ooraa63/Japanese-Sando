@@ -161,6 +161,14 @@ export const en = {
     stepPayment: "Payment",
     stepReview: "Review & confirm",
     stepOf: "Step {n} of {total}",
+    guestPrompt: {
+      title: "Order with an account or as a guest?",
+      subtitle: "An account is optional. Takes about a minute.",
+      loginTitle: "Use my account",
+      loginHint: "Order history and vouchers stay saved in your account.",
+      guestTitle: "Order as guest",
+      guestHint: "Just ordering once? No sign-up needed.",
+    },
     identity: {
       title: "Who is ordering?",
       subtitle: "We only use this to contact you about your order.",
@@ -595,6 +603,7 @@ export const en = {
       viewSite: "View website",
       sales: "Sales ledger",
       vouchers: "Vouchers",
+      pickupDelivery: "Pickup & Delivery",
     },
     dash: {
       title: "Dashboard",
@@ -753,6 +762,24 @@ export const en = {
       deleted: "Zone hidden.",
       confirmDelete: "Hide zone {code}? Past orders stay valid.",
       errorIdRequired: "Zone code is required.",
+      // --- Pickup vs delivery (item 10 of the feedback doc) ---
+      kindLabel: "Type",
+      kindDelivery: "Delivery",
+      kindDeliveryHint: "Areas we deliver to, with a delivery fee.",
+      kindPickup: "Pickup point",
+      kindPickupHint: "Places customers come to collect from. No fee.",
+      noteLabelId: "Note for customers (ID)",
+      noteLabelEn: "Note for customers (EN)",
+      noteHint: "Shown on the order page when customers pick this point.",
+      pickupRowHint: "Pickup point — no fee",
+      pickupTitle: "Pickup",
+      pickupSubtitle: "Pickup points and their opening-hour notes.",
+      deliveryTitle: "Delivery",
+      deliverySubtitle: "Areas you deliver to and their fees.",
+      pickupNew: "Add pickup point",
+      pageTitle: "Pickup & Delivery",
+      pageSubtitle:
+        "Manage pickup points (with their opening hours) and delivery zones with their fees.",
     },
     menu: {
       title: "Menu & stock",

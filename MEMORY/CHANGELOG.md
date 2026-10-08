@@ -4,6 +4,584 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-08 — Item 7/8, 9, 10 dokumen "Perbaikan Ruma Komugi 2" + fix StrictMode
+
+**Scope:** feat: admin pickup & delivery, fix: hydration, fix: dev cart reset, fix: sales table
+
+Sambungan dari entri sebelumnya. Steven menjawab 4 pertanyaan (nav bawah, harga
+coret, total bayar, menu zona) — jawaban dan dampaknya dicatat di bawah.
+
+### Keputusan Steven
+
+1. **Nav bawah tampil di laptop saja** — sudah sesuai, tidak diubah lagi.
+2. **Harga coret bundle diisi sendiri dari menu admin.** Tidak ada kode baru
+   yang perlu ditulis: `MenuClient.tsx` sudah punya field `b-compare-price`
+   + validasi. Yang belum ada cuma angka di database (`compare_price` NULL).
+3. **Item 9 dilewati** — tidak dijawab. Digarisbawahi & diselidiki sendiri
+   (lihat di bawah).
+4. **Menu admin baru + tabel baru untuk titik toko.** Dikoreksi: tabel
+   terpisah TIDAK dibuat, alasannya di bawah.
+
+### Item 9 — "Total bayar masih tidak pas" + "jaraknya masih jauh bgt"
+
+Steven tidak menjawab pertanyaannya, jadi dicek langsung ke data.
+
+**Temuan: angkanya di database BENAR.** Semua 6 order punya
+`subtotal + delivery_fee == total_price` (selisih 0). Jadi ini bukan salah
+hitung — ini masalah tampilan di tabel transaksi (`SalesClient.tsx`):
+
+- Panel detail yang terbuka hanya menampilkan **"Subtotal"** (dan Ongkir
+  kalau > 0) — **tidak pernah menampilkan baris Total**. Di kolom TOTAL yang
+  jauh di kanan terlihat "Rp 18.000", jadi yang terbaca hanya "Subtotal
+  Rp 18.000" → itulah yang terasa "tidak pas".
+- Template kolom `lg:grid-cols-[120px_140px_minmax(0,1fr)_minmax(0,1fr)_120px_...]`
+  memberi PELANGGAN **dan** ITEM lebar `1fr` masing-masing. Di layar lebar
+  teks ITEM yang pendek ("Cookies & Cream ×1") menyisakan ruang kosong
+  raksasa sebelum kolom TOTAL — persis keluhan "jaraknya masih jauh bgt".
+
+**Perbaikan:**
+- Baris **Total** penutup ditambahkan di panel detail (border atas tebal).
+- Template kolom jadi
+  `[130px_140px_minmax(0,1fr)_minmax(0,220px)_110px_minmax(150px,auto)]`
+  + `gap-4` → `gap-3`. ITEM dikunci maksimal 220px, sisa ruang ke PELANGGAN.
+
+### Item 10 — Catatan Pengambilan & Pengiriman
+
+**Keputusan desain: TIDAK membuat tabel baru.**
+
+Steven memilih opsi "tabel baru untuk titik toko" — tapi setelah dicek,
+`delivery_zones` **sudah punya** kolom `kind` ('delivery' | 'pickup') dari
+`migration-32.sql`, lengkap dengan 2 titik pickup di-seed. Tabel terpisah
+hanya akan menduplikasi data dan membuat sisi pembeli harus baca dua sumber.
+Jadi tabel yang sama diperluas.
+
+**Dua lubang yang ditemukan (dan keduanya nyata):**
+
+1. `admin_upsert_zone` **tidak pernah membaca/menulis kolom `kind`** →
+   admin tidak bisa membuat titik toko dari UI; zona baru selalu 'delivery'.
+2. `list_active_zones` **tidak mengembalikan `kind`**, padahal
+   `src/app/order/page.tsx` → `OrderFlow` memfilter lokasi ambil dengan
+   `z.kind === "pickup"`. Akibatnya **pemilih "Lokasi pengambilan" tidak
+   pernah muncul untuk pembeli sungguhan.** Ini diverifikasi lewat RPC, bukan
+   dugaan.
+
+**`supabase/migration-39.sql`** (sudah apply ke DB produksi):
+- Tambah kolom `note_id` / `note_en` (catatan jam ambil per titik).
+- `list_active_zones` — expose `kind` + catatan (dipakai pembeli, anon).
+- `admin_list_zones` — expose `kind` + catatan.
+- `admin_upsert_zone` — **sekarang menyimpan `kind` + catatan**; untuk
+  `kind='pickup'` fee dipaksa 0 dan `requires_address` dipaksa false.
+- Backfill catatan untuk 2 titik pickup lama.
+- Sanity check `do $$ ... $$` yang gagal kalau ada `kind` di luar
+  delivery/pickup atau titik pickup dengan fee ≠ 0.
+- Semua RPC `security definer` → grant `anon/authenticated/service_role`
+  diulang karena `drop function` menghapus ACL.
+
+**Sisi admin:**
+- Route baru `src/app/admin/(dashboard)/pickup-delivery/page.tsx` +
+  `PickupDeliveryTabs.tsx` — 2 tab: **Ambil di Toko** / **Pengantaran**.
+- Menu sidebar baru "Ambil & Kirim" (ikon `Store`).
+- Blok zona **dilepas dari `/admin/settings`**.
+- `DeliveryZonesClient` dapat prop `kindFilter`; form dapat field
+  **Jenis** + 2 textarea **Catatan untuk pembeli (ID/EN)**. Ongkir &
+  "titik tetap" disembunyikan untuk titik ambil (nonsense untuk konteks itu).
+
+**Sisi pembeli:**
+- `src/app/order/page.tsx` sekarang meneruskan `kind` + catatan (ini yang
+  menghidupkan kembali pemilih lokasi pengambilan).
+- `OrderFlow` menampilkan catatan di tiap kartu titik ambil.
+
+### Fix tambahan — StrictMode menghapus keranjang saat refresh
+
+**Bug yang paling mengganggu Steven dan tidak terlihat dari kode.**
+
+`OrderFlow` punya effect unmount yang mengosongkan keranjang:
+
+```ts
+useEffect(() => () => {
+  sessionStorage.removeItem("js_order_step");
+  resetRef.current();
+}, []);
+```
+
+Di `next dev`, React StrictMode (default `true` untuk app router sejak
+Next.js 13.5.1 — dikonfirmasi dari `node_modules/next/dist/docs/01-app/
+03-api-reference/05-config/01-next-config-js/reactStrictMode.md`)
+menjalankan **mount → unmount → mount** saat halaman dibuka. Cleanup itu
+jadi ikut jalan **tepat setelah halaman dimuat**, jadi:
+
+- `sessionStorage.js_order_step` terhapus → langkah yang tersimpan hilang,
+- `reset()` jalan → **keranjang kosong**.
+
+Efeknya: setiap kali Steven refresh di tengah pesanan, halaman balik ke
+"Data Kamu" dan keranjang kosong. Ini sekaligus jadi alasan test E2E
+sebelumnya selalu gagal menyuntik `localStorage`.
+
+**Perbaikan:** `reallyMountedRef` di-set lewat `setTimeout(0)`; cleanup yang
+datang sebelum timeout itu dianggap probe StrictMode dan dilewati.
+
+### Perbaikan lain — cara menyimpan langkah (hydration-safe)
+
+Menyimpan `js_order_step` lewat `useEffect([step])` ternyata SALAH: effect itu
+menimpa nilai tersimpan dengan `steps[0]` **sebelum** React sempat
+membacanya, sehingga restore selalu gagal.
+
+Sekarang:
+- Penyimpanan pindah ke `goTo()` (satu-satunya pemanggil `setStep`).
+- Pembacaan pakai `useSyncExternalStore` (`getServerSnapshot` = `steps[0]`,
+  `getSnapshot` = langkah tersimpan) — pola yang sama dipakai `CartProvider`.
+  Server & render hydration sama-sama `steps[0]` (tidak mismatch), dan
+  React restore sendiri setelah hydration.
+
+### Verifikasi
+
+| Cek | Hasil |
+| --- | --- |
+| `npm run typecheck` | exit 0 |
+| `npm run lint` | 0 error, 0 warning |
+| `scripts/test-pages.mjs` | **15/15** (+ route `/admin/pickup-delivery`) |
+| `scripts/check-step-restore.js` (baru) | 4/4 — refresh tengah pesanan |
+| `scripts/check-pickup-delivery.js` (baru) | 16/16 — admin 2 tab + sisi pembeli |
+| `scripts/check-nav-contact.js` | 9/9 |
+| `scripts/test-bundle-stock-ui.js` | stok 10 → 8, bundle terkunci |
+| `scripts/check-zones.js` (baru) | `admin_upsert_zone` sudah menyimpan `kind` |
+
+### Catatan untuk sesi berikutnya
+
+- **`store_settings.pickup_note_id` = "Ruma Sushi & UVERS\n"** — catatan
+  pickup global LAMA, isinya cuma daftar nama toko. Sekarang tumpang tindih
+  dengan catatan per-titik yang baru. Sudah dikonfirmasi ke Steven supaya
+  dia bersihkan atau isi ulang di /admin/settings.
+- Login admin di browser CDP **harus klik tombol submit**, bukan
+  `form.requestSubmit()` — server action React tidak jalan kalau di-dispatch
+  manual. Lihat `scripts/check-pickup-delivery.js`.
+- Assertion `mustContain` di `test-pages.mjs` akan gagal kalau mengandung
+  `&`, karena di HTML ter-escape jadi `&amp;`.
+
+---
+
+## 2026-10-08 — Dokumen "Perbaikan Ruma Komugi 2": item 1–6 selesai, + fix hydration
+
+**Scope:** fix: ui mobile, fix: desktop nav, fix: hydration, feat: popup kontak & popup tamu
+
+Sumber: dokumen Word `Perbaikan Ruma Komugi 2'.docx` (11 poin). Sesi ini
+menyelesaikan item 1, 2, 3, 4, 5, 6 (dan item 11 yang sudah selesai di sesi
+sebelumnya). Item 7/8, 9, 10 menunggu keputusan Steven.
+
+### Item 1 — Navigasi bawah hanya di laptop, hilang di HP
+
+Steven: "Pada bagian hp saya tidak ada mau bagian bawah itu, karena info
+dibawah nanti ada di bagian akun, tapi untuk laptop tetap harus ada."
+
+- `MobileBottomNav.tsx` → **rename jadi `BottomNav.tsx`** (`git mv` manual).
+  Nama lama jadi menyesatkan karena sekarang tampil di desktop.
+  Kelas `md:hidden` → `hidden md:block`, list jadi `max-w-6xl px-6`.
+- Disembunyikan juga di `/order` (semua `/order*`): alur pemesanan punya
+  `CartStickyBar` sendiri yang `sticky bottom-0 z-30`, sedangkan nav situs
+  `fixed bottom-0 z-40` — kalau keduanya tampil, bar keranjang ketimpa
+  (persis item 6).
+
+### Item 2 — "Kontak" hilang dari navigasi, pindah ke Akun sebagai popup
+
+- Dihapus dari `SiteFooter` (TAUTAN CEPAT) dan `SiteHeader` (nav desktop +
+  drawer HP). Isinya sekarang: Menu / Cara Pesan / Pre-order / Cek Pesanan.
+- `ContactSection.tsx` dipecah: `ContactDetails` (daftar WA/IG/TikTok/alamat/
+  jam, presentasional) dipisah dari `ContactSection` supaya bisa dipakai ulang.
+- **Bar baru `ContactMenuRow.tsx`** (client) — bar "Kontak" di `/account` yang
+  membuka `Modal` berisi `ContactDetails`. Isi popup dikirim sebagai
+  `children` dari server component, jadi blok kontak tetap SSR.
+- `HelpMenuGroup` di `app/account/page.tsx` dapat prop `popupRow?: ReactNode`
+  untuk merender bar non-link.
+- Halaman `/contact` **tidak dihapus** — masih hidup & bisa diakses lewat
+  link FAQ di footer dan bar "Cerita Kami"/"Alamat"/"Jam" di Akun.
+
+### Item 3 — Popup kecil saat tekan "Pesan Sekarang"
+
+- `OrderNowLink.tsx`: `<Link href="/order">` → `<button>` + `Modal` berisi dua
+  pilihan "Pakai akun" (`openAuthModal("login")`) dan "Pesan sebagai tamu"
+  (`router.push("/order")`).
+- Kalau pembeli **sudah login**, popup dilewati dan langsung ke `/order`.
+- i18n baru `order.guestPrompt.*` di `id.ts` + `en.ts`.
+
+### Item 4 — Bug stok bundle (stok 10, pilih bundle, non-bundle masih 10)
+
+**Akar masalah:** `MenuBrowser` menghitung sisa stok hanya dari `quantities`,
+diabaikan `cart.bundles`. `create_order` sendiri mengurangi `categories.stock`
+satu pcs per **slot** bundle, jadi UI melenceng.
+
+- **File baru `src/lib/cart-stock.ts`** — `remainingStockByCategory(categories,
+  quantities, bundles, extraSlots)` mengurangi 3 sumber: item biasa, slot
+  bundle yang sudah di keranjang, slot bundle yang sedang dipilih di modal.
+- `OrderBundleModal` + `MenuBrowser` sama-sama pakai helper itu, jadi angka
+  "Tersedia N" di modal dan di kartu tidak mungkin berbeda.
+- `MenuBrowser` juga nggak lagi `flatMap().find()` di dalam loop.
+
+### Item 5 — Satu bundle hanya boleh sekali di keranjang
+
+- Kartu bundle di `MenuBrowser`: `disabled={inCart > 0}` + chip `Check`
+  "Di keranjang" + styling terkunci.
+
+### Item 6 — Sticky bar keranjang ketimpa nav bawah
+
+Disebabkan oleh z-index (nav `z-40` fixed di atas `CartStickyBar` `z-30`
+sticky.
+- Tertutup oleh item 1 — nav bawah tidak lagi muncul di HP maupun di
+  `/order`. `SiteFooter` dapat `md:pb-20` supaya copyright tidak ketimpa nav di
+  desktop.
+
+### Fix tambahan — hydration mismatch di `/order`
+
+**Bug produksi nyata, ditemukan kebetulan saat bikin test item 4.**
+
+`OrderFlow` dulu restore step dari `sessionStorage` **di dalam `useState`
+initializer**:
+
+```ts
+const [step, setStep] = useState<Step>(() => {
+  if (typeof window !== "undefined") {
+    const saved = sessionStorage.getItem("js_order_step");
+    if (saved && steps.includes(saved)) return saved;
+  }
+  return steps[0];
+});
+```
+
+Server selalu render `steps[0]`; klien me-restore step tersimpan. Kalau
+pembeli **refresh di tengah pesanan** (`js_order_step` = `"menu"`), keduanya
+beda → `Hydration failed because the server rendered text didn't match the
+client` → React buang seluruh tree & render ulang.
+
+Perbaikan: initializer selalu `steps[0]` (identik dengan server), restore
+dipindah ke `useEffect` yang dijaga `restoredStepRef`. Effect-nya **harus
+ditempatkan sebelum** effect penyimpan step, kalau tidak ia menimpa
+`sessionStorage` dengan langkah pertama sebelum sempat dibaca.
+
+### Verifikasi
+
+| Cek | Hasil |
+| --- | --- |
+| `npm run typecheck` | exit 0 |
+| `npm run lint` | 0 error, 0 warning |
+| `npm run build` | exit 0, 20 route |
+| `scripts/test-pages.mjs` | 14/14 lulus |
+| `scripts/test-bundle-stock-ui.js` (baru, E2E) | stok 10 → 8 ✅, kartu bundle terkunci ✅ |
+| `scripts/check-nav-contact.js` (baru) | 9/9 lulus |
+| `scripts/dump-console.js` (baru) | console bersih, hydration error hilang |
+| Route `/`, `/order`, `/contact`, `/track`, `/login`, `/register` | semua 200 |
+
+### Catatan penting untuk sesi berikutnya
+
+- **Test E2E jangan pakai suntik localStorage.** `OrderFlow` mereset keranjang
+  di effect unmount (`resetRef.current()`), jadi seed selalu hilang sebelum
+  komponen membacanya — sudah dicoba 3 cara dan gagal. Klik UI-nya saja
+  (`aria-label="+1 <nama>"` untuk stepper, teks "Tambah ke keranjang" untuk
+  tombol awal, "Konfirmasi" untuk footer modal bundle).
+- `/order` membuka di **step 01 "Data Kamu"**, bukan daftar rasa. Set
+  `sessionStorage.js_order_step = "menu"` lewat
+  `Page.addScriptToEvaluateOnNewDocument` untuk langsung ke langkah menu.
+- Kartu rasa di `FlavorCard` **tidak** punya tombol `+1` sebelum item masuk
+  keranjang — saat `qty === 0` yang dirender tombol "Tambah ke keranjang".
+- `check-nav-contact.js` + `dump-console.js` bisa dipakai ulang kapan pun
+  (butuh dev server jalan; default `APP_URL=http://localhost:3099`).
+
+---
+
+## 2026-10-08 — Fix kartu menu: deskripsi kembali + baris terjual/disukai rapi
+
+**Scope:** fix: ui mobile, fix: hydration
+
+### 1. Deskripsi rasa hilang di HP
+
+**Akar masalah BUKAN data.** `globals.css` (blok `@media (max-width: 639px)`)
+memang sengaja menyembunyikan deskripsi:
+
+```css
+.density-flavor-grid > article .flavor-desc { display: none !important; }
+```
+
+Selector itu HANYA kena di beranda (`MenuBrowser` membungkus kartu sebagai
+`<article>` langsung anak `.density-flavor-grid`). Di `/order` strukturnya
+`<li><FlavorCard/></li>` jadi deskripsi sudah tampil di sana — makanya Steven
+hanya melihatnya hilang di beranda.
+
+Dicek dulu lewat `scripts/check-flavor-text.js`: 4 dari 5 rasa punya deskripsi
+nyata di database. Jadi masalahnya murni CSS.
+
+- `globals.css` — `display: none` diganti `display: block`, font diperkecil
+  ke `0.65rem`. Batas 2 baris tetap pakai `line-clamp-2` yang sudah ada di
+  `FlavorCard`, jadi kartu tidak jadi terlalu tinggi.
+
+### 2. Baris "terjual" + "disukai" kepotong ("0 terj...", "1 disu...")
+
+Sebelumnya `FlavorCard` menaruh angka terjual/disukai dan tombol "Suka" dalam
+satu baris `justify-between`, dan tiap angka diberi `truncate`. Di grid 2 kolom
+HP lebarnya cuma ~156px, jadi teks terpotong.
+
+- `FlavorCard.tsx` — baris social jadi `flex-col`: satu baris penuh untuk
+  tombol/counter suka, satu baris penuh untuk jumlah terjual. Semua
+  `truncate` dihapus.
+- **"disukai" sekarang pakai logo hati (Love)** — ikon `Heart` di counter
+  suka, jadi jelas itu dislike/suka dan bukan cuma angka.
+- Tombol suka tetap jadi pemicu (tappable) dan menampilkan jumlahnya:
+  "♡ 2 disuka". Di `/order` (`readOnlySocial`) tombol tidak dirender, hanya
+  angkanya — sesuai aturan lama.
+
+### 3. Hydration mismatch di HeroCarousel (tambahan, ditemukan saat verifikasi)
+
+Dev server menandai "1 Issue" yang tidak ada hubungannya dengan kartu menu.
+Ternyata `HeroCarousel` membaca `window.matchMedia()` **saat render**:
+
+```tsx
+const isMobile = typeof window !== "undefined" && window.matchMedia(...).matches;
+```
+
+Server selalu me-render gambar hero versi desktop, client di HP me-render versi
+mobile -> React membuang atribut `src`/`srcSet` dan hero bisa berkedip.
+
+- `HeroCarousel.tsx` — `isMobile` jadi `useState(false)` (nilainya sama dengan
+  hasil render server), lalu dikoreksi ke kondisi asli lewat `useEffect` +
+  listener `matchMedia`. `key={slidesKey}` yang sudah ada tetap dipakai untuk
+  me-remount carousel saat daftar gambarnya berganti.
+
+### Catatan data (bukan kode)
+
+Rasa **Cookies & Cream** punya `desc_id = "Test"` dan `desc_en` kosong.
+Setelah deskripsi dikembalikan, tulisan "Test" ikut tampil di kartu. Perlu
+diisi copy yang sebenarnya lewat Admin > Menu & Stok.
+
+### Verifikasi
+
+- `npm run typecheck` / `lint` / `build` -> exit 0
+- `scripts/test-pages.mjs` -> 14 lulus, 0 gagal
+- `scripts/check-card-layout.js` (baru, baca geometri DOM asli di viewport
+  390px): semua 5 kartu rasa `deskripsi.visible = true`, social
+  `flex-direction: column`, tiap baris `clientWidth === scrollWidth`, dan
+  daftar elemen kepotong `terpotong: []` -> tidak ada teks yang terpotong.
+- Screenshot via `scripts/shoot.js` (baru): kartu sudah tampil deskripsi +
+  "♡ N disuka" / "N terjual" tanpa kepotong.
+- Log dev server: `GET / 200` tanpa hydration warning lagi, badge "1 Issue"
+  hilang.
+
+### Skrip baru
+
+`shoot.js` (screenshot via Chrome DevTools Protocol), `check-card-layout.js`
+(ukur overflow teks nyata di DOM), `check-hydration.js` (bandingkan atribut
+`src`/`srcSet` server vs client), `check-flavor-text.js` (cek isi kolom bebas
+di database).
+
+Gotcha CDP: WAJIB `--disable-extensions` + `--remote-allow-origins=*`, dan
+pilih target `type === "page"` yang bukan `chrome-extension://`. Tanpa itu
+WebTools nyambung ke background page extension dan `Page.captureScreenshot`
+timeout tanpa pernah menghasilkan gambar.
+
+---
+
+## 2026-10-08 — Migration-38: buang RPC mati + verifikasi halaman admin dengan login asli
+
+**Scope:** chore: cleanup, feat: test admin, docs:
+
+### Drop RPC yang terbukti tidak kepakai (migration-38, sudah diterapkan)
+
+Sebelum drop, tiap fungsi dicek pakai `scripts/check-fn-usage.js` (skrip baru):
+mencari penyebut nama fungsi di body `pg_proc.prosrc` + dependensi `pg_depend`.
+Hasilnya **0 pemanggil di DB, 0 objek dependen, 0 pemanggil dari `src/`**:
+
+| Fungsi | Kenapa mati |
+|---|---|
+| `customer_upsert_own_profile(text,text,text)` | Versi sebelum ada `p_date_of_birth`. App selalu pakai yang 4-argumen (`src/app/account/actions.ts`). |
+| `admin_set_stock(integer,text)` | Sisa model stok global → tulis `store_settings.total_stock`, kolom yang **tidak dibaca siapa pun**. |
+| `admin_set_stock(bigint,integer,text)` | Sisa model stok per-flavor → tulis `flavors.stock`, juga tidak dibaca siapa pun. |
+
+Semua pakai `drop function if exists` jadi idempoten. Kalau ternyata ada yang
+memanggil, PostgreSQL akan menolak DROP-nya — bukan diam-diam merusak.
+
+Efek: fungsi schema public **69 → 66**, dan sekarang **tidak ada overload
+sama sekali** (`scripts/verify-overloads.js`). Yang dipakai aplikasi
+(`customer_upsert_own_profile` 4-arg + `admin_set_category_stock`) utuh.
+
+### Kode mati lain
+
+- `src/lib/utils.ts` — `remainingStock()` dan `isSoldOut()` dihapus. Keduanya
+  tidak di-import siapa pun, dan keduanya mengasumsikan stok di level flavor,
+  padahal model sekarang `categories.stok`. Menjadikannya jebakan.
+- `scripts/verify-all-rpcs.js` — bug `ReferenceError: grantee is not defined`
+  (baris 51 hilang `g.`) sudah dibetulkan.
+- File untracked dari sesi 6 Okt yang sudah tidak berlaku dihapus:
+  `function-actual.sql`, `sql-fix.md`, `scripts/check-qris-charges.js`,
+  `scripts/test-public-invoice.js`.
+
+### Test admin beneran jalan (14/14 lulus)
+
+Kredensial admin ditaruh di `.env.local` (`ADMIN_EMAIL` + `ADMIN_PASSWORD`),
+sesuai yang sudah diharapkan `scripts/test-pages.mjs`. Login sungguhan
+lewat Supabase Auth, cookie session dipakai buka 6 halaman dashboard.
+
+**2 kegagalan awal BUKAN bug aplikasi — test-nya yang sudah basi:**
+- `/` dicek harus memuat "Japanese Sando". Merek sudah ganti jadi **Rumakomugi**.
+- `/admin/settings` dicek harus memuat "Nomor WhatsApp" + "Rekening". Halaman
+  settings sekarang **bertab** (`SettingsClient` punya state `tab`, default
+  `identity`), jadi HTML server hanya berisi tab yang aktif. Kontak & rekening
+  ada di tab lain.
+
+`scripts/test-pages.mjs` sudah diperbaiki + ditambah cakupan
+`/admin/sales`, `/admin/vouchers`, `/admin/customers`.
+
+### Skrip baru (semua read-only kecuali apply-migration)
+
+`check-fn-usage.js`, `dump-fn.js`, `describe-table.js`, `verify-overloads.js`,
+`check-data-health.js`, `inspect-admin-pages.mjs`, `run-qris-expire.js`.
+Plus `apply-migration.js` — Terapkan SATU file migration (kasih path-nya),
+supaya tidak perlu `npm run db:push` yang menjalankan schema + semua migration.
+
+### ⚠️ Temuan yang perlu keputusan Steven: Midtrans sudah LIVE di produksi
+
+Entry 2026-10-05 menyebut Midtrans "DORMANT, menunggu credentials" — itu
+**sudah tidak akurat**. Dari `npx vercel env ls`:
+
+- `MIDTRANS_SERVER_KEY` → **ada di Production** (dan Development + Preview).
+- `MIDTRANS_IS_PRODUCTION` → ada di Production, **nilainya Hidden** (belum
+  bisa dipastikan `true` atau tidak).
+- `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY` → **tidak ada** di Vercel sama sekali.
+
+Karena `/order/page.tsx` mengirim `midtransReady={Boolean(process.env.MIDTRANS_SERVER_KEY)}`,
+opsi **"QRIS via Midtrans" sekarang tampil untuk pembeli sungguhan**.
+
+Yang diketahui aman: `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY` memang **tidak dibaca
+kode mana pun** (sisa dari implementasi Snap API lama; sekarang pakai QRIS
+Core API `/v2/charge` yang cukup server key). Jadi tidak ada masalah dari
+klien key yang hilang.
+
+Yang **belum terverifikasi**: apakah `MIDTRANS_IS_PRODUCTION` di Vercel bernilai
+`"true"`. Kalau bukan, `getBaseUrl()` mengembalikan `api.sandbox.midtrans.com`
+-> pembeli Production melihat QR, "membayar" lewat sandbox, uang asli tidak
+masuk. Perlu dicek langsung di dashboard Vercel.
+
+### Verifikasi
+
+- `npm run typecheck` / `lint` / `build` -> exit 0
+- `scripts/test-pages.mjs` -> **14 lulus, 0 gagal** (login admin sungguhan)
+- Smoke test 21 route: publik 200, `/account` + 7 route admin 307 ke login
+  (benar), `/api/flavor-like` 405 (POST-only), route tak ada -> 404
+- DB setelah migration-38: data utuh (6 order, stok 10, 5 flavor, 1 profil),
+  `cron.job` tetap 1 (`qris-expire`, active), `expire_stale_qris_orders()`
+  dipanggil langsung -> 0 restock (aman, tidak ada order gantung)
+
+---
+
+## 2026-10-08 — Audit menyeluruh: 58 error lint -> 0, route cron 500 -> 200
+
+**Scope:** chore: lint, refactor: dead code, fix: api route, docs:
+
+### Temuan utama: `npm run lint` SEBELUMNYA GAGAL (58 error)
+
+Workflow lama di `gotchas.md` #10 cuma jalankan `npx eslint src`, jadi error
+di luar `src/` tidak pernah terlihat. `npm run lint` (yang jalan semua file)
+menghasilkan **58 error**:
+
+- **54 error** `@typescript-eslint/no-require-imports` di `scripts/*.js`.
+  Semua skrip utilitas Node sengaja CommonJS (`require("pg")`) supaya bisa
+  `node scripts/foo.js` tanpa flag tambahan. Bukan bug.
+- **4 error** `react-hooks/set-state-in-effect` di `src/` — ini **bug
+  sungguhan** (rules React Compiler baru di `eslint-config-next` 16).
+
+### 4 bug setState-di-effect diperbaiki
+
+1. `ReviewModal.tsx` — `useEffect(() => setOpen(initialOpen), [initialOpen])`.
+   **Dead code**: `TrackForm` hanya me-mount modal saat mau dibuka lalu
+   `onClose` -> unmount, jadi `initialOpen` selalu `true` selama komponen
+   hidup. Effect dihapus (perilaku identik).
+2. `EnhancedMapPicker.tsx` — `setResults([])` saat query kosong dihapus.
+   Kedua tempat baca `results` sudah `query.trim() ? results : nearby`, jadi
+   state-nya memang tidak pernah dirender saat query kosong.
+3. `EnhancedMapPicker.tsx` — `setNearby([])` saat query terisi, alasan sama.
+4. `InlineMapPicker.tsx` — DI sini `results` dibaca tanpa guard, jadi tidak
+   bisa sekadar dihapus. Diganti turunan saat render:
+   `const visibleResults = query.trim() ? results : []`. Perilaku dropdown
+   (hilang saat input dikosongkan) tetap sama.
+
+### 13 warning dead-code dibersihkan
+
+- `MenuBrowser.tsx` — prop `remainingStock` dihapus dari `MenuBrowser` &
+  `OrderMenuBrowser` (sudah dihitung sendiri dari `categories.stock`, lihat
+  entry 2026-10-07), plus `openCategoryId`/`activeCategory` yang tidak pernah
+  di-set sehingga `activeCategory` selalu `null`.
+- `OrderFlow.tsx` — `remainingStock={null}` dihapus dari pemanggilan;
+  `useEffect` unmount keranjang sekarang pakai pola `resetRef` (pola yang
+  sama sudah dipakai `clearIdentityRef` di file itu) alih-alih menambah
+  `reset` ke dependencies.
+- `SalesClient.tsx` + `admin/(dashboard)/sales/page.tsx` — prop `flavors`
+  tidak pernah dipakai; ikut dihapus `getCategoriesAction()` dari page
+  (menghemat 1 query DB per buka `/admin/sales`). Filter per-rasa tetap
+  bekerja lewat query param `?flavor=<id>` yang dijawab di DB.
+- `admin/actions.ts` — **`setStockAction` dihapus (dead + misleading)**.
+  Fungsi ini manggil `admin_set_stock` 2-argumen yang menulis ke
+  `store_settings.total_stock`, padahal stok yang dibaca `create_order` dan
+  ditampilkan ke pembeli ada di `categories.stock`. UI sudah benar memakai
+  `setCategoryStockAction` -> `admin_set_category_stock`.
+- `MapModal.tsx` + `AddressPicker.tsx` — prop `initialLabel` dihapus
+  ( EnhancedMapPicker tidak pernah menerimanya).
+- Import mati: `formatIDR` (FlavorCard), `MapPin` (EnhancedMapPicker),
+  `SettingsIcon` (SettingsClient), `EnhancedMapPicker` (MapModal, sudah
+  dimuat via `next/dynamic`).
+- `account/actions.ts` — `_oauthCodes` dihapus (sisa D26).
+- `eslint.config.mjs` — `scripts/**` masuk `globalIgnores`.
+
+### Fix route: `/api/cron/qris-expire` balas 500
+
+Route balas `500 missing_supabase_service_env` kalau
+`SUPABASE_SERVICE_ROLE_KEY` tidak ada. Sekarang balas **200** dengan
+`{ ok: true, ran: false, reason, note }` — karena penjadwal yang sesungguhnya
+adalah job pg_cron di dalam DB (tidak butuh env aplikasi sama sekali), jadi
+status 500 menyesatkan.
+
+### Bug di skrip verifikasi
+
+`scripts/verify-all-rpcs.js` baris 51: `console.log(\`${grantee}: ...\`)` —
+hilang `g.`, causing `ReferenceError: grantee is not defined` setiap kali
+dipakai. Sudah dibetulkan.
+
+### Skrip read-only baru (aman dipakai kapan saja)
+
+`scripts/verify-overloads.js` (deteksi RPC overloading), `scripts/dump-fn.js`
+(source function live dari DB), `scripts/describe-table.js` (kolom tabel),
+`scripts/check-data-health.js` (ringkasan data inti). Semuanya query
+read-only dan gagal gracefully per-baris.
+
+### PENTING: `npm test` TIDAK aman dijalankan
+
+Script yang di-chain `npm test` calling `resetAll()` / `delete from public.orders`
+dan men-set `total_stock = 100` — itu **menghapus order produksi**. Pakai
+skrip read-only di atas untuk cek kesehatan.
+
+### Verifikasi
+
+- `npm run typecheck` -> exit 0
+- `npm run lint` -> exit 0 (0 error, 0 warning)
+- `npm run build` -> exit 0, 20 route
+- Smoke test 21 route di dev server `:3099`: semua publik 200,
+  `/account` + 7 route `/admin/*` -> 307 ke login (benar), `/api/flavor-like`
+  405 (POST-only), `/api/midtrans/webhook` 200 (health check), route 404 -> 404.
+  Tidak ada error/warning di log dev server.
+- DB (read-only): `pg_cron` 1.6.4 terpasang, `cron.job` berisi **tepat 1**
+  job `qris-expire` `* * * * *` active. `bundles.compare_price` ada.
+  `create_order` potong 3 dari `categories.stock` untuk 1 item + 2 slot
+  bundle (dicek transaksi rollback — data produksi utuh).
+- Data health: 1 admin aktif, 1 kategori (stok 10), 5 flavor aktif semua
+  ada gambar & harga, 1 bundle aktif, 6 order semua punya kode,
+  30 RPC `admin_*`, 1 customer profile (phone terisi), 0 order QRIS gantung.
+
+### Catatan (bukan bug, perlu keputusan Steven)
+
+- **RPC overloading.** `customer_upsert_own_profile` punya 2 versi: 3-argumen
+  (lama, tanpa `p_date_of_birth`) dan 4-argumen (dipakai app). Versi 3-argumen
+  sudah mati tapi belum di-drop. `admin_set_stock` juga 2 versi — itu memang
+  disengaja (global vs per-flavor) dan aman karena dibedakan jumlah argumen.
+- **Halaman admin belum bisa diuji end-to-end** — `ADMIN_EMAIL` /
+  `ADMIN_PASSWORD` tidak ada di `.env.local`, jadi hanya yang bisa dipastikan
+  adalah guard 307 + semua route admin compile.
+
+---
+
 ## 2026-10-08 — Fix menIMAL: deploy Vercel diam-diam pakai commit lama
 
 ### Gejala

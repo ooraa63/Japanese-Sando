@@ -70,6 +70,9 @@ async function loadDeliveryZones(): Promise<DeliveryZone[]> {
       lng: string | null;
       radius_km: string | null;
       requires_address: boolean;
+      kind?: string | null;
+      note_id?: string | null;
+      note_en?: string | null;
     }>).map((z) => ({
       id: z.id,
       name_id: z.name_id,
@@ -79,6 +82,13 @@ async function loadDeliveryZones(): Promise<DeliveryZone[]> {
       lng: z.lng ? Number(z.lng) : null,
       radius_km: z.radius_km ? Number(z.radius_km) : null,
       requires_address: z.requires_address,
+      // `kind` WAJIB diteruskan. Tanpa ini semua zona sampai ke OrderFlow
+      // dengan `kind === undefined`, sehingga filter `z.kind === "pickup"`
+      // selalu kosong dan pemilih "Lokasi pengambilan" tidak pernah muncul
+      // untuk pembeli sungguhan (bug yang ditemukan migration-39).
+      kind: z.kind === "pickup" ? "pickup" : "delivery",
+      note_id: z.note_id ?? undefined,
+      note_en: z.note_en ?? undefined,
     }));
   } catch {
     return fallback;

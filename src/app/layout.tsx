@@ -8,7 +8,7 @@ import { CartProvider } from "@/components/customer/CartProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider";
 import { AuthModal } from "@/components/customer/AuthModal";
-import { MobileBottomNav } from "@/components/customer/MobileBottomNav";
+import { BottomNav } from "@/components/customer/BottomNav";
 import { getCustomerProfile } from "@/lib/data";
 
 const playfair = Playfair_Display({
@@ -99,7 +99,7 @@ export default async function RootLayout({
               <CustomerAuthProvider initialProfile={initialProfile}>
                 {children}
                 <AuthModal />
-                <MobileBottomNav />
+                <BottomNav />
               </CustomerAuthProvider>
             </CartProvider>
           </ToastProvider>

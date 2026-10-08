@@ -304,14 +304,23 @@
   .density-flavor-grid > article h3 {
     font-size: 0.85rem !important;
   }
-  /* Deskripsi disembunyikan di HP supaya kartu tetap ringkas, TAPI baris
-     social (terjual + suka) tetap tampil — Steven minta angka like &
-     terjual kelihatan di HP, dan tombol suka harus bisa diklik. */
+  /* Deskripsi rasa TETAP tampil di HP — Steven minta deskripsi kelihatan di
+     kartu menu. Sebelumnya di-`display: none` di sini sehingga rasa yang
+     punya deskripsi tetap tampil kosong. Dibatasi 2 baris oleh `line-clamp-2`
+     di FlavorCard supaya kartu tidak jadi terlalu tinggi. */
   .density-flavor-grid > article .flavor-desc {
-    display: none !important;
+    display: block !important;
+    margin-top: 0.125rem;
+    font-size: 0.65rem;
+    line-height: 1.25;
   }
+  /* Baris terjual + disukai sudah jadi kolom (lihat FlavorCard): tombol suka
+     dan angka terjual masing-masing satu baris penuh, jadi tidak lagi berebut ruang
+     dan angka tidak kepotong di HP. */
   .density-flavor-grid > article .flavor-social {
     display: flex !important;
+    flex-direction: column;
+    gap: 0.25rem;
     margin-top: 0.375rem;
     padding-top: 0.375rem;
     font-size: 0.7rem;

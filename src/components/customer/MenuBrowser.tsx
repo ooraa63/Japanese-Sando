@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { ChevronRight, Gift, LayoutGrid, Sparkles, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, Check, Gift, LayoutGrid, Sparkles, UtensilsCrossed } from "lucide-react";
 import type { Bundle, Category } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
@@ -10,6 +10,7 @@ import { PriceTag } from "./PriceTag";
 import { cheapestBundle, formatIDR } from "@/lib/utils";
 import { OrderBundleModal } from "./OrderBundleModal";
 import { useCart } from "./CartProvider";
+import { remainingStockByCategory } from "@/lib/cart-stock";
 
 /**
  * Penjelahar menu di beranda (mode lihat-saja):
@@ -18,14 +19,12 @@ import { useCart } from "./CartProvider";
 export function MenuBrowser({
   categories,
   bundles = [],
-  remainingStock = null,
   emptyLabel,
   soldCounts = {},
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri (category_id=NULL). */
   bundles?: Bundle[];
-  remainingStock?: number | null;
   emptyLabel?: string;
   /** Map flavorId -> jumlah terjual (untuk like/sold di beranda). */
   soldCounts?: Record<number, number>;
@@ -212,13 +211,11 @@ export function MenuBrowser({
 export function OrderMenuBrowser({
   categories,
   bundles = [],
-  remainingStock,
   soldCounts = {},
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri (category_id=NULL) atau per-kategori. */
   bundles?: Bundle[];
-  remainingStock: number | null;
   /** Map flavorId -> jumlah pcs terjual (accepted/ready/delivered). */
   soldCounts?: Record<number, number>;
 }) {
@@ -228,11 +225,19 @@ export function OrderMenuBrowser({
     () => categories.filter((c) => (c.flavors?.length ?? 0) > 0),
     [categories]
   );
-  const [openCategoryId, setOpenCategoryId] = useState<number | null>(null);
   const [openBundleId, setOpenBundleId] = useState<number | null>(null);
-
-  const activeCategory = withFlavors.find((c) => c.id === openCategoryId) ?? null;
   const activeBundle = bundles.find((b) => b.id === openBundleId) ?? null;
+
+  // Sisa stok per kategori setelah SELURUH isi keranjang diperhitungkan —
+  // termasuk slot bundle yang sudah ada. Sebelumnya kartu rasa biasa hanya
+  // mengurangi `quantities`, jadi begitu ada bundle di keranjang, angka
+  // "Tersedia N" di halaman ini tetap menampilkan stok penuh (stok 10 ->
+  // bundle 2 pcs -> kartu biasa masih tulis 10, padahal sudah sisa 8).
+  // Logikanya sama dengan `OrderBundleModal` karena keduanya lewat helper.
+  const remainingByCategory = useMemo(
+    () => remainingStockByCategory(categories, quantities, cartBundles),
+    [categories, quantities, cartBundles]
+  );
 
   const empty = withFlavors.length === 0 && bundles.length === 0;
   if (empty) {
@@ -262,12 +267,28 @@ export function OrderMenuBrowser({
           <ul className="density-bundle-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {bundles.map((b) => {
               const inCart = cartBundles.filter((cb) => cb.bundle.id === b.id).length;
+              // Steven: satu bundle hanya boleh masuk keranjang SEKALI. Kalau
+              // sudah ada, kartu dikunci supaya tidak bisa ditambah lagi
+              // (backend juga akan menolak slot ganda untuk paket yang sama).
+              const sudah = inCart > 0;
               return (
                 <li key={b.id}>
                   <button
                     type="button"
+                    disabled={sudah}
                     onClick={() => setOpenBundleId(b.id)}
-                    className="group block h-full w-full overflow-hidden rounded-2xl border-2 border-cocoa-200 bg-white text-left transition hover:-translate-y-0.5 hover:border-matcha-400 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99]"
+                    aria-label={
+                      sudah
+                        ? lang === "en"
+                          ? `${b.name_en} already in cart`
+                          : `${b.name_id} sudah ada di keranjang`
+                        : undefined
+                    }
+                    className={`group block h-full w-full overflow-hidden rounded-2xl border-2 bg-white text-left transition ${
+                      sudah
+                        ? "cursor-not-allowed border-matcha-500 opacity-80"
+                        : "border-cocoa-200 hover:-translate-y-0.5 hover:border-matcha-400 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99]"
+                    }`}
                   >
                     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-transparent bg-white">
                       <div className="relative aspect-[5/3] overflow-hidden bg-gradient-to-br from-honey-300 to-berry-500 sm:aspect-[4/3]">
@@ -305,9 +326,10 @@ export function OrderMenuBrowser({
                           <h3 className="font-display text-lg leading-tight font-bold text-cocoa-900">
                             {lang === "en" ? b.name_en : b.name_id}
                           </h3>
-                          {inCart > 0 ? (
+                          {sudah ? (
                             <span className="chip shrink-0 bg-matcha-500 text-white">
-                              {inCart}
+                              <Check className="size-3" />
+                              {lang === "en" ? "In cart" : "Di keranjang"}
                             </span>
                           ) : null}
                         </div>
@@ -381,20 +403,11 @@ export function OrderMenuBrowser({
                     const fid = String(f.id);
                     const q = quantities[fid] ?? 0;
                     // Stok itu PER KATEGORI (lihat create_order yang mengurangi
-                    // categories.stock), jadi setiap rasa di kategori ini
-                    // memakai sisa stok kategori yang sama. Sisa dikurangi
-                    // barang yang sudah ada di keranjang supaya angka di kartu
-                    // jujur soal apa yang masih bisa dibeli.
-                    const catLeft = c.stock_enabled
-                      ? Math.max(
-                          0,
-                          (c.stock ?? 0) -
-                            (c.flavors ?? []).reduce(
-                              (s, x) => s + (quantities[String(x.id)] ?? 0),
-                              0
-                            )
-                        )
-                      : null;
+                    // categories.stock), jadi setiap rasa di kategori ini memakai
+                    // sisa stok kategori yang sama — termasuk efek bundle yang
+                    // sudah ada di keranjang. Angka dihitung lewat helper yang
+                    // sama dengan OrderBundleModal supaya tidak bisa melenceng.
+                    const catLeft = remainingByCategory.get(c.id) ?? null;
                     return (
                       <li key={f.id} className="flex">
                         <FlavorCard

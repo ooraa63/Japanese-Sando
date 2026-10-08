@@ -7,7 +7,6 @@ import {
   Coffee,
   Crosshair,
   Loader2,
-  MapPin,
   Search,
   ShoppingBag,
   Trees,
@@ -284,7 +283,10 @@ export function EnhancedMapPicker({
   useEffect(() => {
     const q = query.trim();
     if (!q) {
-      setResults([]);
+      // Tidak perlu `setResults([])`: kedua tempat baca `results`
+      // (marker effect & daftar hasil) sudah pakai `query.trim() ? results : nearby`,
+      // jadi saat query kosong hasilnya memang tidak pernah dirender.
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -308,7 +310,8 @@ export function EnhancedMapPicker({
   // ---------- Nearby POIs (muncul saat search box kosong) ----------
   useEffect(() => {
     if (query.trim()) {
-      setNearby([]);
+      // Sama seperti `results`: `nearby` hanya dibaca saat query kosong,
+      // jadi tidak perlu dikosongkan di sini.
       return;
     }
     const debounce = setTimeout(async () => {

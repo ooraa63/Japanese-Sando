@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Clock, HelpCircle, MapPin, MessageCircle, Sparkles, UserCircle } from "lucide-react";
+import { ChevronRight, Clock, HelpCircle, MapPin, Sparkles, UserCircle } from "lucide-react";
 import { getI18nDict } from "@/lib/i18n-server";
 import { getCustomerOrders, getCustomerProfile, getSettings } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
@@ -10,7 +10,8 @@ import { SiteFooter } from "@/components/customer/SiteFooter";
 import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider";
 import { AccountClient } from "./AccountClient";
 import { VouchersSection } from "@/components/customer/VouchersSection";
-import { ContactSection } from "@/components/customer/ContactSection";
+import { ContactDetails, ContactSection } from "@/components/customer/ContactSection";
+import { ContactMenuRow } from "@/components/customer/ContactMenuRow";
 import { CompleteProfileCard } from "@/components/customer/CompleteProfileCard";
 import { getMyVouchersAction } from "@/app/review-actions";
 
@@ -195,13 +196,17 @@ function renderAccount({
                   label: dicts.contactPage.faqTitle,
                   hint: dicts.contactPage.faqSubtitle,
                 },
-                {
-                  href: "/contact",
-                  icon: MessageCircle,
-                  label: dicts.contactPage.contactTitle,
-                  hint: dicts.contactPage.contactSubtitle,
-                },
               ]}
+              popupRow={
+                <ContactMenuRow
+                  label={dicts.contactPage.contactTitle}
+                  hint={dicts.contactPage.contactSubtitle}
+                  title={dicts.account.contact.title}
+                  subtitle={dicts.account.contact.subtitle}
+                >
+                  <ContactDetails settings={settings ?? null} dict={dicts.account.contact} />
+                </ContactMenuRow>
+              }
             />
             <HelpMenuGroup
               title={dicts.account.contact.helpAboutUs}
@@ -255,6 +260,7 @@ function renderAccount({
 function HelpMenuGroup({
   title,
   rows,
+  popupRow,
 }: {
   title: string;
   rows: {
@@ -263,6 +269,8 @@ function HelpMenuGroup({
     label: string;
     hint: string;
   }[];
+  /** Baris tambahan (node `<li>`) yang dirender sebagai popup, bukan link. */
+  popupRow?: React.ReactNode;
 }) {
   return (
     <div>
@@ -291,6 +299,7 @@ function HelpMenuGroup({
             </Link>
           </li>
         ))}
+        {popupRow}
       </ul>
     </div>
   );

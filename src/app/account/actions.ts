@@ -28,11 +28,10 @@ export interface CustomerActionResult<T = undefined> {
   redirectUrl?: string;
 }
 
-/** Kode error lama untuk OAuth — saat ini gak dipakai (lihat blok
- *  "OAUTH — DISABLED" di bawah). Tapi dipertahankan sebagai opsi
- *  type system untuk kompatibilitas mundur kalau RPC lama masih
- *  return string ini. */
-const _oauthCodes = ["oauth_unavailable", "oauth_failed"] as const;
+/** Kode error lama untuk OAuth — sudah tidak dipakai sejak OAuth dihapus
+ * (lihat keputusan D26 di MEMORY/decisions.md). Constant-nya dihapus; kalau
+ * RPC lama masih return string `oauth_unavailable` / `oauth_failed`,
+ * `humanize()` tetap memetakan hal tak dikenal ke "generic". */
 
 // Helper error code lama untuk OAuth — sekarang gak dipakai (lihat blok
 // "OAUTH — DISABLED" di bawah). Tapi dipertahankan kalau ada RPC lama

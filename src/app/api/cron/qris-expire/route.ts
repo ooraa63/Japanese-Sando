@@ -15,6 +15,11 @@ import { NextResponse } from "next/server";
  * Autentikasi: set header `Authorization: Bearer $CRON_SECRET` kalau env
  * `CRON_SECRET` tersedia. Kalau env-nya kosong, route tetap boleh jalan supaya
  * mudah dites manual.
+ *
+ * PENTING: route ini BUKAN penjadwal. Kalau `SUPABASE_SERVICE_ROLE_KEY` tidak
+ * di-set, route hanya melaporkan "tidak dijalankan" dengan status 200 — bukan
+ * error, karena pekerjaan expiry-nya sudah otomatis dikerjakan `pg_cron` di
+ * dalam database (lihat migration-37).
  */
 
 export const dynamic = "force-dynamic";
@@ -40,10 +45,19 @@ export async function GET(req: Request) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceKey) {
-    return NextResponse.json(
-      { ok: false, error: "missing_supabase_service_env" },
-      { status: 500 }
-    );
+    // Bukan error: penjadwal yang sesungguhnya adalah job `qris-expire` di
+    // pg_cron (migration-37), dan job itu tidak butuh env aplikasi sama sekali.
+    // Route ini murni pemicu manual opsional, jadi balas 200 + penjelasan
+    // supaya tidak terlihat seperti crash kalau tanpa service key.
+    return NextResponse.json({
+      ok: true,
+      ran: false,
+      reason: !url ? "missing_supabase_url" : "missing_service_role_key",
+      note:
+        "Route ini hanya pemicu manual. Expiry QRIS tetap berjalan otomatis " +
+        "lewat job pg_cron 'qris-expire'. Set SUPABASE_SERVICE_ROLE_KEY hanya " +
+        "kalau memang perlu memicu RPC ini manual.",
+    });
   }
 
   const res = await fetch(`${url}/rest/v1/rpc/expire_stale_qris_orders`, {
@@ -67,5 +81,5 @@ export async function GET(req: Request) {
   }
 
   const expired = Number(await res.text());
-  return NextResponse.json({ ok: true, expired });
+  return NextResponse.json({ ok: true, ran: true, expired });
 }

@@ -14,7 +14,6 @@ import {
   MessageCircle,
   Plus,
   Save,
-  Settings as SettingsIcon,
   Store,
   Trash2,
   Truck,

@@ -227,3 +227,172 @@ Saat ini tidak ada masalah produksi karena:
 
 Untuk aktivasi: lihat `docs/MIDTRANS.md` atau entry CHANGELOG
 "2026-10-05 — Midtrans QRIS Dinamis (DORMANT, menunggu credentials)".
+
+
+## 18. JANGAN jalankan `npm test` — dia menghapus data produksi
+
+`package.json` script `test` (= `npm test`) me-chain beberapa skrip yang
+memakai `resetAll()` dari `scripts/_testutil.mjs`. Fungsi itu menjalankan:
+
+```sql
+delete from public.orders;
+update public.store_settings set total_stock = 100, stock_enabled = true, ...
+update public.categories set bundle_tiers = '[]';
+```
+
+Jadi `npm test` = **hapus semua order produksi + set stok balik ke 100**.
+`test-flow.mjs`, `test-categories.mjs`, `test-category-bundles.mjs`,
+`test-global-stock.mjs` semuanya memanggilnya. `scripts/cleanup.mjs`
+(`npm run db:cleanup`) lebih ganas lagi — hapus order, stock_logs, dan
+flavor/category.
+
+Untuk cek kesehatan tanpa menyentuh data, pakai skrip read-only:
+
+| Skrip | Isi |
+|---|---|
+| `node scripts/check-cron.mjs` | extension pg_cron + daftar `cron.job` |
+| `node scripts/check-stock.mjs` | stok per kategori + order QRIS gantung |
+| `node scripts/check-data-health.js` | ringkasan tabel inti (admin, menu, order) |
+| `node scripts/verify-bundle-stock.mjs` | hitung potong stok `create_order` (rollback) |
+| `node scripts/verify-overloads.js` | cari RPC yang punya >1 overload |
+| `node scripts/verify-all-rpcs.js` | daftar RPC customer_* + grants |
+| `node scripts/dump-fn.js <nama>` | source function live dari DB |
+| `node scripts/describe-table.js <tabel>` | kolom + tipe sebuah tabel |
+
+Semua skrip di atas cuma `select`. Kalau butuh tes yang menulis, siapkan
+database dev terpisah — jangan pakai `DATABASE_URL` produksi.
+
+
+## 19. `admin_set_stock` (2 argumen) bukan yang dipakai aplikasi
+
+Ada dua overload:
+
+- `admin_set_stock(p_stock, p_note)` → tulis `store_settings.total_stock`
+- `admin_set_stock(p_flavor_id, p_stock, p_note)` → tulis `flavors.stock`
+
+Dan ada RPC terpisah `admin_set_category_stock(p_category_id, p_stock)` →
+tulis `categories.stock`.
+
+**Yang dipakai UI adalah `admin_set_category_stock`** (lihat
+`MenuClient.tsx` -> `setCategoryStockAction`), karena stok yang benar-benar
+dikurangi `create_order` — dan yang dibaca pembeli di `/order` — adalah
+`categories.stock`. Kalau pernah butuh ubah stok manual, jangan pakai
+`admin_set_stock`: hasilnya tidak akan kelihatan di halaman pembeli.
+
+
+## 20. Uji UI: jangan suntik localStorage keranjang
+
+Cart di `localStorage['js_cart_v1']`, tapi `OrderFlow` meresetnya di effect
+unmount (`resetRef.current()` di `src/components/customer/OrderFlow.tsx`).
+Kalau seed manual sebelum memuat `/order`, isinya **selalu** hilang sebelum
+`CartProvider` sempat membacanya — sudah dicoba 3 cara (seed setelah load,
+seed dari beranda lalu navigasi, dan `Page.addScriptToEvaluateOnNewDocument`)
+dan semuanya `jumlahBundle: 0`.
+
+**Cara yang benar: klik UI-nya.** Selector yang stabil:
+
+| Target | Selector |
+| --- | --- |
+| Buka modal bundle | `button` yang `<h3>`-nya = `"Sando 2"` |
+| Tambah slot di modal | `button[aria-label="+1 Sando 2"]` |
+| Konfirmasi bundle | tombol berteks persis `"Konfirmasi"` |
+| Tambah rasa biasa | `button` berteks `"Tambah ke keranjang"` di dalam `article` |
+
+Catatan: kartu `FlavorCard` **tidak** punya tombol `+1` sebelum item masuk
+keranjang — saat `qty === 0` yang dirender adalah tombol "Tambah ke
+keranjang".
+
+`/order` membuka di **step 01 "Data Kamu"**, bukan daftar rasa. Supaya langsung
+ke daftar rasa, set `sessionStorage.js_order_step = "menu"` lewat
+`Page.addScriptToEvaluateOnNewDocument` **sebelum** `Page.navigate` (hanya
+langkah yang bertahan, keranjang tetap wiped — makanya tetap wajib mengklik UI).
+
+Skrip siap pakai: `scripts/test-bundle-stock-ui.js`, `scripts/check-nav-contact.js`,
+`scripts/dump-console.js` (tangkap error console/hydration),
+`scripts/dump-page-text.js`.
+
+## 21. Hydration: jangan baca `window`/`sessionStorage` di `useState` initializer
+
+`OrderFlow` dulu restore step dari `sessionStorage` di dalam
+`useState(() => ...)`. Server selalu render `steps[0]`, klien me-restore step
+tersimpan — jadi **setiap pembeli yang refresh di tengah pesanan** kena
+`Hydration failed because the server rendered text didn't match the client`,
+dan React membuang seluruh tree lalu render ulang (kedip + lambat).
+
+Aturan: initializer harus deterministic dan **sama persis** antara server dan
+klien. Pindahkan pembacaan storage ke `useEffect` (setelah mount). Kalau ada
+effect lain yang menulis storage yang sama, effect restore **harus**
+dideklarasikan lebih dulu, kalau tidak ia menimpa nilai sebelum sempat dibaca.
+
+Gejalanya gampang dideteksi: badge "N Issue" di dev overlay Next.js.
+`scripts/dump-console.js` menangkap exception-nya.
+
+## 22. StrictMode = `true` di dev: effect unmount JALAN saat halaman baru dibuka
+
+Sejak Next.js 13.5.1 StrictMode default `true` untuk app router
+(bukti: `node_modules/next/dist/docs/01-app/03-api-reference/05-config/
+01-next-config-js/reactStrictMode.md`). React lalu menjalankan
+**mount → unmount → mount** di `next dev`.
+
+Efeknya: **cleanup effect terlihat identik dengan "pengguna pindah halaman",
+padahalbaru saja halaman dibuka.** Di `OrderFlow` ini menghapus
+`sessionStorage.js_order_step` + mengosongkan keranjang, jadi setiap refresh
+di tengah pesanan bikin halaman balik ke langkah 1 dan keranjang kosong.
+
+Cara membedakan unmount sungguhan dari probe StrictMode:
+
+```tsx
+const reallyMountedRef = useRef(false);
+useEffect(() => {
+  reallyMountedRef.current = false;
+  const timer = window.setTimeout(() => { reallyMountedRef.current = true; }, 0);
+  return () => {
+    window.clearTimeout(timer);
+    if (!reallyMountedRef.current) return;  // probe StrictMode
+    /* bersihin di sini */
+  };
+}, []);
+```
+
+Cleanup yang datang sebelum timeout = probe. Setelah timeout = navigasi.
+
+## 23. `useSyncExternalStore` untuk baca storage tanpa hydration mismatch
+
+Membaca `sessionStorage`/`localStorage` **di dalam `useState` initializer**
+atau guarded `typeof window` = hydration mismatch kalau storage berisi nilai
+yang berbeda dari render server.
+
+Pola yang benar (sudah dipakai `CartProvider` di repo ini):
+
+```tsx
+const nilai = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+// getServerSnapshot  -> dipakai server render DAN hydration
+// getSnapshot        -> dipakai SETELAH hydration untuk mendeteksi perubahan
+```
+
+Dua jebakan tambahan di sini:
+
+1. **Jangan simpan storage lewat `useEffect([nilai])`** kalau nilai itu juga
+   dibaca dari storage — effect itu akan menimpa nilai lama dengan nilai
+   freshly-computed sebelum React sempat membacanya, sehingga restore selalu
+   gagal. Tulis storage di event handler (mis. `goTo()`), bukan effect.
+2. **`getSnapshot` harus mengembalikan nilai primitif stabil.** Kalau
+   mengembalikan objek baru tiap panggilan, React loop takFinite.
+
+## 24. RPC `security definer`: `drop function` menghapus grant
+
+`delivery_zones` RPC (`list_active_zones`, `admin_list_zones`,
+`admin_upsert_zone`, `admin_delete_zone`) semuanya `security definer` dan
+di-grant ke `anon, authenticated, service_role`.
+
+Kalau return type berubah (mis. nambah kolom), wajib `drop function` dulu —
+dan **grant harus diulang setelahnya**, karena `drop` ikut menghapus ACL.
+ Kalau tidak, pembeli anonymous langsung dapat error "permission denied".
+
+Cek cepat:
+
+```sql
+select proname, prosecdef, proacl::text
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and proname like '%zone%';
+```

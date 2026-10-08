@@ -19,6 +19,7 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import { formatIDR } from "@/lib/utils";
+import { remainingStockByCategory } from "@/lib/cart-stock";
 import { PriceTag } from "./PriceTag";
 
 /** Gradient fallback per flavor (sama dengan FlavorCard). */
@@ -85,61 +86,21 @@ export function OrderBundleModal({
   /**
    * Sisa stok per kategori, sudah dikurangi isian keranjang.
    *
-   * Stok itu PER KATEGORI (lihat `create_order` yang mengurangi
-   * `categories.stock` satu pcs per slot bundle). Jadi kalau user sudah
-   * tambah 1 Cookies biasa DAN punya 1 slot bundle Cookies, dua-duanya
-   * memotong stok kategori yang sama. Perhitungan di sini harus mencerminkan
-   * itu juga, supaya angka "Tersedia N" di modal sama dengan sisa sebenarnya
-   * saat checkout.
+   * Perhitungannya dipakai bersama dengan kartu rasa di halaman /order lewat
+   * `remainingStockByCategory()`, supaya angka "Tersedia N" di modal dan di
+   * kartu biasa selalu sama. Slot bundle yang sedang dipilih di modal ini
+   * diteruskan sebagai `extraSlots`.
    */
-  const remainingByCategory = useMemo(() => {
-    const used = new Map<number, number>();
-    const bump = (catId: number | null | undefined, n: number) => {
-      if (catId == null) return;
-      used.set(catId, (used.get(catId) ?? 0) + n);
-    };
-
-    // Item biasa yang sudah ada di keranjang.
-    for (const [flavorIdStr, qty] of Object.entries(cart.quantities)) {
-      const f = categories
-        .flatMap((c) => c.flavors ?? [])
-        .find((x) => String(x.id) === flavorIdStr);
-      bump(f?.category_id, qty);
-    }
-
-    // Slot bundle yang SUDAH ada di keranjang.
-    for (const entry of cart.bundles ?? []) {
-      for (const flavorId of entry.slots ?? []) {
-        if (flavorId == null) continue;
-        const f = categories
-          .flatMap((c) => c.flavors ?? [])
-          .find((x) => x.id === flavorId);
-        bump(f?.category_id, 1);
-      }
-    }
-
-    // Slot bundle yang SEDANG dipilih di modal ini. Tanpa baris ini angka
-    // stok tidak bergerak saat user memilih rasa — di layar tetap "Tersedia 10"
-    // walau sudah ambil 2. Owensinya: stok 10, pilih 2 rasa -> tampil 8.
-    for (const flavorId of slots) {
-      if (flavorId == null) continue;
-      const f = categories
-        .flatMap((c) => c.flavors ?? [])
-        .find((x) => x.id === flavorId);
-      bump(f?.category_id, 1);
-    }
-
-    const out = new Map<number, number | null>();
-    for (const c of categories) {
-      out.set(
-        c.id,
-        c.stock_enabled
-          ? Math.max(0, (c.stock ?? 0) - (used.get(c.id) ?? 0))
-          : null
-      );
-    }
-    return out;
-  }, [categories, cart.quantities, cart.bundles, slots]);
+  const remainingByCategory = useMemo(
+    () =>
+      remainingStockByCategory(
+        categories,
+        cart.quantities,
+        cart.bundles ?? [],
+        slots
+      ),
+    [categories, cart.quantities, cart.bundles, slots]
+  );
 
   if (!bundle) return null;
 
