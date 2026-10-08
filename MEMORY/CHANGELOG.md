@@ -4,6 +4,61 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-08 — Koreksi item 1: yang disembunyikan di HP adalah footer, bukan nav bawah
+
+**Scope:** fix: footer HP, restore: nav bawah mobile
+
+Steven mengoreksi hasil kerja item 1. Entri sebelumnya salah baca permintaannya:
+yang dihapus dari HP adalah **nav bawah**, padahal yang Steven maksud adalah
+**blok informasi toko di bawah halaman** (footer TAUTAN CEPAT + HUBUNGI KAMI).
+
+Kata-katanya: "bukan nav bawah yang beranda, pesanan saya itu yang hilang; yang
+saya mau itu bawahnya yang tentang informasi toko, saya tidak mau di HP pakai
+konsep itu, itu cukup di PC, untuk HP nanti ada di bagian profile, nanti ada
+contact us."
+
+### Yang diubah
+
+- `MobileBottomNav` dibuat ulang: Beranda / Pesanan Saya / Akun, `md:hidden`,
+  disembunyikan di `/admin`, `/login`, `/register`, `/account`, `/order`.
+  Nav bawah kembali tampil di HP seperti semula.
+- `BottomNav.tsx` (versi laptop-only dari entri sebelumnya) dihapus. Dua file
+  untuk satu navigasi akan bikin bingung; nama komponen balik jadi `MobileBottomNav`.
+- `SiteFooter` dapat `hidden md:block`. Di HP footer tidak dirender sama sekali;
+  di laptop tampil utuh seperti biasa.
+- `md:pb-20` pada baris copyright footer dihapus lagi. Padding itu dibuat
+  karena nav bawah fixed ada di desktop; sekarang nav itu tidak ada, jadi
+  padding cuma menyisakan ruang kosong.
+- `src/app/layout.tsx` import + render balik ke `MobileBottomNav`.
+
+### Yang TIDAK berubah
+
+- Kontak tetap tidak ada di nav bawah maupun footer (item 2 tetap berlaku).
+- Di HP, kontak ada di `/account`: bar "Kontak" membuka popup, blok "Hubungi
+  Kami" lengkap ada di bawah form profil.
+- Nav bawah tetap disembunyikan di `/order` (hasil item 6: sticky bar
+  keranjang tidak boleh ketimpa).
+
+### Verifikasi
+
+`scripts/check-nav-contact.js` ditambah `FOOTER_PROBE` + 11 assertion, sekarang
+**11/11 lulus**:
+
+- Footer tidak ada di HP (390x844)
+- Nav bawah ada di HP, top=785 dari 844px, 3 item: Beranda / Pesanan Saya / Akun
+- Footer ada di laptop, tinggi 303px
+- Nav bawah tidak muncul di laptop
+- "Kontak" tidak ada di nav bawah, footer, maupun header
+- Popup "Pesan Sekarang" (item 3) masih jalan
+- Nav bawah tidak muncul di `/order`
+- Sticky bar keranjang tidak terpotong
+- Copyright footer penuh sampai bawah di desktop (876px dari 900px)
+
+typecheck 0 error, lint 0 error 0 warning. Screenshot `nav-hp-beranda.png`
+dibaca manual: nav bawah terlihat, footer tidak ada.
+
+---
+
 ## 2026-10-08 — Item 7/8, 9, 10 dokumen "Perbaikan Ruma Komugi 2" + fix StrictMode
 
 **Scope:** feat: admin pickup & delivery, fix: hydration, fix: dev cart reset, fix: sales table

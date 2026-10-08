@@ -621,3 +621,42 @@ menu admin-nya dipisah per jenis lewat tab.
   (`pickup_note_id`) — yang isinya masih daftar nama toko lama.
 - Satu sumber data untuk keranjang, picker admin, dan picker pembeli.
 
+
+## Nav bawah HP tetap ada; yang hilang di HP adalah footer (2026-10-08)
+
+Koreksi atas keputusan lama di item 1 dokumen "Perbaikan Ruma Komugi 2". Steven
+mengirim screenshot men-circle bagian bawah halaman dan mengoreksi: yang
+dimaksud "jangan dipakai di HP" adalah **blok informasi toko** (TAUTAN CEPAT
++ HUBUNGI KAMI), bukan nav bawah.
+
+**Keputusan:**
+
+- `MobileBottomNav` (Beranda / Pesanan Saya / Akun) **tetap tampil di HP**,
+  tetap `md:hidden`.
+- `SiteFooter` dapat `hidden md:block` - hilang total di HP, tampil penuh di
+  laptop.
+- `md:pb-20` pada baris copyright di footer **dikembalikan lagi** (dihapus),
+  karena padding itu hanya dibutuhkan ketika nav bawah ada di desktop. Sekarang
+  tidak ada, jadi padding hanya menyisakan ruang kosong.
+
+**Alasan:**
+
+- Nav bawah adalah navigasi utama di HP. Menghapusnya membuat pengguna HP
+  kehilangan jalan ke Beranda / Pesanan Saya / Akun.
+- Footer 4 kolom (Tautan Cepat + Hubungi Kami) memang tidak cocok untuk HP:
+  butuh scroll jauh, dan isinya sudah punya tempat yang lebih wajar di
+  `/account`.
+- Kontak di HP sekarang ada di halaman Akun: bar "Kontak" membuka popup
+  (`ContactMenuRow`), dan blok "Hubungi Kami" lengkap ada di bawah form profil
+  (`ContactSection`).
+
+**Konsekuensi:**
+
+- Nama komponen kembali `MobileBottomNav`; `BottomNav.tsx` (versi laptop-only)
+  dihapus supaya tidak ada dua file untuk satu navigasi. Kalau nanti butuh nav
+  bawah khusus desktop, itu keputusan baru, bukan sisa item 1.
+- Halaman di HP jadi ~300px lebih pendek karena footer hilang.
+- `scripts/check-nav-contact.js` ditambah probe `FOOTER_PROBE` dan 11 assertion
+  baru, supaya regresi ini ketahuan otomatis: nav bawah harus ada di HP, footer
+  harus tidak ada.
+

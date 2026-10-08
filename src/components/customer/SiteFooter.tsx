@@ -16,7 +16,16 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
   const deadline = lang === "en" ? settings?.deadline_en : settings?.deadline_id;
 
   return (
-    <footer className="mt-14 bg-cocoa-900 text-cream-200">
+    // Steven (dokumen "Perbaikan Ruma Komugi 2" item 1 & 2): footer ini adalah
+    // blok INFORMASI TOKO — Tautan Cepat + Hubungi Kami (FAQ, WhatsApp,
+    // Instagram, alamat, jam buka). Di HP tidak dipakai lagi; cukup di PC.
+    //
+    // Di HP informasinya pindah ke halaman /account: bar "Kontak" membuka
+    // popup, dan blok "Hubungi Kami" lengkap ada di bawah form profil
+    // (lihat ContactMenuRow + ContactSection).
+    //
+    // `hidden md:block` = tidak sama sekali di HP, tampil penuh di laptop.
+    <footer className="mt-14 hidden bg-cocoa-900 text-cream-200 md:block">
       <div className="bg-seigaha">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-4">
           <div className="md:col-span-2">
@@ -123,10 +132,7 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
         </div>
 
         <div className="border-t border-cream-50/10">
-          {/* md:pb-20 memberi ruang untuk BottomNav fixed di bawah (desktop).
-              Tanpa ini, baris copyright ketimpa nav. Di HP nav bawah sudah
-              dihapus (item 1 dokumen perbaikan), jadi padding hanya desktop. */}
-          <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 py-6 text-xs text-cream-200/50 sm:flex-row sm:justify-between sm:px-6 md:pb-20">
+          <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 py-6 text-xs text-cream-200/50 sm:flex-row sm:justify-between sm:px-6">
             <p>
               © {new Date().getFullYear()} {storeName}. {t.footer.rights}
             </p>
