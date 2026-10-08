@@ -61,6 +61,33 @@ filter/urut + grid kartu dengan tombol add-to-cart).
 - Screenshot headless Edge (CDP): beranda & `/order` step "menu" di 1440px dan 390px.
   Cek overflow horizontal via `documentElement.scrollWidth` di 390px → 390 (aman).
 
+### Deploy ke produksi
+
+Commit `1bc6add` → push `main` → Vercel自动 build (`japanese-sando-86eukdvxa-ooraa64`),
+live di https://japanese-sando.vercel.app.
+
+Verifikasi produksi (`scripts/wait-for-live.js` + cek langsung):
+
+- Tanda unik build baru ketemu: "Rasa Paling Dicari", "Kategori Kami", "Fresh & Homemade".
+- 10 route publik + admin: **10 lulus / 0 gagal**. `/account` dan `/admin`
+  balas 307 → tujuan redirect-nya juga dicek dan balas 200.
+- `scripts/test-pages.mjs` dengan `APP_URL=https://japanese-sando.vercel.app`:
+  **15 lulus / 0 gagal** (login admin beneran, semua halaman dashboard 200).
+- Browser sungguhan (CDP): 0 console error di beranda & `/order` HP.
+
+**Dua jebakan waktu verifikasi produksi (baru, sudah masuk `gotchas.md` #30):**
+
+1. `__NEXT_ERROR` itu **bukan** tanda error. Shell redirect Next.js selalu
+   `<html id="__next_error__">`. Kalau dipakai sebagai regex, `/account` yang
+   sehat akan dilaporkan gagal.
+2. `"This page could not be found"` juga ada di **bundel JS** semua halaman.
+   Regex error harus dijalankan atas HTML yang sudah dibuang `<script>`/`<style>`,
+   kalau tidak 9 dari 10 halaman palsu dianggap error.
+
+Warning konsol `using deprecated parameters for the initialization function`
+muncul juga di `/track` (halaman yang tidak disentuh) → noise library, bukan
+dari perubahan ini.
+
 ---
 
 ## 2026-10-08 — Koreksi item 1: yang disembunyikan di HP adalah footer, bukan nav bawah

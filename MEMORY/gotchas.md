@@ -483,3 +483,26 @@ render, jadi barulah `ReferenceError: Cannot access 'b' before initialization`
 muncul — di browser, bukan di build.
 
 Saat menambah state turunan, taruh setelah semua nilai yang diacunya.
+
+## 30. Verifikasi produksi: jangan salah tandai halaman sehat sebagai error
+
+Dua regex "tanda error" yang Vrsgitu harus **disensor** sebelum dipakai:
+
+1. **`__NEXT_ERROR` bukan tanda error.** Shell redirect Next.js selalu
+   `<html id="__next_error__">`. `/account` yang sehat (307 → `/login`) akan
+   dilaporkan "GAGAL" kalau regex-nya memakai `__NEXT_ERROR`.
+2. **`"This page could not be found"` ada di bundel JS SEMUA halaman.** Regex
+   harus dijalankan atas HTML yang `<script>`/`<style>`-nya sudah dibuang.
+   Kalau tidak, hampir semua halaman positif palsu.
+
+Tanda error yang benar: `<h1>Application error</h1>`, `Internal Server Error`,
+`Attempted to call useI18n() from the server` — dan itu pun harus dicari di
+bagian HTML yang dirender, bukan payload JS.
+
+**Tambahan:** `scripts/test-pages.mjs` menghormati `APP_URL`. Pakai
+`APP_URL=https://japanese-sando.vercel.app` untuk menguji produksi dengan login
+admin beneran, bukan localhost:
+
+```bash
+npx dotenv run -f .env.local -- node scripts/test-pages.mjs   # dengan $env:APP_URL diset
+```
