@@ -107,8 +107,7 @@ export function OrderBundleModal({
       bump(f?.category_id, qty);
     }
 
-    // Slot bundle: tiap slot = 1 pcs dari kategori rasa yang dipilih.
-    // `slots` bisa berisi null kalau entry belum lengkap terisi — lewati.
+    // Slot bundle yang SUDAH ada di keranjang.
     for (const entry of cart.bundles ?? []) {
       for (const flavorId of entry.slots ?? []) {
         if (flavorId == null) continue;
@@ -117,6 +116,17 @@ export function OrderBundleModal({
           .find((x) => x.id === flavorId);
         bump(f?.category_id, 1);
       }
+    }
+
+    // Slot bundle yang SEDANG dipilih di modal ini. Tanpa baris ini angka
+    // stok tidak bergerak saat user memilih rasa — di layar tetap "Tersedia 10"
+    // walau sudah ambil 2. Owensinya: stok 10, pilih 2 rasa -> tampil 8.
+    for (const flavorId of slots) {
+      if (flavorId == null) continue;
+      const f = categories
+        .flatMap((c) => c.flavors ?? [])
+        .find((x) => x.id === flavorId);
+      bump(f?.category_id, 1);
     }
 
     const out = new Map<number, number | null>();
@@ -129,7 +139,7 @@ export function OrderBundleModal({
       );
     }
     return out;
-  }, [categories, cart.quantities, cart.bundles]);
+  }, [categories, cart.quantities, cart.bundles, slots]);
 
   if (!bundle) return null;
 
@@ -155,16 +165,17 @@ export function OrderBundleModal({
     // Hormati sisa stok kategori: jangan sampai slot baru membuat total
     // melebihi yang tersedia (backend tetap memvalidasi, tapi lebih baik
     // dicegah di sini supaya langkah tambah di UI).
-    if (left !== null) {
-      const alreadyPicked = countOf(flavorId);
-      if (alreadyPicked >= left) {
-        const flavor = allowedFlavors.find((f) => f.id === flavorId);
-    toast.warning(
-      flavor ? (lang === "en" ? flavor.name_en : flavor.name_id) : "",
-      t.order.menu.maxReached.replace("{n}", String(left))
-    );
-        return;
-      }
+    //
+    // `left` di atas SUDAH memotong slot yang sedang dipilih, jadi cukup
+    // cek <= 0. Tidak ada batasan per rasa — satu rasa boleh dipilih
+    // berulang selama stok kategori masih cukup.
+    if (left !== null && left <= 0) {
+      const flavor = allowedFlavors.find((f) => f.id === flavorId);
+      toast.warning(
+        flavor ? (lang === "en" ? flavor.name_en : flavor.name_id) : "",
+        t.order.menu.maxReached.replace("{n}", String(left))
+      );
+      return;
     }
     setSlots((prev) => {
       if (prev.length >= requiredQty) return prev;
@@ -311,7 +322,17 @@ export function OrderBundleModal({
         <div className="density-flavor-grid grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           {allowedFlavors.map((f) => {
             const picked = countOf(f.id);
-            const remaining = requiredQty - filledCount;
+            // Sisa slot bundle (= requiredQty - yang sudah terisi) DAN sisa
+            // stok kategori rasa ini. Pakai yang lebih kecil supaya tombol "+"
+            // mati kalau memang tidak ada stok yang tersisa.
+            const catId = f.category_id;
+            const stockLeft =
+              catId != null ? (remainingByCategory.get(catId) ?? null) : null;
+            const slotBudget = requiredQty - filledCount;
+            const remaining =
+              stockLeft === null
+                ? slotBudget
+                : Math.min(slotBudget, stockLeft);
             return (
               <article
                 key={f.id}

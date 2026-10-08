@@ -225,10 +225,26 @@ export function FlavorCard({
             {categoryName}
           </p>
         ) : null}
+        {/* Judul & deskripsi diberi tinggi minimum tetap supaya harga, label stok,
+            dan tombol selalu sejajar antar kartu—even kalau ada nama 1 baris
+            dan ada 2 baris. Tanpa ini grid jadi "lonjong" (lihat laporan
+            Steven). min-h pakai arbitrary value biar pas untuk 2 baris.
+
+            PENTING: nama hanya boleh dirender SATU kali di sini. Sebelumnya
+            ada <h3>{name}</h3> di dalam wrapper flex ini DAN lagi di blok
+            min-h di bawahnya, jadi tiap kartu menampilkan nama rasa dua kali
+            (lihat laporan Steven "namanya kedouble"). Wrapper flex sekarang
+            hanya untuk menyejajarkan chip jumlah keranjang dengan judul. */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-display text-lg leading-tight font-bold text-cocoa-900">
-            {name}
-          </h3>
+          {!compact ? (
+            <h3 className="font-display min-h-[2.6em] text-lg leading-tight font-bold text-cocoa-900">
+              {name}
+            </h3>
+          ) : (
+            <h3 className="font-display text-base leading-snug font-bold text-cocoa-900">
+              {name}
+            </h3>
+          )}
           {selectable && inCart > 0 ? (
             <span className="chip shrink-0 bg-matcha-100 text-matcha-700">
               <ShoppingBag className="size-3" />
@@ -237,24 +253,11 @@ export function FlavorCard({
           ) : null}
         </div>
 
-        {/* Judul & deskripsi diberi tinggi minimum tetap supaya harga, label stok,
-            dan tombol selalu sejajar antar kartu—even kalau ada nama 1 baris
-            dan ada 2 baris. Tanpa ini grid jadi "lonjong" (lihat laporan
-            Steven). min-h pakai arbitrary value biar pas untuk 2 baris. */}
         {!compact ? (
-          <>
-            <h3 className="font-display min-h-[2.6em] text-base leading-snug font-bold text-cocoa-900">
-              {name}
-            </h3>
-            <p className="flavor-desc mt-1 line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-cocoa-500">
-              {desc ?? " "}
-            </p>
-          </>
-        ) : (
-          <h3 className="font-display text-base leading-snug font-bold text-cocoa-900">
-            {name}
-          </h3>
-        )}
+          <p className="flavor-desc mt-1 line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-cocoa-500">
+            {desc ?? " "}
+          </p>
+        ) : null}
 
         {/* Harga DI BAWAH foto — lebih besar & mencolok supaya pembeli cepat
             lihat harga tanpa harus menebak dari chip kecil. */}
