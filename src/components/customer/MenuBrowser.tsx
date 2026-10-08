@@ -376,7 +376,7 @@ export function OrderMenuBrowser({
                     ) : null}
                   </div>
                 </div>
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                <ul className="density-flavor-grid grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
                   {(c.flavors ?? []).map((f) => {
                     const fid = String(f.id);
                     const q = quantities[fid] ?? 0;
@@ -406,6 +406,7 @@ export function OrderMenuBrowser({
                           // pembeli menekan tombol +.
                           showSocial
                           soldCount={soldCounts[f.id] ?? 0}
+                          readOnlySocial
                           showStock
                           selectable
                         />

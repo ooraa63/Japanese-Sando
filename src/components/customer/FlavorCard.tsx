@@ -237,15 +237,28 @@ export function FlavorCard({
           ) : null}
         </div>
 
-        {!compact && desc ? (
-          <p className="flavor-desc mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-cocoa-500">
-            {desc}
-          </p>
-        ) : null}
+        {/* Judul & deskripsi diberi tinggi minimum tetap supaya harga, label stok,
+            dan tombol selalu sejajar antar kartu—even kalau ada nama 1 baris
+            dan ada 2 baris. Tanpa ini grid jadi "lonjong" (lihat laporan
+            Steven). min-h pakai arbitrary value biar pas untuk 2 baris. */}
+        {!compact ? (
+          <>
+            <h3 className="font-display min-h-[2.6em] text-base leading-snug font-bold text-cocoa-900">
+              {name}
+            </h3>
+            <p className="flavor-desc mt-1 line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-cocoa-500">
+              {desc ?? " "}
+            </p>
+          </>
+        ) : (
+          <h3 className="font-display text-base leading-snug font-bold text-cocoa-900">
+            {name}
+          </h3>
+        )}
 
-        {/* Harga DI BAWAH foto — jadi lebih besar & mencolok supaya pembeli
-            cepat lihat harga tanpa harus menebak dari chip kecil. */}
-        <div className="mt-2">
+        {/* Harga DI BAWAH foto — lebih besar & mencolok supaya pembeli cepat
+            lihat harga tanpa harus menebak dari chip kecil. */}
+        <div className="mt-1.5">
           <PriceTag
             price={flavor.price}
             comparePrice={flavor.compare_price}
@@ -255,10 +268,10 @@ export function FlavorCard({
         </div>
 
         {/* Baris sisa stok. Di beranda disembunyikan (showStock=false) supaya
-    pengunjung yang belum memutuskan tidak ikut melihat angka stok; di
-    /order baru ditampilkan karena di situ baru relevan. */}
+            pengunjung yang belum memutuskan tidak ikut melihat angka stok; di
+            /order baru ditampilkan karena di situ baru relevan. */}
         {showStock ? (
-          <div className="mt-3 flex items-center gap-1.5 text-[11px] font-bold">
+          <div className="mt-1 flex h-4 items-center gap-1.5 text-[11px] font-bold">
             {soldOut ? (
               <span className="text-berry-500">
                 <PackageX className="mr-1 inline size-3" />
@@ -291,46 +304,50 @@ export function FlavorCard({
           </div>
         ) : null}
 
-        {/* Baris 'terjual' + like (mode lihat di beranda, read-only di pre-order) */}
+        {/* Baris 'terjual' + 'disukai'. Di beranda (showSocial + bisa like)
+            menampilkan tombol hati; di /order dipakai readOnlySocial sehingga
+            hanya angkanya yang tampil, tanpa tombol — sesuai permintaan Steven
+            (like hanya di menu tampilan awal). */}
         {showSocial ? (
-          <div className="flavor-social mt-3 flex items-center justify-between border-t border-cocoa-100 pt-3 text-xs">
-            <div className="flex items-center gap-3 text-cocoa-500">
-              <span>
+          <div
+            className="flavor-social mt-2.5 flex shrink-0 items-center justify-between border-t border-cocoa-100 pt-2.5 text-[11px] whitespace-nowrap"
+          >
+            <div className="flex min-w-0 items-center gap-1.5 text-cocoa-500">
+              <span className="truncate">
                 <span className="font-bold text-cocoa-700 tabular">
                   {soldCount}
                 </span>{" "}
                 {t.menu.soldCount}
               </span>
               <span className="text-cocoa-300">·</span>
-              <span>
+              <span className="truncate">
                 <span className="font-bold text-berry-500 tabular">
                   {likesCount}
                 </span>{" "}
                 {t.menu.likesCount}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (readOnlySocial) return;
-                toggleLike();
-              }}
-              disabled={readOnlySocial}
-              aria-pressed={isLiked}
-              aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                readOnlySocial
-                  ? "bg-cocoa-100 text-cocoa-400"
-                  : isLiked
+            {/* Tombol hati hanya di beranda. Di /order disembunyikan
+                altogether (bukan cuma disabled) supaya tidak ada tombol
+                yang menampilkan aksi yang memang tidak bisa dilakukan. */}
+            {readOnlySocial ? null : (
+              <button
+                type="button"
+                onClick={() => toggleLike()}
+                aria-pressed={isLiked}
+                aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
+                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                  isLiked
                     ? "bg-berry-500 text-white"
                     : "bg-cocoa-100 text-cocoa-600 hover:bg-berry-500/15 hover:text-berry-600"
-              }`}
-            >
-              <Heart
-                className={`size-3.5 ${isLiked ? "fill-current" : ""}`}
-              />
-              {isLiked ? t.menu.liked : t.menu.like}
-            </button>
+                }`}
+              >
+                <Heart
+                  className={`size-3.5 ${isLiked ? "fill-current" : ""}`}
+                />
+                {isLiked ? t.menu.liked : t.menu.like}
+              </button>
+            )}
           </div>
         ) : null}
       </div>
@@ -366,7 +383,7 @@ function FlavorCardStepper({
       <button
         type="button"
         disabled
-        className="mt-4 w-full cursor-not-allowed rounded-xl border border-cocoa-200 bg-cocoa-50 py-2.5 text-sm font-bold text-cocoa-400"
+        className="mt-3 w-full cursor-not-allowed rounded-xl border border-cocoa-200 bg-cocoa-50 py-2 text-[13px] font-bold whitespace-nowrap text-cocoa-400"
       >
         {t.menu.unavailable}
       </button>
@@ -375,7 +392,7 @@ function FlavorCardStepper({
 
   if (qty > 0) {
     return (
-      <div className="mt-4 space-y-2">
+      <div className="mt-2 space-y-2">
         <div
           className="inline-flex w-full items-stretch overflow-hidden rounded-xl border-2 border-matcha-500 bg-white shadow-sm"
           role="group"
@@ -437,9 +454,10 @@ function FlavorCardStepper({
         // Toast removed — was interfering with the "Tambah ke keranjang" layer
         // when user clicks repeatedly. Cart drawer provides its own visual feedback.
       }}
-      className="btn-primary mt-4 w-full text-sm"
+      className="btn-primary mt-3 w-full !px-3 !py-2 text-[13px] whitespace-nowrap"
     >
-      + {t.menu.addToCart}
+      <Plus className="mr-1 inline size-3.5" />
+      {t.menu.addToCart}
     </button>
   );
 }
