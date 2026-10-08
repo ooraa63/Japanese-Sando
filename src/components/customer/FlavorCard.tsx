@@ -6,7 +6,6 @@ import { Flame, Heart, MessageSquare, Minus, PackageX, Plus, ShoppingBag, Star }
 import { useI18n } from "@/lib/i18n";
 import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
-import { formatIDR } from "@/lib/utils";
 import { PriceTag } from "./PriceTag";
 import type { Flavor } from "@/lib/types";
 
@@ -307,50 +306,48 @@ export function FlavorCard({
           </div>
         ) : null}
 
-        {/* Baris 'terjual' + 'disukai'. Di beranda (showSocial + bisa like)
-            menampilkan tombol hati; di /order dipakai readOnlySocial sehingga
-            hanya angkanya yang tampil, tanpa tombol — sesuai permintaan Steven
-            (like hanya di menu tampilan awal). */}
+        {/* Baris 'terjual' + 'disukai'.
+            Dua perbaikan dari Steven:
+            1) Angka + tombol dipindah ke BARIS SENDIRI di bawah teks. Sebelumnya
+               semuanya dijejak baris dengan `truncate`, jadi di grid 2 kolom
+               HP terpotong jadi "0 terj..." / "1 disu...". Sekarang tiap baris
+               dapat lebar penuh kartu dan tidak pernah dipotong.
+            2) "disukai" memakai logo hati (Love) — jadi jelas itu dislike/suka,
+               bukan sekadar angka.
+            Di /order dipakai `readOnlySocial` sehingga tombolnya tidak
+            dirender (like hanya di halaman menu), sesuai permintaan Steven. */}
         {showSocial ? (
-          <div
-            className="flavor-social mt-2.5 flex shrink-0 items-center justify-between border-t border-cocoa-100 pt-2.5 text-[11px] whitespace-nowrap"
-          >
-            <div className="flex min-w-0 items-center gap-1.5 text-cocoa-500">
-              <span className="truncate">
-                <span className="font-bold text-cocoa-700 tabular">
-                  {soldCount}
-                </span>{" "}
-                {t.menu.soldCount}
+          <div className="flavor-social mt-2.5 flex shrink-0 flex-col gap-1.5 border-t border-cocoa-100 pt-2.5 text-[11px]">
+            {readOnlySocial ? (
+              <span className="flex items-center justify-center gap-1 text-berry-500">
+                <Heart className="size-3.5 shrink-0 fill-current" />
+                <span className="font-bold tabular">{likesCount}</span>
+                <span className="text-cocoa-500">{t.menu.likesCount}</span>
               </span>
-              <span className="text-cocoa-300">·</span>
-              <span className="truncate">
-                <span className="font-bold text-berry-500 tabular">
-                  {likesCount}
-                </span>{" "}
-                {t.menu.likesCount}
-              </span>
-            </div>
-            {/* Tombol hati hanya di beranda. Di /order disembunyikan
-                altogether (bukan cuma disabled) supaya tidak ada tombol
-                yang menampilkan aksi yang memang tidak bisa dilakukan. */}
-            {readOnlySocial ? null : (
+            ) : (
               <button
                 type="button"
                 onClick={() => toggleLike()}
                 aria-pressed={isLiked}
                 aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
-                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                className={`flex w-full items-center justify-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
                   isLiked
                     ? "bg-berry-500 text-white"
                     : "bg-cocoa-100 text-cocoa-600 hover:bg-berry-500/15 hover:text-berry-600"
                 }`}
               >
                 <Heart
-                  className={`size-3.5 ${isLiked ? "fill-current" : ""}`}
+                  className={`size-3.5 shrink-0 ${isLiked ? "fill-current" : ""}`}
                 />
-                {isLiked ? t.menu.liked : t.menu.like}
+                <span className="tabular">{likesCount}</span>
+                <span>{t.menu.likesCount}</span>
               </button>
             )}
+            <span className="flex items-center justify-center gap-1 text-cocoa-500">
+              <ShoppingBag className="size-3.5 shrink-0" />
+              <span className="font-bold text-cocoa-700 tabular">{soldCount}</span>
+              <span>{t.menu.soldCount}</span>
+            </span>
           </div>
         ) : null}
       </div>

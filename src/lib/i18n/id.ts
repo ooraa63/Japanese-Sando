@@ -159,6 +159,14 @@ export const id: Dict = {
     stepPayment: "Pembayaran",
     stepReview: "Konfirmasi",
     stepOf: "Langkah {n} dari {total}",
+    guestPrompt: {
+      title: "Mau pesan pakai akun atau tamu?",
+      subtitle: "Boleh pakai akun, boleh juga tidak. Cuma butuh satu menit.",
+      loginTitle: "Pakai akun",
+      loginHint: "Riwayat pesanan & voucher tersimpan di akun kamu.",
+      guestTitle: "Pesan sebagai tamu",
+      guestHint: "Cuma mau pesan sekali? Tidak perlu daftar.",
+    },
     identity: {
       title: "Siapa yang memesan?",
       subtitle: "Data ini hanya kami pakai untuk menghubungi pesananmu.",
@@ -594,6 +602,7 @@ export const id: Dict = {
       viewSite: "Lihat website",
       sales: "Mutasi",
       vouchers: "Voucher",
+      pickupDelivery: "Ambil & Kirim",
     },
     dash: {
       title: "Dashboard",
@@ -752,6 +761,24 @@ export const id: Dict = {
       deleted: "Zona disembunyikan.",
       confirmDelete: "Sembunyikan zona {code}? Pesanan lama tetap valid.",
       errorIdRequired: "Kode zona tidak boleh kosong.",
+      // --- Ambil di toko vs Pengantaran (item 10 dokumen perbaikan) ---
+      kindLabel: "Jenis",
+      kindDelivery: "Pengantaran",
+      kindDeliveryHint: "Zona yang bisa diantar ke pembeli, lengkap dengan ongkir.",
+      kindPickup: "Ambil di toko",
+      kindPickupHint: "Titik tempat pembeli datang ambil sendiri. Tanpa ongkir.",
+      noteLabelId: "Catatan untuk pembeli (ID)",
+      noteLabelEn: "Catatan untuk pembeli (EN)",
+      noteHint: "Muncul di halaman pesanan saat pembeli memilih titik ini.",
+      pickupRowHint: "Titik pengambilan — tanpa ongkir",
+      pickupTitle: "Ambil di Toko",
+      pickupSubtitle: "Titik pengambilan + catatan jam ambil.",
+      deliveryTitle: "Pengantaran",
+      deliverySubtitle: "Area yang bisa diantar + ongkirnya.",
+      pickupNew: "Tambah titik",
+      pageTitle: "Catatan Pengambilan & Pengiriman",
+      pageSubtitle:
+        "Atur titik pengambilan (bersama jam ambilnya) dan zona pengantaran beserta ongkir.",
     },
     menu: {
       title: "Menu & Stok",

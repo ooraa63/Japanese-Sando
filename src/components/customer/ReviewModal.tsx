@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2, Loader2, Star, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Modal } from "@/components/ui/Modal";
@@ -28,9 +28,11 @@ export function ReviewModal({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    setOpen(initialOpen);
-  }, [initialOpen]);
+  // Catatan: `initialOpen` sengaja TIDAK di-sync balik ke state `open`.
+  // Pemanggil (TrackForm) hanya me-mount modal saat mau dibuka, lalu
+  // `onClose` -&gt; unmount. Jadi selama hidup komponen, `initialOpen`
+  // selalu `true` dan `open` hanya berubah lewat `close()`.
+  // Effect sync sebelumnya cuma memicu render tambahan tanpa efek.
 
   function close() {
     setOpen(false);

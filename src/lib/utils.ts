@@ -346,11 +346,3 @@ export function clampQty(qty: number, max: number): number {
   if (!Number.isFinite(qty)) return 1;
   return Math.max(1, Math.min(Math.floor(qty), Math.max(1, max)));
 }
-
-export function remainingStock(flavor: { stock_enabled: boolean; stock: number }): number | null {
-  return flavor.stock_enabled ? flavor.stock : null;
-}
-
-export function isSoldOut(flavor: { is_active: boolean; stock_enabled: boolean; stock: number }): boolean {
-  return !flavor.is_active || (flavor.stock_enabled && flavor.stock <= 0);
-}

@@ -29,9 +29,24 @@ export function HeroCarousel({
   fallbackMobile?: string;
   intervalMs?: number;
 }) {
-  // Hitung array URL per render (SSR-friendly: pakai default non-mobile).
-  const isMobile =
-    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+  // PENTING: jangan baca `window.matchMedia` langsung saat render.
+  // Server selalu me-render versi desktop, sementara client di HP akan
+  // me-render versi mobile — hasilnya hydration mismatch pada
+  // `<Image src>/srcSet` (React membuang atribut itu, dan hero bisa berkedip).
+  //
+  // Jadi: render pertama selalu pakai nilai yang sama dengan server
+  // (desktop), lalu koreksi ke versi mobile setelah mount. `key={slidesKey}`
+  // di bawah sudah sengaja dipakai supaya pergantian daftar gambar me-remount
+  // carousel dengan benar.
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply(); // <- sinkronkan segera setelah mount
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   const desktopUrls = [fallback, ...(images ?? [])].filter(Boolean);
   const mobileUrls = fallbackMobile

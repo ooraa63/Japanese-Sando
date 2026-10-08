@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import {
+  Info,
   Loader2,
   MapPin,
   Plus,
   Save,
+  Store,
   Trash2,
 } from "lucide-react";
 import type { AdminDeliveryZone } from "@/app/admin/actions";
@@ -30,6 +32,11 @@ interface ZoneDraft {
   requires_address: boolean;
   sort_order: number;
   is_active: boolean;
+  /** 'delivery' = zona antaran (pakai ongkir). 'pickup' = titik pengambilan. */
+  kind: "delivery" | "pickup";
+  /** Catatan untuk pembeli — mis. jam ambil. Dipakai titik pengambilan. */
+  note_id: string;
+  note_en: string;
 }
 
 const EMPTY: ZoneDraft = {
@@ -43,9 +50,17 @@ const EMPTY: ZoneDraft = {
   requires_address: true,
   sort_order: 0,
   is_active: true,
+  kind: "delivery",
+  note_id: "",
+  note_en: "",
 };
 
-export function DeliveryZonesClient() {
+export function DeliveryZonesClient({
+  kindFilter,
+}: {
+  /** Batasi daftar (dan jenis bawaan saat membuat baru) ke satu jenis. */
+  kindFilter?: "delivery" | "pickup";
+} = {}) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const [rows, setRows] = useState<AdminDeliveryZone[]>([]);
@@ -65,8 +80,24 @@ export function DeliveryZonesClient() {
   }, [load]);
 
   function startNew() {
-    setEditing({ ...EMPTY });
+    setEditing({
+      ...EMPTY,
+      // Zona baru di halaman "Ambil di toko" langsung jadi titik ambil,
+      // dan tidak perlu ongkir / alamat pembeli.
+      ...(kindFilter === "pickup"
+        ? { kind: "pickup" as const, fee: 0, requires_address: false }
+        : kindFilter === "delivery"
+          ? { kind: "delivery" as const }
+          : {}),
+    });
   }
+
+  // Baris yang tampil. Kalau halaman ini difilter per jenis (menu "Catatan
+  // Pengambilan & Pengiriman" punya tab Ambil di toko / Pengantaran),
+  // hanya jenis itu yang dirender — jadi admin tidak salah pilih tab.
+  const visibleRows = kindFilter
+    ? rows.filter((r) => (r.kind ?? "delivery") === kindFilter)
+    : rows;
 
   function startEdit(row: AdminDeliveryZone) {
     setEditing({
@@ -80,6 +111,9 @@ export function DeliveryZonesClient() {
       requires_address: row.requires_address,
       sort_order: row.sort_order,
       is_active: row.is_active,
+      kind: row.kind === "pickup" ? "pickup" : "delivery",
+      note_id: row.note_id ?? "",
+      note_en: row.note_en ?? "",
     });
   }
 
@@ -101,6 +135,12 @@ export function DeliveryZonesClient() {
         requires_address: editing.requires_address,
         sort_order: editing.sort_order,
         is_active: editing.is_active,
+        // Tanpa `kind` di payload, `admin_upsert_zone` selalu menyimpan
+        // 'delivery' — itu sebabnya admin tidak pernah bisa membuat titik
+        // pengambilan. Lihat supabase/migration-39.sql.
+        kind: editing.kind,
+        note_id: editing.note_id.trim(),
+        note_en: editing.note_en.trim(),
       };
       const res = await saveDeliveryZoneAction(payload);
       if (res.ok) {
@@ -137,35 +177,49 @@ export function DeliveryZonesClient() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-cocoa-900">
-            {t.admin.deliveryZones.title}
-          </h2>
-          <p className="mt-1 text-xs text-cocoa-500">
-            {t.admin.deliveryZones.subtitle}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={startNew}
-          className="btn-primary shrink-0 !py-1.5 !text-[13px]"
-        >
-          <Plus className="size-3.5" />
-          {t.admin.deliveryZones.new}
-        </button>
+          {kindFilter === "pickup"
+            ? t.admin.deliveryZones.pickupTitle
+            : kindFilter === "delivery"
+              ? t.admin.deliveryZones.deliveryTitle
+              : t.admin.deliveryZones.title}
+        </h2>
+        <p className="mt-1 text-xs text-cocoa-500">
+          {kindFilter === "pickup"
+            ? t.admin.deliveryZones.pickupSubtitle
+            : kindFilter === "delivery"
+              ? t.admin.deliveryZones.deliverySubtitle
+              : t.admin.deliveryZones.subtitle}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={startNew}
+        className="btn-primary shrink-0 !py-1.5 !text-[13px]"
+      >
+        <Plus className="size-3.5" />
+        {kindFilter === "pickup"
+          ? t.admin.deliveryZones.pickupNew
+          : t.admin.deliveryZones.new}
+      </button>
       </div>
 
-      {rows.length === 0 ? (
+      {visibleRows.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-cocoa-200 bg-cream-50 p-6 text-center text-sm text-cocoa-500">
           {t.admin.deliveryZones.empty}
         </p>
       ) : (
         <ul className="space-y-2">
-          {rows.map((row) => (
+          {visibleRows.map((row) => (
             <li
               key={row.id}
               className="flex flex-wrap items-center gap-3 rounded-2xl border border-cocoa-200 bg-cream-50 p-3"
             >
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-cocoa-100 text-cocoa-700">
-                <MapPin className="size-4" />
+                {row.kind === "pickup" ? (
+                  <Store className="size-4" />
+                ) : (
+                  <MapPin className="size-4" />
+                )}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-cocoa-900">
@@ -175,12 +229,20 @@ export function DeliveryZonesClient() {
                   </span>
                 </p>
                 <p className="text-xs text-cocoa-500">
-                  {formatIDR(row.fee, lang)} ·{" "}
-                  {row.lat && row.lng
-                    ? `${t.admin.deliveryZones.fixedLabel} (${row.lat.toFixed(4)}, ${row.lng.toFixed(4)})`
-                    : t.admin.deliveryZones.addressRequiredLabel}
-                  {row.radius_km ? ` · ${row.radius_km} km` : ""}
+                  {row.kind === "pickup"
+                    ? t.admin.deliveryZones.pickupRowHint
+                    : `${formatIDR(row.fee, lang)} · ${
+                        row.lat && row.lng
+                          ? `${t.admin.deliveryZones.fixedLabel} (${row.lat.toFixed(4)}, ${row.lng.toFixed(4)})`
+                          : t.admin.deliveryZones.addressRequiredLabel
+                      }${row.radius_km ? ` · ${row.radius_km} km` : ""}`}
                 </p>
+                {row.note_id ? (
+                  <p className="mt-1 flex items-start gap-1.5 text-xs text-matcha-700">
+                    <Info className="mt-0.5 size-3 shrink-0" />
+                    <span className="min-w-0">{row.note_id}</span>
+                  </p>
+                ) : null}
               </div>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${
@@ -225,6 +287,7 @@ export function DeliveryZonesClient() {
           saving={pending}
           t={t}
           lang={lang}
+          kindFilter={kindFilter}
         />
       ) : null}
     </section>
@@ -239,6 +302,7 @@ function EditZoneModal({
   saving,
   t,
   lang,
+  kindFilter,
 }: {
   draft: ZoneDraft;
   setDraft: (d: ZoneDraft) => void;
@@ -247,6 +311,7 @@ function EditZoneModal({
   saving: boolean;
   t: ReturnType<typeof useI18n>["t"];
   lang: "id" | "en";
+  kindFilter?: "delivery" | "pickup";
 }) {
   function patch(p: Partial<ZoneDraft>) {
     setDraft({ ...draft, ...p });
@@ -267,13 +332,59 @@ function EditZoneModal({
           </h2>
         </header>
         <div className="space-y-3 overflow-y-auto p-5">
+          {/* Jenis zona: menentukan sisa form di bawah. Hidden kalau halaman
+              ini sudah difilter (tab Ambil di toko / Pengantaran). */}
+          {kindFilter ? null : (
+            <div>
+              <span className="label">{t.admin.deliveryZones.kindLabel}</span>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(["delivery", "pickup"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() =>
+                      patch(
+                        k === "pickup"
+                          ? { kind: "pickup", fee: 0, requires_address: false }
+                          : { kind: "delivery" }
+                      )
+                    }
+                    className={`flex items-start gap-2 rounded-xl border-2 p-3 text-left transition ${
+                      draft.kind === k
+                        ? "border-matcha-500 bg-matcha-500/10"
+                        : "border-cocoa-200 bg-white hover:bg-cream-100"
+                    }`}
+                  >
+                    {k === "pickup" ? (
+                      <Store className="mt-0.5 size-4 shrink-0 text-cocoa-600" />
+                    ) : (
+                      <MapPin className="mt-0.5 size-4 shrink-0 text-cocoa-600" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-cocoa-900">
+                        {k === "pickup"
+                          ? t.admin.deliveryZones.kindPickup
+                          : t.admin.deliveryZones.kindDelivery}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-cocoa-500">
+                        {k === "pickup"
+                          ? t.admin.deliveryZones.kindPickupHint
+                          : t.admin.deliveryZones.kindDeliveryHint}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <label className="block">
             <span className="label">{t.admin.deliveryZones.codeLabel}</span>
             <input
               className="input font-mono lowercase"
               value={draft.id}
               onChange={(e) => patch({ id: e.target.value })}
-              placeholder="antar"
+              placeholder={draft.kind === "pickup" ? "pickup-toko" : "antar"}
               maxLength={50}
             />
           </label>
@@ -299,35 +410,73 @@ function EditZoneModal({
               />
             </label>
           </div>
-          <label className="block">
-            <span className="label">{t.admin.deliveryZones.feeLabel}</span>
-            <input
-              type="number"
-              min={0}
-              step={500}
-              className="input"
-              value={draft.fee}
-              onChange={(e) => patch({ fee: Number(e.target.value) })}
-            />
-          </label>
+          {/* Titik pengambilan tidak pakai ongkir dan pembeli tidak perlu
+              menandai alamat (mereka datang ke lokasi), jadi kedua field ini
+              disembunyikan + dikunci di migration-39. */}
+          {draft.kind === "pickup" ? null : (
+            <>
+              <label className="block">
+                <span className="label">{t.admin.deliveryZones.feeLabel}</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={500}
+                  className="input"
+                  value={draft.fee}
+                  onChange={(e) => patch({ fee: Number(e.target.value) })}
+                />
+              </label>
 
-          <label className="flex cursor-pointer items-start gap-2 rounded-xl bg-cream-100 p-3">
-            <input
-              type="checkbox"
-              checked={!draft.requires_address}
-              onChange={(e) =>
-                patch({ requires_address: !e.target.checked })
+              <label className="flex cursor-pointer items-start gap-2 rounded-xl bg-cream-100 p-3">
+                <input
+                  type="checkbox"
+                  checked={!draft.requires_address}
+                  onChange={(e) =>
+                    patch({ requires_address: !e.target.checked })
+                  }
+                  className="mt-0.5 size-4 rounded border-cocoa-300"
+                />
+                <span className="text-xs">
+                  <span className="font-bold text-cocoa-700">
+                    {t.admin.deliveryZones.fixedLabel}
+                  </span>
+                  <span className="mt-0.5 block text-cocoa-500">
+                    {t.admin.deliveryZones.fixedHint}
+                  </span>
+                </span>
+              </label>
+            </>
+          )}
+
+          {/* Catatan pembeli — dipakai untuk jam ambil pada titik pengambilan.
+              Ini yang Steven minta: "...ada catatan juga jadi tau ambil jam
+              berapa". */}
+          <label className="block">
+            <span className="label">{t.admin.deliveryZones.noteLabelId}</span>
+            <textarea
+              className="input min-h-[4.5rem]"
+              value={draft.note_id}
+              onChange={(e) => patch({ note_id: e.target.value })}
+              placeholder={
+                draft.kind === "pickup"
+                  ? "mis. Ambil setiap hari 10.00 - 20.00 WIB"
+                  : "mis. Pengiriman tiap hari kerja"
               }
-              className="mt-0.5 size-4 rounded border-cocoa-300"
+              maxLength={240}
             />
-            <span className="text-xs">
-              <span className="font-bold text-cocoa-700">
-                {t.admin.deliveryZones.fixedLabel}
-              </span>
-              <span className="mt-0.5 block text-cocoa-500">
-                {t.admin.deliveryZones.fixedHint}
-              </span>
+            <span className="mt-1 block text-xs text-cocoa-400">
+              {t.admin.deliveryZones.noteHint}
             </span>
+          </label>
+          <label className="block">
+            <span className="label">{t.admin.deliveryZones.noteLabelEn}</span>
+            <textarea
+              className="input min-h-[4.5rem]"
+              value={draft.note_en}
+              onChange={(e) => patch({ note_en: e.target.value })}
+              placeholder="e.g. Pick up daily 10:00 - 20:00 WIB"
+              maxLength={240}
+            />
           </label>
 
           {draft.lat || draft.lng || !draft.requires_address ? (

@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  Store,
   Ticket,
   TrendingUp,
   Users,
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/admin/menu", key: "menu" as const, icon: UtensilsCrossed, exact: false },
   { href: "/admin/customers", key: "customers" as const, icon: Users, exact: false },
   { href: "/admin/vouchers", key: "vouchers" as const, icon: Ticket, exact: false },
+  { href: "/admin/pickup-delivery", key: "pickupDelivery" as const, icon: Store, exact: false },
   { href: "/admin/settings", key: "settings" as const, icon: Settings, exact: false },
 ];
 
@@ -52,6 +54,7 @@ export function AdminShell({
     settings: string;
     sales: string;
     vouchers: string;
+    pickupDelivery: string;
     viewSite: string;
     signOut: string;
   };

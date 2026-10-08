@@ -21,39 +21,21 @@ import { getMutasiAction } from "@/app/admin/actions";
 import { useToast } from "@/components/ui/Toast";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
-interface FlavorLite {
-  id: number;
-  name_id: string;
-  name_en: string;
-  is_active: boolean;
-}
-
 interface SalesFilters {
   fromDate: string;
   toDate: string;
   search: string;
 }
 
-const EMPTY_SUMMARY: SalesSummary = {
-  revenue_total: 0,
-  orders_count: 0,
-  pcs_sold: 0,
-  revenue_today: 0,
-  orders_today: 0,
-  top_flavors: [],
-};
-
 export function SalesClient({
   initialSummary,
   initialTransactions,
   initialTotal,
-  flavors,
   initialFilters,
 }: {
   initialSummary: SalesSummary;
   initialTransactions: SalesTransaction[];
   initialTotal: number;
-  flavors: FlavorLite[];
   initialFilters: SalesFilters;
 }) {
   const { t, lang } = useI18n();
@@ -394,7 +376,17 @@ export function SalesClient({
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-cocoa-200 bg-cream-50">
-            <div className="hidden border-b border-cocoa-200 bg-cream-100/70 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-cocoa-500 lg:grid lg:grid-cols-[120px_140px_minmax(0,1fr)_minmax(0,1fr)_120px_minmax(150px,auto)] lg:gap-4">
+            {/* Template lebar kolom ini dipakai header (baris di bawah ini)
+                DAN setiap baris data — harus selalu sama, kalau tidak kolom
+                tidak sejajar.
+
+                Kolom PELANGGAN & ITEM dulunya dua-duanya `1fr`, jadi di layar
+                lebar sisa ruang dibagi rata. Teks ITEM yang pendek
+                ("Cookies & Cream x1") menyisakan jarak kosong raksasa
+                sebelum kolom TOTAL — Steven: "jaraknya masih jauh bgt".
+                Sekarang ITEM dikunci maksimal 220px, sisa ruang diberikan ke
+                PELANGGAN, dan gap dikecilkan 4 -> 3. */}
+            <div className="hidden border-b border-cocoa-200 bg-cream-100/70 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-cocoa-500 lg:grid lg:grid-cols-[130px_140px_minmax(0,1fr)_minmax(0,220px)_110px_minmax(150px,auto)] lg:gap-3">
               <div>{t.admin.sales.colDate}</div>
               <div>{t.admin.sales.colCode}</div>
               <div>{t.admin.sales.colCustomer}</div>
@@ -412,7 +404,7 @@ export function SalesClient({
                     <button
                       type="button"
                       onClick={() => toggleExpanded(tr.id)}
-                      className="grid w-full grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3.5 text-left transition hover:bg-cocoa-100/40 lg:grid-cols-[120px_140px_minmax(0,1fr)_minmax(0,1fr)_120px_minmax(150px,auto)] lg:items-center lg:gap-4"
+                      className="grid w-full grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3.5 text-left transition hover:bg-cocoa-100/40 lg:grid-cols-[130px_140px_minmax(0,1fr)_minmax(0,220px)_110px_minmax(150px,auto)] lg:items-center lg:gap-3"
                     >
                       <div className="font-mono text-xs text-cocoa-500">
                         {formatFullDateTime(tr.created_at, lang)}
@@ -475,6 +467,21 @@ export function SalesClient({
                               </span>
                             </li>
                           ) : null}
+                          {/* Baris TOTAL penutup.
+                              Sebelumnya panel detail berhenti di
+                              "Subtotal" (+ Ongkir kalau ada) tanpa
+                              menampilkan total akhir — jadi yang terlihat
+                              cuma "Subtotal Rp 18.000" padahal kolom TOTAL
+                              di kanan menulis Rp 18.000. Itu yang Steven laporkan
+                              sebagai "total bayar masih tidak pas".
+                              Sekarang subtotal + ongkir + total kelihatan
+                              lengkap dalam satu panel. */}
+                          <li className="flex items-center justify-between gap-4 border-t-2 border-cocoa-300 pt-2 text-sm font-extrabold text-cocoa-900">
+                            <span>{t.admin.sales.colTotal}</span>
+                            <span className="font-mono">
+                              {formatIDR(tr.total_price, lang)}
+                            </span>
+                          </li>
                         </ul>
                       </div>
                     ) : null}

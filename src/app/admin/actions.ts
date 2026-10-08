@@ -552,31 +552,13 @@ export async function deleteBundleAction(
   return { ok: true, data: data as { deactivated: boolean } };
 }
 
-export async function setStockAction(
-  totalStock: number
-): Promise<ActionResult<{ total_stock: number; previous: number }>> {
-  if (!Number.isInteger(totalStock) || totalStock < 0) {
-    return { ok: false, error: "invalid_stock" };
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_set_stock", {
-    p_stock: totalStock,
-    p_note: null,
-  });
-
-  if (error) return { ok: false, error: humanize(error.message) };
-
-  revalidatePath("/admin/menu");
-  revalidatePath("/admin");
-  revalidatePath("/");
-  revalidatePath("/order");
-  return { ok: true, data: data as { total_stock: number; previous: number } };
-}
-
 /**
- * Stok per-kategori (ganti `setStockAction`). Penjual memilih menu dari
- * halaman Menu & Stok, lalu klik +/- untuk mengubah stok kategori.
+ * Stok per-kategori. Penjual memilih menu dari halaman Menu & Stok, lalu
+ * klik +/- untuk mengubah stok kategori.
+ *
+ * Catatan: RPC `admin_set_stock` versi lama (2 argumen, menulis ke
+ * `store_settings.total_stock`) sudah TIDAK dipakai lagi — stok yang dibaca
+ * `create_order` dan ditampilkan ke pembeli ada di `categories.stock`.
  */
 export async function setCategoryStockAction(
   categoryId: number,

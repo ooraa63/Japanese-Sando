@@ -66,6 +66,8 @@ const migration34Path = path.resolve(process.cwd(), "supabase/migration-34.sql")
 const migration35Path = path.resolve(process.cwd(), "supabase/migration-35.sql");
 const migration36Path = path.resolve(process.cwd(), "supabase/migration-36.sql");
 const migration37Path = path.resolve(process.cwd(), "supabase/migration-37.sql");
+const migration38Path = path.resolve(process.cwd(), "supabase/migration-38.sql");
+const migration39Path = path.resolve(process.cwd(), "supabase/migration-39.sql");
 const sql =
   schemaSql +
   "\n\n" +
@@ -184,6 +186,8 @@ try {
     { name: "migration-35.sql", sql: existsSync(migration35Path) ? readFileSync(migration35Path, "utf8") : "" },
     { name: "migration-36.sql", sql: existsSync(migration36Path) ? readFileSync(migration36Path, "utf8") : "" },
     { name: "migration-37.sql", sql: existsSync(migration37Path) ? readFileSync(migration37Path, "utf8") : "" },
+    { name: "migration-38.sql", sql: existsSync(migration38Path) ? readFileSync(migration38Path, "utf8") : "" },
+    { name: "migration-39.sql", sql: existsSync(migration39Path) ? readFileSync(migration39Path, "utf8") : "" },
   ].filter((p) => p.sql.trim().length > 0);
 
   for (const part of parts) {

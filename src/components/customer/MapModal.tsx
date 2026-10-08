@@ -3,10 +3,7 @@
 import { X } from "lucide-react";
 import dynamic from "next/dynamic";
 import type { Dict } from "@/lib/types";
-import {
-  EnhancedMapPicker,
-  type SearchResult,
-} from "./EnhancedMapPicker";
+import type { SearchResult } from "./EnhancedMapPicker";
 
 const DEFAULT_CENTER = { lat: -6.917, lng: 107.619 };
 
@@ -30,14 +27,12 @@ const InnerPicker = dynamic(
 export function MapModal({
   open,
   center,
-  initialLabel,
   onClose,
   onPick,
   dict,
 }: {
   open: boolean;
   center: { lat: number; lng: number };
-  initialLabel: string;
   onClose: () => void;
   onPick: (lat: number, lng: number, label: string) => void;
   dict: Dict["order"]["payment"];

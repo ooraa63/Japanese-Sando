@@ -111,7 +111,6 @@ export function AddressPicker({
             lat: typeof draft.lat === "number" ? draft.lat : -6.917,
             lng: typeof draft.lng === "number" ? draft.lng : 107.619,
           }}
-          initialLabel={draft.address}
           onClose={() => setOpen(false)}
           onPick={(lat, lng, label) => {
             updateDraft({ lat, lng, address: label || draft.address });

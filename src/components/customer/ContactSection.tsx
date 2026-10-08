@@ -7,12 +7,25 @@ import { formatPhone, waLink } from "@/lib/utils";
  * Blok "Hubungi kami" di /account — identitas toko (WA, IG, TikTok,
  * alamat, jam buka). Server component, render dari settings.
  */
-export function ContactSection({
+/**
+ * Daftar detail kontak (WA, IG, TikTok, alamat, jam buka).
+ *
+ * Dipisah dari `ContactSection` supaya isinya bisa dipakai ulang di popup
+ * kontak (dokumen "Perbaikan Ruma Komugi 2", item 2): di halaman Akun,
+ * menekan bar "Kontak" membuka popup kecil berisi daftar ini — bukan
+ * pindah ke halaman /contact.
+ *
+ * Murni presentasional (tanpa state/hook) supaya aman dipanggil dari server
+ * component DAN diteruskan sebagai `children` ke client component popup.
+ */
+export function ContactDetails({
   settings,
   dict,
+  className = "mt-5 space-y-3",
 }: {
   settings: StoreSettings | null;
   dict: Dict["account"]["contact"];
+  className?: string;
 }) {
   const whatsapp = settings?.whatsapp?.trim();
   const instagram = settings?.instagram?.trim();
@@ -22,15 +35,12 @@ export function ContactSection({
   const hoursId = settings?.hours_id?.trim();
   const hoursEn = settings?.hours_en?.trim();
 
-  const hasAny = whatsapp || instagram || tiktok || address || hoursId;
-
-  if (!hasAny) return null;
+  if (!(whatsapp || instagram || tiktok || address || hoursId || hoursEn)) {
+    return null;
+  }
 
   return (
-    <section id="contact" className="card scroll-mt-20 p-6 sm:p-7">
-      <h2 className="text-lg font-bold text-cocoa-900">{dict.title}</h2>
-      <p className="mt-1 text-sm text-cocoa-500">{dict.subtitle}</p>
-      <ul className="mt-5 space-y-3">
+    <ul className={className}>
         {whatsapp ? (
           <li className="flex items-start gap-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-matcha-100 text-matcha-700">
@@ -130,7 +140,34 @@ export function ContactSection({
             </div>
           </li>
         ) : null}
-      </ul>
+    </ul>
+  );
+}
+
+/**
+ * Blok "Hubungi kami" di /account — identitas toko (WA, IG, TikTok,
+ * alamat, jam buka). Server component, render dari settings.
+ */
+export function ContactSection({
+  settings,
+  dict,
+}: {
+  settings: StoreSettings | null;
+  dict: Dict["account"]["contact"];
+}) {
+  const whatsapp = settings?.whatsapp?.trim();
+  const instagram = settings?.instagram?.trim();
+  const tiktok = settings?.tiktok?.trim();
+  const address = settings?.address?.trim();
+  const hoursId = settings?.hours_id?.trim();
+
+  if (!(whatsapp || instagram || tiktok || address || hoursId)) return null;
+
+  return (
+    <section id="contact" className="card scroll-mt-20 p-6 sm:p-7">
+      <h2 className="text-lg font-bold text-cocoa-900">{dict.title}</h2>
+      <p className="mt-1 text-sm text-cocoa-500">{dict.subtitle}</p>
+      <ContactDetails settings={settings} dict={dict} />
     </section>
   );
 }

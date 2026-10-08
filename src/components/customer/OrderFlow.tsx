@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -45,6 +45,33 @@ type Step = (typeof FULL_STEPS)[number];
  *  Guest (= tanpa profile) tetap melewati identity dulu. */
 function stepsFor(profileComplete: boolean): readonly Step[] {
   return profileComplete ? LOGGED_IN_STEPS : FULL_STEPS;
+}
+
+/**
+ * Baca langkah tersimpan dari sessionStorage.
+ *
+ * Dipisah sebagai fungsi modul-level supaya `getSnapshot` mengembalikan
+ * nilai primitif yang stabil — `useSyncExternalStore` akan loop takFinite
+ * kalau snapshot-nya objek baru setiap panggilan.
+ */
+function readOrderStep(steps: readonly Step[]): Step {
+  if (typeof window === "undefined") return steps[0];
+  try {
+    const saved = sessionStorage.getItem("js_order_step") as Step | null;
+    if (saved && steps.includes(saved)) return saved;
+  } catch {
+    // Mode privat / storage diblokir — pakai langkah pertama.
+  }
+  return steps[0];
+}
+
+/**
+ * Subscribe no-op: sessionStorage hanya dibaca satu kali saat mount, tidak
+ * ada sumber daya eksternal yang perlu dipantau. Yang penting dari argumen
+ * subscribe ini adalah mengembalikan fungsi unsubscribe.
+ */
+function subscribeOrderStep(): () => void {
+  return () => {};
 }
 /** True kalau customer sudah punya profile lengkap (boleh skip identity).
  *  profile lengkap = user_id + full_name + phone. Saat signup via /register
@@ -118,18 +145,32 @@ export function OrderFlow({
   // Catatan: useState initial hanya jalan sekali, jadi user yang logout
   // setelah halaman dimuat akan tetap di step dia sekarang sampai dia
   // refresh. Itu acceptable — Guest UX di tengah flow = friction.
-  const [step, setStep] = useState<Step>(() => {
-    // Restore step dari sessionStorage (kalau ada), supaya refresh di step
-    // 'menu' (pilih rasa) gak balik ke 'identity'. Penting untuk UX mobile.
-    // Filter: kalau step yang tersimpan tidak ada di steps user saat ini
-    // (mis. saved 'identity' tapi sekarang login), fallback ke langkah
-    // pertama yang applicable.
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("js_order_step") as Step | null;
-      if (saved && steps.includes(saved)) return saved;
-    }
-    return steps[0];
-  });
+  //
+  // PENTING: langkah TIDAK boleh dibaca dari sessionStorage saat render
+  // pertama. Server selalu render `steps[0]`, sementara klien akan me-restore
+  // langkah tersimpan (mis. "menu") — dua render itu beda dan memicu:
+  //   "Hydration failed because the server rendered text didn't match the
+  //    client" → React buang seluruh tree & render ulang (kedip + lambat).
+  // Itu terjadi setiap kali pembeli me-refresh di tengah alur pesanan.
+  //
+  // `useSyncExternalStore` (pola yang sama dipakai `CartProvider`) aman untuk
+  // ini: React memakai `getServerSnapshot` baik saat render server maupun saat
+  // hydration, dan HANYA membandingkan dengan `getSnapshot` sisi klien
+  // SETELAH hydration selesai. Jadi tidak ada mismatch, dan langkah
+  // tersimpan tetap dipulihkan.
+  const stepFromStorage = useSyncExternalStore(
+    subscribeOrderStep,
+    () => readOrderStep(steps),
+    () => steps[0]
+  );
+
+  // Navigasi manual menimpa nilai yang dibaca dari storage. Sekali user
+  // menekan tombol, storage bukan lagi sumber kebenaran untuk sesi ini.
+  const [stepOverride, setStepOverride] = useState<Step | null>(null);
+  const step = stepOverride ?? stepFromStorage;
+  const setStep = useCallback((target: Step) => {
+    setStepOverride(target);
+  }, []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
@@ -305,23 +346,54 @@ export function OrderFlow({
 
   const stepIndex = steps.indexOf(step);
 
-  // Simpan step ke sessionStorage setiap user pindah step — biar refresh
-  // (mis. user pilih flavor lalu accidentally refresh) tetap di step itu.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    sessionStorage.setItem("js_order_step", step);
-  }, [step]);
+  // Simpan langkah ke sessionStorage TIDAK lagi lewat effect yang depends on
+  // `step`. Effect seperti itu akan menimpa nilai yang tersimpan dengan
+  // `steps[0]` SEBELUM `useSyncExternalStore` sempat membacanya, sehingga
+  // restore selalu gagal. Karena `setStep` hanya dipanggil dari `goTo()`,
+  // menulis storage di sana sudah menutup semua perpindahan langkah.
 
   // Reset cart + step saat user meninggalkan halaman /order. Tujuannya:
   //   1. Privacy — data identitas (nama, telepon, IG) gak kesimpan ke pre-order
   //      berikutnya.
   //   2. UX bersih — next visit selalu mulai dari awal, gak ada leftover.
+  // Pakai ref supaya effect unmount tetap jalan HANYA SEKALI tanpa memaksa
+  // `reset` (yang identitasnya berubah tiap render) masuk dependencies — kalau
+  // tidak, keranjang ikut ke-reset setiap kali komponen render.
+  const resetRef = useRef(reset);
   useEffect(() => {
+    resetRef.current = reset;
+  }, [reset]);
+
+  // Penanda "komponen sudah benar-benar ter-mount", untuk membedakan
+  // unmount sungguhan dari probe unmount milik StrictMode. Di-set lewat
+  // timeout 0ms: kalau cleanup datang SEBELUM timeout itu, itu probe
+  // StrictMode (mount kedua menyusul sesaat kemudian), bukan navigasi.
+  const reallyMountedRef = useRef(false);
+
+  useEffect(() => {
+    reallyMountedRef.current = false;
+    const timer = window.setTimeout(() => {
+      reallyMountedRef.current = true;
+    }, 0);
     return () => {
+      window.clearTimeout(timer);
       if (typeof window === "undefined") return;
-      // window unmount = user leaving page (route change). Bersihin.
+      // PROBE STRICT MODE — jangan bersihkan.
+      //
+      // Di `next dev`, React StrictMode (default `true` untuk app router
+      // sejak Next 13.5.1) menjalankan seluruh efek SEKALI LAGI di awal
+      // development: mount -> unmount -> mount. Cleanup di atas kelihatan
+      // persis seperti "pembeli meninggalkan halaman", padahal yang terjadi
+      // baru saja halaman dimuat.
+      //
+      // Akibatnya di dev: begitu /order terbuka, `js_order_step` dan
+      // keranjang langsung terhapus, dan setiap kali pembeli refresh di
+      // tengah pesanan halaman balik ke "Data Kamu" dengan keranjang kosong.
+      if (!reallyMountedRef.current) return;
+
+      // Unmount sungguhan = pindah halaman. Bersihin.
       sessionStorage.removeItem("js_order_step");
-      reset();
+      resetRef.current();
     };
   }, []);
 
@@ -330,6 +402,13 @@ export function OrderFlow({
   function goTo(target: Step) {
     setErrors({});
     setStep(target);
+    // Simpan di sini (bukan effect) supaya tidak menimpa nilai yang
+    // tersimpan sebelum `useSyncExternalStore` sempat membacanya.
+    try {
+      sessionStorage.setItem("js_order_step", target);
+    } catch {
+      // Mode privat / storage penuh — langkah tetap jalan di state.
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -828,7 +907,6 @@ export function OrderFlow({
                 <OrderMenuBrowser
                   categories={categories}
                   bundles={bundles}
-                  remainingStock={null}
                   soldCounts={soldCounts}
                 />
               )}
@@ -971,8 +1049,10 @@ export function OrderFlow({
                 </div>
               ) : null}
 
-              {/* Tingkat 2b: lokasi pickup (hanya muncul setelah pilih 'Ambil di toko').
-                  Migration-32: admin bisa add/edit/hapus via settings → zona. */}
+              {/* Tingkat 2b: titik pengambilan (hanya muncul setelah pilih 'Ambil di
+                  toko'). Dikelola admin di menu "Ambil & Kirim"
+                  (/admin/pickup-delivery). Catatan di bawah dipakai untuk
+                  jam ambil — "ada catatan juga jadi tau ambil jam berapa". */}
               {draft.deliveryMethod === "pickup" &&
               deliveryZones.filter((z) => z.kind === "pickup").length > 0 ? (
                 <div className="mt-4">
@@ -985,6 +1065,8 @@ export function OrderFlow({
                       .map((z) => {
                         const zName =
                           lang === "en" ? z.name_en : z.name_id;
+                        const zNote =
+                          (lang === "en" ? z.note_en : z.note_id) ?? "";
                         return (
                           <ChoiceCard
                             key={z.id}
@@ -995,6 +1077,7 @@ export function OrderFlow({
                             icon={<Store className="size-5" />}
                             title={zName}
                             desc={lang === "en" ? "Free" : "Gratis"}
+                            note={zNote}
                           />
                         );
                       })}

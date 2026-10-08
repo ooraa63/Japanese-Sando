@@ -43,10 +43,12 @@ export function SiteHeader({
     };
   }, [open]);
 
+  // "Kontak" sengaja tidak ada di daftar ini (dokumen "Perbaikan Ruma Komugi 2",
+  // item 2): link Kontak dihapus dari navigasi dan info kontaknya dipindah ke
+  // halaman /account — tekan "Kontak" di sana untuk membuka popup.
   const links = [
     { href: "/#menu", label: t.nav.menu, desc: "" },
     { href: "/track", label: t.nav.track, desc: "" },
-    { href: "/contact", label: t.nav.contact, desc: "" },
   ];
 
   return (
