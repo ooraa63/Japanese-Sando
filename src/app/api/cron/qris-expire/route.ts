@@ -1,22 +1,20 @@
 import { NextResponse } from "next/server";
 
 /**
- * Cron: expire QRIS yang lewat masa berlaku.
+ * Pemicu manual untuk `expire_stale_qris_orders()`.
  *
- * Vercel Cron memanggil `GET /api/cron/qris-expire` tiap menit (lihat
- * `vercel.json`). Fungsinya memanggil RPC `expire_stale_qris_orders()` yang
- * menandai order QRIS `pending` yang `qris_expires_at < now()` jadi
- * `expired` + `cancelled` dan mengembalikan stok kategori.
+ * JADWAL UTAMA sekarang ada di `pg_cron` (lihat migration-37): database
+ * memanggil RPC-nya sendiri tiap menit, jadi tidak bergantung paket Vercel
+ * sama sekali. Route ini sengaja tetap ada untuk:
+ *   - tes manual setelah pasang cron,
+ *   - pemicu dari cron pihak ketiga kalau diperlukan nanti.
  *
- * Kenapa perlu cron (bukan_and relying on webhook Midtrans):
- *   Kalau pembeli menutup modal QRIS / tidak bayar sama sekali, Midtrans
- *   TIDAK mengirim webhook apa pun. Order akan menggantung selamanya di
- *   `qris_status='pending'`. Cron inilah yang menutup celah itu.
+ * Kenapa tidak pakai Vercel Cron: project ini plan Hobby, yang membatasi cron
+ * maksimal 2x sehari — jadwal tiap menit tidak akan pernah dipicu.
  *
- * Autentikasi: Vercel mengirim header `Authorization: Bearer $CRON_SECRET`
- *   kalau env `CRON_SECRET` di-set. Kalau env-nya kosong (mis. di preview
- *   tanpa secret), route tetap boleh jalan supaya mudah dites manual —
- *   tapi tidak ada yang bisa memicu lewat URL publik tanpa secret di prod.
+ * Autentikasi: set header `Authorization: Bearer $CRON_SECRET` kalau env
+ * `CRON_SECRET` tersedia. Kalau env-nya kosong, route tetap boleh jalan supaya
+ * mudah dites manual.
  */
 
 export const dynamic = "force-dynamic";

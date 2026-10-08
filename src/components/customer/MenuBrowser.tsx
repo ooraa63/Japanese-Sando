@@ -212,7 +212,7 @@ export function OrderMenuBrowser({
   categories,
   bundles = [],
   remainingStock,
-  soldCounts,
+  soldCounts = {},
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri (category_id=NULL) atau per-kategori. */
@@ -400,6 +400,11 @@ export function OrderMenuBrowser({
                           flavor={f}
                           inCart={q}
                           remainingStock={catLeft}
+                          // Tampilkan counter terjual + like juga di HP,
+                          // supaya social proof-nya kelihatan sebelum
+                          // pembeli menekan tombol +.
+                          showSocial
+                          soldCount={soldCounts[f.id] ?? 0}
                           selectable
                         />
                       </li>

@@ -819,8 +819,6 @@ export function OrderFlow({
                   title={t.order.menu.title}
                   subtitle={t.order.menu.subtitle}
                 />
-                {/* Info stok per kategori — total pcs yang masih tersedia */}
-                <StockBadge categories={categories} t={t} />
               </div>
 
               {/* Rincian item: klik kategori dulu, lalu rasa-rasanya */}
@@ -1420,40 +1418,6 @@ export function OrderFlow({
 }
 
 /* ---------- komponen kecil ---------- */
-
-/**
- * Badge kecil di header langkah menu: total pcs dari semua kategori yang
- * membatasi stok. Hanya dirender bila ada kategori dengan `stock_enabled`.
- */
-function StockBadge({
-  categories,
-  t,
-}: {
-  categories: Category[];
-  t: ReturnType<typeof useI18n>["t"];
-}) {
-  // Akumulasi total pcs tersisa untuk kategori yang membatasi stok.
-  const tracked = categories.filter((c) => c.stock_enabled);
-  if (tracked.length === 0) return null;
-  const total = tracked.reduce((s, c) => s + Math.max(0, c.stock ?? 0), 0);
-  const low = total > 0 && total <= 5;
-
-  return (
-    <p
-      className={`mt-4 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold ${
-        total > 0
-          ? low
-            ? "bg-honey-300/20 text-honey-500"
-            : "bg-matcha-50 text-matcha-700"
-          : "bg-berry-500/10 text-berry-600"
-      }`}
-    >
-      {total > 0
-        ? t.order.menu.stockLeft.replace("{n}", String(total))
-        : t.menu.soldOut}
-    </p>
-  );
-}
 
 function StepHeading({
   icon,
