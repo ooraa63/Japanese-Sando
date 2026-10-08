@@ -416,3 +416,24 @@ rusak. Kalau ripgrep menampilkan `—` sementara `Get-Content` menampilkan
 
 Perbaikan: `git checkout -- MEMORY/<file>.md` lalu tulis ulang pakai tool
 yang UTF-8-safe. Jangan `Add-Content` untuk teks non-ASCII.
+
+## 26. Verifikasi deploy: tandanya harus BENAR-BENAR baru
+
+`scripts/watch-deploy.js` dulu melaporkan "DEPLOY SUDAH LIVE" dalam 0,1 menit
+setelah `git push` — padahal deploy baru belum mendarat. Penyebabnya tandanya
+terlalu umum: dia cuma cek `/admin/pickup-delivery` bukan 404 dan "Kontak"
+hilang dari footer. Dua-duanya **sudah true di deploy sebelumnya**, jadi
+script-nya tidak pernah benar-benar membedakan deploy lama dari yang baru.
+
+**Aturan:** sebelum-andalkan skrip pantau deploy, tanya "apakah kondisi ini
+hanya bisa terjadi di build yang baru?" Kalau tidak, skripnya tidak berguna
+dan akan memberi rasa aman yang palsu.
+
+Contoh tanda yang benar untuk koreksi item 1: kelas CSS `<footer>` di HTML
+produksi harus memuat `hidden md:block`. Kode lama (`mt-14 bg-cocoa-900 ...`)
+tidak punya `hidden`, jadi HTML itu hanya mungkin berasal dari build baru.
+
+**Tambahan:** pakai cache-buster (`?_cb=${Date.now()}`) plus header
+`cache-control: no-cache` saat fetch produksi, biar tidak membaca respons CDN
+basi. `Invoke-WebRequest` dari PowerShell sempat timeout 60 detik ke domain
+Vercel — pakai `fetch` dari Node jauh lebih andal.

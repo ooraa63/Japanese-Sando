@@ -31,6 +31,25 @@ contact us."
   padding cuma menyisakan ruang kosong.
 - `src/app/layout.tsx` import + render balik ke `MobileBottomNav`.
 
+### Efek samping yang ditemukan & diperbaiki: spacer bawah hilang
+
+Footer tadinya **ikut memberi padding bawah** di akhir halaman HP. Kalau footer
+dihilangkan, halaman HP berubah, jadi elemen terakhirnya nempel ke nav bawah
+yang `fixed`. Diukur dengan `scripts/check-nav-overlap.js`:
+
+| Halaman | Jarak konten terakhir ke nav, sebelum | sesudah |
+| --- | --- | --- |
+| `/` | 29px | 97px |
+| `/track` | 314px | 314px |
+| `/contact` | **6px** (hampir ketimpa) | 74px |
+
+Perbaikan: `MobileBottomNav` sekarang merender `<div aria-hidden
+className="h-[68px] md:hidden" />` tepat sebelum `<nav>`. Karena komponen ini
+sudah tahu pathname, spasi hanya muncul di halaman yang nav-nya benar-benar
+tampil — di `/order`, `/account`, `/admin`, `/login`, `/register` nav-nya
+sembunyi, jadi spacer ikut hilang dan halaman tidak nambah sia-sia. Di laptop
+`md:hidden` bikin nol efek.
+
 ### Yang TIDAK berubah
 
 - Kontak tetap tidak ada di nav bawah maupun footer (item 2 tetap berlaku).
@@ -56,6 +75,24 @@ contact us."
 
 typecheck 0 error, lint 0 error 0 warning. Screenshot `nav-hp-beranda.png`
 dibaca manual: nav bawah terlihat, footer tidak ada.
+
+Verifikasi tambahan:
+
+- `scripts/check-nav-overlap.js` (baru) — scroll ke bawah di viewport 390x844,
+  cari elemen teks paling bawah, bandingkan dengan atas nav. Semua halaman
+  punya jarak >= 16px.
+- `scripts/watch-deploy-footer.js` (baru) — menunggu deploy baru lewat tanda
+  KHUSUS (`<footer>` harus punya `hidden md:block`). `watch-deploy.js` yang
+  lama salah: tandanya sudah true di deploy sebelumnya, jadi dia melaporkan
+  "LIVE" dalam 0,1 menit sebelum deploy baru mendarat.
+- `scripts/verify-live-item1.js` (baru) — cek HTML produksi pakai cache-buster,
+  14/14 lulus.
+
+Catatan: assertion "footer tidak punya link /contact" itu **salah**. Footer
+sengaja tetap punya 2 link `/contact` di dalam blok HUBUNGI KAMI (FAQ + Kontak,
+`SiteFooter.tsx:102,111`). Itu memang bagian dari blok info toko yang Steven
+minta tetap ada di PC. Yang hilang dari footer hanya entri "Kontak" di daftar
+TAUTAN CEPAT.
 
 ---
 
