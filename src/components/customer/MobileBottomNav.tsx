@@ -6,32 +6,25 @@ import { Home, Receipt, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 /**
- * Bottom navigation bar. Fixed di bawah viewport, di atas konten.
- *
- * **Hanya muncul di laptop/desktop (`hidden md:block`).** Steven: "Pada bagian
- * hp saya tidak ada mau bagian bawah itu, karena info dibawah nanti ada di
- * bagian akun, tapi untuk laptop tetap harus ada." Jadi di HP Navigasi bawah
- * dihilangkan — semua isinya (Pesanan Saya, Akun, Kontak) sudah ada di dalam
- * halaman /account. Di desktop nav bawah tetap tampil.
+ * Bottom navigation bar untuk mobile (HP). Fixed di bawah viewport, di atas
+ * konten. Hidden di desktop (`md:hidden`).
  *
  * Item: Beranda, Pesanan Saya, Akun.
  *
- * "Kontak" sengaja TIDAK ada di sini sejak item 2 dokumen perbaikan: kontak
- * dipindah ke halaman Akun (popup), bukan link terpisah.
+ * "Kontak" TIDAK ada di sini (dokumen "Perbaikan Ruma Komugi 2" item 2):
+ * link Kontak dihapus dari navigasi, dan informasi toko dipindah ke halaman
+ * /account — di sana ada bar "Kontak" yang membuka popup, plus blok
+ * "Hubungi Kami" lengkap di bawah form profil.
  *
- * Hidden di route admin & auth supaya gak ganggu alur login/registrasi.
+ * Hidden di route admin & auth supaya gak ganggu alur login/registrasi,
+ * dan di /order karena alur pemesanan punya sticky bar keranjang sendiri
+ * (sticky, z-30) yang akan ketimpa nav ini (fixed, z-40) — itu bug
+ * "keranjang pas slide masih error" yang Steven laporkan.
  */
-export function BottomNav() {
+export function MobileBottomNav() {
   const pathname = usePathname() ?? "";
   const { t } = useI18n();
 
-  // Hide di route admin, login, register, dan halaman detail pre-order
-  // (modal QR full-screen, gak perlu nav di bawah).
-  //
-  // `/order` juga disembunyikan: alur pemesanan punya sticky bar keranjang
-  // sendiri yang menempel di bawah (`CartStickyBar`, z-30). Kalau nav situs
-  // (z-40) ikut muncul di sana, bar keranjang ketimpa — persis bug "keranjang
-  // pas slide masih error" yang Steven laporkan.
   const hidden = pathname.startsWith("/admin")
     || pathname.startsWith("/login")
     || pathname.startsWith("/register")
@@ -48,10 +41,10 @@ export function BottomNav() {
 
   return (
     <nav
-      aria-label="Bottom navigation"
-      className="fixed inset-x-0 bottom-0 z-40 hidden border-t border-cocoa-200 bg-cream-50 pb-[env(safe-area-inset-bottom)] md:block"
+      aria-label="Mobile navigation"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-cocoa-200 bg-cream-50 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <ul className="mx-auto grid max-w-6xl grid-cols-3 px-6">
+      <ul className="grid grid-cols-3">
         {items.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           const Icon = item.icon;

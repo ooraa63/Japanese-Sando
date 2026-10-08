@@ -54,13 +54,25 @@ async function shot(name) {
 }
 
 const NAV_PROBE = `(() => {
-  const nav = document.querySelector('nav[aria-label="Bottom navigation"]');
+  const nav = document.querySelector('nav[aria-label="Mobile navigation"]');
   const r = nav?.getBoundingClientRect();
   return {
     ada: !!nav,
     tampil: nav ? getComputedStyle(nav).display !== 'none' && r.width > 0 : false,
     top: r ? Math.round(r.top) : null,
     vh: window.innerHeight,
+  };
+})()`;
+
+/** Footer = blok INFORMASI TOKO (Tautan Cepat + Hubungi Kami). */
+const FOOTER_PROBE = `(() => {
+  const f = document.querySelector('footer');
+  const r = f?.getBoundingClientRect();
+  return {
+    ada: !!f,
+    tampil: f ? getComputedStyle(f).display !== 'none' && r.height > 0 : false,
+    tinggi: r ? Math.round(r.height) : null,
+    isi: f ? f.innerText.replace(/\\s+/g,' ').trim().slice(0, 70) : null,
   };
 })()`;
 
@@ -85,20 +97,36 @@ try {
   };
   await send("Page.enable"); await send("Runtime.enable");
 
-  // ---------- ITEM 1: bottom nav HP vs laptop ----------
+  // ---------- ITEM 1: FOOTER (informasi toko) hanya di PC ----------
   await goto("/", { w: 390, h: 844 });
-  const hp = await evaluate(NAV_PROBE);
-  cek("Item 1 — bottom nav di HP (beranda)", hp.tampil === false, `display=${hp.tampil ? "tampil" : "tersembunyi"}`);
+  const hpFooter = await evaluate(FOOTER_PROBE);
+  cek("Item 1 — footer (info toko) TIDAK tampil di HP",
+    hpFooter.tampil === false,
+    `display=${hpFooter.tampil ? "tampil" : "tersembunyi"}`);
+
+  const hpNav = await evaluate(NAV_PROBE);
+  cek("Item 1 — nav bawah (Beranda/Pesanan Saya/Akun) tetap ada di HP",
+    hpNav.tampil === true,
+    `top=${hpNav.top} dari ${hpNav.vh}px`);
   await shot("hp-beranda");
 
   await goto("/", { w: 1280, h: 900 });
-  const laptop = await evaluate(NAV_PROBE);
-  cek("Item 1 — bottom nav di laptop", laptop.tampil === true, `top=${laptop.top} (viewport ${laptop.vh}px) -> menempel di bawah`);
+  const laptopFooter = await evaluate(FOOTER_PROBE);
+  cek("Item 1 — footer (info toko) tampil di laptop",
+    laptopFooter.tampil === true,
+    `tinggi=${laptopFooter.tinggi}px, isi="${(laptopFooter.isi || "").slice(0, 45)}..."`);
+
+  const laptopNav = await evaluate(NAV_PROBE);
+  cek("Item 1 — nav bawah tidak muncul di laptop",
+    laptopNav.tampil === false,
+    `tampil=${laptopNav.tampil}`);
   await shot("laptop-beranda");
 
   // ---------- ITEM 2: Kontak hilang dari navigasi ----------
+  // Catatan: We're di viewport laptop (1280px) supaya footer ikut ter-render
+  // — di HP footer memang tidak ada sama sekali (item 1).
   const navLinks = await evaluate(`(() => {
-    const nav = document.querySelector('nav[aria-label="Bottom navigation"]');
+    const nav = document.querySelector('nav[aria-label="Mobile navigation"]');
     const footerQuick = [...document.querySelectorAll('footer h3')]
       .find(h => /tautan cepat/i.test(h.innerText))
       ?.nextElementSibling;
@@ -110,7 +138,7 @@ try {
     };
   })()`);
   const adaKontak = (s) => s && /kontak/i.test(s);
-  cek("Item 2 — Kontak hilang dari bottom nav", !adaKontak(navLinks.bottomNav), `isi: "${navLinks.bottomNav}"`);
+  cek("Item 2 — Kontak hilang dari nav bawah HP", !adaKontak(navLinks.bottomNav), `isi: "${navLinks.bottomNav}"`);
   cek("Item 2 — Kontak hilang dari TAUTAN CEPAT footer", !adaKontak(navLinks.footer), `isi: "${navLinks.footer}"`);
   cek("Item 2 — Kontak hilang dari nav header", !adaKontak(navLinks.header), `isi: "${navLinks.header}"`);
 
@@ -157,7 +185,7 @@ try {
         const r = d.getBoundingClientRect();
         return { teks: (d.innerText || '').replace(/\\s+/g,' ').trim().slice(0,60), top: Math.round(r.top), bottom: Math.round(r.bottom) };
       });
-    const nav = document.querySelector('nav[aria-label="Bottom navigation"]');
+    const nav = document.querySelector('nav[aria-label="Mobile navigation"]');
     const nr = nav?.getBoundingClientRect();
     const bar = all.find(x => /Rumakomugi/i.test(x.teks));
     return {
@@ -178,16 +206,21 @@ try {
   await goto("/", { w: 1280, h: 900 }, 4500);
   await evaluate("window.scrollTo(0, document.body.scrollHeight)");
   await sleep(800);
+  // Di desktop tidak ada nav bawah lagi, jadi footer (info toko) bebas penuh
+  // sampai dasar halaman — copyright-nya tidak boleh terpotong viewport.
   const footerNav = await evaluate(`(() => {
-    const nav = document.querySelector('nav[aria-label="Bottom navigation"]');
-    const r = nav.getBoundingClientRect();
+    const nav = document.querySelector('nav[aria-label="Mobile navigation"]');
     const copyright = [...document.querySelectorAll('footer p')].find(p => /©/.test(p.innerText));
     const c = copyright?.getBoundingClientRect();
-    return { navTop: Math.round(r.top), copyrightBottom: c ? Math.round(c.bottom) : null, tertimpa: c ? c.bottom > r.top : null };
+    return {
+      navAda: !!nav && getComputedStyle(nav).display !== 'none',
+      copyrightBottom: c ? Math.round(c.bottom) : null,
+      vh: window.innerHeight,
+    };
   })()`);
-  cek("Item 6 — copyright footer tidak ketimpa nav (desktop)",
-    footerNav.tertimpa === false,
-    `copyright bawah=${footerNav.copyrightBottom}px, nav mulai di ${footerNav.navTop}px`);
+  cek("Item 6 — footer penuh sampai bawah di desktop",
+    footerNav.navAda === false && (footerNav.copyrightBottom ?? 0) <= footerNav.vh,
+    `nav bawah=${footerNav.navAda}, copyright bawah=${footerNav.copyrightBottom}px dari ${footerNav.vh}px`);
   await shot("laptop-footer");
 
   console.log(`\nScreenshot: ${shots.join(", ")}`);

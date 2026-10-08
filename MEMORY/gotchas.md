@@ -396,3 +396,23 @@ select proname, prosecdef, proacl::text
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public' and proname like '%zone%';
 ```
+
+## 25. PowerShell dobel-encode UTF-8 saat append ke file
+
+Append teks Indonesia/ber-em-dash lewat `Add-Content -Encoding UTF8` dari
+PowerShell 5.1 bisa merusak file: karakter `—` jadi `â€”`, `’` jadi `â€™`.
+
+**Penyebab:** argumen `-Command` dibaca pakai codepage ANSI (CP1252), bukan
+UTF-8, jadi byte UTF-8-nya berubah jadi karakter lain; lalu `-Encoding UTF8`
+menulis ulang karakter salah itu sebagai UTF-8 — jadi dobel encode.
+
+**Yang aman:** pakai tool `write` / `edit` (baca-tulis UTF-8 langsung), atau
+`node -e` / skrip `.js`.
+
+**Cara deteksi:** kalau `Get-Content` menampilkan `â€”` tapi `grep` (ripgrep)
+juga menampilkan `â€”`, itu bukan cuma tampilan terminal — file-nya memang
+rusak. Kalau ripgrep menampilkan `—` sementara `Get-Content` menampilkan
+`â€”`, file-nya aman, cuma PowerShell yang salah baca.
+
+Perbaikan: `git checkout -- MEMORY/<file>.md` lalu tulis ulang pakai tool
+yang UTF-8-safe. Jangan `Add-Content` untuk teks non-ASCII.
