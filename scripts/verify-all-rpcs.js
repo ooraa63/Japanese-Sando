@@ -48,7 +48,7 @@ function loadEnv() {
       AND routine_name = 'customer_profile'
   `);
   for (const g of grants.rows) {
-    console.log(`  ${grantee}: ${privilege_type}`);
+    console.log(`  ${g.grantee}: ${g.privilege_type}`);
   }
 
   await c.end();

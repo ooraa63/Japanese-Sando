@@ -86,10 +86,24 @@ if (dash.status === 200) {
 console.log("\n=== 3. Halaman lain di dashboard ===");
 await openPage("/admin/orders", { mustContain: ["Pesanan", "Semua"] });
 await openPage("/admin/menu", { mustContain: ["Menu", "Stok", "jenis makanan"] });
-await openPage("/admin/settings", { mustContain: ["Pengaturan", "Nomor WhatsApp", "Rekening"] });
+// Pengaturan sudah jadi TAB (lihat SettingsClient): HTML yang dikirim server
+// hanya berisi tab yang aktif, default-nya "identity". Label Kontak & Rekening
+// baru muncul setelah admin mengklik tabnya, jadi jangan di sini.
+await openPage("/admin/settings", { mustContain: ["Pengaturan", "Identitas toko"] });
+await openPage("/admin/sales", { mustContain: ["Mutasi", "Pendapatan", "Rasa terlaris"] });
+await openPage("/admin/vouchers", { mustContain: ["Voucher"] });
+await openPage("/admin/customers", { mustContain: ["Pelanggan", "WhatsApp"] });
+// Menu "Ambil & Kirim" (item 10 dokumen perbaikan): dua tab "Ambil di Toko"
+// dan "Pengiriman", tab pertama terbuka secara default.
+// Catatan: jangan cek judul lengkap — tanda "&" di HTML ter-escape jadi
+// "&amp;", jadi yang dicek hanya bagian tanpa "&".
+await openPage("/admin/pickup-delivery", {
+  mustContain: ["Catatan Pengambilan", "Ambil di Toko", "Pengantaran"],
+});
 
 console.log("\n=== 4. Halaman publik tetap terbuka ===");
-await openPage("/", { mustContain: ["Japanese Sando", "Pesan Sekarang"] });
+// Nama merek = "Rumakomugi" (dari store_settings.store_name).
+await openPage("/", { mustContain: ["Rumakomugi", "Pesan Sekarang"] });
 await openPage("/order", { mustContain: ["Pre-order", "Siapa yang memesan"] });
 await openPage("/track", { mustContain: ["Cek Status Pesanan"] });
 

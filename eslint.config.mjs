@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Skrip utilitas Node (scripts/**) sengaja CommonJS supaya bisa
+    // `node scripts/foo.js` tanpa "--input-type=module". File ini bukan
+    // bagian dari bundle Next.js, jadi aturan react/@typescript-eslint
+    // untuk `src/` tidak relevan di sini.
+    "scripts/**",
   ]),
 ]);
 
