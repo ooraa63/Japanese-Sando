@@ -40,6 +40,12 @@ export function FlavorCard({
   soldCount = 0,
   showSocial = false,
   /**
+   * `showStock` -> tampilkan baris sisa stok ("Tersedia 11" / "Tersisa 3" /
+   * "Habis"). Dimatikan di beranda karena kurang relevan untuk pengunjung
+   * yang belum mau pesan; sisa stok baru relevan di halaman /order.
+   */
+  showStock = true,
+  /**
    * `readOnlySocial` -> tampilkan counter 'terjual' & status like, tapi
    * tombol like dinonaktifkan (untuk halaman pre-order yang hanya boleh
    * melihat).
@@ -58,6 +64,8 @@ export function FlavorCard({
   soldCount?: number;
   /** Tampilkan like heart + counter 'terjual' di kartu. */
   showSocial?: boolean;
+  /** Tampilkan baris sisa stok. False di beranda, true di /order. */
+  showStock?: boolean;
   /** Read-only: tampil tapi jangan izinkan like. */
   readOnlySocial?: boolean;
 }) {
@@ -246,26 +254,31 @@ export function FlavorCard({
           />
         </div>
 
-        <div className="mt-3 flex items-center gap-1.5 text-[11px] font-bold">
-          {soldOut ? (
-            <span className="text-berry-500">
-              <PackageX className="mr-1 inline size-3" />
-              {t.menu.soldOut}
-            </span>
-          ) : stockEnabled ? (
-            <span className={low ? "text-honey-500" : "text-matcha-600"}>
-              <Flame className="mr-1 inline size-3" />
-              {low
-                ? t.menu.lowStock.replace("{n}", String(left))
-                : t.menu.inStock.replace("{n}", String(left))}
-            </span>
-          ) : (
-            <span className="text-matcha-600">
-              <Flame className="mr-1 inline size-3" />
-              {t.menu.unlimited}
-            </span>
-          )}
-        </div>
+        {/* Baris sisa stok. Di beranda disembunyikan (showStock=false) supaya
+    pengunjung yang belum memutuskan tidak ikut melihat angka stok; di
+    /order baru ditampilkan karena di situ baru relevan. */}
+        {showStock ? (
+          <div className="mt-3 flex items-center gap-1.5 text-[11px] font-bold">
+            {soldOut ? (
+              <span className="text-berry-500">
+                <PackageX className="mr-1 inline size-3" />
+                {t.menu.soldOut}
+              </span>
+            ) : stockEnabled ? (
+              <span className={low ? "text-honey-500" : "text-matcha-600"}>
+                <Flame className="mr-1 inline size-3" />
+                {low
+                  ? t.menu.lowStock.replace("{n}", String(left))
+                  : t.menu.inStock.replace("{n}", String(left))}
+              </span>
+            ) : (
+              <span className="text-matcha-600">
+                <Flame className="mr-1 inline size-3" />
+                {t.menu.unlimited}
+              </span>
+            )}
+          </div>
+        ) : null}
 
         {selectable ? (
           <div className="mt-auto pt-3">

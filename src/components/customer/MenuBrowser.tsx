@@ -184,7 +184,8 @@ export function MenuBrowser({
               <FlavorCard
                 key={f.id}
                 flavor={f}
-                remainingStock={shown.stock_enabled ? shown.stock ?? 0 : null}
+                remainingStock={null}
+                showStock={false}
                 categoryName={onlyOne ? undefined : lang === "en" ? shown.name_en : shown.name_id}
                 showSocial
                 soldCount={soldCounts[f.id] ?? 0}
@@ -405,6 +406,7 @@ export function OrderMenuBrowser({
                           // pembeli menekan tombol +.
                           showSocial
                           soldCount={soldCounts[f.id] ?? 0}
+                          showStock
                           selectable
                         />
                       </li>

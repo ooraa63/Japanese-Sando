@@ -356,6 +356,7 @@ export const en = {
   contact: {
     whatsapp: "WhatsApp",
     address: "Address",
+    mapTitle: "Find us",
     hours: "Opening hours",
     deadline: "Pre-order deadline",
     instagram: "Instagram",
@@ -525,6 +526,8 @@ export const en = {
     contact: {
       title: "Contact us",
       helpTitle: "Need help?",
+      helpGeneral: "General",
+      helpAboutUs: "About us",
       subtitle: "Got a question about your order or want to order by chat?",
       whatsapp: "WhatsApp",
       instagram: "Instagram",

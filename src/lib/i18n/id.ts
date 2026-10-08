@@ -354,6 +354,7 @@ export const id: Dict = {
   contact: {
     whatsapp: "WhatsApp",
     address: "Alamat",
+    mapTitle: "Lokasi kami",
     hours: "Jam buka",
     deadline: "Batas pre-order",
     instagram: "Instagram",
@@ -525,6 +526,8 @@ export const id: Dict = {
     contact: {
       title: "Hubungi kami",
       helpTitle: "Butuh bantuan?",
+      helpGeneral: "Umum",
+      helpAboutUs: "Tentang kami",
       subtitle: "Kalau ada pertanyaan soal pesanan atau mau order langsung.",
       whatsapp: "WhatsApp",
       instagram: "Instagram",
