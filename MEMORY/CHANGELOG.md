@@ -81,12 +81,14 @@ Verifikasi tambahan:
 - `scripts/check-nav-overlap.js` (baru) — scroll ke bawah di viewport 390x844,
   cari elemen teks paling bawah, bandingkan dengan atas nav. Semua halaman
   punya jarak >= 16px.
-- `scripts/watch-deploy-footer.js` (baru) — menunggu deploy baru lewat tanda
-  KHUSUS (`<footer>` harus punya `hidden md:block`). `watch-deploy.js` yang
-  lama salah: tandanya sudah true di deploy sebelumnya, jadi dia melaporkan
-  "LIVE" dalam 0,1 menit sebelum deploy baru mendarat.
-- `scripts/verify-live-item1.js` (baru) — cek HTML produksi pakai cache-buster,
-  14/14 lulus.
+- `scripts/wait-for-live.js` (baru) — tunggu deploy baru, tandanya dikirim dari
+  command line (`node scripts/wait-for-live.js '<substring>'`), jadi tidak bisa
+  basi diam-diam. `watch-deploy.js` yang lama salah: tandanya sudah true di
+  deploy sebelumnya, jadi dia melaporkan "LIVE" dalam 0,1 menit sebelum deploy
+  baru mendarat.
+- `scripts/verify-live-item1.js` (baru) — cek HTML produksi dengan cache-buster,
+  **19/19 lulus**: footer + nav bawah + isi TAUTAN CEPAT / HUBUNGI KAMI di
+  beranda, dan `/order` + `/account` benar-benar tanpa nav maupun spacer.
 
 Catatan: assertion "footer tidak punya link /contact" itu **salah**. Footer
 sengaja tetap punya 2 link `/contact` di dalam blok HUBUNGI KAMI (FAQ + Kontak,

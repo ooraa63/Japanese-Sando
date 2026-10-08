@@ -425,9 +425,19 @@ terlalu umum: dia cuma cek `/admin/pickup-delivery` bukan 404 dan "Kontak"
 hilang dari footer. Dua-duanya **sudah true di deploy sebelumnya**, jadi
 script-nya tidak pernah benar-benar membedakan deploy lama dari yang baru.
 
-**Aturan:** sebelum-andalkan skrip pantau deploy, tanya "apakah kondisi ini
+**Aturan:** sebelum mengandalkan skrip pantau deploy, tanya "apakah kondisi ini
 hanya bisa terjadi di build yang baru?" Kalau tidak, skripnya tidak berguna
 dan akan memberi rasa aman yang palsu.
+
+Solusinya sudah dipakai sekarang: **`scripts/wait-for-live.js`**. Tandanya
+diserahkan lewat command line, jadi tidak bisa basi diam-diam:
+
+```
+node scripts/wait-for-live.js 'aria-hidden class="h-[68px] md:hidden"'
+```
+
+Kalau dipanggil tanpa argumen, skrip menolak jalan — jadi tidak mungkin
+terlupaikan tandanya.
 
 Contoh tanda yang benar untuk koreksi item 1: kelas CSS `<footer>` di HTML
 produksi harus memuat `hidden md:block`. Kode lama (`mt-14 bg-cocoa-900 ...`)

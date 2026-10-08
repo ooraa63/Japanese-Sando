@@ -7,7 +7,8 @@
  * toko yang Steven minta tetap ada di PC. Yang hilang dari footer hanya
  * entri "Kontak" di daftar TAUTAN CEPAT (item 2).
  */
-const url = `https://japanese-sando.vercel.app/?_cb=${Date.now()}`;
+const BASE = process.env.SITE_URL || "https://japanese-sando.vercel.app";
+const url = `${BASE}/?_cb=${Date.now()}`;
 
 const res = await fetch(url, {
   headers: { "user-agent": "verify-item1", "cache-control": "no-cache" },
@@ -49,7 +50,34 @@ const checks = [
   ["footer: blok HUBUNGI KAMI masih ada di PC (maksud Steven)", contactStart >= 0],
   ["footer: link /contact di HUBUNGI KAMI tetap ada", /href="\/contact"/.test(footerHtml)],
   ["footer: copyright ada", footerHtml.includes("\u00a9")],
+  // Spacer supaya konten terakhir tidak tertutup nav bawah di HP.
+  // Hanya boleh muncul di halaman yang nav-nya memang tampil.
+  ["spacer ada di beranda (nav tampil)", html.includes('aria-hidden="true" class="h-[68px] md:hidden"')],
 ];
+
+const fetchPage = async (route) => {
+  const r = await fetch(`${BASE}${route}?_cb=${Date.now()}`, {
+    headers: { "user-agent": "verify-item1", "cache-control": "no-cache" },
+  });
+  return { status: r.status, html: await r.text() };
+};
+
+// Halaman yang nav bawahnya DISEMBUNYIKAN: spacer juga harus hilang di sana,
+// supaya halaman tidak nambah ruang kosong sia-sia.
+const TANPA_NAV = ["/order", "/account"];
+for (const route of TANPA_NAV) {
+  const p = await fetchPage(route);
+  const adaSpacer = p.html.includes('aria-hidden="true" class="h-[68px] md:hidden"');
+  const adaNav = p.html.includes('aria-label="Mobile navigation"');
+  checks.push([
+    `${route}: tidak ada spacer (nav disembunyikan di sini)`,
+    !adaSpacer,
+  ]);
+  checks.push([
+    `${route}: nav bawah memang tidak dirender`,
+    !adaNav,
+  ]);
+}
 
 let fail = 0;
 for (const [name, pass] of checks) {
