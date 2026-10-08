@@ -4,6 +4,70 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-08 — Fix menIMAL: deploy Vercel diam-diam pakai commit lama
+
+### Gejala
+Steven melapor 6 masalah yang screenshot-nya masih versi lama: harga masih di
+atas foto, kartu masih "Selalu tersedia", WA masih ada di hero, `/contact` 404.
+
+### Akar masalah: BUKAN kode
+Log build Vercel (`vercel inspect --logs`) menunjukkan:
+
+```
+Cloning github.com/ooraa63/Japanese-Sando (Branch: main, Commit: b94cba3)
+```
+
+Deployment 10:14 build commit **b94cba3** (commit Mapbox), padahal
+`5039600` sudah ada di GitHub (`git ls-remote` mengonfirmasi). Artinya
+GitHub integration Vercel tidak ter-trigger / memakai ref basi. Route list
+di build tersebut masih memuat `/admin/announcements` — bukti jelas versi lama.
+
+`/contact` di domain utama balas 404, dan HTML beranda masih punya
+`grid-cols-3` di MobileBottomNav + chip WA/alamat di hero.
+
+Workaround: deploy langsung dengan `npx vercel --prod` (upload dari lokal,
+melewati git integration).
+
+### Perbaikan UI yang memang baru diminta (commit f7fea73)
+- **OrderFlow**: hapus komponen `StockBadge` + pemanggilannya. Badge global
+  "Sisa N pcs untuk semua rasa" dihapus — Steven minta sisa stok hanya di tiap
+  kartu rasa, bukan satu angka total di header.
+- **MenuBrowser**: kartu Flavor di `/order` dapat `showSocial` + `soldCount`,
+  jadi counter terjual & jumlah like tampil juga di HP (sebelumnya cuma
+  beranda). `soldCounts` diberi default `{}` biar type-safe.
+
+### Cron QRIS: Vercel Cron -> pg_cron
+Ternyata plan Vercel Hobby **membatasi cron jadi 2x sehari**, jadi jadwal
+`* * * * *` tidak akan pernah dipicu — order QRIS unpaid tetap bisa menggantung
+berjam-jam meski deploy sukses.
+
+- `vercel.json` DIHAPUS.
+- **migration-37**: `create extension pg_cron`, unschedule job lama, lalu
+  `cron.schedule('qris-expire', '* * * * *', 'select public.expire_stale_qris_orders();')`.
+  Idempoten: file ini boleh di-run ulang tanpa bikin job ganda (terverifikasi —
+  tetap 1 job).
+- Route `/api/cron/qris-expire` tetap ada, hanya untuk pemicu manual.
+- **Konsekuensi penting**: `SUPABASE_SERVICE_ROLE_KEY` dan `CRON_SECRET`
+  tidak lagi WAJIB di Vercel. Cron jalan di dalam database.
+
+### Catatan teknis pg_cron
+`cron.schedule()` **tidak boleh** dipanggil di dalam blok `DO` — PostgreSQL
+gagal parse (`syntax error at or near "cron"`). Harus statement biasa di level
+atas. Percobaan pertama dengan `DO $schedule$ ... $schedule$` gagal karena itu.
+
+### Verifikasi
+- `npm run typecheck` + `npm run build` bersih; `/admin/announcements` hilang,
+  `/contact` & `/api/cron/qris-expire` ada.
+- DB: `pg_cron` terpasang, `cron.job` berisi `qris-expire` `* * * * *` active.
+- DB: `categories.stock_enabled = true`, `stock = 11` (Sando Sandwich) —
+  jadi data stok sudah benar, murni masalah build lama.
+
+### Gotcha baru
+- `git push` ke GitHub BISA sukses sementara Vercel tetap build commit lama.
+  Sebelum debugging kode saat site "tidak berubah", cek dulu:
+  `npx vercel inspect <deployment-url> --logs | Select-String "Commit:"`.
+
+---
 ## 2026-10-07 — 13 perbaikan dari review Word "Perbaikan Ruma Komugi"
 
 Steven kirim Word berisi 13 feedback + screenshot. Semuanya dikerjakan dalam satu
