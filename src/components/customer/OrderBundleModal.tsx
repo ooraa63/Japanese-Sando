@@ -11,6 +11,7 @@ import {
   Minus,
   Heart,
   MessageSquare,
+  PackageX,
 } from "lucide-react";
 import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -81,6 +82,55 @@ export function OrderBundleModal({
     return list;
   }, [bundle, categories, lang]);
 
+  /**
+   * Sisa stok per kategori, sudah dikurangi isian keranjang.
+   *
+   * Stok itu PER KATEGORI (lihat `create_order` yang mengurangi
+   * `categories.stock` satu pcs per slot bundle). Jadi kalau user sudah
+   * tambah 1 Cookies biasa DAN punya 1 slot bundle Cookies, dua-duanya
+   * memotong stok kategori yang sama. Perhitungan di sini harus mencerminkan
+   * itu juga, supaya angka "Tersedia N" di modal sama dengan sisa sebenarnya
+   * saat checkout.
+   */
+  const remainingByCategory = useMemo(() => {
+    const used = new Map<number, number>();
+    const bump = (catId: number | null | undefined, n: number) => {
+      if (catId == null) return;
+      used.set(catId, (used.get(catId) ?? 0) + n);
+    };
+
+    // Item biasa yang sudah ada di keranjang.
+    for (const [flavorIdStr, qty] of Object.entries(cart.quantities)) {
+      const f = categories
+        .flatMap((c) => c.flavors ?? [])
+        .find((x) => String(x.id) === flavorIdStr);
+      bump(f?.category_id, qty);
+    }
+
+    // Slot bundle: tiap slot = 1 pcs dari kategori rasa yang dipilih.
+    // `slots` bisa berisi null kalau entry belum lengkap terisi — lewati.
+    for (const entry of cart.bundles ?? []) {
+      for (const flavorId of entry.slots ?? []) {
+        if (flavorId == null) continue;
+        const f = categories
+          .flatMap((c) => c.flavors ?? [])
+          .find((x) => x.id === flavorId);
+        bump(f?.category_id, 1);
+      }
+    }
+
+    const out = new Map<number, number | null>();
+    for (const c of categories) {
+      out.set(
+        c.id,
+        c.stock_enabled
+          ? Math.max(0, (c.stock ?? 0) - (used.get(c.id) ?? 0))
+          : null
+      );
+    }
+    return out;
+  }, [categories, cart.quantities, cart.bundles]);
+
   if (!bundle) return null;
 
   const name = lang === "en" ? bundle.name_en : bundle.name_id;
@@ -99,6 +149,23 @@ export function OrderBundleModal({
     : "";
 
   function addOne(flavorId: number) {
+    const catId = allowedFlavors.find((f) => f.id === flavorId)?.category_id;
+    const left =
+      catId != null ? (remainingByCategory.get(catId) ?? null) : null;
+    // Hormati sisa stok kategori: jangan sampai slot baru membuat total
+    // melebihi yang tersedia (backend tetap memvalidasi, tapi lebih baik
+    // dicegah di sini supaya langkah tambah di UI).
+    if (left !== null) {
+      const alreadyPicked = countOf(flavorId);
+      if (alreadyPicked >= left) {
+        const flavor = allowedFlavors.find((f) => f.id === flavorId);
+    toast.warning(
+      flavor ? (lang === "en" ? flavor.name_en : flavor.name_id) : "",
+      t.order.menu.maxReached.replace("{n}", String(left))
+    );
+        return;
+      }
+    }
     setSlots((prev) => {
       if (prev.length >= requiredQty) return prev;
       return [...prev, flavorId];
@@ -286,10 +353,40 @@ export function OrderBundleModal({
                       {formatIDR(f.price, lang)}
                     </p>
                   )}
-                  <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-matcha-700">
-                    <Sparkles className="size-3" />
-                    {t.menu.unlimited}
-                  </p>
+                  {/* Sisa stok kategori SEBENARNYA — sebelumnya di-hardcode "Selalu tersedia"
+                      padahal create_order sudah mengurangi categories.stock satu
+                      pcs per slot bundle. */}
+                  {(() => {
+                    const catId = f.category_id;
+                    const left =
+                      catId != null
+                        ? (remainingByCategory.get(catId) ?? null)
+                        : null;
+                    if (left === 0) {
+                      return (
+                        <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-berry-500">
+                          <PackageX className="size-3" />
+                          {t.menu.soldOut}
+                        </p>
+                      );
+                    }
+                    if (left !== null) {
+                      return (
+                        <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-matcha-700">
+                          <Sparkles className="size-3" />
+                          {left <= 5
+                            ? t.menu.lowStock.replace("{n}", String(left))
+                            : t.menu.inStock.replace("{n}", String(left))}
+                        </p>
+                      );
+                    }
+                    return (
+                      <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-cocoa-400">
+                        <Sparkles className="size-3" />
+                        {t.menu.unlimited}
+                      </p>
+                    );
+                  })()}
                   <div className="mt-2 flex items-center justify-between text-[11px] text-cocoa-500">
                     <span className="tabular">
                       <span className="font-bold text-cocoa-800">
