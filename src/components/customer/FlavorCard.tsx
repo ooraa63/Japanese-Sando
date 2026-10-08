@@ -50,6 +50,12 @@ export function FlavorCard({
    * melihat).
    */
   readOnlySocial = false,
+  /**
+   * `storefront` -> kartu bergaya etalase ala UIUX 3: foto di atas, hati
+   * pojok kanan atas, lalu baris bawah berisi harga di kiri dan tombol
+   * tambah di kanan. Warna tetap coklat — yang diambil layout-nya.
+   */
+  storefront = false,
 }: {
   flavor: Flavor;
   inCart?: number;
@@ -67,6 +73,8 @@ export function FlavorCard({
   showStock?: boolean;
   /** Read-only: tampil tapi jangan izinkan like. */
   readOnlySocial?: boolean;
+  /** Gaya etalase (UIUX 3) alih-alih kartu menu biasa. */
+  storefront?: boolean;
 }) {
   const { t, lang } = useI18n();
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
@@ -160,6 +168,103 @@ export function FlavorCard({
         /* diam — localStorage sudah ter-update */
       }
     })();
+  }
+
+  /* ------------------------------------------------------------------
+   * Gaya etalase (UIUX 3): foto di atas, hati pojok kanan atas, baris
+   * bawah berisi harga + tombol tambah. Dipakai di halaman /order.
+   * ------------------------------------------------------------------ */
+  if (storefront) {
+    return (
+      <article
+        className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
+          soldOut
+            ? "border-cocoa-100 opacity-70"
+            : "border-cocoa-200/70 hover:-translate-y-1 hover:border-cocoa-300 hover:shadow-xl hover:shadow-cocoa-900/10"
+        }`}
+      >
+        <div className="relative aspect-[4/3] overflow-hidden bg-cream-100">
+          {flavor.image_url ? (
+            <Image
+              src={flavor.image_url}
+              alt={name}
+              fill
+              sizes="(max-width: 640px) 45vw, (max-width: 1024px) 33vw, 25vw"
+              className="object-cover transition duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="absolute inset-0 grid place-items-center bg-grain">
+              <span className="font-display text-5xl font-bold text-white/25 select-none">
+                {name.charAt(0)}
+              </span>
+            </div>
+          )}
+
+          {/* Hati pojok kanan atas — penanda "disukai" ala referensi. */}
+          {readOnlySocial ? (
+            <span className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm">
+              <Heart
+                className={`size-4 text-berry-500 ${isLiked ? "fill-current" : ""}`}
+              />
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleLike}
+              aria-pressed={isLiked}
+              aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
+              className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm transition hover:bg-white active:scale-95"
+            >
+              <Heart
+                className={`size-4 transition ${isLiked ? "fill-current text-berry-500" : "text-cocoa-400"}`}
+              />
+            </button>
+          )}
+
+          {soldOut ? (
+            <div className="absolute inset-0 grid place-items-center bg-cocoa-950/65">
+              <span className="chip bg-white text-cocoa-800 shadow-lg">
+                <PackageX className="size-3.5" />
+                {t.menu.soldOut}
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-1 flex-col p-3.5">
+          <h3 className="font-display text-sm leading-tight font-bold text-cocoa-900">
+            {name}
+          </h3>
+          <p className="mt-1 line-clamp-2 min-h-[2.4em] text-[11px] leading-snug text-cocoa-500">
+            {desc ?? " "}
+          </p>
+
+          {/* Baris bawah: harga di atas, tombol full-width di bawahnya.
+              Di grid 4 kolom HP kartu ini sempit — kalau harga dan
+              tombol dijejer horizontal, angkanya terpotong jadi
+              "Rp 1..." (masalah yang pernah dilaporkan Steven). Jadi
+              menumpuknya adalah pilihan sadar, bukan sekadar gaya. */}
+          <div className="mt-auto flex flex-col gap-2 pt-3">
+            <PriceTag
+              price={flavor.price}
+              comparePrice={flavor.compare_price}
+              lang={lang}
+              size="md"
+            />
+            {selectable ? (
+              <StorefrontAction
+                flavor={flavor}
+                inCart={inCart}
+                soldOut={soldOut}
+                stockEnabled={stockEnabled}
+                left={left}
+                fullWidth
+              />
+            ) : null}
+          </div>
+        </div>
+      </article>
+    );
   }
 
   return (
@@ -352,6 +457,108 @@ export function FlavorCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+/**
+ * Tombol aksi ringkas untuk kartu etalase (UIUX 3).
+ *
+ * Kalau produk belum ada di keranjang: tombol "+ Tambah" selebar baris.
+ * Kalau sudah ada: angka pcs + tombol tambah kecil, supayaqty bisa naik
+ * tanpa membuka drawer.
+ *
+ * `useCart()` dipanggil di sini (bukan di FlavorCard) supaya kartu yang
+ * hanya dilihat-saja tidak ikut memuat state keranjang.
+ */
+function StorefrontAction({
+  flavor,
+  inCart,
+  soldOut,
+  stockEnabled,
+  left,
+  fullWidth = false,
+}: {
+  flavor: Flavor;
+  inCart: number;
+  soldOut: boolean;
+  stockEnabled: boolean;
+  left: number;
+  /** Tombol selebar kartu (default kartu etalase pakai true). */
+  fullWidth?: boolean;
+}) {
+  const { t, lang } = useI18n();
+  const cart = useCart();
+  const toast = useToast();
+  const name = lang === "en" ? flavor.name_en : flavor.name_id;
+  // `inCart` dikirim induk sebagai nilai awal supaya kartu tetap benar
+  // walau provider keranjang belum selesai memuat.
+  const qty = cart.quantities[String(flavor.id)] ?? inCart ?? 0;
+
+  if (soldOut) {
+    return (
+      <button
+        type="button"
+        disabled
+        className={`cursor-not-allowed rounded-xl border border-cocoa-200 bg-cocoa-50 px-3 py-2 text-[12px] font-bold whitespace-nowrap text-cocoa-400 ${
+          fullWidth ? "w-full" : ""
+        }`}
+      >
+        {t.menu.unavailable}
+      </button>
+    );
+  }
+
+  if (qty > 0) {
+    return (
+      <div
+        className={`flex items-center gap-1 ${fullWidth ? "w-full justify-between" : "shrink-0"}`}
+      >
+        <button
+          type="button"
+          onClick={() => cart.setQuantity(flavor.id, qty - 1)}
+          aria-label={`-1 ${name}`}
+          className="grid size-9 shrink-0 place-items-center rounded-xl border-2 border-matcha-500 bg-white text-matcha-600 transition hover:bg-matcha-50 active:scale-95"
+        >
+          <Minus className="size-4" />
+        </button>
+        <span className="min-w-6 flex-1 text-center font-display text-sm font-extrabold text-cocoa-900 tabular">
+          {qty}
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            const next = qty + 1;
+            // Hormati sisa stok (kalau ada) supaya langkah berikutnya
+            // tidak menambah lebih dari yang dijual.
+            if (stockEnabled && left > 0 && next > left) {
+              toast.warning(
+                name,
+                t.order.menu.maxReached.replace("{n}", String(left))
+              );
+              return;
+            }
+            cart.add(flavor);
+          }}
+          aria-label={`+1 ${name}`}
+          className="grid size-9 shrink-0 place-items-center rounded-xl bg-matcha-500 text-white transition hover:bg-matcha-600 active:scale-95"
+        >
+          <Plus className="size-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => cart.add(flavor)}
+      className={`btn-primary !rounded-full !px-3.5 !py-2 text-[12px] whitespace-nowrap ${
+        fullWidth ? "w-full" : "shrink-0"
+      }`}
+    >
+      <Plus className="size-3.5" />
+      {t.storefront.addShort}
+    </button>
   );
 }
 

@@ -4,6 +4,65 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-09 — Redesign tampilan beranda (UIUX 1) + halaman pre-order (UIUX 3)
+
+**Scope:** feat: redesign UI/UX beranda & halaman pre-order
+
+Steven minta UIUX dibuat "seperti UIUX 1" untuk tampilan beranda, dan untuk halaman
+pre-order beli/pesan "boleh seperti UIUX 3" — **tapi warna tetap coklat**, yang
+diambil hanya cara tampilannya (layout), bukan palet referensinya.
+
+Referensi: `Gambar/UIUX 1.jfif` (landing page bakery: hero split + baris produk +
+kartu favorit) dan `Gambar/UIUX 3.jfif` (halaman produk: strip kategori + toolbar
+filter/urut + grid kartu dengan tombol add-to-cart).
+
+### Yang diubah
+
+**Komponen baru (beranda):**
+- `HomeHero.tsx` — hero 3 panel ala UIUX 1: badge lingkaran + preview di kiri,
+  foto produk (carousel + titik indikator) di tengah, judul + CTA di kanan.
+  Slide pertama selalu `hero_image_url` supaya panel tengah tidak pernah kosong.
+- `CategoryBand.tsx` — baris kategori: teks + tombol | foto produk | teks + tombol.
+- `FeaturedStrip.tsx` — 4 produk unggulan bernomor, ikut layout baris produk UIUX 1.
+- `BestSellers.tsx` — 3 kartu favorit + titik carousel (hanya muncul > 3 rasa).
+
+**Halaman pre-order (UIUX 3):**
+- `MenuBrowser.tsx` (`OrderMenuBrowser`) — bagian kategori diubah dari
+  "seksi per kategori" jadi: strip kategori (dapat di-scroll di HP) + toolbar
+  (filter stok habis / jumlah produk / urutan) + satu grid produk.
+- `FlavorCard.tsx` — dapat prop `storefront`: gaya etalase (hati pojok kanan atas,
+  harga di atas, tombol full-width di bawah). `StorefrontAction` terpisah supaya
+  `useCart()` tidak ikut terpasang di kartu lihat-saja.
+
+**Lain-lain:**
+- `ShopInfo.tsx` — dapat `variant`: `overlay` (default, seperti lama) dan
+  `static` untuk diletakkan di bawah hero baru.
+- `page.tsx` — hero lama diganti `HomeHero`; `HeroCarousel` tidak lagi dipakai
+  di beranda. Hitung `heroSlides` + `featuredFlavors`.
+- `i18n/id.ts` + `i18n/en.ts` — grup baru `home` dan `storefront`.
+
+### Catatan penting
+
+- **Harga etalase ditumpuk, bukan disejajikan dengan tombol.** Versi pertama
+  menaruh harga kiri + tombol kanan dalam satu baris; di grid 4 kolom angka
+  terpotong jadi "Rp 1..." — pola yang sama sudah pernah dilaporkan sebelumnya
+  (`MEMORY/gotchas.md`). Sekarang harga di atas, tombol full-width di bawahnya.
+- **`shownFlavors` harus dihitung SESUDAH `remainingByCategory`.** Versi pertama
+  menaruhnya sebelum → ReferenceError (TDZ) saat render.
+- **Komponen baru yang memanggil `useI18n()` wajib `"use client"`.**
+  `useI18n` itu client hook; tanpa direktif itu halaman beranda balas 500.
+
+### Verifikasi
+
+- `npx tsc --noEmit` — bersih
+- `npx eslint src --max-warnings=0` — bersih
+- `npm run build` — sukses
+- `npm run test:pages` — 15 lulus / 0 gagal
+- Screenshot headless Edge (CDP): beranda & `/order` step "menu" di 1440px dan 390px.
+  Cek overflow horizontal via `documentElement.scrollWidth` di 390px → 390 (aman).
+
+---
+
 ## 2026-10-08 — Koreksi item 1: yang disembunyikan di HP adalah footer, bukan nav bawah
 
 **Scope:** fix: footer HP, restore: nav bawah mobile

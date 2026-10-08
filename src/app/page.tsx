@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  ArrowRight,
   MessageCircle,
   ShoppingBag,
-  Sparkles,
 } from "lucide-react";
 import { getPublicMenu, getSettings } from "@/lib/data";
 import { getI18nDict } from "@/lib/i18n-server";
@@ -12,7 +10,10 @@ import { MenuBrowser } from "@/components/customer/MenuBrowser";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { ShopInfo } from "@/components/customer/ShopInfo";
-import { HeroCarousel } from "@/components/customer/HeroCarousel";
+import { HomeHero } from "@/components/customer/HomeHero";
+import { CategoryBand } from "@/components/customer/CategoryBand";
+import { FeaturedStrip } from "@/components/customer/FeaturedStrip";
+import { BestSellers } from "@/components/customer/BestSellers";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
@@ -44,6 +45,27 @@ export default async function HomePage() {
 
   const open = settings?.is_preorder_open ?? true;
 
+  // Rasa unggulan untuk strip 4 kolom + panel tengah CategoryBand.
+  // Prioritas: rasa bertanda `is_featured`, lalu pakai foto yang ada supaya
+  // kartu tidak pernah kosong. Kalau tidak ada featured, ambil 4 rasa pertama.
+  const allFlavors = categories.flatMap((c) => c.flavors ?? []);
+  const featuredFlavors = (() => {
+    const withPhoto = allFlavors.filter((f) => f.image_url);
+    const featured = allFlavors.filter((f) => f.is_featured);
+    const merged = [...featured, ...withPhoto].filter(
+      (f, i, arr) => arr.findIndex((x) => x.id === f.id) === i
+    );
+    return merged.slice(0, 4);
+  })();
+
+  // Foto untuk hero split. `hero_image_url` selalu jadi slide pertama supaya
+  // panel tengah tidak pernah kosong; sisanya carousel opsional.
+  const heroSlides = [
+    settings?.hero_image_url,
+    ...(settings?.hero_carousel_urls ?? []),
+    ...(settings?.hero_mobile_carousel_urls ?? []),
+  ].filter((u): u is string => Boolean(u));
+
   return (
     <>
       <SiteHeader
@@ -53,62 +75,36 @@ export default async function HomePage() {
       />
 
       <main id="main">
-        {/* ===================== HERO + CAROUSEL + TOKO INFO OVERLAY ===================== */}
-        <section className="relative overflow-hidden bg-cocoa-950 text-cream-50">
-          <div className="absolute inset-0">
-            <HeroCarousel
-              images={settings?.hero_carousel_urls ?? []}
-              imagesMobile={settings?.hero_mobile_carousel_urls ?? []}
-              fallback={settings?.hero_image_url || "/hero-sando.jpg"}
-              fallbackMobile={settings?.hero_image_mobile_url ?? undefined}
-              intervalMs={4000}
+        {/* ===================== HERO (layout split ala UIUX 1) ===================== */}
+        <HomeHero
+          images={heroSlides}
+          ctaSlot={
+            <OrderNowLink
+              open={open}
+              whatsapp={settings?.whatsapp}
+              className="btn-primary !rounded-full !px-6 !py-3 text-sm"
+              label={dicts.hero.cta}
+              closedLabel={dicts.order.closed.title}
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-cocoa-950/85 via-cocoa-950/55 to-cocoa-950/90" />
-            <div className="absolute inset-0 bg-gradient-to-r from-cocoa-950/90 via-cocoa-950/40 to-transparent" />
-            <div className="absolute inset-0 bg-seigaha opacity-30" />
-          </div>
+          }
+        />
 
-          {/* Overlay info toko — floating di pojok bawah */}
-          <ShopInfo settings={settings} />
+        {/* Strip jam buka + batas pre-order, tetap ada tapi digeser dari
+            hero ke bawah supaya tidak menutupi panel split. */}
+        <div className="bg-cream-100 pb-2">
+          <ShopInfo settings={settings} variant="static" />
+        </div>
 
-          <div className="relative mx-auto flex min-h-[calc(100dvh-4rem)] max-w-6xl flex-col justify-center px-4 py-16 sm:px-6 lg:py-24">
-            <div className="max-w-xl">
-              <p className="chip border border-cream-50/25 bg-cream-50/10 text-cream-100 backdrop-blur-sm">
-                <Sparkles className="size-3.5" />
-                {dicts.hero.eyebrow}
-              </p>
+        {/* ===================== KATEGORI + CARA PESAN ===================== */}
+        <CategoryBand
+          categories={categories}
+          heroImage={featuredFlavors[0]?.image_url ?? null}
+        />
 
-              <h1 className="mt-5 text-4xl leading-[1.08] font-extrabold text-balance sm:text-5xl lg:text-[3.4rem]">
-                {dicts.hero.title}
-              </h1>
-
-              <p className="mt-5 max-w-lg text-base leading-relaxed text-cream-200/85">
-                {dicts.hero.subtitle}
-              </p>
-
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <OrderNowLink
-                  open={open}
-                  whatsapp={settings?.whatsapp}
-                  className="btn !bg-matcha-500 !px-7 !py-3.5 !text-base text-white shadow-xl shadow-matcha-900/30 hover:!bg-matcha-400"
-                  label={dicts.hero.cta}
-                  closedLabel={dicts.order.closed.title}
-                />
-                <a
-                  href="#menu"
-                  className="btn !border-2 !border-cream-50/40 !px-7 !py-3.5 !text-base text-cream-50 backdrop-blur-sm hover:!bg-cream-50 hover:!text-cocoa-900"
-                >
-                  {dicts.hero.ctaSecondary}
-                  <ArrowRight className="size-4" />
-                </a>
-              </div>
-
-              <p className="mt-10 font-display text-xs tracking-[0.3em] text-cream-200/35 uppercase sm:text-sm">
-                {dicts.hero.badge}
-              </p>
-            </div>
-          </div>
-        </section>
+        {/* ===================== PRODUK UNGGULAN ===================== */}
+        {featuredFlavors.length > 0 ? (
+          <FeaturedStrip flavors={featuredFlavors} />
+        ) : null}
 
         {/* ===================== MENU ===================== */}
         <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12 sm:px-6 lg:py-16">
@@ -152,6 +148,11 @@ export default async function HomePage() {
             />
           </div>
         </section>
+
+        {/* ===================== FAVORIT PELANGGAN ===================== */}
+        {allFlavors.length > 0 ? (
+          <BestSellers flavors={allFlavors.slice(0, 9)} />
+        ) : null}
 
         {/* ===================== REVIEWS ===================== */}
         <section className="border-y border-cocoa-200/60 bg-cream-100/40 py-12 lg:py-16">

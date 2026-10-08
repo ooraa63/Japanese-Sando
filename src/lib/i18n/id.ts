@@ -77,6 +77,40 @@ export const id: Dict = {
       cod: "bisa COD",
     },
   },
+  /** Label untuk bagian beranda yang mengikuti layout UIUX 1. */
+  home: {
+    badgeTop: "Fresh & Homemade",
+    badgeBottom: "Setiap Pesanan",
+    categoriesTitle: "Kategori Kami",
+    categoriesDesc:
+      "Sando sandwich, croissant, dan kue — semua dimasak fresh setelah kamu pesan.",
+    categoriesCta: "Lihat Kategori",
+    howTitle: "Cara Pre-order",
+    howDesc:
+      "Pesan dalam satu menit, bayar transfer atau tunai, lalu ambil selagi masih hangat.",
+    howCta: "Mulai Pesan",
+    featuredEyebrow: "Menu andalan",
+    featuredTitle: "Rasa Paling Dicari",
+    featuredDesc: "Rasa yang paling sering dipesan pelanggan, minggu demi minggu.",
+    bestTitle: "Favorit Pelanggan",
+    bestDesc: "Dipilih oleh mereka yang sudah mencobanya.",
+    viewAll: "Lihat Menu Lengkap",
+  },
+  /** Toolbar + kartu produk di halaman pre-order (layout UIUX 3). */
+  storefront: {
+    allCategories: "Semua",
+    productsCount: "{n} Produk",
+    filter: "Filter",
+    sortBy: "Urutkan",
+    sortRecommended: "Rekomendasi",
+    sortPriceLow: "Harga: terendah",
+    sortPriceHigh: "Harga: tertinggi",
+    sortNameAsc: "Nama: A-Z",
+    hideSoldOut: "Sembunyikan yang habis",
+    showAll: "Tampilkan semua",
+    addShort: "Tambah",
+    bundlesTitle: "Paket hemat",
+  },
   menu: {
     title: "Pilihan Rasa Kami",
     subtitle: "Harga sudah termasuk semua. Tidak ada biaya tersembunyi.",

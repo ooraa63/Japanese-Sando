@@ -447,3 +447,39 @@ tidak punya `hidden`, jadi HTML itu hanya mungkin berasal dari build baru.
 `cache-control: no-cache` saat fetch produksi, biar tidak membaca respons CDN
 basi. `Invoke-WebRequest` dari PowerShell sempat timeout 60 detik ke domain
 Vercel — pakai `fetch` dari Node jauh lebih andal.
+
+## 27. Komponen baru yang pakai `useI18n()` wajib `"use client"`
+
+`useI18n()` itu **client hook** (dibaca dari cookie/localStorage). Komponen
+server yang memanggilnya tidak akan gagal saat `tsc` atau `eslint` — dia baru
+meledak saat runtime dengan:
+
+```
+Error: Attempted to call useI18n() from the server but useI18n is on the client.
+```
+
+Halaman balas **500**, dan gejalanya jauh dari bagian yang kamu ubah.
+`CategoryBand` dan `FeaturedStrip` kena ini waktu redesign 2026-10-09.
+
+**Cek cepat sebelum `npm run build`:** kalau file baru memanggil `useI18n()`,
+pastikan baris pertamanya `"use client";`.
+
+## 28. Layout kartu sempit: jangan jejer harga + tombol dalam satu baris
+
+Di grid 4 kolom (kartu ±150px), `justify-between` antara `PriceTag` dan tombol
+"Tambah" membuat angka harga **terpotong** jadi "Rp 1..." — bukan ellipsis CSS,
+tapi flex yang immersiveeminimalkan lebar harga.
+
+Ini pola yang sama seperti nomor-nomor soal teks terpotong di kartu produk.
+Solusinya: **harga di atas, tombol full-width di bawah** (`flex-col gap-2`).
+Tetap terlihat sebagai satu blok "harga + tombol" seperti di referensi, tapi
+tidak pernah terpotong.
+
+## 29. Urutan deklarasi `useMemo` = urutan eksekusi (TDZ)
+
+`const a = useMemo(() => ... b ...)` ditulis **sebelum** `const b = useMemo(...)`
+tidak caught oleh TypeScript maupun ESLint. Callback-nya baru dipanggil saat
+render, jadi barulah `ReferenceError: Cannot access 'b' before initialization`
+muncul — di browser, bukan di build.
+
+Saat menambah state turunan, taruh setelah semua nilai yang diacunya.

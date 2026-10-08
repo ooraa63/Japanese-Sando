@@ -79,6 +79,40 @@ export const en = {
       cod: "cash on delivery",
     },
   },
+  /** Label untuk bagian beranda yang mengikuti layout UIUX 1. */
+  home: {
+    badgeTop: "Fresh & Homemade",
+    badgeBottom: "Every Single Order",
+    categoriesTitle: "Our Categories",
+    categoriesDesc:
+      "Sando sandwiches, croissants, and cakes — everything is baked fresh after you order.",
+    categoriesCta: "See Categories",
+    howTitle: "How Pre-order Works",
+    howDesc:
+      "Order in a minute, pay by transfer or cash, then collect while it is still warm.",
+    howCta: "Start Pre-order",
+    featuredEyebrow: "Signature menu",
+    featuredTitle: "Most Ordered Flavors",
+    featuredDesc: "The flavors our customers come back for, week after week.",
+    bestTitle: "Customer Favorites",
+    bestDesc: "Hand-picked by people who already tried them.",
+    viewAll: "See Full Menu",
+  },
+  /** Toolbar + kartu produk di halaman pre-order (layout UIUX 3). */
+  storefront: {
+    allCategories: "All",
+    productsCount: "{n} Products",
+    filter: "Filter",
+    sortBy: "Sort by",
+    sortRecommended: "Recommended",
+    sortPriceLow: "Price: low to high",
+    sortPriceHigh: "Price: high to low",
+    sortNameAsc: "Name: A-Z",
+    hideSoldOut: "Hide sold out",
+    showAll: "Show all",
+    addShort: "Add",
+    bundlesTitle: "Value bundles",
+  },
   menu: {
     title: "Our flavors",
     subtitle: "Prices include everything. No hidden charges.",

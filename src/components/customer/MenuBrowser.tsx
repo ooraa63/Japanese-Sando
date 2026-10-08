@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { ChevronRight, Check, Gift, LayoutGrid, Sparkles, UtensilsCrossed } from "lucide-react";
+import {
+  ChevronRight,
+  Check,
+  Filter,
+  Gift,
+  LayoutGrid,
+  Sparkles,
+  UtensilsCrossed,
+} from "lucide-react";
 import type { Bundle, Category } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
@@ -11,6 +19,9 @@ import { cheapestBundle, formatIDR } from "@/lib/utils";
 import { OrderBundleModal } from "./OrderBundleModal";
 import { useCart } from "./CartProvider";
 import { remainingStockByCategory } from "@/lib/cart-stock";
+
+/** Urutan tampilan grid produk di halaman pre-order (UIUX 3). */
+type SortKey = "recommended" | "price-asc" | "price-desc" | "name";
 
 /**
  * Penjelahar menu di beranda (mode lihat-saja):
@@ -228,6 +239,16 @@ export function OrderMenuBrowser({
   const [openBundleId, setOpenBundleId] = useState<number | null>(null);
   const activeBundle = bundles.find((b) => b.id === openBundleId) ?? null;
 
+  /* ---------- State etalase ala UIUX 3 ---------- */
+  const [activeCategory, setActiveCategory] = useState<number | "all">("all");
+  const [hideSoldOut, setHideSoldOut] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("recommended");
+
+  const totalFlavors = useMemo(
+    () => withFlavors.reduce((sum, c) => sum + (c.flavors?.length ?? 0), 0),
+    [withFlavors]
+  );
+
   // Sisa stok per kategori setelah SELURUH isi keranjang diperhitungkan —
   // termasuk slot bundle yang sudah ada. Sebelumnya kartu rasa biasa hanya
   // mengurangi `quantities`, jadi begitu ada bundle di keranjang, angka
@@ -238,6 +259,46 @@ export function OrderMenuBrowser({
     () => remainingStockByCategory(categories, quantities, cartBundles),
     [categories, quantities, cartBundles]
   );
+
+  // Gabungan semua rasa dari kategori terpilih, lalu disaring & diurutkan.
+  // `soldOut` dihitung di sini (bukan di kartu) supaya bisa dipakai untuk
+  // tombol filter "sembunyikan yang habis" juga.
+  const shownFlavors = useMemo(() => {
+    const pool =
+      activeCategory === "all"
+        ? withFlavors.flatMap((c) => (c.flavors ?? []).map((f) => ({ flavor: f, category: c })))
+        : withFlavors
+            .filter((c) => c.id === activeCategory)
+            .flatMap((c) => (c.flavors ?? []).map((f) => ({ flavor: f, category: c })));
+
+    const isSoldOut = ({ flavor: f, category: c }: (typeof pool)[number]) => {
+      const isActive = f.is_active ?? true;
+      if (!isActive) return true;
+      const left = remainingByCategory.get(c.id);
+      return left != null && left <= 0;
+    };
+
+    const filtered = hideSoldOut ? pool.filter((x) => !isSoldOut(x)) : pool;
+
+    // "Rekomendasi" = featured dulu, sisanya ikut urutan kategori supaya
+    // tidak lompat-lompat tiap render.
+    const sorted = [...filtered];
+    if (sortKey === "recommended") {
+      sorted.sort((a, b) => {
+        const fa = a.flavor.is_featured ? 0 : 1;
+        const fb = b.flavor.is_featured ? 0 : 1;
+        if (fa !== fb) return fa - fb;
+        return a.flavor.sort_order - b.flavor.sort_order;
+      });
+    } else if (sortKey === "price-asc") {
+      sorted.sort((a, b) => a.flavor.price - b.flavor.price);
+    } else if (sortKey === "price-desc") {
+      sorted.sort((a, b) => b.flavor.price - a.flavor.price);
+    } else {
+      sorted.sort((a, b) => a.flavor.sort_order - b.flavor.sort_order);
+    }
+    return sorted;
+  }, [withFlavors, activeCategory, hideSoldOut, sortKey, remainingByCategory]);
 
   const empty = withFlavors.length === 0 && bundles.length === 0;
   if (empty) {
@@ -356,80 +417,163 @@ export function OrderMenuBrowser({
         </div>
       ) : null}
 
-      {/* ---------- Section kategori (item satuan) — rasa inline, gak perlu klik kategori dulu ---------- */}
+      {/* ---------- Strip kategori (UIUX 3) ---------- */}
       {withFlavors.length > 0 ? (
-        <div className="space-y-8">
-          {withFlavors.map((c) => {
-            const name = lang === "en" ? c.name_en : c.name_id;
-            const desc = lang === "en" ? c.desc_en : c.desc_id;
-            const inCart = (c.flavors ?? []).reduce(
-              (s, f) => s + (quantities[String(f.id)] ?? 0),
-              0
-            );
-            return (
-              <div key={c.id} id={`category-${c.id}`} className="scroll-mt-24">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-cocoa-100">
-                    {c.image_url ? (
-                      <Image
-                        src={c.image_url}
-                        alt=""
-                        width={36}
-                        height={36}
-                        className="size-9 object-cover"
-                      />
-                    ) : (
-                      <LayoutGrid className="size-5 text-cocoa-500" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-display text-base font-extrabold text-cocoa-900 sm:text-lg">
-                        {name}
-                      </h3>
-                      {inCart > 0 ? (
-                        <span className="chip shrink-0 bg-matcha-500 text-white">
-                          {inCart}
-                        </span>
-                      ) : null}
-                    </div>
-                    {desc ? (
-                      <p className="line-clamp-1 text-xs text-cocoa-500">{desc}</p>
-                    ) : null}
-                  </div>
-                </div>
-                <ul className="density-flavor-grid grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-                  {(c.flavors ?? []).map((f) => {
-                    const fid = String(f.id);
-                    const q = quantities[fid] ?? 0;
-                    // Stok itu PER KATEGORI (lihat create_order yang mengurangi
-                    // categories.stock), jadi setiap rasa di kategori ini memakai
-                    // sisa stok kategori yang sama — termasuk efek bundle yang
-                    // sudah ada di keranjang. Angka dihitung lewat helper yang
-                    // sama dengan OrderBundleModal supaya tidak bisa melenceng.
-                    const catLeft = remainingByCategory.get(c.id) ?? null;
-                    return (
-                      <li key={f.id} className="flex">
-                        <FlavorCard
-                          flavor={f}
-                          inCart={q}
-                          remainingStock={catLeft}
-                          // Tampilkan counter terjual + like juga di HP,
-                          // supaya social proof-nya kelihatan sebelum
-                          // pembeli menekan tombol +.
-                          showSocial
-                          soldCount={soldCounts[f.id] ?? 0}
-                          readOnlySocial
-                          showStock
-                          selectable
+        <div className="mb-6">
+          <ul className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+            <li className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveCategory("all")}
+                className={`flex w-24 flex-col items-center gap-2 rounded-2xl border-2 p-3 transition sm:w-28 ${
+                  activeCategory === "all"
+                    ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
+                    : "border-cocoa-200 bg-white text-cocoa-600 hover:border-cocoa-300"
+                }`}
+              >
+                <span className="grid size-11 place-items-center rounded-xl bg-cocoa-100">
+                  <LayoutGrid
+                    className={`size-5 ${
+                      activeCategory === "all" ? "text-cocoa-700" : "text-cocoa-500"
+                    }`}
+                  />
+                </span>
+                <span className="text-[11px] font-bold leading-tight">
+                  {t.storefront.allCategories}
+                </span>
+                <span
+                  className={`text-[10px] tabular ${
+                    activeCategory === "all" ? "text-cream-300" : "text-cocoa-400"
+                  }`}
+                >
+                  {totalFlavors}
+                </span>
+              </button>
+            </li>
+
+            {withFlavors.map((c) => {
+              const name = lang === "en" ? c.name_en : c.name_id;
+              const count = c.flavors?.length ?? 0;
+              const isActive = activeCategory === c.id;
+              return (
+                <li key={c.id} className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory(c.id)}
+                    aria-current={isActive}
+                    className={`flex w-24 flex-col items-center gap-2 rounded-2xl border-2 p-3 transition sm:w-28 ${
+                      isActive
+                        ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
+                        : "border-cocoa-200 bg-white text-cocoa-600 hover:border-cocoa-300"
+                    }`}
+                  >
+                    <span
+                      className={`relative grid size-11 place-items-center overflow-hidden rounded-xl ${
+                        c.image_url ? "bg-cocoa-100" : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
+                      }`}
+                    >
+                      {c.image_url ? (
+                        <Image
+                          src={c.image_url}
+                          alt=""
+                          fill
+                          sizes="44px"
+                          className="object-cover"
                         />
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+                      ) : (
+                        <LayoutGrid className="size-5 text-white/70" />
+                      )}
+                    </span>
+                    <span className="line-clamp-2 text-[11px] leading-tight font-bold">
+                      {name}
+                    </span>
+                    <span
+                      className={`text-[10px] tabular ${
+                        isActive ? "text-cream-300" : "text-cocoa-400"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
+      {/* ---------- Toolbar: filter / jumlah produk / urutan (UIUX 3) ---------- */}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-y border-cocoa-200/70 py-3">
+        <button
+          type="button"
+          onClick={() => setHideSoldOut((v) => !v)}
+          aria-pressed={hideSoldOut}
+          className={`inline-flex items-center gap-2 text-xs font-bold transition ${
+            hideSoldOut ? "text-cocoa-800" : "text-cocoa-500 hover:text-cocoa-800"
+          }`}
+        >
+          <Filter className="size-3.5" />
+          {hideSoldOut
+            ? lang === "en"
+              ? "Showing available only"
+              : "Hanya yang tersedia"
+            : t.storefront.hideSoldOut}
+        </button>
+
+        <span className="text-xs font-bold text-cocoa-400 tabular">
+          {t.storefront.productsCount.replace("{n}", String(shownFlavors.length))}
+        </span>
+
+        <label className="inline-flex items-center gap-1.5 text-xs text-cocoa-400">
+          <span className="font-bold">{t.storefront.sortBy}</span>
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="cursor-pointer rounded-lg border border-cocoa-200 bg-white px-2 py-1 text-xs font-bold text-cocoa-700"
+          >
+            <option value="recommended">{t.storefront.sortRecommended}</option>
+            <option value="price-asc">{t.storefront.sortPriceLow}</option>
+            <option value="price-desc">{t.storefront.sortPriceHigh}</option>
+            <option value="name">{t.storefront.sortNameAsc}</option>
+          </select>
+        </label>
+      </div>
+
+      {/* ---------- Grid produk (UIUX 3) ---------- */}
+      {withFlavors.length > 0 ? (
+        <div>
+          <div className="sr-only" id={`category-${activeCategory ?? "all"}`} />
+          <ul className="density-flavor-grid grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {shownFlavors.map(({ flavor: f, category: c }) => {
+              const fid = String(f.id);
+              const q = quantities[fid] ?? 0;
+              // Stok itu PER KATEGORI (lihat create_order yang mengurangi
+              // categories.stock), jadi setiap rasa memakai sisa stok
+              // kategorinya — termasuk efek bundle yang sudah di keranjang.
+              const catLeft = remainingByCategory.get(c.id) ?? null;
+              return (
+                <li key={f.id} className="flex">
+                  <FlavorCard
+                    flavor={f}
+                    inCart={q}
+                    remainingStock={catLeft}
+                    showSocial={false}
+                    soldCount={soldCounts[f.id] ?? 0}
+                    readOnlySocial
+                    showStock={false}
+                    selectable
+                    storefront
+                  />
+                </li>
+              );
+            })}
+          </ul>
+
+          {shownFlavors.length === 0 ? (
+            <p className="card p-10 text-center text-sm text-cocoa-400">
+              {t.menu.empty}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

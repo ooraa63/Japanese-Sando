@@ -5,7 +5,13 @@ import { Clock, HelpCircle, MessageCircle, Timer } from "lucide-react";
 import type { StoreSettings } from "@/lib/types";
 
 /**
- * Strip info ringkas di pojok bawah hero.
+ * Strip info ringkas.
+ *
+ * Dua tampilan:
+ * - `overlay` (default) — nempel di pojok bawah hero lewat absolute. Dipakai
+ *   kalau komponen ini jadi anak dari hero yang sudah `relative`.
+ * - `static` — flowed di bawah hero. Dipakai barangkali hero sudah punya
+ *   panel sendiri, jadi strip ini tidak boleh menutupi apa pun.
  *
  * Nomor telepon / Instagram / alamat TIDAK lagi ditampilkan di sini — semua
  * info kontak lengkap dipindah ke halaman `/contact` supaya hero tetap bersih
@@ -13,7 +19,13 @@ import type { StoreSettings } from "@/lib/types";
  * pre-order (info yang memang dibutuhkan pembeli saat melihat menu) dan
  * shortcut ke halaman Kontak.
  */
-export function ShopInfo({ settings }: { settings: StoreSettings | null }) {
+export function ShopInfo({
+  settings,
+  variant = "overlay",
+}: {
+  settings: StoreSettings | null;
+  variant?: "overlay" | "static";
+}) {
   const s = settings;
   if (!s) return null;
 
@@ -21,9 +33,23 @@ export function ShopInfo({ settings }: { settings: StoreSettings | null }) {
   const deadline = s.deadline_id || s.deadline_en;
   if (!hours && !deadline) return null;
 
+  const isOverlay = variant === "overlay";
+
   return (
-    <div className="absolute inset-x-0 bottom-0 z-10 px-3 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-6xl items-end pb-4 sm:pb-6">
+    <div
+      className={
+        isOverlay
+          ? "absolute inset-x-0 bottom-0 z-10 px-3 sm:px-6 lg:px-8"
+          : "w-full px-4 sm:px-6"
+      }
+    >
+      <div
+        className={
+          isOverlay
+            ? "mx-auto flex max-w-6xl items-end pb-4 sm:pb-6"
+            : "mx-auto flex max-w-6xl items-center py-3"
+        }
+      >
         <div className="flex w-full flex-wrap items-center gap-2 rounded-2xl bg-cocoa-950/55 px-3 py-2 text-cream-100 shadow-2xl backdrop-blur-md ring-1 ring-cream-50/15 sm:gap-3 sm:px-4">
           {hours ? (
             <span className="inline-flex items-center gap-1.5 rounded-xl bg-cocoa-800/70 px-3 py-1.5 text-xs font-bold text-cream-50 sm:text-sm">
