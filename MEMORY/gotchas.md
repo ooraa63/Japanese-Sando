@@ -486,7 +486,7 @@ Saat menambah state turunan, taruh setelah semua nilai yang diacunya.
 
 ## 30. Verifikasi produksi: jangan salah tandai halaman sehat sebagai error
 
-Dua regex "tanda error" yang Vrsgitu harus **disensor** sebelum dipakai:
+Dua regex "tanda error" yang sering dipakai harus **disensor** sebelum dipakai:
 
 1. **`__NEXT_ERROR` bukan tanda error.** Shell redirect Next.js selalu
    `<html id="__next_error__">`. `/account` yang sehat (307 → `/login`) akan
@@ -570,3 +570,26 @@ satu:
 
 Yang **tidak boleh** sama sekali: mengarang kode voucher. Pembeli akan
 memakainya dan gagal.
+
+## 34. `--user-data-dir` Edge untuk screenshot = ribuan file untracked di `git status`
+
+Screenshot produksi lewat CDP (Edge headless) butuh profil sendiri supaya tidak
+menabrak profil Edge yang sedang dipakai. Kalau `--user-data-dir` diarahkan ke
+dalam repo (mis. `.tmp-shots/pu4`), Edge **tidak pernah** membersihkannya: isi
+foldernya `Default/`, `Edge Sidebar/`, model optimizer, cache shader — ribuan
+file, dan `git status` jadi tidak terbaca.
+
+Aturannya:
+- taruh profil di luar repo (mis. `$env:TEMP`), **atau** di dalam repo tapi
+  sudah di-ignore (pola `/.tmp-*` sudah ditambahkan di `.gitignore`),
+- tutup Edge-nya sebelum menghapus foldernya, kalau tidak `mavis-trash` gagal
+  karena file masih di-lock,
+- cek `git status --short` sebelum `git add -A`, jangan asal tambah semua.
+
+## 35. `git add -A` bisa ikut menyeret file yang bukan milikmu
+
+Folder `Gambar/` memang **di-commit** (referensi desain Steven), tapi `.jfif`
+baru bisa muncul sebagai untracked tanpa diminta — misalnya
+`Gambar/UIUX 5.jfif` yang di luar konteks kerjaan. Sebelum `git add -A`, cek
+`git status` dan pastikan setiap file yang akan ikut commit memang sengaja
+dimasukkan. Kalau ragu, `git add -u -A` atau tambahkan eksplisit per file.

@@ -4,6 +4,25 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-09 — Housekeeping: bersihkan artefak verifikasi, .gitignore untuk `.tmp-*`
+
+**Scope:** chore: hapus file sementara verifikasi + gotcha baru
+
+Deploy UIUX 4 sudah hijau (lihat entry di bawah), tapi working tree masih
+memuat artefak verifikasi: `.tmp-verify-u4.mjs`, `.tmp-browser-u4.mjs`, dan
+`.tmp-shots/` — yang terakhir berisi profil Edge headless dengan ribuan file
+(cache, model optimizer, `Default/`) sehingga `git status` jadi tidak terbaca.
+
+Yang dikerjakan:
+- Edge yang masih memegang folder profil ditutup, lalu semua artefak
+  dihapus lewat `mavis-trash`,
+- `.gitignore` dapat baris `/.tmp-*` supaya verifikasi berikutnya tidak
+  mengotori repo lagi,
+- `MEMORY/gotchas.md` dapat #34 (profil Edge headless di dalam repo) dan #35
+  (cek `git status` sebelum `git add -A`).
+
+Tidak ada perubahan kode aplikasi, jadi tidak ada deploy baru.
+
 ## 2026-10-09 — Beranda ganti ke UIUX 4 (tampilan aplikasi), top bar + bottom nav ikut
 
 **Scope:** feat: redesign beranda (UIUX 4), top bar mobile, bottom nav 5 tab, halaman /favorites
@@ -136,7 +155,7 @@ filter/urut + grid kartu dengan tombol add-to-cart).
 
 ### Deploy ke produksi
 
-Commit `1bc6add` → push `main` → Vercel自动 build (`japanese-sando-86eukdvxa-ooraa64`),
+Commit `1bc6add` → push `main` → Vercel build otomatis (`japanese-sando-86eukdvxa-ooraa64`),
 live di https://japanese-sando.vercel.app.
 
 Verifikasi produksi (`scripts/wait-for-live.js` + cek langsung):

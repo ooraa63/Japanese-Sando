@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# artefak verifikasi lokal (screenshot, script CDP, profil headless)
+.tmp-*
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
