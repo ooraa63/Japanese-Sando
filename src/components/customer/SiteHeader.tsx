@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  Bell,
   ChevronRight,
   LogIn,
   Menu,
+  Search,
   ShoppingBag,
   UserCircle,
   X,
@@ -26,8 +29,10 @@ export function SiteHeader({
 }) {
   const { t, lang } = useI18n();
   const { profile, loading, openAuthModal } = useCustomerAuth();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -42,6 +47,15 @@ export function SiteHeader({
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  /** Pencarian -&gt; buka grid produk di /order dengan kata kunci. */
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    setOpen(false);
+    router.push(`/order?q=${encodeURIComponent(q)}`);
+  }
 
   // "Kontak" sengaja tidak ada di daftar ini (dokumen "Perbaikan Ruma Komugi 2",
   // item 2): link Kontak dihapus dari navigasi dan info kontaknya dipindah ke
@@ -59,7 +73,76 @@ export function SiteHeader({
           : "border-b border-transparent bg-cream-50/0"
       }`}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+      {/* ---------- Mobile: top bar ala UIUX 4 ----------
+          Urutannya: tombol menu · kolom pencarian · lonceng · avatar.
+          Desktop masih pakai bar logo + nav di bawah. */}
+      <div className="flex h-16 items-center gap-2.5 px-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="grid size-10 shrink-0 place-items-center rounded-xl text-cocoa-700 transition active:bg-cocoa-100"
+          aria-label="Menu"
+          aria-expanded={open}
+        >
+          {open ? <X className="size-5" /> : <Menu className="size-5" />}
+        </button>
+
+        <form onSubmit={submitSearch} className="min-w-0 flex-1" role="search">
+          <label className="flex items-center gap-2 rounded-full border border-cocoa-200 bg-white px-3.5 py-2">
+            <Search className="size-4 shrink-0 text-cocoa-400" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t.home.searchPlaceholder}
+              aria-label={t.home.searchPlaceholder}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-cocoa-400"
+            />
+          </label>
+        </form>
+
+        {/* Belum ada fitur notifikasi, jadi lonceng ini diarahkan ke /account
+            (riwayat pesanan) — bukan tombol mati. */}
+        <Link
+          href="/account"
+          className="relative grid size-10 shrink-0 place-items-center rounded-xl text-cocoa-700 transition active:bg-cocoa-100"
+          aria-label={t.nav.orders}
+        >
+          <Bell className="size-5" />
+          <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-honey-400 ring-2 ring-cream-50" />
+        </Link>
+
+        {loading && !profile ? (
+          <span
+            aria-hidden
+            className="size-9 shrink-0 animate-pulse rounded-full bg-cocoa-100"
+          />
+        ) : profile ? (
+          <Link
+            href="/account"
+            className="size-9 shrink-0 overflow-hidden rounded-full bg-matcha-500"
+            aria-label={t.customerAuth.accountChip}
+          >
+            <span className="grid h-full w-full place-items-center text-white">
+              <UserCircle className="size-5" />
+            </span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => openAuthModal("login")}
+            className="size-9 shrink-0 overflow-hidden rounded-full bg-cocoa-100"
+            aria-label={t.customerAuth.loginCta}
+          >
+            <span className="grid h-full w-full place-items-center text-cocoa-500">
+              <UserCircle className="size-5" />
+            </span>
+          </button>
+        )}
+      </div>
+
+      {/* ---------- Desktop ---------- */}
+      <div className="mx-auto hidden h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 md:flex">
         <Link href="/" className="group flex items-center gap-2.5" aria-label={storeName}>
           {logoUrl ? (
             <span className="relative size-10 shrink-0 overflow-hidden rounded-full bg-cocoa-900 ring-1 ring-cocoa-200 transition group-hover:scale-105">
@@ -89,7 +172,7 @@ export function SiteHeader({
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
+        <nav className="flex items-center gap-1" aria-label="Main">
           {links.map((l) => (
             <Link
               key={l.href}
@@ -103,17 +186,15 @@ export function SiteHeader({
 
         <div className="flex items-center gap-2">
           <LanguageToggle />
-          {/* Loading awal: tampilkan placeholder biar gak flash "Masuk"
-              selagi session token lagi di-refresh. */}
           {loading && !profile ? (
             <span
               aria-hidden="true"
-              className="hidden h-10 w-10 animate-pulse rounded-full bg-cocoa-100 sm:inline-flex"
+              className="h-10 w-10 animate-pulse rounded-full bg-cocoa-100"
             />
           ) : profile ? (
             <Link
               href="/account"
-              className="hidden h-10 items-center gap-1.5 rounded-full bg-matcha-500 px-3.5 text-[13px] font-bold text-white shadow-sm shadow-matcha-900/20 transition hover:bg-matcha-600 sm:inline-flex"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-matcha-500 px-3.5 text-[13px] font-bold text-white shadow-sm shadow-matcha-900/20 transition hover:bg-matcha-600"
               aria-label={t.customerAuth.accountChip}
               title={t.customerAuth.accountChip}
             >
@@ -126,7 +207,7 @@ export function SiteHeader({
             <button
               type="button"
               onClick={() => openAuthModal("login")}
-              className="hidden h-10 items-center gap-1.5 rounded-full border border-cocoa-200 bg-white px-3.5 text-[13px] font-bold text-cocoa-700 transition hover:bg-cocoa-100 sm:inline-flex"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-cocoa-200 bg-white px-3.5 text-[13px] font-bold text-cocoa-700 transition hover:bg-cocoa-100"
             >
               <LogIn className="size-4" />
               <span>{t.customerAuth.loginCta}</span>
@@ -134,20 +215,11 @@ export function SiteHeader({
           )}
           <Link
             href="/order"
-            className="btn-primary hidden !px-4 !py-2.5 text-[13px] sm:inline-flex"
+            className="btn-primary !px-4 !py-2.5 text-[13px]"
           >
             <ShoppingBag className="size-4" />
             {t.nav.order}
           </Link>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="grid size-10 place-items-center rounded-xl border border-cocoa-200 text-cocoa-700 transition hover:bg-cocoa-100 md:hidden"
-            aria-label="Menu"
-            aria-expanded={open}
-          >
-            {open ? <X className="size-5" /> : <Menu className="size-5" />}
-          </button>
         </div>
       </div>
 

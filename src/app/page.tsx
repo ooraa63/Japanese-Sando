@@ -1,23 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  MessageCircle,
-  ShoppingBag,
-} from "lucide-react";
-import { getPublicMenu, getSettings } from "@/lib/data";
-import { getI18nDict } from "@/lib/i18n-server";
+import { MessageCircle, ShoppingBag } from "lucide-react";
+import { getPublicMenu, getSettings, getCustomerProfile } from "@/lib/data";
+import { getI18nDict, getLang } from "@/lib/i18n-server";
 import { MenuBrowser } from "@/components/customer/MenuBrowser";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { ShopInfo } from "@/components/customer/ShopInfo";
-import { HomeHero } from "@/components/customer/HomeHero";
-import { CategoryBand } from "@/components/customer/CategoryBand";
-import { FeaturedStrip } from "@/components/customer/FeaturedStrip";
-import { BestSellers } from "@/components/customer/BestSellers";
+import { AppHome } from "@/components/customer/AppHome";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
-import { getLang } from "@/lib/i18n-server";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
@@ -34,10 +27,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [settings, menu, lang] = await Promise.all([
+  const [settings, menu, lang, profile] = await Promise.all([
     getSettings(),
     getPublicMenu(),
     getLang(),
+    // Null kalau belum login — beranda tetap jalan untuk pengunjung.
+    getCustomerProfile().catch(() => null),
   ]);
   const categories = menu.categories;
   const bundles = menu.bundles;
@@ -45,25 +40,11 @@ export default async function HomePage() {
 
   const open = settings?.is_preorder_open ?? true;
 
-  // Rasa unggulan untuk strip 4 kolom + panel tengah CategoryBand.
-  // Prioritas: rasa bertanda `is_featured`, lalu pakai foto yang ada supaya
-  // kartu tidak pernah kosong. Kalau tidak ada featured, ambil 4 rasa pertama.
-  const allFlavors = categories.flatMap((c) => c.flavors ?? []);
-  const featuredFlavors = (() => {
-    const withPhoto = allFlavors.filter((f) => f.image_url);
-    const featured = allFlavors.filter((f) => f.is_featured);
-    const merged = [...featured, ...withPhoto].filter(
-      (f, i, arr) => arr.findIndex((x) => x.id === f.id) === i
-    );
-    return merged.slice(0, 4);
-  })();
-
-  // Foto untuk hero split. `hero_image_url` selalu jadi slide pertama supaya
-  // panel tengah tidak pernah kosong; sisanya carousel opsional.
-  const heroSlides = [
+  // Foto hero. `hero_image_url` selalu jadi slide pertama supaya banner
+  // tidak pernah kosong; sisanya carousel opsional.
+  const heroImages = [
     settings?.hero_image_url,
     ...(settings?.hero_carousel_urls ?? []),
-    ...(settings?.hero_mobile_carousel_urls ?? []),
   ].filter((u): u is string => Boolean(u));
 
   return (
@@ -75,42 +56,36 @@ export default async function HomePage() {
       />
 
       <main id="main">
-        {/* ===================== HERO (layout split ala UIUX 1) ===================== */}
-        <HomeHero
-          images={heroSlides}
-          ctaSlot={
-            <OrderNowLink
-              open={open}
-              whatsapp={settings?.whatsapp}
-              className="btn-primary !rounded-full !px-6 !py-3 text-sm"
-              label={dicts.hero.cta}
-              closedLabel={dicts.order.closed.title}
-            />
-          }
-        />
+        {/* ===================== BERANDA GAYA APLIKASI (UIUX 4) ===================== */}
+        <section className="mx-auto max-w-2xl px-4 pt-4 pb-10 sm:px-6 sm:pt-6">
+          <AppHome
+            categories={categories}
+            heroImages={heroImages}
+            userName={profile?.full_name ?? null}
+            freeShippingMin={settings?.free_shipping_min ?? 0}
+            deadline={settings?.deadline_id || settings?.deadline_en || null}
+            ctaSlot={
+              <OrderNowLink
+                open={open}
+                whatsapp={settings?.whatsapp}
+                className="inline-flex items-center gap-1.5 rounded-full bg-cream-50 px-5 py-2.5 text-sm font-bold text-cocoa-900 transition hover:bg-honey-300"
+                label={dicts.home.heroCta}
+                closedLabel={dicts.order.closed.title}
+              />
+            }
+          />
+        </section>
 
-        {/* Strip jam buka + batas pre-order, tetap ada tapi digeser dari
-            hero ke bawah supaya tidak menutupi panel split. */}
+        {/* Strip jam buka + batas pre-order */}
         <div className="bg-cream-100 pb-2">
           <ShopInfo settings={settings} variant="static" />
         </div>
 
-        {/* ===================== KATEGORI + CARA PESAN ===================== */}
-        <CategoryBand
-          categories={categories}
-          heroImage={featuredFlavors[0]?.image_url ?? null}
-        />
-
-        {/* ===================== PRODUK UNGGULAN ===================== */}
-        {featuredFlavors.length > 0 ? (
-          <FeaturedStrip flavors={featuredFlavors} />
-        ) : null}
-
-        {/* ===================== MENU ===================== */}
-        <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12 sm:px-6 lg:py-16">
+        {/* ===================== MENU LENGKAP ===================== */}
+        <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-10 sm:px-6 lg:py-14">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-bold tracking-[0.2em] text-berry-500 uppercase">
+              <p className="text-xs font-bold tracking-[0.2em] text-honey-600 uppercase">
                 {dicts.nav.menu}
               </p>
               <h2 className="mt-2 text-3xl font-extrabold text-cocoa-900 sm:text-4xl">
@@ -148,11 +123,6 @@ export default async function HomePage() {
             />
           </div>
         </section>
-
-        {/* ===================== FAVORIT PELANGGAN ===================== */}
-        {allFlavors.length > 0 ? (
-          <BestSellers flavors={allFlavors.slice(0, 9)} />
-        ) : null}
 
         {/* ===================== REVIEWS ===================== */}
         <section className="border-y border-cocoa-200/60 bg-cream-100/40 py-12 lg:py-16">

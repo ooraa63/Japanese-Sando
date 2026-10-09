@@ -4,6 +4,79 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-09 — Beranda ganti ke UIUX 4 (tampilan aplikasi), top bar + bottom nav ikut
+
+**Scope:** feat: redesign beranda (UIUX 4), top bar mobile, bottom nav 5 tab, halaman /favorites
+
+Steven berubah pikiran setelah UIUX 1 + UIUX 3 tadi: "ganti UIUX nya menjadi
+UIUX 4, pakainya full seperti itu dulu". Referensi: `Gambar/UIUX 4.jfif` —
+screen Home sebuah aplikasi coffee shop.
+
+Struktur yang diambil (mobile):
+top bar (menu · search · lonceng · avatar) → sapaan → hero banner +
+titik carousel → Kategori → Populer → banner promo → Terlaris → bottom nav 5 tab.
+
+### Yang diubah
+
+- `AppHome.tsx` (baru) — semua section beranda dalam satu komponen client:
+  `HomeGreeting`, `HeroBanner`, `CategoryRow`, `PopularGrid`, `PromoBanner`,
+  `BestSellingList`, dan komposisi `AppHome`. Menggantikan 4 komponen UIUX 1
+  yang sekarang **dihapus**: `HomeHero`, `CategoryBand`, `FeaturedStrip`,
+  `BestSellers`.
+- `SiteHeader.tsx` — mobile sekarang pakai top bar ala desain (hamburger,
+  kolom search, lonceng, avatar). Desktop tetap bar logo + nav.
+- `MobileBottomNav.tsx` — 3 tab jadi 5: Beranda · Menu · Pesanan · Favorit · Profil.
+- `favorites/page.tsx` + `FavoritesClient.tsx` (baru) — halaman favorit.
+- `MenuBrowser.tsx` (`OrderMenuBrowser`) — baca `?q=` dari URL untuk pencarian.
+- `page.tsx` — beranda dirakit ulang; `getCustomerProfile()` untuk nama sapaan.
+- `i18n/{id,en}.ts` — grup `home` ditulis ulang untuk UIUX 4; `nav.orders`,
+  `nav.favorites`, `home.favSubtitle` baru.
+
+### Keputusan: jangan mengarang angka promo
+
+Referensi menampilkan "Get 20% OFF / Use Code: COFFEE20". **Kode itu tidak
+dikarang** — project ini punya tabel `vouchers` (per customer, dibaca lewat
+RPC `list_my_vouchers`, tidak ada RPC publik untuk banner), dan mengarang
+diskon di storefront akan membuat pembeli memakai kode yang salah.
+
+`PromoBanner` karena itu hanya menampilkan data nyata dari `store_settings`:
+`free_shipping_min` (gratis ongkir) atau `deadline_id/en`. Kalau keduanya
+kosong, banner tidak dirender. **Steven cukup isi "minimum gratis ongkir" di
+admin → banner langsung muncul** tanpa kode.
+
+Angka "rating bintang 4.5" di referensi juga tidak ada di database, jadi
+diganti **jumlah suka (`likes_count`) dengan ikon hati** — angka nyata, tidak
+menyamakan diri sebagai rating.
+
+### Keputusan: "Terlaris" disembunyikan kalau belum ada penjualan
+
+Versi pertama jatuh ke `allFlavors.slice(0,5)` dan menampilkan lima baris
+"0 terjual" — tidak berguna dan menyesatkan. Sekarang section hanya dirender
+kalau minimal satu rasa punya `soldCount > 0`. Section ini otomatis muncul
+sendiri setelah ada penjualan pertama, tanpa perlu ubah kode.
+
+### Catatan teknis
+
+- `setState` di dalam `useEffect` **ditolak ESLint** (`react-hooks/set-state-in-effect`).
+  Sapaan berbasis jam dan daftar favorit sudah dipindah ke
+  `useSyncExternalStore` — pola yang sama seperti gotcha #23. Snapshot
+  `localStorage` di-cache di modul level supaya referensinya stabil,
+  kalau tidak `useSyncExternalStore` loop tak terbatas.
+- `Star` dan `soldCounts` di `PopularGrid` sudah tidak dipakai setelah angka
+  pindah ke hati — ikut dihapus biar ESLint `--max-warnings=0` tetap hijau.
+
+### Verifikasi
+
+- `npx tsc --noEmit` — bersih
+- `npx eslint src --max-warnings=0` — bersih
+- `npm run build` — sukses
+- `npm run test:pages` — 15 lulus / 0 gagal
+- Screenshot headless (CDP) 390px & 1440px: beranda, `/favorites`,
+  `/order?q=matcha` → **0 console error**. Pencarian "matcha" benar-benar
+  menyaring jadi 1 produk.
+
+---
+
 ## 2026-10-09 — Redesign tampilan beranda (UIUX 1) + halaman pre-order (UIUX 3)
 
 **Scope:** feat: redesign UI/UX beranda & halaman pre-order

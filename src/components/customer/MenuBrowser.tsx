@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import {
   ChevronRight,
   Check,
@@ -244,6 +245,10 @@ export function OrderMenuBrowser({
   const [hideSoldOut, setHideSoldOut] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
 
+  // Pencarian dari kolom search di top bar: `/order?q=matcha`.
+  const searchParams = useSearchParams();
+  const searchQuery = (searchParams.get("q") ?? "").trim().toLowerCase();
+
   const totalFlavors = useMemo(
     () => withFlavors.reduce((sum, c) => sum + (c.flavors?.length ?? 0), 0),
     [withFlavors]
@@ -278,7 +283,28 @@ export function OrderMenuBrowser({
       return left != null && left <= 0;
     };
 
-    const filtered = hideSoldOut ? pool.filter((x) => !isSoldOut(x)) : pool;
+    let filtered = hideSoldOut ? pool.filter((x) => !isSoldOut(x)) : pool;
+
+    // Pencarian: cocok di nama (id + en), deskripsi, dan slug.
+    // Kategori yang sedang aktif TIDAK dipakai untuk mempersempit
+    // pencarian — kalau user mengetik "matcha" sedang berada di kategori
+    // lain, hasilnya akan menyesatkan. Kategori aktif cuma menentukan
+    // urutan tampil, bukan kelayakannya.
+    if (searchQuery) {
+      filtered = filtered.filter(({ flavor: f }) => {
+        const haystack = [
+          f.name_id,
+          f.name_en,
+          f.desc_id,
+          f.desc_en,
+          f.slug,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(searchQuery);
+      });
+    }
 
     // "Rekomendasi" = featured dulu, sisanya ikut urutan kategori supaya
     // tidak lompat-lompat tiap render.
@@ -298,7 +324,7 @@ export function OrderMenuBrowser({
       sorted.sort((a, b) => a.flavor.sort_order - b.flavor.sort_order);
     }
     return sorted;
-  }, [withFlavors, activeCategory, hideSoldOut, sortKey, remainingByCategory]);
+  }, [withFlavors, activeCategory, hideSoldOut, sortKey, remainingByCategory, searchQuery]);
 
   const empty = withFlavors.length === 0 && bundles.length === 0;
   if (empty) {

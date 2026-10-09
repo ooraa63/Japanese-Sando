@@ -506,3 +506,67 @@ admin beneran, bukan localhost:
 ```bash
 npx dotenv run -f .env.local -- node scripts/test-pages.mjs   # dengan $env:APP_URL diset
 ```
+
+## 31. ESLint React 19: `setState` sinkron di dalam `useEffect` = error
+
+Aturan `react-hooks/set-state-in-effect` (dan `--max-warnings=0` di project ini)
+menolak `setState` yang dipanggil langsung di badan `useEffect`. Dulu pola ini
+dipakai di `OrderFlow` untuk baca `sessionStorage` — sekarang wajib
+`useSyncExternalStore` (lihat #23). Berlaku juga untuk hal yang digerakkan
+sumber luar kecil:
+
+- **Sapaan berdasarkan jam** → `useSyncExternalStore` dengan
+  `getServerSnapshot` mengembalikan nilai tetap, `getSnapshot` membaca jam.
+- **Daftar dari `localStorage`** → sama, **tapi snapshot harus di-cache**.
+  `getSnapshot` yang mengembalikan array BARU tiap panggilan bikin
+  `useSyncExternalStore` loop tak terbatas. Cache di modul level, ganti cache
+  hanya kalau string isi storage-nya berubah:
+
+```ts
+let cachedRaw: string | null = null;
+let cachedList: number[] = [];
+function getSnapshot() {
+  const raw = /* baca localStorage -> string */;
+  if (raw === cachedRaw) return cachedList;   // referensinya sama -> aman
+  cachedRaw = raw;
+  cachedList = /* parse */;
+  return cachedList;
+}
+```
+
+## 32. `npm run build` bisa menggantung diam-diam setelah `next dev` dibunuh paksa
+
+Kalau dev server dimatikan paksa (bukan Ctrl-C), worker Turbopack-nya
+**tetap hidup** dan memegang CPU + lock di `.next`. Build berikutnya bisa
+menggantung beberapa menit tanpa error.
+
+Cek dulu sebelum build ulang:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Select-Object ProcessId, CommandLine
+```
+
+Baris yang `.next\build\chunks\pool_entry-...` itu worker sisa — akhiri
+saja. Build juga butuh `.next` **tidak dipakai** apa pun: jangan jalankan
+`next dev` dan `next build` bersamaan. Kalau `.next` sudah tidak sinkron,
+hapus saja (lihat #3).
+
+## 33. Jangan mengarang angka atau kode promo di storefront
+
+Referensi desain sering memuat angka yang tidak ada di database — rating
+bintang, kode diskon, "20% OFF". Menyalinnya mentah akan menampilkan
+**klaim palsu** ke pembeli.
+
+Aturan: kalau datanya tidak ada, jangan tampilkan sebagai fakta. Pilih salah
+satu:
+- pakai data nyata yang setara (mis. `likes_count` + ikon hati, bukan rating
+  bintang), atau
+- sembunyikan section-nya sampai datanya ada (mis. "Terlaris" disembunyikan
+  kalau belum ada penjualan), atau
+- jadikan isi banner dari admin (mis. banner promo yang isinya diambil
+  dari `free_shipping_min`, jadi begitu admin mengisinya banner otomatis
+  berubah).
+
+Yang **tidak boleh** sama sekali: mengarang kode voucher. Pembeli akan
+memakainya dan gagal.
