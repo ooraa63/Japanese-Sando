@@ -593,3 +593,80 @@ baru bisa muncul sebagai untracked tanpa diminta — misalnya
 `Gambar/UIUX 5.jfif` yang di luar konteks kerjaan. Sebelum `git add -A`, cek
 `git status` dan pastikan setiap file yang akan ikut commit memang sengaja
 dimasukkan. Kalau ragu, `git add -u -A` atau tambahkan eksplisit per file.
+
+## 36. `pg` mengembalikan `bigint` sebagai STRING — tes sanitizer bisa salah
+
+Kolom `bigint` (termasuk `flavors.id`) datang dari driver `pg` sebagai
+`'1'`, bukan `1`. Kalau sebuah tes mengambil id lalu meneruskannya ke
+parameter jsonb, yang terkirim jadi `["4","1"]` — **string**, bukan angka.
+
+Akibatnya fungsi yang sengaja menyaring angka akan membuang semuanya, dan
+tes terlihat "lolos" padahal hasilnya selalu `[]`. Gejalanya: semua kasus
+uji mengembalikan nilai kosong yang sama, padahal kasusnya jelas berbeda.
+
+Aturan: begitu ambil `id` dari `pg`, ubah dulu — `Number(f.id)`. Kalau
+semua hasil tes identik, **curigai tesnya dulu**, bukan fungsinya.
+
+## 37. `e ->> '0'` tidak berlaku untuk elemen jsonb SKALAR
+
+Untuk menyaring array jsonb berisi angka:
+
+```sql
+-- SALAH: e adalah skalar (4), bukan objek. ->> dengan kunci teks selalu NULL.
+where (e ->> '0') ~ '^[0-9]+$'
+
+-- BENAR: path kosong '#>> ...' mengambil skalar sebagai teks.
+where jsonb_typeof(e) in ('number','string')
+  and (e #>> '{}') ~ '^[0-9]+$'
+```
+
+Bug ini muncul dua kali: sekali karena `->> '0'` (semua id terbuang), sekali
+karena tesnya mengirim string (lihat #36). Dua-duanya bikin sanitizer
+"selalu mengembalikan array kosong" — yang terlihat seperti logika filter
+berfungsi, padahal tidak.
+
+## 38. RPC admin bisa diuji tanpa browser: set `request.jwt.claims`
+
+Hampir semua RPC `admin_*` diawali `if not public.is_admin()`, dan
+`is_admin()` → `auth.uid()`. Dari koneksi `pg` biasa, `auth.uid()` selalu
+NULL, jadi RPC-nya akan selalu menolak.
+
+Triknya: PostgREST menaruh JWT di GUC `request.jwt.claims`. Set manual di
+dalam transaksi, lalu **rollback** supaya data produksi tidak berubah:
+
+```js
+await c.query("begin");
+await c.query(`select set_config('request.jwt.claims', $1, true)`, [
+  JSON.stringify({ role: "authenticated", sub: adminUserId }),
+]);
+const r = await c.query(`select public.admin_save_settings($1::jsonb) as r`, [payload]);
+await c.query("rollback");   // <-- wajib, kalau tidak data ikut tersimpan
+```
+
+Ini membuat pengujian merge/validasi RPC jadi mungkin tanpa browser,
+dan aman karena selalu rollback.
+
+## 39. Kelas warna Tailwind yang tidak dikenal = no-op SENYAP
+
+Tailwind v4 tidak error untuk kelas yang tidak ada token-nya — warnanya
+diam-diam tidak dipakai. Di project ini `honey-50`, `honey-100`, dan
+`honey-600` sudah dipakai di beberapa komponen (`AppHome`,
+`QrisPaymentModal`, `CompleteProfileCard`) padahal palet di `globals.css`
+hanya punya `honey-300/400/500`. Akibatnya "Lihat Semua", harga di kartu
+Populer, dan latar ikon kategori tidak pernah diberi warna.
+
+Sudah diperbaiki di migration-40 (tambahan token honey). Kalau nanti lihat
+UI "ada gaya tapi benar-benar tidak kena", cek dulu token-nya ada di
+`@theme` — jangan langsung ganti kelasnya.
+
+## 40. Jangan `npm run db:push` cuma untuk menerapkan satu migrasi
+
+`db-push.mjs` menjalankan ulang `schema.sql` + **semua** migration dari awal.
+Itu benar untuk DB kosong, tapi untuk DB produksi berarti menjalankan ulang
+40 migrasi historis sekaligus — termasuk yang melakukan `update` pada data
+live.
+
+Untuk satu file, pakai `npm run db:apply -- supabase/migration-N.sql`
+(`scripts/db-apply.mjs`). File migrasi tetap harus idempoten
+(`create or replace`, `add column if not exists`, `drop ... if exists`)
+supaya aman kalau nanti `db:push` dijalankan penuh.

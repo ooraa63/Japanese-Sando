@@ -16,7 +16,7 @@ melakukan perubahan apa pun.
 ## Cara pakai untuk AI session baru
 
 1. **Baca `README.md` dulu** — pahami apa project ini, struktur folder, dan stack.
-2. **Baca `CHANGELOG.md`** — lihat update terakhir supaya tidak重复 kerja.
+2. **Baca `CHANGELOG.md`** — lihat update terakhir supaya tidak mengulang kerja.
 3. **Baca `gotchas.md`** — hindari jebakan yang sudah pernah ditemukan.
 4. **Baca `decisions.md`** (kalau ada perubahan arsitektur) — pahami kenapa keputusan itu diambil.
 5. Setelah selesai kerja, **tambah entri baru di `CHANGELOG.md`** di bagian paling atas.

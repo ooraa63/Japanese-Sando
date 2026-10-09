@@ -660,3 +660,34 @@ dimaksud "jangan dipakai di HP" adalah **blok informasi toko** (TAUTAN CEPAT
   baru, supaya regresi ini ketahuan otomatis: nav bawah harus ada di HP, footer
   harus tidak ada.
 
+---
+
+## D27 — Sorotan beranda (Populer & Terlaris) dipilih penjual, bukan algoritma
+
+**Keputusan:** Section "Populer" dan "Terlaris" di beranda diisi dari pilihan
+penjual: `store_settings.popular_flavor_ids` dan `.best_selling_flavor_ids`
+(jsonb, maksimal 3). Kalau kolom kosong, frontend jatuh ke perilaku lama (urut
+otomatis). Batas 3 ditegakkan di tiga lapis: CHECK constraint di DB,
+`MAX_HOME_PICKS` di kode, dan disable tombol di UI.
+
+**Alasan:**
+- Showcase yang ditonjolkan itu keputusan bisnis, bukan algoritma. Urutan otomatis
+  (like + terjual) justru sering salah: di toko yang baru mulai semua angka masih
+  kecil, jadi urutannya nyaris acak.
+- Batas 3 diminta Steven dan juga cocok dengan layout (grid 3 kolom di HP).
+- Batas ditegakkan di DB karena satu-satunya tempat yang tidak bisa dilewati dari
+  sisi mana pun — payload rusak tetap tidak bisa menyisipkan 4 produk.
+
+**Konsekuensi:**
+- **Array kosong berarti "otomatis", bukan "kosong".** Karena itu tidak ada
+  risiko beranda kosong setelah deploy.
+- Penjual yang belum pernah menyentuh tab Beranda tetap dapat halaman utuh.
+- Id yang menunjuk produk yang sudah dihapus **dibuang diam-diam** di dua tempat
+  (`clean_flavor_id_list` saat simpan, `pickByIds` saat render), jadi tidak ada
+  rongsokan yang tampil ke pembeli.
+- Urutan tampil = urutan klik di dashboard. Mengubah urutan berarti hapus lalu
+  pilih ulang (belum ada drag-and-drop).
+- Pemilih di dashboard memakai `getActiveFlavors()`, sengaja sama dengan sumber
+  data beranda. Kalau penjual memilih produk non-aktif, produk itu tidak akan
+  muncul di beranda — jadi hindari memilih yang tidak langsung terlihat.
+

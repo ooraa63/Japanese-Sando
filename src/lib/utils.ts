@@ -346,3 +346,34 @@ export function clampQty(qty: number, max: number): number {
   if (!Number.isFinite(qty)) return 1;
   return Math.max(1, Math.min(Math.floor(qty), Math.max(1, max)));
 }
+
+/**
+ * Batas produk yang boleh dipilih penjual untuk section "Populer" dan
+ * "Terlaris" di beranda.
+ *
+ * Tiga angka ini harus sama semua tempat: di sini, di `SettingsClient`
+ * (UI admin), dan sebagai CHECK constraint `settings_*_flavor_ids_ok`
+ * di database (migration-40). Kalau satu berubah, selalu ikut ketiganya.
+ */
+export const MAX_HOME_PICKS = 3;
+
+/**
+ * Rapaikan daftar id produk yang berasal dari kolom jsonb database.
+ *
+ * Nilai di DB tidak selalu bersih: bisa bukan array, bisa berisi teks,
+ * bisa dobel, dan bisa lebih dari batas. Semua itu dibuang di sini supaya
+ * komponen cukup percaya hasilnya. Array kosong berarti "penjual belum
+ * memilih" — pemanggil lalu memakai urutan otomatis.
+ */
+export function normalizeFlavorIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const out: number[] = [];
+  for (const v of value) {
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isInteger(n) || n <= 0) continue;
+    if (out.includes(n)) continue;
+    out.push(n);
+    if (out.length >= MAX_HOME_PICKS) break;
+  }
+  return out;
+}

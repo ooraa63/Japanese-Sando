@@ -19,6 +19,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:push": "node scripts/db-push.mjs",
+    "db:apply": "node scripts/db-apply.mjs",
     "db:cleanup": "node scripts/cleanup.mjs",
     "test:order": "node scripts/test-flow.mjs",
     "test:db": "node scripts/test-rls.mjs",

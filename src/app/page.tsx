@@ -8,7 +8,7 @@ import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { ShopInfo } from "@/components/customer/ShopInfo";
 import { AppHome } from "@/components/customer/AppHome";
-import { waLink } from "@/lib/utils";
+import { normalizeFlavorIds, waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
 
@@ -64,6 +64,8 @@ export default async function HomePage() {
             userName={profile?.full_name ?? null}
             freeShippingMin={settings?.free_shipping_min ?? 0}
             deadline={settings?.deadline_id || settings?.deadline_en || null}
+            popularIds={normalizeFlavorIds(settings?.popular_flavor_ids)}
+            bestSellingIds={normalizeFlavorIds(settings?.best_selling_flavor_ids)}
             ctaSlot={
               <OrderNowLink
                 open={open}

@@ -33,9 +33,15 @@
   --color-berry-500: #e1445c;
   --color-berry-600: #c22b45;
 
+  /* honey-50/100/600 ditambahkan karena sudah dipakai di beberapa komponen
+     (AppHome, QrisPaymentModal, CompleteProfileCard) tapi belum punya token —
+     kelas yang tidak dikenal di Tailwind v4 diam-diam jadi no-op. */
+  --color-honey-50: #fdf6e8;
+  --color-honey-100: #faeac9;
   --color-honey-300: #f2c46b;
   --color-honey-400: #e8ab3c;
   --color-honey-500: #d18d1c;
+  --color-honey-600: #a5700f;
 
   --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;

@@ -4,6 +4,52 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-09 — "Populer" & "Terlaris" bisa dipilih penjual (maks 3) + token honey yang hilang
+
+**Scope:** feat: sorotan beranda dipilih dari dashboard (Admin > Settings > Beranda)
+
+Steven minta: "Populer dan Terlaris buat bisa di set oleh admin penjual dan max
+ada 3 aja". Sebelumnya keduanya dihitung otomatis oleh frontend (like + terjual),
+dan "Terlaris" kadang kosong karena belum ada penjualan.
+
+**Mengubah:**
+- `supabase/migration-40.sql` — baru. Kolom `store_settings.popular_flavor_ids`
+  & `.best_selling_flavor_ids` (jsonb, array of flavor id, maks 3, CHECK
+  constraint), fungsi `clean_flavor_id_list()` sebagai sanitizer, dan
+  `admin_save_settings()` ditulis ulang (salinan dari migration-7 + 2 kolom baru).
+- `scripts/db-apply.mjs` + `scripts/db-push.mjs` + `package.json` — skrip baru
+  untuk menerapkan SATU file migrasi, dan `db:push` sekarang menyertakan
+  migration-40.
+- `src/lib/utils.ts` — `MAX_HOME_PICKS` (3) + `normalizeFlavorIds()`.
+- `src/lib/types.ts` — dua kolom baru di `StoreSettings`.
+- `src/components/admin/SettingsClient.tsx` — tab baru "Beranda" dengan 2
+  pemilih produk; tab nav sekarang `lg:flex-wrap` karena 8 tab meluber.
+- `src/components/customer/AppHome.tsx` — pakai pilihan penjual kalau ada,
+  fallback otomatis kalau kosong; batas turun 6→3 dan 5→3.
+- `src/app/page.tsx` + `src/app/admin/(dashboard)/settings/page.tsx` —
+  sambungan data.
+- `src/lib/i18n/id.ts` + `en.ts` — 13 label baru.
+- `src/app/globals.css` — token `honey-50/100/600` yang dipakai tapi belum pernah
+  ada (lihat gotcha #38).
+
+**Mengapa:**
+Penjual perlu menentukan sendiri apa yang ditonjolkan — bukan algorithmic.
+Batas 3 ditegakkan di tiga tempat sekaligus (UI, kode, CHECK constraint DB)
+supaya tidak bisa dilanggar dari sisi mana pun. Array kosong berarti "penjual
+belum memilih" dan website memakai perilaku lama, jadi tidak ada risiko
+halaman kosong setelah deploy.
+
+**Verifikasi:**
+- migration diterapkan ke DB produksi, sanitizer diuji 7 kasus (potong 3, duplikat,
+  id tidak ada, id berupa string, sampah, bukan array, kosong) — semua benar.
+- `admin_save_settings` diuji sungguhan lewat `request.jwt.claims` + rollback:
+  `[4,1,4,999999,2]` → `[4,1,2]`, dan `store_name` tidak ikut wiped.
+- Uji UI end-to-end (headless Edge): pilih 4 produk (klik ke-4 otomatis disabled
+  + tooltip "Maksimal 3 produk sudah tercapai"), simpan, DB terisi 3, beranda
+  menampilkan urutan yang sama persis. 0 console error.
+- `tsc --noEmit` dan `eslint --max-warnings=0` bersih, `npm run build` sukses,
+  `npm run test:pages` 15/15.
+
 ## 2026-10-09 — Housekeeping: bersihkan artefak verifikasi, .gitignore untuk `.tmp-*`
 
 **Scope:** chore: hapus file sementara verifikasi + gotcha baru

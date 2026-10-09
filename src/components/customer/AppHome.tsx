@@ -15,7 +15,7 @@ import {
 import type { Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
-import { formatIDR } from "@/lib/utils";
+import { formatIDR, MAX_HOME_PICKS } from "@/lib/utils";
 
 /**
  * Beranda bergaya aplikasi — mengikuti layout UIUX 4 (screen "Home"):
@@ -340,9 +340,10 @@ export function PromoBanner({
 /* ==================================================================
  * Terlaris — baris: foto | nama | harga | tombol +
  *
- * Hanya dirender kalau ada rasa yang benar-benar sudah terjual. Kalau
- * belum ada satu pun penjualan, section ini disembunyikan — bukan
- * menampilkan lima baris "0 terjual" yang tidak berguna.
+ * Daftarnya sudah difilter oleh pemanggil (AppHome): kalau penjual belum
+ * memilih apa pun, isinya hanya produk yang benar-benar sudah terjual.
+ * Kalau produknya nol, section ini disembunyikan — bukan menampilkan
+ * baris "0 terjual" yang tidak berguna.
  * ================================================================ */
 export function BestSellingList({
   flavors,
@@ -353,9 +354,7 @@ export function BestSellingList({
 }) {
   const { t, lang } = useI18n();
 
-  // Filter lagi di sini supaya aman dipanggil dari mana saja.
-  const rows = flavors.filter((f) => (soldCounts[f.id] ?? 0) > 0);
-  if (rows.length === 0) return null;
+  if (flavors.length === 0) return null;
 
   return (
     <section>
@@ -484,12 +483,34 @@ function useSoldCounts() {
 /* ==================================================================
  * Komposisi seluruh isi beranda
  * ================================================================ */
+
+/**
+ * Urutkan produk mengikuti pilihan penjual.
+ *
+ * Id yang tidak ditemukan (produknya sudah dihapus atau dinonaktifkan)
+ * diam-diam dilewati supaya section tidak pernah menampilkan rongsokan.
+ * Order admin dipakai apa adanya — itu yang dia susun lewat dashboard.
+ */
+function pickByIds(flavors: Flavor[], ids: number[] | null | undefined): Flavor[] {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  const byId = new Map(flavors.map((f) => [f.id, f]));
+  const out: Flavor[] = [];
+  for (const raw of ids) {
+    const f = byId.get(Number(raw));
+    if (f) out.push(f);
+    if (out.length >= MAX_HOME_PICKS) break;
+  }
+  return out;
+}
+
 export function AppHome({
   categories,
   heroImages,
   userName,
   freeShippingMin,
   deadline,
+  popularIds,
+  bestSellingIds,
   ctaSlot,
 }: {
   categories: Category[];
@@ -497,6 +518,10 @@ export function AppHome({
   userName?: string | null;
   freeShippingMin: number;
   deadline?: string | null;
+  /** Pilihan penjual untuk "Populer" (maks 3). Kosong = pakai otomatis. */
+  popularIds?: number[];
+  /** Pilihan penjual untuk "Terlaris" (maks 3). Kosong = pakai otomatis. */
+  bestSellingIds?: number[];
   ctaSlot: React.ReactNode;
 }) {
   const soldCounts = useSoldCounts();
@@ -506,26 +531,38 @@ export function AppHome({
     [categories]
   );
 
-  // "Populer" = paling banyak disukai. Angka like itu nyata, jadi urut
-  // berdasarkan-nya; tidak ada angka rekaan seperti rating bintang.
-  const popular = useMemo(() => {
+  // Pilihan penjual menang kalau ada. Kalau tidak ada pilihan, pakai
+  // urutan otomatis seperti sebelumnya (like + terjual) — jadi website
+  // tetap utuh untuk penjual yang belum pernah ke tab Beranda.
+  const popularPicked = useMemo(
+    () => pickByIds(allFlavors, popularIds),
+    [allFlavors, popularIds]
+  );
+  const autoPopular = useMemo(() => {
     const sorted = [...allFlavors].sort((a, b) => {
       const sa = soldCounts[a.id] ?? 0;
       const sb = soldCounts[b.id] ?? 0;
       if (sa !== sb) return sb - sa;
       return (b.likes_count ?? 0) - (a.likes_count ?? 0);
     });
-    return sorted.slice(0, 6);
+    return sorted.slice(0, MAX_HOME_PICKS);
   }, [allFlavors, soldCounts]);
+  const popular = popularPicked.length > 0 ? popularPicked : autoPopular;
 
-  // "Terlaris" = benar-benar yang sudah terjual. Kalau belum ada satu
-  // pun, list-nya kosong dan section-nya disembunyikan oleh komponen.
-  const bestSelling = useMemo(() => {
+  const bestPicked = useMemo(
+    () => pickByIds(allFlavors, bestSellingIds),
+    [allFlavors, bestSellingIds]
+  );
+  // Otomatis: hanya yang benar-benar terjual, jadi tidak pernah baris
+  // "0 terjual". Kalau penjual memilih sendiri, pilihan dia yang dipakai
+  // apa adanya.
+  const autoBestSelling = useMemo(() => {
     return allFlavors
       .filter((f) => (soldCounts[f.id] ?? 0) > 0)
       .sort((a, b) => (soldCounts[b.id] ?? 0) - (soldCounts[a.id] ?? 0))
-      .slice(0, 5);
+      .slice(0, MAX_HOME_PICKS);
   }, [allFlavors, soldCounts]);
+  const bestSelling = bestPicked.length > 0 ? bestPicked : autoBestSelling;
 
   return (
     <div className="space-y-6">

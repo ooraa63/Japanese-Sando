@@ -118,6 +118,14 @@ export interface StoreSettings {
   /** Logo & tagline di bawah nama toko */
   logo_url: string | null;
   brand_line: string;
+  /**
+   * Id flavor yang dipilih penjual untuk section "Populer" di beranda.
+   * Urutan array = urutan tampil. Kosong (`[]`) berarti otomatis
+   * (urut berdasarkan like + terjual). Maksimal 3 — migration-40.
+   */
+  popular_flavor_ids: number[];
+  /** Id flavor untuk section "Terlaris". Sama: maks 3, `[]` = otomatis. */
+  best_selling_flavor_ids: number[];
   updated_at: string;
 }
 
