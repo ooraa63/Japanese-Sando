@@ -81,13 +81,21 @@ export default async function HomePage() {
         </div>
 
         {/* ===================== MENU LENGKAP =====================
-            Header "Our flavors" + tombol "Order these" DIHAPUS
-            (permintaan Steven, 10-10-2026): setelah section "Populer"
-            di atas, daftar menu langsung menyusul tanpa perantara.
+            Permintaan Steven (10-10-2026): setelah "Populer" ada judul
+            besar "Menu", lalu di bawahnya nama kategori ("Sando Sandwich")
+            dan kartu rasa-nya.
 
-            Bundle / paket hemat juga sudah pindah ke atas "Populer"
-            (lihat AppHome), jadi di sini tidak perlu dirender lagi. */}
-        <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 pb-10 sm:px-6 lg:pb-14">
+            Lebarnya disamakan dengan `AppHome` (max-w-2xl) supaya baris
+            kartu Menu dan baris kartu Populer punya lebar yang sama —
+            kalau menu memakai max-w-6xl, di desktop kartu-kartunya jadi
+            jauh lebih lebar dari Populer tepat di atasnya.
+
+            Bundle / paket hemat sudah pindah ke atas "Populer" (lihat
+            AppHome), jadi di sini tidak perlu dirender lagi. */}
+        <section id="menu" className="mx-auto max-w-2xl scroll-mt-20 px-4 pb-10 sm:px-6 lg:pb-14">
+          <h2 className="mb-4 text-2xl font-extrabold text-cocoa-900">
+            {dicts.menu.title}
+          </h2>
           <MenuBrowser categories={categories} />
         </section>
 

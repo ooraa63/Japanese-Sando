@@ -734,3 +734,63 @@ Aturan kalau menyalin settings ke tabel lain:
 - lebih baik lagi, jangan menyalin: baca langsung dari `store_settings`
   saat render kalau bar-nya memang cuma "display setting".
 
+## 44. `npm run lint` = `eslint` tanpa argumen = pindai SELURUH direktori kerja
+
+`package.json` punya `"lint": "eslint"` tanpa path. Artinya ESLint memindai
+apa pun yang ada di working tree — termasuk file sementara.
+
+Gejalanya: setelah screenshot headless, `npm run lint` tiba-tiba melaporkan
+`✖ 957 problems (37 errors, 920 warnings)` padahal `npm run typecheck` dan
+build bersih. Penyebabnya bukan kodenya: `--user-data-dir` Chrome/Edge
+menulis **profil browser utuh** (ribuan file `.js`) di dalam repo.
+
+Aturan:
+- taruh profil browser **di luar repo** (`join(tmpdir(), ...)`), bukan
+  `./.tmp-...`, walaupun `.gitignore` sudah menutup `/.tmp-*`;
+- kalau terlanjur menumpuk, hapus dulu baru lint. `rmSync(PROFILE)` di
+  `finally` bisa gagal diam-diam di Windows karena file masih di-handle
+  proses browser — bungkus error-nya kalau memang penting.
+
+## 45. Test UI headless yang mengklik tombol = menulis DATA NYATA ke produksi
+
+Verifikasi "tombol like berfungsi" dengan `button.click()` bukan uji yang
+murni membaca: `useFlavorLikes.toggle()` langsung `POST /api/flavor-like`,
+jadi setiap putaran test menulis baris sungguhan ke tabel `flavor_likes`
+produksi dan menaikkan `flavors.likes_count`.
+
+Yang terjadi di project ini (10-10-2026): 10 baris `flavor_likes` dan
+`likes_count` = 6/0/2/1/1, semuanya artefak pengujian. Token yang jelas
+made-up: `session_id` berawalan `s-` dengan pola `s-<random>-<epochms>`.
+
+Aturan:
+- sebelum menjalankan tes otomatis yang menyentuh UI, cek dulu apakah
+  aksinya menulis ke DB (`fetch(..., { method: "POST" })`);
+- kalau iya, pakai endpoint tes/dev yang tidak menulis, atau panggil
+  `toggle()` dua kali (like lalu unlike) supaya angka kembali;
+- setelah tes, **cek** `flavor_likes` + `flavors.likes_count` dan laporkan
+  ke penjual kalau ada data uji yang bocor. Angka like/terjual yang dikarang
+  atau bocor sama saja data palsu — jangan dibiarkan live.
+
+## 46. Edge 155: pakai `--headless` polos, bukan `--headless=new`
+
+Di Edge 155, `--headless=new` **tidak lagi dikenali**: proses langsung exit
+dan port remote debugging tidak pernah terbuka. Gejalanya lewat Node:
+`Error: CDP tidak siap` setelah menunggu 30 detik.
+
+Yang benar: `--headless` polos + `--remote-allow-origins=*`, dan
+`--user-data-dir` harus **path absolut**. Path relatif saat dipanggil dari
+`spawn()` juga membuat browser exit tanpa membuka port.
+
+## 47. `captureBeyondViewport: true` memalsukan elemen `position: fixed`
+
+Untuk screenshot seluruh halaman, `captureBeyondViewport` dipakai supaya
+halaman panjang ikut ter-render. Masalahnya: elemen fixed seperti
+`MobileBottomNav` ikut ter-render di tengah gambar dan **menutupi kartu**,
+sehingga terlihat seperti bug layout yang tidak ada.
+
+Untuk screenshot satu section:
+1. `el.scrollIntoView({ block: "start" })` lewat `Runtime.evaluate`,
+2. `Page.captureScreenshot({ format: "png" })` **tanpa** `captureBeyondViewport`.
+
+Hasilnya persis seperti yang dilihat pengguna.
+

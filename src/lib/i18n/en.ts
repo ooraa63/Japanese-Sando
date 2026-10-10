@@ -134,7 +134,9 @@ export const en = {
     bundlesTitle: "Value bundles",
   },
   menu: {
-    title: "Our flavors",
+    // Big heading for the menu section on the homepage. Used to be
+    // "Our flavors", which was removed together with that header.
+    title: "Menu",
     subtitle: "Prices include everything. No hidden charges.",
     readOnlyNote: "Browse first, then tap “Order these” to start your pre-order.",
     empty: "The menu is being updated. Please come back soon.",

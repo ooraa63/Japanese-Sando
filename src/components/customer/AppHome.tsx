@@ -3,13 +3,12 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, ShoppingBag } from "lucide-react";
 import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { createClient } from "@/lib/supabase/client";
-import { formatIDR, MAX_HOME_PICKS } from "@/lib/utils";
-import { useFlavorLikes } from "@/lib/useFlavorLikes";
+import { MAX_HOME_PICKS } from "@/lib/utils";
+import { useSoldCounts } from "@/lib/useSoldCounts";
 import { BundleShowcase } from "@/components/customer/BundleShowcase";
+import { FlavorCard } from "@/components/customer/FlavorCard";
 
 /**
  * Beranda bergaya aplikasi — mengikuti layout UIUX 4 (screen "Home"):
@@ -182,9 +181,11 @@ export function PopularGrid({
 /**
  * Kartu read-only di section "Populer".
  *
- * Sengaja BUKAN `<button>` dan TIDAK punya handler klik: kartu ini hanya
- * menampilkan. Status like tetap ditampilkan (jadi pembeli tahu produk ini
- * sudah ia sukai di menu), tapi tidak bisa diubah dari sini.
+ * Sengaja memakai komponen yang SAMA dengan kartu di section "Menu"
+ * (`FlavorCard` gaya `dense`) supaya dua baris itu terlihat_IDENTIK —
+ * bedanya hanya satu hal: di sini `readOnlySocial`, jadi hatinya cuma ikon
+ * penanda dan tidak bisa ditekan. Section "Menu" di bawahnya yang menjadi
+ * tempat Likes Like.
  */
 function PopularCard({
   flavor,
@@ -193,71 +194,16 @@ function PopularCard({
   flavor: Flavor;
   soldCount: number;
 }) {
-  const { t, lang } = useI18n();
-  const likes = useFlavorLikes();
-
-  const name = lang === "en" ? flavor.name_en : flavor.name_id;
-  const liked = likes.isLiked(flavor.id);
-  const likesCount = likes.count(flavor.id, flavor.likes_count ?? 0);
-
   return (
-    <div
-      className={`flex w-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
-        liked ? "border-cocoa-200/70 opacity-45 saturate-50" : "border-cocoa-200/70"
-      }`}
-    >
-      <div className="relative aspect-square overflow-hidden bg-cream-100">
-        {flavor.image_url ? (
-          <Image
-            src={flavor.image_url}
-            alt={name}
-            fill
-            sizes="(max-width: 640px) 30vw, 20vw"
-            className="object-cover"
-          />
-        ) : (
-          <div className="grid h-full w-full place-items-center bg-grain">
-            <span className="font-display text-3xl font-bold text-white/30">
-              {name.charAt(0)}
-            </span>
-          </div>
-        )}
-
-        {/* Hati di sini HANYA ikon penanda, bukan tombol. */}
-        <span
-          aria-hidden
-          className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full bg-white/90 shadow-sm"
-        >
-          <Heart
-            className={`size-3.5 ${liked ? "fill-berry-400 text-berry-400" : "text-cocoa-400"}`}
-          />
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col p-2 sm:p-2.5">
-        <p className="line-clamp-1 text-[11px] font-bold text-cocoa-900 sm:text-xs">
-          {name}
-        </p>
-
-        {/* Jumlah suka + jumlah terjual, keduanya angka nyata. */}
-        <p className="mt-0.5 flex items-center gap-2 text-[10px] font-bold tabular text-cocoa-500">
-          <span className="flex items-center gap-0.5">
-            <Heart className="size-3 fill-berry-400 text-berry-400" />
-            {likesCount}
-          </span>
-          {soldCount > 0 ? (
-            <span className="flex items-center gap-0.5 text-cocoa-400">
-              <ShoppingBag className="size-3" />
-              {soldCount} {t.home.sold}
-            </span>
-          ) : null}
-        </p>
-
-        <p className="mt-auto pt-1.5 text-[11px] font-extrabold text-honey-600 tabular sm:text-xs">
-          {formatIDR(flavor.price, lang)}
-        </p>
-      </div>
-    </div>
+    <FlavorCard
+      flavor={flavor}
+      dense
+      showSocial
+      readOnlySocial
+      showBadge={false}
+      soldCount={soldCount}
+      showSold={soldCount > 0}
+    />
   );
 }
 
@@ -284,42 +230,6 @@ function SectionHead({
       ) : null}
     </div>
   );
-}
-
-/* ==================================================================
- * Counter "terjual" per rasa
- * ================================================================ */
-
-/**
- * Ambil counter terjual dari RPC publik. Satu panggilan untuk seluruh
- * halaman — semua section yang butuh angka ini menerima hasil yang sama.
- * Kalau gagal, angka dianggap 0 (kotak selalu tampil, tidak error).
- */
-function useSoldCounts() {
-  const [counts, setCounts] = useState<Record<number, number>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase.rpc("public_flavor_sold_counts");
-        if (cancelled || !Array.isArray(data)) return;
-        const m: Record<number, number> = {};
-        for (const row of data as Array<{ flavor_id: number; qty: number }>) {
-          m[row.flavor_id] = row.qty;
-        }
-        setCounts(m);
-      } catch {
-        /* kotak kosong, bukan error */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return counts;
 }
 
 /* ==================================================================

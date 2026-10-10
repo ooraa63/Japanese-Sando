@@ -132,7 +132,10 @@ export const id: Dict = {
     bundlesTitle: "Paket hemat",
   },
   menu: {
-    title: "Pilihan Rasa Kami",
+    // Dipakai sebagai judul besar section menu di beranda (permintaan
+    // Steven, 10-10-2026). Sebelumnya "Pilihan Rasa Kami" — teks itu
+    // sudah dihapus bersama header "Our flavors".
+    title: "Menu",
     subtitle: "Harga sudah termasuk semua. Tidak ada biaya tersembunyi.",
     readOnlyNote: "Lihat dulu, lalu ketuk “Pesan rasa ini” untuk mulai pre-order.",
     empty: "Menu sedang kami perbarui. Silakan kembali lagi nanti.",

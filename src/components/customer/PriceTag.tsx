@@ -18,6 +18,7 @@ export function PriceTag({
   lang,
   size = "md",
   align = "left",
+  className = "",
 }: {
   price: number;
   /** Harga sebelum diskon. Null / <= price = tidak ada harga coret. */
@@ -25,6 +26,8 @@ export function PriceTag({
   lang: Language;
   size?: "sm" | "md" | "lg" | "xl";
   align?: "left" | "center" | "right";
+  /** Warna tambahan untuk angka harga (mis. `text-honey-600` di kartu kecil). */
+  className?: string;
 }) {
   const hasDiscount =
     comparePrice != null && Number.isFinite(comparePrice) && comparePrice > price;
@@ -59,7 +62,7 @@ export function PriceTag({
   if (!hasDiscount) {
     return (
       <span
-        className={`inline-flex items-baseline font-extrabold text-cocoa-900 tabular ${priceSize} ${justify}`}
+        className={`inline-flex items-baseline font-extrabold tabular ${priceSize} ${justify} ${className}`}
       >
         {formatIDR(price, lang)}
       </span>
@@ -76,7 +79,11 @@ export function PriceTag({
       >
         {formatIDR(comparePrice, lang)}
       </span>
-      <span className={`font-extrabold text-cocoa-900 tabular ${priceSize}`}>
+      <span
+        className={`font-extrabold tabular ${priceSize} ${
+          className || "text-cocoa-900"
+        }`}
+      >
         {formatIDR(price, lang)}
       </span>
     </span>

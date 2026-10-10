@@ -4,6 +4,56 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-10 — Beranda: judul besar "Menu", kartu menu jadi 3 kolom + jumlah terjual
+
+**Scope:** feat: judul section menu + kartu menu ringkas
+
+Steven minta dua hal: (1) setelah **Populer** ada **judul besar "Menu"**, lalu di
+bawahnya nama kategori ("Sando Sandwich") dan rasa-rasanya; (2) kartu **menu**
+diperkecil supaya **3 kartu muat dalam satu baris** dan tampilannya mengikuti
+gambar 2 (kartu Populer), **ditambah jumlah terjual**.
+
+**Mengubah:**
+- `src/lib/useSoldCounts.ts` — BARU. Hook `useSoldCounts` diekstrak dari
+  `AppHome` supaya `MenuBrowser` (section terpisah) memakai angka terjual yang
+  sama tanpa memanggil RPC kedua.
+- `src/components/customer/FlavorCard.tsx` — prop baru `dense` (kartu ringkas
+  3 kolom: foto persegi, nama 1 baris, baris "♥ suka / 🛍 terjual", harga
+  `size="sm"` warna `honey-600`) dan `showBadge`. Di mode `dense` hati pindah ke
+  pojok kanan atas foto dan jadi `<button>` (bukan pil full-width di bawah),
+  mengikuti gambar referensi. Badge "Signature" pakai `min-w-0` + `truncate`
+  dan hati pakai `ml-auto` — tanpa itu, produk tanpa badge membuat hati melompat
+  ke KIRI dan produk dengan badge hampir mendorong hati keluar kartu.
+- `src/components/customer/PriceTag.tsx` — prop `className` baru untuk mewarnai
+  angka harga tanpa kehilangan harga coret + badge diskon.
+- `src/components/customer/AppHome.tsx` — `PopularCard` (isi 80 baris) diganti
+  pemanggilan `FlavorCard dense` dengan `readOnlySocial` + `showBadge={false}`.
+  Satu komponen untuk dua section, jadi tidak bisa melenceng.
+- `src/components/customer/MenuBrowser.tsx` — grid `grid-cols-3` (class
+  `density-flavor-grid` sengaja dibuang karena memaksa 2 kolom di < 640px),
+  kartu jadi `dense`, dan `soldCounts` diambil dari hook (prop-nya dihapus).
+  Label kategori dibuat `text-base font-extrabold`.
+- `src/app/page.tsx` — `<h2>` besar "Menu" di atas `MenuBrowser`; section menu
+  diubah `max-w-6xl` → `max-w-2xl` supaya lebarnya sama dengan baris Populer.
+- `src/lib/i18n/{id,en}.ts` — `menu.title` "Pilihan Rasa Kami"/"Our flavors" →
+  "Menu". Key ini sudah tidak dipakai komponen lain (yang pakai `menu.title`
+  punya namespace berbeda: `admin.menu.title`, `order.menu.title`).
+
+**Verifikasi:** tsc + eslint bersih, `npm run build` sukses, `test-pages.mjs`
+16/16, screenshot headless viewport 390px: urutan h2 `Populer` → `Menu`,
+label kategori "Sando Sandwich", 5 kartu menu dalam grid 3 kolom, 5 tombol
+like di Menu dan 0 di Populer, teks "N terjual" tampil, "Our flavors" /
+"Pilihan Rasa Kami" / "Kategori" hilang, 0 console error. Klik hati →
+`aria-pressed=true`, label "Hapus suka", `like:flavor:1` tersimpan.
+
+**Peringatan — data uji yang bocor ke produksi:** test browser headless yang
+dipakai untuk verifikasi ini **menuliskan like sungguhan ke database
+produksi** lewat `POST /api/flavor-like`. Tabel `flavor_likes` sekarang berisi
+10 baris dan `flavors.likes_count` = 6/0/2/1/1 — semuanya artefak pengujian,
+bukan pembeli. Detail + cara membersihkannya ada di gotchas.md #45.
+
+---
+
 ## 2026-10-10 — Beranda: Bundle naik ke atas Populer, kartu Menu jadi gaya referensi, Populer jadi read-only
 
 **Scope:** feat: susunan ulang beranda sesuai gambar referensi Steven

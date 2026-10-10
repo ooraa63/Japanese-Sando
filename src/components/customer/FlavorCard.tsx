@@ -28,6 +28,22 @@ export function FlavorCard({
   flavor,
   inCart = 0,
   compact = false,
+  /**
+   * `dense` -> kartu ringkas ala gambar referensi: foto persegi, nama 1 baris,
+   * baris "♥ suka / 🛍 terjual", lalu harga. Cukup kecil untuk 3 kartu dalam
+   * satu baris di HP. Dipakai section "Menu" di beranda dan section "Populer"
+   * (dengan `readOnlySocial`, jadi yang di sana tidak bisa di-like).
+   *
+   * Bedanya hanya ini, sisanya komponen yang sama — jadi dua baris kartu itu
+   * dijamin terlihat konsisten.
+   */
+  dense = false,
+  /**
+   * `showBadge` -> tampilkan badge "Signature" di foto (produk unggulan dari
+   * admin). Default true di kartu "Menu". Dimatikan di "Populer" supaya kartu
+   * di sana bersih, mengikuti gambar referensi Steven yang tidak memakai badge.
+   */
+  showBadge = true,
   remainingStock = null,
   categoryName,
   /**
@@ -67,6 +83,10 @@ export function FlavorCard({
   flavor: Flavor;
   inCart?: number;
   compact?: boolean;
+  /** Kartu ringkas 3-kolom (foto persegi + baris suka/terjual + harga). */
+  dense?: boolean;
+  /** Tampilkan badge "Signature" di foto. Default true. */
+  showBadge?: boolean;
   /** Stok keseluruhan toko (bukan per rasa). null = tak terbatas. */
   remainingStock?: number | null;
   /** Nama kategori, ditampilkan sebagai label kecil di atas nama rasa. */
@@ -209,6 +229,143 @@ export function FlavorCard({
           </div>
         </div>
       </article>
+    );
+  }
+
+  /* ------------------------------------------------------------------
+   * Kartu ringkas 3-kolom (referensi Steven, 10-10-2026).
+   *
+   * Dipakai di dua tempat dengan komponen yang sama supaya tidak melenceng:
+   *   - section "Menu"   -> `readOnlySocial` = false, hati di pojok kanan
+   *     atas adalah TOMBOL like.
+   *   - section "Populer"-> `readOnlySocial` = true, hati hanya ikon
+   *     penanda dan kartu tidak bisa diketuk sama sekali.
+   *
+   * Layout mengikuti gambar referensi: foto persegi, nama, baris
+   * "♥ jumlah suka  🛍 jumlah terjual", lalu harga. Tanpa deskripsi —
+   * di lebar ~110px (3 kolom di HP) deskripsi cuma jadi baris kecil yang
+   * bikin kartu terlalu tinggi. Angka terjual selalu dari RPC publik
+   * (`useSoldCounts`), tidak pernah dikarang.
+   * ------------------------------------------------------------------ */
+  if (dense) {
+    return (
+      <div
+        className={`relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
+          isLiked
+            ? "border-cocoa-200/70 opacity-45 saturate-50"
+            : "border-cocoa-200/70"
+        }`}
+      >
+        <div
+          className={`flavor-photo relative aspect-square overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)}`}
+        >
+          {flavor.image_url ? (
+            <Image
+              src={flavor.image_url}
+              alt={name}
+              fill
+              sizes="(max-width: 640px) 32vw, (max-width: 1024px) 22vw, 200px"
+              className="object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 grid place-items-center bg-grain">
+              <span className="font-display text-4xl font-bold text-white/30 select-none">
+                {name.charAt(0)}
+              </span>
+            </div>
+          )}
+
+          <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-1 p-1.5">
+            {/* Badge "Signature" (produk unggulan dari admin) di kiri atas.
+                Lebih kecil dari `chip` biasa supaya tidak memakan kartu.
+                Teksnya boleh terpotong — lebih baik jadi "Signatu..." daripada
+                mendorong hati ke luar kartu (kartu ini cuma ~110px di HP). */}
+            {showBadge && flavor.is_featured && !soldOut ? (
+              <span className="inline-flex min-w-0 shrink items-center gap-0.5 rounded-full bg-honey-400/95 px-1.5 py-0.5 text-[10px] leading-none font-bold text-cocoa-900 shadow">
+                <Star className="size-2.5 shrink-0 fill-current" />
+                <span className="truncate">{t.menu.signature}</span>
+              </span>
+            ) : null}
+
+            {/* Hati pojok kanan atas. Di "Menu" ini tombol like; di
+                "Populer" (`readOnlySocial`) hanya ikon penanda.
+
+                `ml-auto` wajib: kalau produk ini tidak punya badge
+                "Signature", taginya tidak ada dan tanpa `ml-auto` hati
+                ini akan menempel di KIRI — padahal di gambar referensi
+                posisinya selalu kanan atas. */}
+            {readOnlySocial ? (
+              <span
+                aria-hidden
+                className="ml-auto grid size-7 shrink-0 place-items-center rounded-full bg-white/90 shadow-sm"
+              >
+                <Heart
+                  className={`size-3.5 ${isLiked ? "fill-berry-500 text-berry-500" : "text-cocoa-400"}`}
+                />
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={toggleLike}
+                aria-pressed={isLiked}
+                aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
+                className="ml-auto grid size-7 shrink-0 place-items-center rounded-full bg-white/90 shadow-sm transition hover:bg-white active:scale-95"
+              >
+                <Heart
+                  className={`size-3.5 transition ${isLiked ? "fill-berry-500 text-berry-500" : "text-cocoa-400"}`}
+                />
+              </button>
+            )}
+          </div>
+
+          {soldOut ? (
+            <div className="absolute inset-0 grid place-items-center bg-cocoa-950/65">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-white px-2 py-0.5 text-[10px] leading-none font-bold text-cocoa-800 shadow-lg">
+                <PackageX className="size-3 shrink-0" />
+                {t.menu.soldOut}
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-1 flex-col p-2">
+          <p className="line-clamp-1 text-[11px] font-bold text-cocoa-900 sm:text-xs">
+            {name}
+          </p>
+
+          {/* Jumlah suka + jumlah terjual, keduanya angka nyata dari DB.
+              Teks dipotong dengan `truncate`, bukan angka, supaya "1 terjual"
+              tidak pernah berubah jadi "1 ter..." di kartu sempit. */}
+          {showSocial ? (
+            <p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold text-cocoa-500 tabular">
+              <span className="flex shrink-0 items-center gap-0.5">
+                <Heart className="size-3 fill-berry-400 text-berry-400" />
+                {likesCount}
+              </span>
+              {showSold ? (
+                <span className="flex min-w-0 items-center gap-0.5 text-cocoa-400">
+                  <ShoppingBag className="size-3 shrink-0" />
+                  <span className="truncate">
+                    {soldCount} {t.menu.soldCount}
+                  </span>
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+
+          {/* Harga di baris paling bawah. Harga asal dicoret + badge diskon
+              (kalau ada) sudah ditangani PriceTag. */}
+          <div className="mt-auto pt-1.5">
+            <PriceTag
+              price={flavor.price}
+              comparePrice={flavor.compare_price}
+              lang={lang}
+              size="sm"
+              className="text-honey-600"
+            />
+          </div>
+        </div>
+      </div>
     );
   }
 

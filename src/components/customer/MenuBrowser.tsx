@@ -17,6 +17,7 @@ import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
 import { PriceTag } from "./PriceTag";
 import { cheapestBundle, formatIDR } from "@/lib/utils";
+import { useSoldCounts } from "@/lib/useSoldCounts";
 import { OrderBundleModal } from "./OrderBundleModal";
 import { useCart } from "./CartProvider";
 import { remainingStockByCategory } from "@/lib/cart-stock";
@@ -32,16 +33,17 @@ export function MenuBrowser({
   categories,
   bundles = [],
   emptyLabel,
-  soldCounts = {},
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri (category_id=NULL). */
   bundles?: Bundle[];
   emptyLabel?: string;
-  /** Map flavorId -> jumlah terjual (untuk like/sold di beranda). */
-  soldCounts?: Record<number, number>;
 }) {
   const { t, lang } = useI18n();
+  // Angka terjual diambil di sisi client supaya kartu bisa menampilkan
+  // "N terjual" tanpa menunggu render server. Hook yang sama dipakai section
+  // "Populer" di atas, jadi keduanya menampilkan angka yang konsisten.
+  const soldCounts = useSoldCounts();
   const withFlavors = useMemo(
     () => categories.filter((c) => (c.flavors?.length ?? 0) > 0),
     [categories]
@@ -77,8 +79,8 @@ export function MenuBrowser({
       {/* ---------- Tingkat 1: jenis makanan ---------- */}
       <div>
         {onlyOne ? (
-          <p className="mb-3 flex items-center gap-2 text-sm font-bold text-cocoa-500">
-            <UtensilsCrossed className="size-4" />
+          <p className="mb-3 flex items-center gap-2 text-base font-extrabold text-cocoa-800">
+            <UtensilsCrossed className="size-4 shrink-0 text-cocoa-400" />
             {lang === "en" ? withFlavors[0].name_en : withFlavors[0].name_id}
           </p>
         ) : (
@@ -190,16 +192,20 @@ export function MenuBrowser({
             </div>
           ) : null}
 
-          <div className="density-flavor-grid grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+          {/* Tiga kartu dalam satu baris, bahkan di HP — ini yang Steven
+              minta (10-10-2026): kartu menu diperkecil supaya ukurannya
+              sama dengan kartu "Populer" tepat di atasnya, bukan dua kali
+              sebesar itu. Class `density-flavor-grid` sengaja TIDAK dipakai
+              di sini karena class itu memaksa 2 kolom di layar < 640px. */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
             {(shown.flavors ?? []).map((f) => (
               <FlavorCard
                 key={f.id}
                 flavor={f}
-                remainingStock={null}
-                showStock={false}
-                categoryName={onlyOne ? undefined : lang === "en" ? shown.name_en : shown.name_id}
+                dense
                 showSocial
                 soldCount={soldCounts[f.id] ?? 0}
+                showSold
               />
             ))}
           </div>
