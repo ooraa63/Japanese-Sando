@@ -1,14 +1,14 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Heart,
   LayoutGrid,
-  Plus,
-  Star,
+  ShoppingBag,
   Truck,
   Timer,
 } from "lucide-react";
@@ -16,6 +16,7 @@ import type { Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatIDR, MAX_HOME_PICKS } from "@/lib/utils";
+import { useFlavorLikes } from "@/lib/useFlavorLikes";
 
 /**
  * Beranda bergaya aplikasi — mengikuti layout UIUX 4 (screen "Home"):
@@ -192,10 +193,17 @@ export function CategoryRow({ categories }: { categories: Category[] }) {
 }
 
 /* ==================================================================
- * Produk populer — kartu 3 kolom dengan hati + jumlah suka
+ * Produk populer — kartu ala aplikasi: foto, hati, nama, jumlah
+ * suka + terjual, dan harga.
  * ================================================================ */
-export function PopularGrid({ flavors }: { flavors: Flavor[] }) {
-  const { t, lang } = useI18n();
+export function PopularGrid({
+  flavors,
+  soldCounts = {},
+}: {
+  flavors: Flavor[];
+  soldCounts?: Record<number, number>;
+}) {
+  const { t } = useI18n();
 
   if (flavors.length === 0) {
     return <p className="text-sm text-cocoa-400">{t.home.emptyPopular}</p>;
@@ -209,67 +217,139 @@ export function PopularGrid({ flavors }: { flavors: Flavor[] }) {
         linkLabel={t.home.viewAll}
       />
       <ul className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
-        {flavors.map((f) => {
-          const name = lang === "en" ? f.name_en : f.name_id;
-          const isSoldOut = f.is_active === false;
-          return (
-            <li key={f.id} className="flex">
-              <Link
-                href="/order"
-                className="group flex w-full flex-col overflow-hidden rounded-2xl border border-cocoa-200/70 bg-white transition hover:-translate-y-0.5 hover:border-honey-400 hover:shadow-md"
-              >
-                <div className="relative aspect-square overflow-hidden bg-cream-100">
-                  {f.image_url ? (
-                    <Image
-                      src={f.image_url}
-                      alt={name}
-                      fill
-                      sizes="(max-width: 640px) 30vw, 20vw"
-                      className="object-cover transition duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="grid h-full w-full place-items-center bg-grain">
-                      <span className="font-display text-3xl font-bold text-white/30">
-                        {name.charAt(0)}
-                      </span>
-                    </div>
-                  )}
-                  {/* Hati ala referensi; menaut ke halaman favorit. */}
-                  <span
-                    aria-hidden
-                    className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full bg-white/90 shadow-sm"
-                  >
-                    <Heart className="size-3.5 text-cocoa-400" />
-                  </span>
-                  {isSoldOut ? (
-                    <div className="absolute inset-0 grid place-items-center bg-cocoa-950/60">
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-cocoa-800">
-                        {t.menu.soldOut}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-1 flex-col p-2 sm:p-2.5">
-                  <p className="line-clamp-1 text-[11px] font-bold text-cocoa-900 sm:text-xs">
-                    {name}
-                  </p>
-                  <div className="mt-auto flex items-center justify-between gap-1 pt-1.5">
-                    <span className="flex items-center gap-0.5 text-[10px] font-bold text-cocoa-500">
-                      <Heart className="size-3 fill-berry-400 text-berry-400" />
-                      {f.likes_count ?? 0}
-                    </span>
-                    <span className="text-[11px] font-extrabold text-honey-600 tabular sm:text-xs">
-                      {formatIDR(f.price, lang)}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            </li>
-          );
-        })}
+        {flavors.map((f) => (
+          <li key={f.id} className="flex">
+            <PopularCard flavor={f} soldCount={soldCounts[f.id] ?? 0} />
+          </li>
+        ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Kartu produk di section "Populer".
+ *
+ * Dua cara untuk menyukai (permintaan Steven): tekan ikon hati, atau
+ * ketuk ganda kartunya. Tombol hati memakai `e.stopPropagation` supaya
+ * tidak sekaligus memicu navigasi ke /order.
+ *
+ * Produk yang sudah disukai jadi pudar (opasitas rendah) — bukan hilang
+ * total, supaya hati masih bisa ditekan untuk membatalkan. Kalau hilang
+ * total, satu-satunya cara membatalkan like adalah membuka halaman menu,
+ * dan itu membingungkan.
+ */
+function PopularCard({
+  flavor,
+  soldCount,
+}: {
+  flavor: Flavor;
+  soldCount: number;
+}) {
+  const { t, lang } = useI18n();
+  const router = useRouter();
+  const likes = useFlavorLikes();
+
+  const name = lang === "en" ? flavor.name_en : flavor.name_id;
+  const liked = likes.isLiked(flavor.id);
+  const likesCount = likes.count(flavor.id, flavor.likes_count ?? 0);
+
+  function toggle(event: React.MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    likes.toggle(flavor.id);
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => router.push("/order")}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push("/order");
+        }
+      }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        likes.toggle(flavor.id);
+      }}
+      className={`group flex w-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white transition ${
+        liked
+          ? "border-cocoa-200/70 opacity-45 saturate-50"
+          : "border-cocoa-200/70 hover:-translate-y-0.5 hover:border-honey-400 hover:shadow-md"
+      }`}
+    >
+      <div className="relative aspect-square overflow-hidden bg-cream-100">
+        {flavor.image_url ? (
+          <Image
+            src={flavor.image_url}
+            alt={name}
+            fill
+            sizes="(max-width: 640px) 30vw, 20vw"
+            className="object-cover transition duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center bg-grain">
+            <span className="font-display text-3xl font-bold text-white/30">
+              {name.charAt(0)}
+            </span>
+          </div>
+        )}
+
+        {/* Hati = tombol like. Penuh kalau produk ini sudah disukai. */}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-pressed={liked}
+          aria-label={
+            liked
+              ? `${t.home.unlike} ${name}`
+              : `${t.home.like} ${name}`
+          }
+          className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full bg-white/90 shadow-sm transition active:scale-90"
+        >
+          <Heart
+            className={`size-3.5 ${
+              liked ? "fill-berry-400 text-berry-400" : "text-cocoa-400"
+            }`}
+          />
+        </button>
+
+        {flavor.is_active === false ? (
+          <div className="absolute inset-0 grid place-items-center bg-cocoa-950/60">
+            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-cocoa-800">
+              {t.menu.soldOut}
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex flex-1 flex-col p-2 sm:p-2.5">
+        <p className="line-clamp-1 text-[11px] font-bold text-cocoa-900 sm:text-xs">
+          {name}
+        </p>
+
+        {/* Jumlah suka + jumlah terjual, keduanya angka nyata. */}
+        <p className="mt-0.5 flex items-center gap-2 text-[10px] font-bold tabular text-cocoa-500">
+          <span className="flex items-center gap-0.5">
+            <Heart className="size-3 fill-berry-400 text-berry-400" />
+            {likesCount}
+          </span>
+          {soldCount > 0 ? (
+            <span className="flex items-center gap-0.5 text-cocoa-400">
+              <ShoppingBag className="size-3" />
+              {soldCount} {t.home.sold}
+            </span>
+          ) : null}
+        </p>
+
+        <p className="mt-auto pt-1.5 text-[11px] font-extrabold text-honey-600 tabular sm:text-xs">
+          {formatIDR(flavor.price, lang)}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -337,87 +417,6 @@ export function PromoBanner({
   );
 }
 
-/* ==================================================================
- * Terlaris — baris: foto | nama | harga | tombol +
- *
- * Daftarnya sudah difilter oleh pemanggil (AppHome): kalau penjual belum
- * memilih apa pun, isinya hanya produk yang benar-benar sudah terjual.
- * Kalau produknya nol, section ini disembunyikan — bukan menampilkan
- * baris "0 terjual" yang tidak berguna.
- * ================================================================ */
-export function BestSellingList({
-  flavors,
-  soldCounts = {},
-}: {
-  flavors: Flavor[];
-  soldCounts?: Record<number, number>;
-}) {
-  const { t, lang } = useI18n();
-
-  if (flavors.length === 0) return null;
-
-  return (
-    <section>
-      <SectionHead
-        title={t.home.bestSelling}
-        href="/order"
-        linkLabel={t.home.viewAll}
-      />
-      <ul className="space-y-2.5">
-        {flavors.map((f) => {
-          const name = lang === "en" ? f.name_en : f.name_id;
-          return (
-            <li key={f.id}>
-              <Link
-                href="/order"
-                className="flex items-center gap-3 rounded-2xl border border-cocoa-200/70 bg-white p-2.5 transition hover:border-honey-400 hover:shadow-md"
-              >
-                <span className="relative size-14 shrink-0 overflow-hidden rounded-xl bg-cream-100">
-                  {f.image_url ? (
-                    <Image
-                      src={f.image_url}
-                      alt=""
-                      fill
-                      sizes="56px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <span className="grid h-full w-full place-items-center bg-grain font-display text-lg font-bold text-white/40">
-                      {name.charAt(0)}
-                    </span>
-                  )}
-                </span>
-
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold text-cocoa-900">
-                    {name}
-                  </span>
-                  <span className="mt-0.5 flex items-center gap-1 text-[11px] text-cocoa-400">
-                    <Star className="size-3 fill-honey-400 text-honey-400" />
-                    <span className="font-bold tabular">
-                      {soldCounts[f.id] ?? 0}
-                    </span>
-                    <span>{t.home.sold}</span>
-                  </span>
-                </span>
-
-                <span className="shrink-0 text-sm font-extrabold text-cocoa-900 tabular">
-                  {formatIDR(f.price, lang)}
-                </span>
-                <span
-                  aria-hidden
-                  className="grid size-9 shrink-0 place-items-center rounded-xl bg-honey-400 text-cocoa-900"
-                >
-                  <Plus className="size-4" />
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
 
 /* ---------- judul section + link "Lihat semua" ---------- */
 function SectionHead({
@@ -510,7 +509,6 @@ export function AppHome({
   freeShippingMin,
   deadline,
   popularIds,
-  bestSellingIds,
   ctaSlot,
 }: {
   categories: Category[];
@@ -520,8 +518,6 @@ export function AppHome({
   deadline?: string | null;
   /** Pilihan penjual untuk "Populer" (maks 3). Kosong = pakai otomatis. */
   popularIds?: number[];
-  /** Pilihan penjual untuk "Terlaris" (maks 3). Kosong = pakai otomatis. */
-  bestSellingIds?: number[];
   ctaSlot: React.ReactNode;
 }) {
   const soldCounts = useSoldCounts();
@@ -532,8 +528,8 @@ export function AppHome({
   );
 
   // Pilihan penjual menang kalau ada. Kalau tidak ada pilihan, pakai
-  // urutan otomatis seperti sebelumnya (like + terjual) — jadi website
-  // tetap utuh untuk penjual yang belum pernah ke tab Beranda.
+  // urutan otomatis (like + terjual) — jadi website tetap utuh untuk
+  // penjual yang belum pernah ke tab Beranda.
   const popularPicked = useMemo(
     () => pickByIds(allFlavors, popularIds),
     [allFlavors, popularIds]
@@ -549,21 +545,6 @@ export function AppHome({
   }, [allFlavors, soldCounts]);
   const popular = popularPicked.length > 0 ? popularPicked : autoPopular;
 
-  const bestPicked = useMemo(
-    () => pickByIds(allFlavors, bestSellingIds),
-    [allFlavors, bestSellingIds]
-  );
-  // Otomatis: hanya yang benar-benar terjual, jadi tidak pernah baris
-  // "0 terjual". Kalau penjual memilih sendiri, pilihan dia yang dipakai
-  // apa adanya.
-  const autoBestSelling = useMemo(() => {
-    return allFlavors
-      .filter((f) => (soldCounts[f.id] ?? 0) > 0)
-      .sort((a, b) => (soldCounts[b.id] ?? 0) - (soldCounts[a.id] ?? 0))
-      .slice(0, MAX_HOME_PICKS);
-  }, [allFlavors, soldCounts]);
-  const bestSelling = bestPicked.length > 0 ? bestPicked : autoBestSelling;
-
   return (
     <div className="space-y-6">
       <HomeGreeting userName={userName} />
@@ -572,11 +553,9 @@ export function AppHome({
 
       <CategoryRow categories={categories} />
 
-      <PopularGrid flavors={popular} />
+      <PopularGrid flavors={popular} soldCounts={soldCounts} />
 
       <PromoBanner freeShippingMin={freeShippingMin} deadline={deadline} />
-
-      <BestSellingList flavors={bestSelling} soldCounts={soldCounts} />
     </div>
   );
 }

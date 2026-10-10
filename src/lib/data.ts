@@ -6,8 +6,28 @@ import type {
   CustomerOrderSummary,
   CustomerProfile,
   Flavor,
+  ProfileMenuItem,
   StoreSettings,
 } from "@/lib/types";
+
+/**
+ * Bar menu di sheet Profil (tab paling kanan bottom nav).
+ *
+ * Hanya bar AKTIF yang ikut, itu sudah difilter di RPC
+ * `public_profile_menu()`. Kalau RPC gagal (mis. migrasi belum
+ * diterapkan), balikin array kosong — bottom nav lalu hanya menampilkan
+ * tombol Profil kosong, bukan halaman error.
+ */
+export const getProfileMenuItems = cache(async (): Promise<ProfileMenuItem[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("public_profile_menu");
+
+  if (error) {
+    console.error("Gagal memuat menu profil:", error.message);
+    return [];
+  }
+  return (data as ProfileMenuItem[] | null) ?? [];
+});
 
 /** Ambil pengaturan toko. Aman dipanggil tanpa login. */
 export const getSettings = cache(async (): Promise<StoreSettings | null> => {

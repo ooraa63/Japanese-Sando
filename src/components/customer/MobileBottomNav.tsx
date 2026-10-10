@@ -2,46 +2,45 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Heart, Home, Receipt, UtensilsCrossed } from "lucide-react";
+import { ClipboardList, Home } from "lucide-react";
+import type { ProfileMenuItem } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
+import { ProfileSheet, ProfileTabButton } from "@/components/customer/ProfileSheet";
 
 /**
  * Bottom navigation bar untuk mobile (HP). Fixed di bawah viewport, di atas
  * konten. Hidden di desktop (`md:hidden`).
  *
- * Susunan mengikuti UIUX 4: Beranda · Menu · Pesanan · Favorit · Profil.
+ * Tiga tab saja: Beranda · Pesanan · Profil.
  *
- * "Kontak" TIDAK ada di sini (dokumen "Perbaikan Ruma Komugi 2" item 2):
- * link Kontak dihapus dari navigasi, dan informasi toko dipindah ke halaman
- * /account — di sana ada bar "Kontak" yang membuka popup, plus blok
- * "Hubungi Kami" lengkap di bawah form profil.
+ * - "Menu" TIDAK jadi tab: reachable lewat section Kategori + menu lengkap
+ *   di beranda, dan lewat tombol pesan di hero.
+ * - "Favorit" dihapus (2026-10-10, permintaan Steven). Tidak ada halaman
+ *   /favorites lagi; hati di kartu produk jadi tombol toggle biasa.
+ * - "Profil" bukan link: ia membuka sheet berisi daftar menu (Account,
+ *   Contact Us, FAQ, dst) yang isinya dikelola penjual dari dashboard.
  *
- * "Pesanan" dan "Profil" sama-sama menuju /account karena memang satu
- * halaman: daftar pesanan + form profil + kontak + voucher.
+ * "Pesanan" dan "Profil" sama-sama butuh login, jadi keduanya disembunyikan
+ * di route yang flow-nya sudah punya tombol sendiri.
  *
- * Hidden di route admin & auth supaya gak ganggu alur login/registrasi,
- * dan di /order karena alur pemesanan punya sticky bar keranjang sendiri
- * (sticky, z-30) yang akan ketimpa nav ini (fixed, z-40) — itu bug
+ * Hidden juga di /order karena alur pemesanan punya sticky bar keranjang
+ * sendiri (sticky, z-30) yang akan ketimpa nav ini (fixed, z-40) — itu bug
  * "keranjang pas slide masih error" yang Steven laporkan.
  */
-export function MobileBottomNav() {
+export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMenuItem[] }) {
   const pathname = usePathname() ?? "";
   const { t } = useI18n();
 
   const hidden = pathname.startsWith("/admin")
     || pathname.startsWith("/login")
     || pathname.startsWith("/register")
-    || pathname.startsWith("/account")
     || pathname.startsWith("/order");
 
   if (hidden) return null;
 
   const items = [
     { href: "/", label: t.nav.home, icon: Home },
-    { href: "/#menu", label: t.nav.menu, icon: UtensilsCrossed },
     { href: "/account", label: t.nav.orders, icon: ClipboardList },
-    { href: "/favorites", label: t.nav.favorites, icon: Heart },
-    { href: "/account#profile", label: t.nav.account, icon: Receipt },
   ];
 
   return (
@@ -63,13 +62,12 @@ export function MobileBottomNav() {
         aria-label="Mobile navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-cocoa-200 bg-cream-50 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
-        <ul className="grid grid-cols-5">
+        <ul className="grid grid-cols-3">
           {items.map((item) => {
-            const [base, hash] = item.href.split("#");
             const active =
-              hash
-                ? false
-                : pathname === base || (base !== "/" && pathname.startsWith(base));
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(item.href);
             const Icon = item.icon;
             return (
               <li key={item.href}>
@@ -89,8 +87,17 @@ export function MobileBottomNav() {
               </li>
             );
           })}
+
+          {/* Profil: bukan link, tapi membuka sheet daftar menu. Sengaja
+              button (bukan <a>) supaya pencreen reader membacanya sebagai
+              aksi, dan supaya sheet bisa dibuka tanpa pindah halaman. */}
+          <li>
+            <ProfileTabButton />
+          </li>
         </ul>
       </nav>
+
+      <ProfileSheet items={profileMenu} />
     </>
   );
 }

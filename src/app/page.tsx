@@ -65,7 +65,6 @@ export default async function HomePage() {
             freeShippingMin={settings?.free_shipping_min ?? 0}
             deadline={settings?.deadline_id || settings?.deadline_en || null}
             popularIds={normalizeFlavorIds(settings?.popular_flavor_ids)}
-            bestSellingIds={normalizeFlavorIds(settings?.best_selling_flavor_ids)}
             ctaSlot={
               <OrderNowLink
                 open={open}

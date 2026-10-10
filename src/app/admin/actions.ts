@@ -11,6 +11,7 @@ import type {
   DeliveryZone,
   Order,
   OrderStatus,
+  ProfileMenuItem,
   SalesSummary,
   SalesTransaction,
   StoreSettings,
@@ -768,5 +769,56 @@ export async function saveSettingsAction(
 
   revalidatePath("/", "layout");
   revalidatePath("/admin/settings");
+  return { ok: true };
+}
+
+/* =============================================================================
+ *  MENU PROFIL (sheet tab "Profil" di bottom nav)
+ *  Bar menu + isi popup-nya dikelola penuh dari dashboard.
+ *  Tabel & RPC: supabase/migration-41.sql
+ * ========================================================================== */
+
+export async function listProfileMenuItemsAction(): Promise<
+  ActionResult<ProfileMenuItem[]>
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error || !data) return { ok: false, error: "not_authorized" };
+
+  const { data: rows, error: sErr } = await supabase.rpc(
+    "admin_list_profile_menu_items"
+  );
+  if (sErr) return { ok: false, error: humanize(sErr.message) };
+
+  const payload = (rows ?? {}) as { items?: ProfileMenuItem[] };
+  return { ok: true, data: payload.items ?? [] };
+}
+
+export async function saveProfileMenuItemAction(
+  payload: Record<string, unknown>
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_save_profile_menu_item", {
+    p_payload: payload,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  // Sheet profil ada di root layout, jadi harus disegarkan dari root.
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/profile-menu");
+  return { ok: true };
+}
+
+export async function deleteProfileMenuItemAction(
+  id: number
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_delete_profile_menu_item", {
+    p_id: id,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/profile-menu");
   return { ok: true };
 }

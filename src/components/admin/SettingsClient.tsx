@@ -95,7 +95,6 @@ function toDraft(s: StoreSettings | null): Draft {
     logo_url: s?.logo_url ?? null,
     brand_line: s?.brand_line ?? "Japanese Bake & Pastry",
     popular_flavor_ids: normalizeFlavorIds(s?.popular_flavor_ids),
-    best_selling_flavor_ids: normalizeFlavorIds(s?.best_selling_flavor_ids),
   };
 }
 
@@ -619,13 +618,6 @@ export function SettingsClient({
             selected={form.popular_flavor_ids}
             options={flavors}
             onChange={(ids) => patch({ popular_flavor_ids: ids })}
-          />
-          <HomePickField
-            title={t.admin.settings.bestPicker}
-            hint={t.admin.settings.bestPickerHint}
-            selected={form.best_selling_flavor_ids}
-            options={flavors}
-            onChange={(ids) => patch({ best_selling_flavor_ids: ids })}
           />
         </div>
       </Section>

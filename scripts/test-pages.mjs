@@ -100,6 +100,10 @@ await openPage("/admin/customers", { mustContain: ["Pelanggan", "WhatsApp"] });
 await openPage("/admin/pickup-delivery", {
   mustContain: ["Catatan Pengambilan", "Ambil di Toko", "Pengantaran"],
 });
+// Menu Profil (migration-41): bar menu sheet Profil di aplikasi pembeli.
+await openPage("/admin/profile-menu", {
+  mustContain: ["Menu Profil", "Tambah bar menu"],
+});
 
 console.log("\n=== 4. Halaman publik tetap terbuka ===");
 // Nama merek = "Rumakomugi" (dari store_settings.store_name).

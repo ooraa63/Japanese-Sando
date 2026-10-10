@@ -9,7 +9,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider";
 import { AuthModal } from "@/components/customer/AuthModal";
 import { MobileBottomNav } from "@/components/customer/MobileBottomNav";
-import { getCustomerProfile } from "@/lib/data";
+import { getCustomerProfile, getProfileMenuItems } from "@/lib/data";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -84,6 +84,10 @@ export default async function RootLayout({
   // null kalau belum login — aman dipanggil untuk semua visitor.
   const initialProfile = await getCustomerProfile();
 
+  // Bar menu sheet Profil (tab paling kanan bottom nav). Datanya diambil
+  // di sini supaya sheet ter-render dari server dan tidak flash kosong.
+  const profileMenu = await getProfileMenuItems();
+
   return (
     // `data-scroll-behavior` dipakai Next.js 16 agar navigasi antar halaman
     // tetap langsung ke atas, bukan smooth-scroll.
@@ -99,7 +103,7 @@ export default async function RootLayout({
               <CustomerAuthProvider initialProfile={initialProfile}>
                 {children}
                 <AuthModal />
-                <MobileBottomNav />
+                <MobileBottomNav profileMenu={profileMenu} />
               </CustomerAuthProvider>
             </CartProvider>
           </ToastProvider>

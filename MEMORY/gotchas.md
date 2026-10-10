@@ -670,3 +670,67 @@ Untuk satu file, pakai `npm run db:apply -- supabase/migration-N.sql`
 (`scripts/db-apply.mjs`). File migrasi tetap harus idempoten
 (`create or replace`, `add column if not exists`, `drop ... if exists`)
 supaya aman kalau nanti `db:push` dijalankan penuh.
+
+## 41. PowerShell `Set-Content -Encoding UTF8` MERUSAK karakter Unicode
+
+Dua kali sesi ini file .tsx rusak setelah disunting lewat PowerShell:
+
+```powershell
+$kept = $lines[0..417] + $lines[499..($lines.Count-1)]
+Set-Content -Path $p -Value $kept -Encoding UTF8   # <- EM-DASH jadi "â€”"
+```
+
+Gejalanya kelihatan saat `grep` menemukan karakter aneh (`â€`, `â˜•`)
+dan `tsc` / lint meledak di tempat yang tidak ada hubungannya.
+
+Untuk pengeditan file di repo ini:
+- pakai tool `edit` / `write` (menulis UTF-8 dengan benar), atau
+- pakai Node: `fs.readFileSync(p,"utf8")` -> ubah -> `fs.writeFileSync(p,s,"utf8")`.
+
+Kalau `-replace` massal memang perlu PowerShell, pakai
+`[System.IO.File]::WriteAllText($p, $n, (New-Object System.Text.UTF8Encoding $false))`
+agar tanpa BOM dan tanpa ruining isi. Kalau terlanjur rusak, pola yang
+muncul: `â€”` -> `—`, `â€™` -> `’`, `â€œ` -> `“`, `â˜•` -> `☕`.
+
+## 42. `react-hooks/static-components`: jangan bikin komponen saat render
+
+Pola ini DITOLAK lint kalau nama komponen berasal dari peta objek:
+
+```tsx
+const ICONS: Record<string, typeof UserCircle> = { UserCircle, HelpCircle, ... };
+const Icon = iconFor(item.icon);   // <-- "This component is created during render"
+return <Icon className="size-4" />;
+```
+
+Perbaikannya: kembalikan JSX, bukan komponen.
+
+```tsx
+function iconNode(name: string): React.ReactNode {
+  switch (name) {
+    case "UserCircle": return <UserCircle className="size-4.5" />;
+    default:           return <HelpCircle className="size-4.5" />;
+  }
+}
+```
+
+Dipakai di dua tempat: pemetaan ikon bar menu Profil di
+`ProfileSheet.tsx` dan di `ProfileMenuClient.tsx`. Nama ikon datang dari
+database, jadi mapping lewat switch juga lebih aman daripada indexing objek
+dengan string dari luar.
+
+## 43. Menyalin `store_settings` ke tabel lain = salinan yang bisa melenceng
+
+Migration-41 mengisi bar "Hubungi Kami" & "Jam Buka" dari
+`store_settings` supaya sheet Profil langsung berguna. Masalahnya: begitu
+disalin, nilai itu **tidak lagi ikut berubah** kalau penjual mengedit
+Pengaturan.
+
+Akibat nyata: `address` yang rusak (`"Vihara Tian En, Jl.buffers"`) ikut
+tersalin dan sekarang tampil ke pembeli sebagai isi popup.
+
+Aturan kalau menyalin settings ke tabel lain:
+- beri tahu penjual di UI bahwa isinya salinan (lihat
+  `profileMenu.contactCopiedFromSettings`),
+- lebih baik lagi, jangan menyalin: baca langsung dari `store_settings`
+  saat render kalau bar-nya memang cuma "display setting".
+

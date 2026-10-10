@@ -33,6 +33,10 @@ export function AccountClient({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
+  // Pesanan dipisah dua: yang masih berjalan vs yang sudah selesai.
+  const activeOrders = initialOrders.filter((o) => !isFinished(o.status));
+  const historyOrders = initialOrders.filter((o) => isFinished(o.status));
+
   function onSubmitProfile(formData: FormData) {
     startTransition(async () => {
       const result: CustomerActionResult = await updateCustomerProfileAction(
@@ -163,30 +167,75 @@ export function AccountClient({
         </form>
       </section>
 
-      {/* ===== Orders ===== */}
-      <section>
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <h2 className="text-lg font-bold text-cocoa-900">{dict.orders.title}</h2>
-          <span className="text-xs font-bold text-cocoa-400">
-            {initialOrders.length} {dict.orders.total}
-          </span>
-        </div>
+      {/* ===== Pesanan =====
+          Dibagi dua bagian (permintaan Steven, 10-10-2026):
+          "Sedang diproses" = pre-order yang belum diterima, dan
+          "Riwayat" = yang sudah selesai. Yang selesai = sudah diantar atau
+          dibatalkan. */}
+      <section className="space-y-8">
+        <OrderGroup
+          title={dict.orders.activeTitle}
+          hint={dict.orders.activeHint}
+          orders={activeOrders}
+          emptyText={dict.orders.activeEmpty}
+          dict={dict}
+        />
+        <OrderGroup
+          title={dict.orders.historyTitle}
+          hint={dict.orders.historyHint}
+          orders={historyOrders}
+          emptyText={dict.orders.historyEmpty}
+          dict={dict}
+        />
+      </section>
+    </div>
+  );
+}
 
-        {initialOrders.length === 0 ? (
-          <div className="card p-8 text-center text-cocoa-400 sm:p-10">
-            <p>{dict.orders.empty}</p>
-            <Link href="/order" className="btn-primary mt-5 inline-flex">
+/**
+ * Status yang menandai pesanan sudah selesai: diterima (delivered) atau
+ * dibatalkan (cancelled). Selain itu masih berjalan.
+ */
+function isFinished(status: string) {
+  return status === "delivered" || status === "cancelled";
+}
+
+function OrderGroup({
+  title,
+  hint,
+  orders,
+  emptyText,
+  dict,
+}: {
+  title: string;
+  hint: string;
+  orders: CustomerOrderSummary[];
+  emptyText: string;
+  dict: AccountDict;
+}) {
+  return (
+    <div>
+      <div className="mb-3">
+        <h2 className="text-lg font-bold text-cocoa-900">{title}</h2>
+        <p className="mt-0.5 text-xs text-cocoa-400">{hint}</p>
+      </div>
+
+      {orders.length === 0 ? (
+        <div className="card p-6 text-center text-sm text-cocoa-400">
+          <p>{emptyText}</p>
+          {title === dict.orders.activeTitle ? (
+            <Link href="/order" className="btn-primary mt-4 inline-flex">
               {dict.orders.newOrder}
             </Link>
-          </div>
-        ) : (
-          <ul className="space-y-3">
-            {initialOrders.map((o) => (
-              <OrderRow key={o.id} order={o} dict={dict} />
-            ))}
-          </ul>
-        )}
-      </section>
+          ) : null}
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {orders.map((o) => (
+            <OrderRow key={o.id} order={o} dict={dict} />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

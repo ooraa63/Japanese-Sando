@@ -124,9 +124,38 @@ export interface StoreSettings {
    * (urut berdasarkan like + terjual). Maksimal 3 — migration-40.
    */
   popular_flavor_ids: number[];
-  /** Id flavor untuk section "Terlaris". Sama: maks 3, `[]` = otomatis. */
-  best_selling_flavor_ids: number[];
   updated_at: string;
+}
+
+/** Satu tombol di dalam popup bar menu Profil. */
+export interface ProfileMenuButton {
+  label_id: string;
+  label_en?: string;
+  href: string;
+}
+
+/**
+ * Bar menu di sheet Profil (bottom nav, tab paling kanan).
+ *
+ * Kelola dari dashboard: Admin > Menu Profil. Pembeli hanya melihat bar
+ * yang `is_active` (lihat `public_profile_menu()`, migration-41).
+ *
+ * `code = "account"` punya perilaku KHUSUS: bar itu tidak menampilkan isi
+ * popup, tapi membuka form login. Kode lain bebas dan hanya menampilkan
+ * `body` + `buttons` apa adanya.
+ */
+export interface ProfileMenuItem {
+  id: number;
+  code: string;
+  /** Nama ikon lucide; dipetakan lewat whitelist di frontend. */
+  icon: string;
+  title_id: string;
+  title_en: string;
+  body_id: string;
+  body_en: string;
+  buttons: ProfileMenuButton[];
+  sort_order: number;
+  is_active: boolean;
 }
 
 /**

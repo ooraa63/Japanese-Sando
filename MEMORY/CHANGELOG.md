@@ -4,6 +4,70 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-10 — Bottom nav jadi 3 tab (Beranda/Pesanan/Profil) + kartu Populer bisa di-like
+
+**Scope:** feat: tab Profil berupa sheet menu dinamis, Favorit & Terlaris dihapus, like jadi interaktif
+
+Steven (10-10) minta: (1) kartu menu seperti referensi + hapus "favorit" dan
+"terlaris"; (2) tambah jumlah terjual dan fitur like (ketuk hati atau double
+klik); (3) bottom nav jadi 3 tab — Beranda, Pesanan (2 bar: sedang diproses +
+riwayat), dan Profil (daftar bar yang kalau ditekan muncul popup; semua bisa
+diset dari admin).
+
+**Mengubah:**
+- `supabase/migration-41.sql` — baru. Tabel `profile_menu_items` (bar menu
+  profil: code, icon, title/body dua bahasa, buttons jsonb, sort_order,
+  is_active) + RLS + `public_profile_menu()` + 3 RPC admin. Ter-seed 5 bar dari
+  data `store_settings` yang sudah ada.
+- `scripts/db-push.mjs` — ikut menyertakan migration-41.
+- `src/components/customer/ProfileSheet.tsx` — baru. Sheet (baris-baris menu)
+  + popup isi per bar. Status buka/tutup di store modul-level supaya tombol
+  tab dan sheet bisa terpisah.
+- `src/components/customer/MobileBottomNav.tsx` — 5 tab → 3 tab; "Profil"
+  jadi tombol buka sheet, bukan link.
+- `src/lib/useFlavorLikes.ts` — baru. Store like bersama (localStorage +
+  `/api/flavor-like`), dipakai kartu Populer dan kartu menu sekaligus.
+- `src/components/customer/AppHome.tsx` — kartu Populer kini punya tombol
+  like + jumlah terjual; `BestSellingList` DIHAPUS; komposisi tidak menerima
+  `bestSellingIds`.
+- `src/app/favorites/` — DIHAPUS (routing + komponen).
+- `src/app/account/AccountClient.tsx` — pesanan dipecah dua bagian
+  (`OrderGroup` + helper `isFinished`).
+- `src/components/admin/ProfileMenuClient.tsx` + `src/app/admin/(dashboard)/profile-menu/page.tsx`
+  — baru. CRUD bar menu profil.
+- `src/components/admin/AdminShell.tsx` + `layout.tsx` — item sidebar baru.
+- `src/app/admin/actions.ts` — 3 action baru.
+- `src/lib/types.ts`, `src/lib/data.ts` — `ProfileMenuItem`,
+  `getProfileMenuItems()`. `best_selling_flavor_ids` dihapus dari tipe.
+- `src/lib/i18n/id.ts` + `en.ts` — grup `profile`, key `nav.profile`, label
+  admin `profileMenu`, dan label pesanan aktif/riwayat.
+- `src/components/admin/SettingsClient.tsx` — pemilih "Terlaris" dihapus.
+
+**Catatan penting (untuk Steven):**
+- Kolom `store_settings.best_selling_flavor_ids` (dari migration-40) TIDAK
+  di-drop, cuma tidak dipakai lagi. Tidak dihapus supaya kalau mau dikembalikan
+  tidak perlu migrasi.
+- Data yang sudah rusak di `store_settings`: `address = "Vihara Tian En,
+  Jl.buffers"`, `hours_id` kosong, `instagram` & `maps_url` kosong,
+  `whatsapp = "621234567890"` (placeholder). Migration-41 menyalin nilai-nilai
+  itu ke bar "Hubungi Kami" dan "Jam Buka", jadi yang rusak sekarang terlihat
+  ke pembeli. Perlu diperbaiki dari Pengaturan > Kontak & Lokasi, lalu
+  disalin ulang di Menu Profil (isinya salinan, bukan live).
+- Kartu yang sudah di-like jadi PUDAR (opacity 45%), bukan hilang total —
+  supaya hati masih bisa ditekan untuk membatalkan.
+
+**Verifikasi:**
+- migration-41 diterapkan ke DB produksi; 5 bar ter-seed, `public_profile_menu()`
+  menghormati `is_active`.
+- Uji browser (Edge headless, viewport HP): bottom nav = 3 tab; kartu Populer
+  punya hati + "1 terjual"; klik hati → `aria-pressed` true, label jadi
+  "Batalkan suka", kartu opacity 0.45, `like:flavor:1` masuk localStorage;
+  double-click kartu juga men Like; sheet Profil menampilkan 5 bar; tap
+  "Hubungi Kami" → popup berisi isi + tombol "Chat WhatsApp"; tap "Akun Saya"
+  → AuthModal login terbuka; halaman admin `/admin/profile-menu` menampilkan
+  5 bar dengan tombol Ubah. **0 console error.**
+- `/favorites` sekarang 404. `tsc --noEmit` dan `eslint --max-warnings=0` bersih.
+
 ## 2026-10-09 — "Populer" & "Terlaris" bisa dipilih penjual (maks 3) + token honey yang hilang
 
 **Scope:** feat: sorotan beranda dipilih dari dashboard (Admin > Settings > Beranda)
