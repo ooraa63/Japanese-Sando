@@ -691,3 +691,20 @@ otomatis). Batas 3 ditegakkan di tiga lapis: CHECK constraint di DB,
   data beranda. Kalau penjual memilih produk non-aktif, produk itu tidak akan
   muncul di beranda — jadi hindari memilih yang tidak langsung terlihat.
 
+## D28 — Counter like hasil pengujian DIJAGA, tidak dihapus
+
+Steven sudah tahu bahwa counter like di toko ini **bukan dari pembeli sungguhan**
+— berasal dari verifikasi otomatis yang mengklik hati lewat browser headless.
+Saat diberi tahu (10-10-2026), jawabannya: **"biarkan aja dulu, jangan ada
+hapus apa-apa."**
+
+Jadi:
+- **JANGAN** menghapus baris `flavor_likes` atau me-reset `flavors.likes_count`
+  tanpa permintaan eksplisit Steven, meskipun angkanya terlihat seperti data uji.
+- Angka itu sengaja dipakai sebagai **testimoni sosial** supaya etalase tidak
+  terlihat kosong saat demo atau presentasi ke calon pembeli.
+- Kalau nanti Steven berubah pikiran, urutannya: `delete from flavor_likes` lalu
+  `update flavors set likes_count = 0`. Asal-usul angkanya ada di gotchas.md #45.
+
+Temuan asli: `flavor_likes` berisi 10 baris, `likes_count` = 6/0/2/1/1.
+

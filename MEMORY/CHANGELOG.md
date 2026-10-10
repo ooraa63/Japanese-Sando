@@ -50,7 +50,11 @@ like di Menu dan 0 di Populer, teks "N terjual" tampil, "Our flavors" /
 dipakai untuk verifikasi ini **menuliskan like sungguhan ke database
 produksi** lewat `POST /api/flavor-like`. Tabel `flavor_likes` sekarang berisi
 10 baris dan `flavors.likes_count` = 6/0/2/1/1 — semuanya artefak pengujian,
-bukan pembeli. Detail + cara membersihkannya ada di gotchas.md #45.
+bukan pembeli.
+
+Steven sudah diberi tahu dan **meminta agar dibiarkan** ("biarkan aja dulu,
+jangan ada hapus apa-apa") karena angka itu dipakai sebagai testimoni sosial
+agar etalase tidak terlihat kosong. Lihat decisions.md **D28**.
 
 ---
 

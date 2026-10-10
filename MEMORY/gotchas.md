@@ -768,8 +768,13 @@ Aturan:
 - kalau iya, pakai endpoint tes/dev yang tidak menulis, atau panggil
   `toggle()` dua kali (like lalu unlike) supaya angka kembali;
 - setelah tes, **cek** `flavor_likes` + `flavors.likes_count` dan laporkan
-  ke penjual kalau ada data uji yang bocor. Angka like/terjual yang dikarang
-  atau bocor sama saja data palsu — jangan dibiarkan live.
+  ke penjual kalau ada data uji yang bocor.
+
+**Status data ini sekarang: sengaja DIJAGA.** Steven sudah tahu dan meminta
+agar tidak dihapus — angkanya dipakai sebagai testimoni sosial agar etalase
+tidak terlihat kosong (lihat decisions.md **D28**). Jadi jangan ikut
+"membersihkan" angka itu. Yang tetap berlaku: laporkan kalau tes berikutnya
+menambah baris baru.
 
 ## 46. Edge 155: pakai `--headless` polos, bukan `--headless=new`
 
