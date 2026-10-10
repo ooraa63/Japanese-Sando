@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { MessageCircle, ShoppingBag } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { getPublicMenu, getSettings, getCustomerProfile } from "@/lib/data";
 import { getI18nDict, getLang } from "@/lib/i18n-server";
 import { MenuBrowser } from "@/components/customer/MenuBrowser";
@@ -60,10 +59,9 @@ export default async function HomePage() {
         <section className="mx-auto max-w-2xl px-4 pt-4 pb-10 sm:px-6 sm:pt-6">
           <AppHome
             categories={categories}
+            bundles={bundles}
             heroImages={heroImages}
             userName={profile?.full_name ?? null}
-            freeShippingMin={settings?.free_shipping_min ?? 0}
-            deadline={settings?.deadline_id || settings?.deadline_en || null}
             popularIds={normalizeFlavorIds(settings?.popular_flavor_ids)}
             ctaSlot={
               <OrderNowLink
@@ -82,47 +80,15 @@ export default async function HomePage() {
           <ShopInfo settings={settings} variant="static" />
         </div>
 
-        {/* ===================== MENU LENGKAP ===================== */}
-        <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-10 sm:px-6 lg:py-14">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-bold tracking-[0.2em] text-honey-600 uppercase">
-                {dicts.nav.menu}
-              </p>
-              <h2 className="mt-2 text-3xl font-extrabold text-cocoa-900 sm:text-4xl">
-                {dicts.menu.title}
-              </h2>
-              <p className="mt-2 text-base text-cocoa-500">{dicts.menu.subtitle}</p>
-              <p className="mt-1.5 text-[13px] text-cocoa-400">{dicts.menu.readOnlyNote}</p>
-            </div>
-            {open ? (
-              <Link href="/order" className="btn-primary shrink-0">
-                <ShoppingBag className="size-4" />
-                {dicts.menu.orderNow}
-              </Link>
-            ) : null}
-          </div>
+        {/* ===================== MENU LENGKAP =====================
+            Header "Our flavors" + tombol "Order these" DIHAPUS
+            (permintaan Steven, 10-10-2026): setelah section "Populer"
+            di atas, daftar menu langsung menyusul tanpa perantara.
 
-          <div className="mt-10">
-            <MenuBrowser
-              categories={categories}
-              bundles={(bundles as unknown as Array<{
-                id: number;
-                category_id: number | null;
-                slug: string;
-                name_id: string;
-                name_en: string;
-                desc_id: string;
-                desc_en: string;
-                price: number;
-                required_qty: number;
-                image_url: string | null;
-                is_active: boolean;
-                is_featured: boolean;
-                sort_order: number;
-              }>) ?? []}
-            />
-          </div>
+            Bundle / paket hemat juga sudah pindah ke atas "Populer"
+            (lihat AppHome), jadi di sini tidak perlu dirender lagi. */}
+        <section id="menu" className="mx-auto max-w-6xl scroll-mt-20 px-4 pb-10 sm:px-6 lg:pb-14">
+          <MenuBrowser categories={categories} />
         </section>
 
         {/* ===================== REVIEWS ===================== */}

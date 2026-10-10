@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import { Flame, Heart, MessageSquare, Minus, PackageX, Plus, ShoppingBag, Star } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
+import { useFlavorLikes } from "@/lib/useFlavorLikes";
 import { PriceTag } from "./PriceTag";
 import type { Flavor } from "@/lib/types";
 
@@ -45,6 +45,13 @@ export function FlavorCard({
    */
   showStock = true,
   /**
+   * `showSold` -> tampilkan baris "N terjual" di bawah pil like.
+   * Default false: kartu menu di beranda cukup menampilkan "N liked"
+   * (gambar referensi Steven) — angka terjual sudah tampil di section
+   * "Populer", jadi tidak perlu diulang dua kali di halaman yang sama.
+   */
+  showSold = false,
+  /**
    * `readOnlySocial` -> tampilkan counter 'terjual' & status like, tapi
    * tombol like dinonaktifkan (untuk halaman pre-order yang hanya boleh
    * melihat).
@@ -71,6 +78,8 @@ export function FlavorCard({
   showSocial?: boolean;
   /** Tampilkan baris sisa stok. False di beranda, true di /order. */
   showStock?: boolean;
+  /** Tampilkan baris "N terjual" di bawah pil like. Default false. */
+  showSold?: boolean;
   /** Read-only: tampil tapi jangan izinkan like. */
   readOnlySocial?: boolean;
   /** Gaya etalase (UIUX 3) alih-alih kartu menu biasa. */
@@ -97,78 +106,14 @@ export function FlavorCard({
         )
       : null;
 
-  // Session-id per-device untuk tracking like di server. localStorage agar
-// konsisten antar reload. Server pakai tabel flavor_likes dengan
-// (flavor_id, session_id) untuk hitung likes_count.
-  const sessionIdKey = "sando_session_id";
-  const likeKey = `like:flavor:${flavor.id}`;
-  const [isLiked, setIsLiked] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return window.localStorage.getItem(likeKey) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const [likesCount, setLikesCount] = useState<number>(flavor.likes_count ?? 0);
-
-  function getSessionId(): string {
-    if (typeof window === "undefined") return "ssr";
-    try {
-      let s = window.localStorage.getItem(sessionIdKey);
-      if (!s) {
-        s = `s-${Math.random().toString(36).slice(2)}-${Date.now()}`;
-        window.localStorage.setItem(sessionIdKey, s);
-      }
-      return s;
-    } catch {
-      return "ssr";
-    }
-  }
-
-  function toggleLike() {
-    if (readOnlySocial) return;
-    setIsLiked((prev) => {
-      const next = !prev;
-      try {
-        if (next) window.localStorage.setItem(likeKey, "1");
-        else window.localStorage.removeItem(likeKey);
-      } catch {
-        /* abaikan */
-      }
-      return next;
-    });
-    // Optimistic update counter
-    setLikesCount((c) => Math.max(0, c + (isLiked ? -1 : 1)));
-    // Kirim ke server (async, fire-and-forget)
-    const sessionId = getSessionId();
-    void (async () => {
-      try {
-        const res = await fetch("/api/flavor-like", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ flavor_id: flavor.id, session_id: sessionId }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as {
-            liked: boolean;
-            likes_count: number;
-          };
-          // Sync dengan server
-          setIsLiked(data.liked);
-          setLikesCount(data.likes_count);
-          try {
-            if (data.liked) window.localStorage.setItem(likeKey, "1");
-            else window.localStorage.removeItem(likeKey);
-          } catch {
-            /* abaikan */
-          }
-        }
-      } catch {
-        /* diam — localStorage sudah ter-update */
-      }
-    })();
-  }
+  // Like memakai store BERSAMA (`useFlavorLikes`) yang sama dengan kartu di
+  // section "Populer". Kalau kartu ini punya state sendiri, menekan hati di
+  // menu tidak akan membuat kartu Populer ikut berubah — dan dua kartu untuk
+  // produk yang sama akan saling menimpa.
+  const likes = useFlavorLikes();
+  const isLiked = likes.isLiked(flavor.id);
+  const likesCount = likes.count(flavor.id, flavor.likes_count ?? 0);
+  const toggleLike = () => likes.toggle(flavor.id);
 
   /* ------------------------------------------------------------------
    * Gaya etalase (UIUX 3): foto di atas, hati pojok kanan atas, baris
@@ -267,6 +212,14 @@ export function FlavorCard({
     );
   }
 
+  /* ------------------------------------------------------------------
+   * Kartu menu di beranda (gambar referensi Steven, 10-10-2026):
+   * foto tinggi, badge "Signature" di kiri atas, nama Playfair besar,
+   * deskripsi, harga besar, lalu pil "N liked" selebar kartu.
+   *
+   * Ini SATU-SATUNYA tempat di beranda yang bisa di-like; section
+   * "Populer" di atasnya sengaja read-only.
+   * ------------------------------------------------------------------ */
   return (
     <article
       className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
@@ -275,9 +228,10 @@ export function FlavorCard({
           : "border-cocoa-200/70 hover:-translate-y-1 hover:border-cocoa-300 hover:shadow-xl hover:shadow-cocoa-900/10"
       }`}
     >
-      {/* Foto / placeholder */}
+      {/* Foto / placeholder. Rasio dibuat lebih tinggi dari 4:3 supaya
+          kartu terasa seperti "poster" produk ala referensi. */}
       <div
-        className={`flavor-photo relative aspect-square overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)} sm:aspect-[4/3]`}
+        className={`flavor-photo relative aspect-[4/5] overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)}`}
       >
         {flavor.image_url ? (
           <Image
@@ -299,7 +253,7 @@ export function FlavorCard({
           {flavor.is_featured && !soldOut ? (
             <span className="chip bg-honey-400/95 text-cocoa-900 shadow">
               <Star className="size-3 fill-current" />
-              {t.menu.featured}
+              {t.menu.signature}
             </span>
           ) : (
             <span />
@@ -329,10 +283,9 @@ export function FlavorCard({
             {categoryName}
           </p>
         ) : null}
-        {/* Judul & deskripsi diberi tinggi minimum tetap supaya harga, label stok,
-            dan tombol selalu sejajar antar kartu—even kalau ada nama 1 baris
-            dan ada 2 baris. Tanpa ini grid jadi "lonjong" (lihat laporan
-            Steven). min-h pakai arbitrary value biar pas untuk 2 baris.
+        {/* Judul & deskripsi diberi tinggi minimum tetap supaya harga dan pil
+            like selalu sejajar antar kartu — даже kalau ada nama 1 baris
+            dan ada 2 baris.
 
             PENTING: nama hanya boleh dirender SATU kali di sini. Sebelumnya
             ada <h3>{name}</h3> di dalam wrapper flex ini DAN lagi di blok
@@ -341,7 +294,7 @@ export function FlavorCard({
             hanya untuk menyejajarkan chip jumlah keranjang dengan judul. */}
         <div className="flex items-start justify-between gap-2">
           {!compact ? (
-            <h3 className="font-display min-h-[2.6em] text-lg leading-tight font-bold text-cocoa-900">
+            <h3 className="font-display min-h-[2.6em] text-xl leading-tight font-bold text-cocoa-900">
               {name}
             </h3>
           ) : (
@@ -358,19 +311,19 @@ export function FlavorCard({
         </div>
 
         {!compact ? (
-          <p className="flavor-desc mt-1 line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-cocoa-500">
+          <p className="flavor-desc mt-1.5 line-clamp-3 min-h-[3.6em] text-[13px] leading-relaxed text-cocoa-500">
             {desc ?? " "}
           </p>
         ) : null}
 
-        {/* Harga DI BAWAH foto — lebih besar & mencolok supaya pembeli cepat
-            lihat harga tanpa harus menebak dari chip kecil. */}
-        <div className="mt-1.5">
+        {/* Harga DI BAWAH foto — dibuat sebesar mungkin di kartu beranda
+            supaya pembeli cepat lihat tanpa menebak dari chip kecil. */}
+        <div className="mt-2">
           <PriceTag
             price={flavor.price}
             comparePrice={flavor.compare_price}
             lang={lang}
-            size="lg"
+            size="xl"
           />
         </div>
 
@@ -411,21 +364,20 @@ export function FlavorCard({
           </div>
         ) : null}
 
-        {/* Baris 'terjual' + 'disukai'.
-            Dua perbaikan dari Steven:
-            1) Angka + tombol dipindah ke BARIS SENDIRI di bawah teks. Sebelumnya
-               semuanya dijejak baris dengan `truncate`, jadi di grid 2 kolom
-               HP terpotong jadi "0 terj..." / "1 disu...". Sekarang tiap baris
-               dapat lebar penuh kartu dan tidak pernah dipotong.
-            2) "disukai" memakai logo hati (Love) — jadi jelas itu dislike/suka,
-               bukan sekadar angka.
-            Di /order dipakai `readOnlySocial` sehingga tombolnya tidak
-            dirender (like hanya di halaman menu), sesuai permintaan Steven. */}
+        {/* Baris 'disukai' (+ 'terjual' kalau diaktifkan).
+            Perataan:
+            1) Angka + tombol dipakai BARIS SENDIRI di bawah teks, bukan
+               dijejak baris dengan `truncate` — di grid sempit angka
+               "terjual"/"disukai" pernah terpotong jadi "0 ter...".
+            2) "disukai" memakai logo hati, jadi jelas itu suka, bukan
+               sekadar angka.
+            Di /order dipakai `readOnlySocial` sehingga tombolnya hilang
+            dan angka saja yang tampil — like hanya ada di beranda. */}
         {showSocial ? (
-          <div className="flavor-social mt-2.5 flex shrink-0 flex-col gap-1.5 border-t border-cocoa-100 pt-2.5 text-[11px]">
+          <div className="flavor-social mt-3 flex shrink-0 flex-col gap-1.5 border-t border-cocoa-100 pt-3 text-[12px]">
             {readOnlySocial ? (
               <span className="flex items-center justify-center gap-1 text-berry-500">
-                <Heart className="size-3.5 shrink-0 fill-current" />
+                <Heart className="size-4 shrink-0 fill-current" />
                 <span className="font-bold tabular">{likesCount}</span>
                 <span className="text-cocoa-500">{t.menu.likesCount}</span>
               </span>
@@ -435,24 +387,26 @@ export function FlavorCard({
                 onClick={() => toggleLike()}
                 aria-pressed={isLiked}
                 aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
-                className={`flex w-full items-center justify-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                className={`flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2.5 text-[13px] font-bold transition active:scale-[0.98] ${
                   isLiked
                     ? "bg-berry-500 text-white"
                     : "bg-cocoa-100 text-cocoa-600 hover:bg-berry-500/15 hover:text-berry-600"
                 }`}
               >
                 <Heart
-                  className={`size-3.5 shrink-0 ${isLiked ? "fill-current" : ""}`}
+                  className={`size-4 shrink-0 ${isLiked ? "fill-current" : ""}`}
                 />
                 <span className="tabular">{likesCount}</span>
                 <span>{t.menu.likesCount}</span>
               </button>
             )}
-            <span className="flex items-center justify-center gap-1 text-cocoa-500">
-              <ShoppingBag className="size-3.5 shrink-0" />
-              <span className="font-bold text-cocoa-700 tabular">{soldCount}</span>
-              <span>{t.menu.soldCount}</span>
-            </span>
+            {showSold ? (
+              <span className="flex items-center justify-center gap-1 text-cocoa-500">
+                <ShoppingBag className="size-4 shrink-0" />
+                <span className="font-bold text-cocoa-700 tabular">{soldCount}</span>
+                <span>{t.menu.soldCount}</span>
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>

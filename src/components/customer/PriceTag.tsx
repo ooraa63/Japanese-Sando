@@ -23,7 +23,7 @@ export function PriceTag({
   /** Harga sebelum diskon. Null / <= price = tidak ada harga coret. */
   comparePrice?: number | null;
   lang: Language;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   align?: "left" | "center" | "right";
 }) {
   const hasDiscount =
@@ -33,17 +33,21 @@ export function PriceTag({
     : 0;
 
   const priceSize =
-    size === "lg"
-      ? "text-2xl"
-      : size === "sm"
-        ? "text-sm"
-        : "text-base";
+    size === "xl"
+      ? "text-3xl"
+      : size === "lg"
+        ? "text-2xl"
+        : size === "sm"
+          ? "text-sm"
+          : "text-base";
   const compareSize =
-    size === "lg"
-      ? "text-sm"
-      : size === "sm"
-        ? "text-[11px]"
-        : "text-xs";
+    size === "xl"
+      ? "text-base"
+      : size === "lg"
+        ? "text-sm"
+        : size === "sm"
+          ? "text-[11px]"
+          : "text-xs";
 
   const justify =
     align === "center"

@@ -4,6 +4,63 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-10 — Beranda: Bundle naik ke atas Populer, kartu Menu jadi gaya referensi, Populer jadi read-only
+
+**Scope:** feat: susunan ulang beranda sesuai gambar referensi Steven
+
+Steven kirim 4 gambar dan minta: (1) kartu **menu** diubah ke gaya gambar 1,
+(2) kartu **Populer** tidak bisa diketuk sama sekali — hanya lihat; yang bisa
+di-like adalah kartu **menu**, (3) section **Kategori** dan header
+"Menu / Our flavors" dihapus, dan (4) **Bundle** diletakkan di atas Populer.
+Urutan akhirnya: sapaan → hero → paket hemat → Populer → menu.
+
+**Mengubah:**
+- `src/components/customer/BundleShowcase.tsx` — BARU. Kartu bundle
+  diekstrak dari `MenuBrowser` supaya bisa dipakai di dua tempat.
+- `src/components/customer/MenuBrowser.tsx` — blok bundle + `BundleCard`
+  dihapus; header tingkat-2 tidak lagi ditulis ulang saat hanya ada satu
+  kategori (duplikat "Sando Sandwich" muncul dua kali).
+- `src/components/customer/AppHome.tsx` — `CategoryRow` dan `PromoBanner`
+  DIHAPUS; `BundleShowcase` disisipkan di atas `PopularGrid`; `PopularCard`
+  jadi `<div>` biasa tanpa `role=button`/`onClick`/`onDoubleClick`, hatinya
+  jadi `<span>`; props `freeShippingMin` & `deadline` dihapus.
+- `src/app/page.tsx` — blok header "Our flavors" + tombol "Order these"
+  dihapus; bundle diteruskan ke `AppHome`.
+- `src/components/customer/FlavorCard.tsx` — foto jadi `aspect-[4/5]`,
+  nama `text-xl`, harga `size="xl"`, badge pakai `t.menu.signature`
+  ("Signature"), pil like dibesar (full-width, `text-[13px]`), deskripsi
+  `line-clamp-3`, dan prop baru `showSold` (default false — kartu menu
+  cukup menampilkan "N disuka"; angka terjual sudah tampil di Populer).
+- `src/components/customer/PriceTag.tsx` — ukuran harga baru `"xl"`.
+- `src/lib/i18n/{id,en}.ts` — `menu.signature`.
+
+**Bug yang ditemukan & diperbaiki sekalian:**
+- `FlavorCard` punya state like sendiri (`useState` + `localStorage`), sementara
+  kartu Populer memakai store bersama `useFlavorLikes`. Akibatnya menekan hati di
+  menu **tidak** membuat kartu Populer ikut pudar. Sekarang `FlavorCard`
+  memakai `useFlavorLikes()` juga — satu sumber kebenaran untuk semua kartu.
+
+**Catatan:**
+- Banner promo (`PromoBanner`) dihapus dari komposisi beranda, komponennya
+  juga ikut hilang. Tapi banner ini memang tidak pernah tampil di produksi
+  (`free_shipping_min = 0` dan deadline kosong), jadi tidak ada perubahan
+  tampilan yang dilihat pembeli — kalau Steven mau promo lagi, tinggal
+  dikembalikan ke `AppHome`.
+- Strip jam buka / batas pre-order (`ShopInfo`) tetap ada antara Populer dan
+  menu. Steven bilang "di bawahnya menu langsung"; strip ini tipis dan bukan
+  section, jadi tidak dihapus tanpa diminta.
+- `menu.featured` (label "Favorit") tidak dipakai lagi di kartu; admin masih
+  memakai `admin.menu.featured` untuk menandai produk unggulan.
+
+**Verifikasi:**
+- Uji browser (Edge headless, viewport HP): urutan "Pilihan Paket Hemat"
+  (idx 130) < "Populer" (idx 207); "Kategori"/"Our flavors"/"Pilihan Rasa Kami"
+  tidak ada; section Populer berisi 3 `<li>` dengan 0 elemen interaktif dan 0
+  tombol like; kartu menu punya badge "Signature" + tombol like; klik hati di
+  menu → `aria-pressed` true, label "Hapus suka", `like:flavor:1` tersimpan,
+  dan kartu Populer untuk produk yang sama ikut pudar. **0 console error.**
+- `tsc --noEmit` dan `eslint --max-warnings=0` bersih.
+
 ## 2026-10-10 — Bottom nav jadi 3 tab (Beranda/Pesanan/Profil) + kartu Populer bisa di-like
 
 **Scope:** feat: tab Profil berupa sheet menu dinamis, Favorit & Terlaris dihapus, like jadi interaktif

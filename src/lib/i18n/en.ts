@@ -143,6 +143,7 @@ export const en = {
     flavors: "flavors",
     orderNow: "Order these",
     featured: "Signature",
+    signature: "Signature",
     soldOut: "Sold out",
     lowStock: "Only {n} left",
     inStock: "{n} available",

@@ -141,6 +141,7 @@ export const id: Dict = {
     flavors: "rasa",
     orderNow: "Pesan rasa ini",
     featured: "Favorit",
+    signature: "Signature",
     soldOut: "Habis",
     lowStock: "Tersisa {n}",
     inStock: "Tersedia {n}",

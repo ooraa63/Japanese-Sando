@@ -1,22 +1,15 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  Heart,
-  LayoutGrid,
-  ShoppingBag,
-  Truck,
-  Timer,
-} from "lucide-react";
-import type { Category, Flavor } from "@/lib/types";
+import { Heart, ShoppingBag } from "lucide-react";
+import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatIDR, MAX_HOME_PICKS } from "@/lib/utils";
 import { useFlavorLikes } from "@/lib/useFlavorLikes";
+import { BundleShowcase } from "@/components/customer/BundleShowcase";
 
 /**
  * Beranda bergaya aplikasi — mengikuti layout UIUX 4 (screen "Home"):
@@ -148,53 +141,12 @@ export function HeroBanner({
 }
 
 /* ==================================================================
- * Kategori — deretan ikon yang bisa digeser
- * ================================================================ */
-export function CategoryRow({ categories }: { categories: Category[] }) {
-  const { t, lang } = useI18n();
-  const withFlavors = categories.filter((c) => (c.flavors?.length ?? 0) > 0);
-  if (withFlavors.length === 0) return null;
-
-  return (
-    <section>
-      <SectionHead title={t.home.categories} />
-      <ul className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        {withFlavors.map((c) => {
-          const name = lang === "en" ? c.name_en : c.name_id;
-          return (
-            <li key={c.id} className="shrink-0">
-              <Link
-                href="/order"
-                className="flex w-[4.5rem] flex-col items-center gap-1.5 rounded-2xl border border-cocoa-200/70 bg-white p-2.5 transition hover:border-honey-400 hover:shadow-md"
-              >
-                <span className="relative grid size-11 place-items-center overflow-hidden rounded-xl bg-honey-100">
-                  {c.image_url ? (
-                    <Image
-                      src={c.image_url}
-                      alt=""
-                      fill
-                      sizes="44px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <LayoutGrid className="size-5 text-honey-600" />
-                  )}
-                </span>
-                <span className="line-clamp-2 text-center text-[10px] leading-tight font-bold text-cocoa-700">
-                  {name}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-/* ==================================================================
- * Produk populer — kartu ala aplikasi: foto, hati, nama, jumlah
- * suka + terjual, dan harga.
+ * Produk populer — deretan kartu yang HANYA untuk dilihat.
+ *
+ * Permintaan Steven (10-10-2026): kartu di section ini tidak bisa
+ * diketuk sama sekali. Bukan link ke /order, dan hatinya bukan tombol.
+ * Menyonya di sini berarti heart-nya berubah jadi ikon biasa.
+ * Tombolnya ada di section "Menu" di bawahnya.
  * ================================================================ */
 export function PopularGrid({
   flavors,
@@ -228,16 +180,11 @@ export function PopularGrid({
 }
 
 /**
- * Kartu produk di section "Populer".
+ * Kartu read-only di section "Populer".
  *
- * Dua cara untuk menyukai (permintaan Steven): tekan ikon hati, atau
- * ketuk ganda kartunya. Tombol hati memakai `e.stopPropagation` supaya
- * tidak sekaligus memicu navigasi ke /order.
- *
- * Produk yang sudah disukai jadi pudar (opasitas rendah) — bukan hilang
- * total, supaya hati masih bisa ditekan untuk membatalkan. Kalau hilang
- * total, satu-satunya cara membatalkan like adalah membuka halaman menu,
- * dan itu membingungkan.
+ * Sengaja BUKAN `<button>` dan TIDAK punya handler klik: kartu ini hanya
+ * menampilkan. Status like tetap ditampilkan (jadi pembeli tahu produk ini
+ * sudah ia sukai di menu), tapi tidak bisa diubah dari sini.
  */
 function PopularCard({
   flavor,
@@ -247,38 +194,16 @@ function PopularCard({
   soldCount: number;
 }) {
   const { t, lang } = useI18n();
-  const router = useRouter();
   const likes = useFlavorLikes();
 
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
   const liked = likes.isLiked(flavor.id);
   const likesCount = likes.count(flavor.id, flavor.likes_count ?? 0);
 
-  function toggle(event: React.MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    likes.toggle(flavor.id);
-  }
-
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => router.push("/order")}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          router.push("/order");
-        }
-      }}
-      onDoubleClick={(e) => {
-        e.preventDefault();
-        likes.toggle(flavor.id);
-      }}
-      className={`group flex w-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white transition ${
-        liked
-          ? "border-cocoa-200/70 opacity-45 saturate-50"
-          : "border-cocoa-200/70 hover:-translate-y-0.5 hover:border-honey-400 hover:shadow-md"
+      className={`flex w-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
+        liked ? "border-cocoa-200/70 opacity-45 saturate-50" : "border-cocoa-200/70"
       }`}
     >
       <div className="relative aspect-square overflow-hidden bg-cream-100">
@@ -288,7 +213,7 @@ function PopularCard({
             alt={name}
             fill
             sizes="(max-width: 640px) 30vw, 20vw"
-            className="object-cover transition duration-500 group-hover:scale-105"
+            className="object-cover"
           />
         ) : (
           <div className="grid h-full w-full place-items-center bg-grain">
@@ -298,32 +223,15 @@ function PopularCard({
           </div>
         )}
 
-        {/* Hati = tombol like. Penuh kalau produk ini sudah disukai. */}
-        <button
-          type="button"
-          onClick={toggle}
-          aria-pressed={liked}
-          aria-label={
-            liked
-              ? `${t.home.unlike} ${name}`
-              : `${t.home.like} ${name}`
-          }
-          className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full bg-white/90 shadow-sm transition active:scale-90"
+        {/* Hati di sini HANYA ikon penanda, bukan tombol. */}
+        <span
+          aria-hidden
+          className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full bg-white/90 shadow-sm"
         >
           <Heart
-            className={`size-3.5 ${
-              liked ? "fill-berry-400 text-berry-400" : "text-cocoa-400"
-            }`}
+            className={`size-3.5 ${liked ? "fill-berry-400 text-berry-400" : "text-cocoa-400"}`}
           />
-        </button>
-
-        {flavor.is_active === false ? (
-          <div className="absolute inset-0 grid place-items-center bg-cocoa-950/60">
-            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-cocoa-800">
-              {t.menu.soldOut}
-            </span>
-          </div>
-        ) : null}
+        </span>
       </div>
 
       <div className="flex flex-1 flex-col p-2 sm:p-2.5">
@@ -352,71 +260,6 @@ function PopularCard({
     </div>
   );
 }
-
-/* ==================================================================
- * Banner promo
- *
- * PENTING: kode diskon di referensi ("COFFEE20") tidak boleh
- * dikarang — kalau tidak ada, pembeli akan pakai kode yang salah.
- * Yang ditampilkan hanya DATA NYATA dari settings:
- *   - `free_shipping_min` > 0  -> gratis ongkir (itu voucher asli)
- *   - selain itu                 -> batas pesanan
- * Kalau keduanya kosong, banner tidak dirender sama sekali.
- * ================================================================ */
-export function PromoBanner({
-  freeShippingMin,
-  deadline,
-}: {
-  freeShippingMin: number;
-  deadline?: string | null;
-}) {
-  const { t, lang } = useI18n();
-
-  const hasFreeShip = freeShippingMin > 0;
-  if (!hasFreeShip && !deadline) return null;
-
-  return (
-    <section className="relative overflow-hidden rounded-[1.5rem] bg-cocoa-900 p-5 shadow-lg shadow-cocoa-900/15">
-      <div className="pointer-events-none absolute -right-6 -bottom-6 size-40 rounded-full bg-honey-500/15 blur-2xl" />
-      <div className="relative max-w-[65%]">
-        {hasFreeShip ? (
-          <>
-            <h3 className="font-display text-lg leading-tight font-extrabold text-cream-50">
-              {t.home.promoFreeShip}
-            </h3>
-            <p className="mt-1 text-xs text-cream-200/75">
-              {t.home.promoFreeShipDesc.replace(
-                "{min}",
-                formatIDR(freeShippingMin, lang)
-              )}
-            </p>
-          </>
-        ) : (
-          <>
-            <h3 className="font-display text-lg leading-tight font-extrabold text-cream-50">
-              {t.home.promoDeadline}
-            </h3>
-            <p className="mt-1 text-xs text-cream-200/75">{deadline}</p>
-          </>
-        )}
-
-        <Link
-          href="/order"
-          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-cream-50 px-4 py-2 text-xs font-bold text-cocoa-900 transition hover:bg-honey-300"
-        >
-          {hasFreeShip ? (
-            <Truck className="size-3.5" />
-          ) : (
-            <Timer className="size-3.5" />
-          )}
-          {t.home.promoUseCode}
-          <ArrowRight className="size-3.5" />
-        </Link>
-      </div>
-    </section>
-  );
-}
-
 
 /* ---------- judul section + link "Lihat semua" ---------- */
 function SectionHead({
@@ -504,18 +347,17 @@ function pickByIds(flavors: Flavor[], ids: number[] | null | undefined): Flavor[
 
 export function AppHome({
   categories,
+  bundles = [],
   heroImages,
   userName,
-  freeShippingMin,
-  deadline,
   popularIds,
   ctaSlot,
 }: {
   categories: Category[];
+  /** Bundle / paket hemat — ditampilkan di atas "Populer". */
+  bundles?: Bundle[];
   heroImages: string[];
   userName?: string | null;
-  freeShippingMin: number;
-  deadline?: string | null;
   /** Pilihan penjual untuk "Populer" (maks 3). Kosong = pakai otomatis. */
   popularIds?: number[];
   ctaSlot: React.ReactNode;
@@ -545,17 +387,19 @@ export function AppHome({
   }, [allFlavors, soldCounts]);
   const popular = popularPicked.length > 0 ? popularPicked : autoPopular;
 
+  // Urutan beranda (permintaan Steven, 10-10-2026):
+  //   sapaan -> hero -> paket hemat -> Populer -> (lanjut ke menu)
+  // Section "Kategori" dan banner promo dihapus; menu langsung menyusul
+  // section "Populer".
   return (
     <div className="space-y-6">
       <HomeGreeting userName={userName} />
 
       <HeroBanner images={heroImages} ctaSlot={ctaSlot} />
 
-      <CategoryRow categories={categories} />
+      <BundleShowcase bundles={bundles} />
 
       <PopularGrid flavors={popular} soldCounts={soldCounts} />
-
-      <PromoBanner freeShippingMin={freeShippingMin} deadline={deadline} />
     </div>
   );
 }
