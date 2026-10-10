@@ -4,6 +4,52 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-10 — Perbaikan kartu 3 kolom: ukuran sama, terjual selalu tampil, tanpa "Lihat Semua", tanpa efek transparan
+
+**Scope:** fix: kartu Populer/Menu kembali sama besar dan seragam
+
+Steven kirim 2 screenshot dengan 5 keluhan:
+1. ukuran kartu tidak sama semua,
+2. kartu kanan tidak menampilkan jumlah penjualan,
+3. "View all" dihapus,
+4. spacing di PC jelek,
+5. efek kartu jadi transparan kalau di-like dihapus.
+
+**Akar masalah (1) dan (4) — ini yang sebenarnya penting:**
+
+Di section "Populer", tiap kartu dibungkus `<li className="flex">` di dalam
+`grid grid-cols-3`. Pada flex **baris**, `align-items: stretch` hanya
+meregangkan sumbu **tegak**, bukan lebar — sehingga lebar kartu mengikuti
+isi teksnya, bukan lebar sel. Terukur: kartu 109px / 95px / 104px di HP
+padahal selnya 113px. Foto `aspect-square` mengikuti lebar itu, jadi
+tinggi fotonya berbeda-beda, dan sisa ruang di PC terbaca sebagai celah
+yang kegedean.
+
+Perbaikan: `w-full` pada kartu dense. Section "Menu" tidak kena masalah
+ini karena kartunya anak grid langsung (otomatis mengisi sel).
+
+Ditambah `shrink-0` pada kontainer foto, karena kartu diregangkan ke
+tinggi baris grid dan tanpa itu flexbox memampatkan foto (117/101/112px
+padahal semuanya square).
+
+**Verifikasi (angka, bukan perkiraan):** HP 390px → foto 111/111/111,
+kartu 189/189/189, isi 77/77/77. PC 1280px → foto 198/198/198, kartu
+279/279/279, gap 12px. Kelima kartu Menu juga seragam. `test-pages` 16/16,
+0 console error.
+
+**Mengubah:**
+- `src/components/customer/FlavorCard.tsx` — `w-full` + `shrink-0` di kartu
+  dense; efek `opacity-45 saturate-50` saat di-like **dihapus** ( kelasnya
+  sudah tidak ada di mana pun di `components/customer/`); badge "Signature"
+  disempitkan ke `text-[9px] px-1.5` supaya kata utuh (sebelumnya
+  "Signat...").
+- `src/components/customer/AppHome.tsx` — `SectionHead` tidak lagi menerima
+  `href`/`linkLabel` (link "Lihat Semua" dihapus); `showSold` tanpa syarat
+  supaya "0 terjual" ikut tampil; gap disamakan dengan Menu (`gap-2.5 sm:gap-3`).
+- `src/components/customer/MenuBrowser.tsx` — gap disamakan (`gap-2.5 sm:gap-3`).
+
+---
+
 ## 2026-10-10 — Beranda: judul besar "Menu", kartu menu jadi 3 kolom + jumlah terjual
 
 **Scope:** feat: judul section menu + kartu menu ringkas

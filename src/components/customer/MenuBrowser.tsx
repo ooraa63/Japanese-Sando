@@ -197,7 +197,7 @@ export function MenuBrowser({
               sama dengan kartu "Populer" tepat di atasnya, bukan dua kali
               sebesar itu. Class `density-flavor-grid` sengaja TIDAK dipakai
               di sini karena class itu memaksa 2 kolom di layar < 640px. */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
             {(shown.flavors ?? []).map((f) => (
               <FlavorCard
                 key={f.id}

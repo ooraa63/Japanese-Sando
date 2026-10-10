@@ -162,12 +162,14 @@ export function PopularGrid({
 
   return (
     <section>
-      <SectionHead
-        title={t.home.popular}
-        href="/order"
-        linkLabel={t.home.viewAll}
-      />
-      <ul className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
+      {/* Tanpa link "Lihat Semua" (permintaan Steven, 10-10-2026): semua
+          produk sudah tampil lengkap di section "Menu" tepat di bawahnya,
+          jadi link itu cuma menambah ruang kosong. */}
+      <SectionHead title={t.home.popular} />
+      {/* Jarak antar kartu disamakan dengan section "Menu" (gap-2.5 / sm:gap-3)
+          supaya dua baris kartu itu terlihat satu kesatuan — beda 1px di HP
+          tapi 4px di PC, dan efeknya terlihat di layar lebar. */}
+      <ul className="grid grid-cols-3 gap-2.5 sm:gap-3">
         {flavors.map((f) => (
           <li key={f.id} className="flex">
             <PopularCard flavor={f} soldCount={soldCounts[f.id] ?? 0} />
@@ -202,7 +204,10 @@ function PopularCard({
       readOnlySocial
       showBadge={false}
       soldCount={soldCount}
-      showSold={soldCount > 0}
+      /* Angka terjual SELALU tampil, termasuk "0 terjual" (permintaan
+         Steven, 10-10-2026). Sebelumnya disembunyikan saat 0 — itu membuat
+         kartu tampak tidak lengkap dan tinggi barisnya tidak rata. */
+      showSold
     />
   );
 }

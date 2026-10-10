@@ -799,3 +799,54 @@ Untuk screenshot satu section:
 
 Hasilnya persis seperti yang dilihat pengguna.
 
+## 48. Kartu di dalam `<li class="flex">` TIDAK otomatis mengisi lebar sel grid
+
+Ini jebakan yang membuat "ukuran kartu tidak sama semua" (10-10-2026) dan
+sulit ditebak karena gejalanya murni CSS.
+
+Struktur beranda "Populer":
+```tsx
+<ul className="grid grid-cols-3">
+  <li className="flex"><Kartu /></li>
+</ul>
+```
+
+`li` adalah grid item (jadi lebarnya = lebar sel, benar), TAPI `li` juga
+`display: flex` dengan arah **baris**. Pada flex baris, `align-items: stretch`
+hanya meregangkan sumbu **TEGAK**. Lebar kartu diurus oleh sumbu **UTAMA**,
+yang governed oleh `flex-basis: auto` — artinya **lebar kartu = lebar
+isi teksnya**, bukan lebar sel.
+
+Terukur di HP: sel 113px, tapi kartunya 109px / 95px / 104px sesuai panjang
+nama ("Cookies & Cream" vs "Choco Matcha"). Foto `aspect-square` mengikuti
+lebar itu → tinggi foto berbeda-beda, dan di PC sisa ruang terbaca sebagai
+celah yang kegedean.
+
+Perbaikannya `w-full` pada komponen kartu.
+
+Section "Menu" TIDAK kena masalah ini karena kartunya anak grid langsung
+(`<div className="grid grid-cols-3">` → `<Kartu />` tanpa pembungkus) —
+grid item meregangkan ke sel di kedua sumbu.
+
+**Aturan:** kalau sebuah komponen kartu dibungkus elemen flex (atau inline,
+atau `width: max-content`), ia **tidak** otomatis selebar selnya. Tambahkan
+`w-full`. Kalau ragu, ukur dengan `getBoundingClientRect()` per kartu dan
+bandingkan — jangan pakai perkiraan mata.
+
+## 49. `aspect-*` di dalam flex column tetap bisa dipampatkan
+
+Kartu `flex h-full flex-col` di dalam `li` yang diregangkan ke tinggi baris
+grid: saat kartu diregangkan ke tinggi yang lebih kecil dari kebutuhan,
+flexboxshrink item-nya. Kontainer foto `aspect-square` ikut menyusut —
+terukur 117px / 101px / 112px padahal semua lebarnya sama dan
+`aspect-ratio: 1 / 1` tetap tertulis di `getComputedStyle`.
+
+Jadi `aspect-ratio` yang benar di `getComputedStyle` **tidak menjamin**
+tinggi akhirnya benar. Tambahkan `shrink-0` pada elemen yang ukurannya
+harus dijaga persis (foto, ikon, thumbnail).
+
+**Cara memastikan tidak menebak:** ukur tinggi tiap kartu/foto lewat
+`getBoundingClientRect()` di headless browser dan bandingkan angkanya.
+Bug "kartu tidak sama tinggi" hampir selalu terlihat sebagai angka yang
+tidak sama, bukan sebagai selisih halus yang perlu dilihat mata.
+

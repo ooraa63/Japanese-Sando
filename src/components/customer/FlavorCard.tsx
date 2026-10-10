@@ -246,18 +246,26 @@ export function FlavorCard({
    * di lebar ~110px (3 kolom di HP) deskripsi cuma jadi baris kecil yang
    * bikin kartu terlalu tinggi. Angka terjual selalu dari RPC publik
    * (`useSoldCounts`), tidak pernah dikarang.
+   *
+   * PENTING — `w-full` + `shrink-0` pada foto:
+   *
+   * - `w-full`: di section "Populer" setiap kartu dibungkus `<li class="flex">`.
+   *   Pada flex baris, `align-items: stretch` hanya meregangkan sumbu TEGAK,
+   *   bukan lebar. Tanpa `w-full` lebar kartu mengikuti isi teksnya
+   *   (109px / 95px / 104px di HP) — inilah sebabnya "ukurannya tidak sama
+   *   semua" dan celah antar kartu di PC terlihat kegedean.
+   *   Di section "Menu" kartu jadi anak grid langsung (otomatis penuh), tapi
+   *   `w-full` tidak merusak apa pun di sana.
+   *
+   * - `shrink-0` pada foto: kartu diregangkan ke tinggi baris grid. Tanpa
+   *   ini flexbox memampatkan foto supaya muat, sehingga tinggi foto antar
+   *   kartu berbeda padahal semuanya square.
    * ------------------------------------------------------------------ */
   if (dense) {
     return (
-      <div
-        className={`relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
-          isLiked
-            ? "border-cocoa-200/70 opacity-45 saturate-50"
-            : "border-cocoa-200/70"
-        }`}
-      >
+      <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-cocoa-200/70 bg-white transition hover:border-cocoa-300">
         <div
-          className={`flavor-photo relative aspect-square overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)}`}
+          className={`flavor-photo relative aspect-square shrink-0 overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)}`}
         >
           {flavor.image_url ? (
             <Image
@@ -277,11 +285,13 @@ export function FlavorCard({
 
           <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-1 p-1.5">
             {/* Badge "Signature" (produk unggulan dari admin) di kiri atas.
-                Lebih kecil dari `chip` biasa supaya tidak memakan kartu.
-                Teksnya boleh terpotong — lebih baik jadi "Signatu..." daripada
-                mendorong hati ke luar kartu (kartu ini cuma ~110px di HP). */}
+                Class `chip` bawaan TIDAK dipakai: default-nya `px-3 py-1
+                text-xs` terlalu lebar untuk kartu 3 kolom (~113px di HP)
+                dan akibatnya kata "Signature" jadi "Signat...". Teks 9px +
+                padding ramping membuatnya utuh; `truncate` tetap dipakai
+                sebagai jaring pengaman kalau labelnya nanti lebih panjang. */}
             {showBadge && flavor.is_featured && !soldOut ? (
-              <span className="inline-flex min-w-0 shrink items-center gap-0.5 rounded-full bg-honey-400/95 px-1.5 py-0.5 text-[10px] leading-none font-bold text-cocoa-900 shadow">
+              <span className="inline-flex min-w-0 shrink items-center gap-0.5 rounded-full bg-honey-400/95 px-1.5 py-0.5 text-[9px] leading-none font-bold text-cocoa-900 shadow">
                 <Star className="size-2.5 shrink-0 fill-current" />
                 <span className="truncate">{t.menu.signature}</span>
               </span>
