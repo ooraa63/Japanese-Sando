@@ -986,3 +986,55 @@ Saat memverifikasi badge, hitung per-kartu (`section.querySelectorAll('li')`)
 atau pakai `:scope >` — jangan menghitung span global, atau nanti terlihat
 seolah badge dobel padahal tidak.
 
+## 58. Hapus route = `.next` masih menyimpan validator-nya
+
+Setelah `src/app/admin/(dashboard)/vouchers/` dihapus, `npm run build` gagal
+dengan:
+
+```
+.next/dev/types/validator.ts(134,39): error TS2307:
+  Cannot find module '../../../src/app/admin/(dashboard)/vouchers/page.js'
+.next/types/validator.ts(134,39): error TS2307: ...
+```
+
+File sumber sudah benar; yang salah adalah **validator hasil generate** di
+`.next` yang masih menunjuk route lama. `npx tsc --noEmit` juga ikut gagal untuk
+alasan yang sama, jadi ini bukan salah kode.
+
+Solusi: hapus `.next` lalu build ulang. `rm -- ".next"` (diarahkan ke
+`mavis-trash`), foldernya gitignored jadi aman dihapus.
+
+## 59. `fetch` tanpa cookie admin tidak bisa menguji route `/admin/*`
+
+`src/proxy.ts` mengarahkan setiap `/admin/*` yang tanpa session ke
+`/admin/login` dengan status **307**. Jadi `fetch("/admin/vouchers")` polos
+mengembalikan 307 — itu jawaban middleware, bukan jawaban route-nya, dan akan
+disalahartikan "route masih ada".
+
+Untuk menguji apakah sebuah route admin benar-benar hilang, sertakan cookie
+session admin seperti yang dilakukan `openPage()` di `scripts/test-pages.mjs`:
+
+```js
+await fetch(`${APP}/admin/vouchers`, {
+  headers: { cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") },
+});
+```
+
+Dengan begitu 404 yang muncul benar-benar 404 dari router, bukan pengalihan.
+
+## 60. Mengubah fungsi PostgreSQL = salin utuh definisi yang SEDANG live
+
+Tidak ada cara mengubah satu baris di dalam fungsi. Untuk menghapus satu
+kondisi dari `create_order` (300+ baris), definisi **harus** diambil verbatim
+dari migrasi yang paling akhir yang mendefinisikannya, baru diubah satu baris.
+Menyalin dari migrasi lama = mengembalikan fitur yang sudah pernah diupgrade.
+
+Cara aman: cari migrasi terakhir yang punya `create ... function public.<nama>`
+(migration-33 untuk `create_order`, bukan migration-18 yang terlihat lebih
+"klasik"), lalu generate file migrasi baru dengan skrip supaya tidak salah
+ketik. Hasil generate selalu diperiksa ulang sebelum `db:apply`.
+
+Dan **`create or replace`, bukan `drop` + `create`**: drop menghapus grant
+`execute` untuk anon & authenticated, sehingga pembeli tidak bisa lagi membuat
+pesanan. Tulis ulang `grant execute` secara eksipisit sebagai pengaman.
+

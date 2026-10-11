@@ -776,3 +776,40 @@ disembunyikan seluruhnya**.
   supaya website tidak memamerkan label "New" pada produk yang Steven belum
   pilih.
 
+## D31 — Tiga fitur dibuang dari sisi kode, tapi datanya disimpan
+
+**Keputusan:** Steven meminta (11-10-2026) voucher "dihapus aja dulu", strip
+kategori di /order dihapus, info like/stok/penjualan tidak ditulis di kartu
+/order, dan batas maksimal per rasa dihapus. Semuanya dikerjakan sebagai
+**perubahan kode**, bukan penghapusan data.
+
+**Kenapa:**
+
+- **Voucher:** "dihapus **dulu**" — kata itu yang menentukan. Kode (route,
+  komponen, action, tipe) dibuang supaya tidak ada menu yang menggantung, tapi
+  tabel `vouchers` dan RPC-nya **tetap ada**. Kalau Steven berubah pikiran,
+  nyalakan lagi tanpa kehilangan voucher. Menghapus tabel itu tidak bisa
+  dibatalkan, dan tidak ada yang diminta.
+  - Pengecualian: grup i18n `admin.vouchers` tetap dipakai
+    `DeliveryZonesClient` (`statusActive` / `activeLabel`), jadi jangan dihapus
+    beserta utuhannya.
+- **Strip kategori:** dihapus dari `OrderMenuBrowser` saja, **tidak** dari
+  `MenuBrowser` (beranda) yang masih memakai state kategori. Menghapus dari
+  keduanya berarti menyimpan ulang untuk section yang tidak complained.
+- **Info like/stok/penjualan:** ternyata stok, jumlah like, dan penjualan
+  **sudah tidak pernah ditulis** di kartu `/order`; yang tersisa hanya ikon
+  hati. Jadi yang dihapus adalah hati itu, lewat prop `showHeart` yang hanya
+  berlaku untuk mode `storefront` — bukan menghapus seluruh blok sosial dari
+  komponen, karena beranda masih butuh.
+- **Batas maksimal pesanan:** dihapus dari `create_order`, tapi kolom
+  `store_settings.max_per_order` **tidak** dihapus karena tidak ada frontend
+  yang membacanya; sisa satu kolom tidak berbahaya dan membuat perubahan ini
+  bisa dibatalkan.
+
+**Konsekuensi yang harus diingat:**
+
+- Setiap kali sebuah route dihapus, `.next` masih menyimpan validator-nya dan
+  build akan gagal (gotcha #58) — hapus `.next` lalu build ulang.
+- Uji `/admin/*` selalu butuh cookie session admin, kalau tidak yang diuji
+  middleware, bukan route (gotcha #59).
+

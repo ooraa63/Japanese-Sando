@@ -91,7 +91,23 @@ await openPage("/admin/menu", { mustContain: ["Menu", "Stok", "jenis makanan"] }
 // baru muncul setelah admin mengklik tabnya, jadi jangan di sini.
 await openPage("/admin/settings", { mustContain: ["Pengaturan", "Identitas toko"] });
 await openPage("/admin/sales", { mustContain: ["Mutasi", "Pendapatan", "Rasa terlaris"] });
-await openPage("/admin/vouchers", { mustContain: ["Voucher"] });
+// Fitur Voucher DIHAPUS (permintaan Steven, 11-10-2026): route, komponen, dan
+// action-nya dihapus; tabel & RPC di database sengaja dibiarkan supaya kalau
+// Steven berubah pikiran tinggal dinyalakan lagi tanpa kehilangan data.
+// Ujinya dibalik: bukan "halaman ini ada", tapi "halaman ini benar-benar 404".
+{
+  // WAJIB pakai cookie admin: tanpa itu semua `/admin/*` diarahkan ke login
+  // oleh proxy, jadi kita hanya menguji middleware -- bukan route-nya.
+  await openPage("/admin/vouchers", { expectStatus: 404 });
+  const orders = await fetch(`${APP}/admin/orders`, {
+    headers: { cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") },
+  });
+  const ordersText = await orders.text();
+  check(
+    "menu admin tidak punya tautan Voucher",
+    !ordersText.includes('href="/admin/vouchers"')
+  );
+}
 await openPage("/admin/customers", { mustContain: ["Pelanggan", "WhatsApp"] });
 // Menu "Ambil & Kirim" (item 10 dokumen perbaikan): dua tab "Ambil di Toko"
 // dan "Pengiriman", tab pertama terbuka secara default.

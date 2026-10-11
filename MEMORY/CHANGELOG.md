@@ -6,6 +6,91 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+---
+
+## 2026-10-11 — Voucher dihapus, strip kategori & info like di /order dihapus, batas maksimal pesanan dihapus
+
+**Scope:** feat+fix: empat permintaan Steven dengan tiga screenshot
+
+1. "untuk voucher juga fiturnya dihapus aja dulu"
+2. "pre order yang gambar 2 itu dihapus aja" (strip kartu "All" / nama kategori)
+3. "gambar 3, sisa stok, jumlah like dan penjualan tidak ditulis" (kartu produk di /order)
+4. "Gada maksimal pemilibhan 1 rasa, semua bergantung pada stok"
+
+**1. Fitur Voucher dihapus dari aplikasi** — code, bukan data
+
+Dihapus: item nav `/admin/vouchers` (`AdminShell.tsx`), route
+`src/app/admin/(dashboard)/vouchers/`, `VouchersClient.tsx`,
+`VouchersSection.tsx`, `getVouchersAction` / `saveVoucherAction` /
+`deleteVoucherAction`, `getMyVouchersAction` + pemakaiannya di `/account`, dan
+tipe `Voucher` / `VoucherType` / `VoucherList` di `src/lib/types.ts`.
+
+**Yang SENGAJA tetap:** tabel `vouchers` dan RPC-nya (`admin_list_vouchers`,
+`admin_upsert_voucher`, `admin_delete_voucher`, `list_my_vouchers`) di database.
+Stevensaid "dihapus dulu", jadi kode dibuang tapi data disimpan — kalau berubah
+pikiran, fiturnya bisa dinyalakan lagi tanpa kehilangan voucher yang sudah ada.
+I18N grup `admin.vouchers` juga dibiarkan karena `DeliveryZonesClient` memakai
+`statusActive` / `activeLabel` dari grup itu.
+
+**2. Strip kategori di /order dihapus** — `src/components/customer/MenuBrowser.tsx`
+
+Kartu "Semua" + kartu nama kategori (dengan jumlah rasa) dihapus seluruhnya,
+bersama state `activeCategory`, `totalFlavors`, penyaringan per kategori, dan
+anchor `sr-only` ber-`id="category-..."`.
+
+Alasan: strip itu cuma menambah satu tap sebelum pembeli bisa lihat produk, dan
+yang dibuka lewat strip tetap "Semua" — jadi tidak ada gunanya. `shownFlavors`
+sekarang selalu menggabungkan semua kategori. `MenuBrowser` (beranda) **tidak**
+disentuh — state `activeCategory`-nya di sana masih dipakai.
+
+Catatan ditulis di tempat blok itu supaya kalau nanti ada kategori kedua, tinggal
+dikembalikan.
+
+**3. Info like/stok/penjualan di kartu /order dihapus** — `FlavorCard.tsx`
+
+Ternyata stok (`showStock={false}`), jumlah like (`showSocial={false}`), dan
+penjualan memang **sudah tidak pernah ditulis** di kartu itu. Yang masih
+tersisa cuma ikon hati di pojok foto — itu yang dihapus, lewat prop baru
+`showHeart` yang hanya berlaku untuk mode `storefront`. Halaman `/order` mengirim
+`showHeart={false}`.
+
+Mode `dense` (beranda) tidak terpengaruh: section "Menu" tetap satu-satunya
+tempat pembeli bisa likes, sesuai keputusan sebelumnya.
+
+**4. Batas maksimal per rasa dihapus** — `supabase/migration-44.sql`
+
+`create_order` menolak pesanan dengan
+`if v_qty > v_settings.max_per_order then raise 'invalid_quantity'`
+— plafon 10 pcs per rasa yang tidak ada hubungannya dengan stok, padahal
+fungsi yang sama sudah memeriksa stok kategori (`insufficient_stock`).
+
+Definisi fungsi diambil **verbatim** dari migration-33 (versi yang live), lalu
+hanya baris itu yang berubah; `create or replace` dipakai supaya grant execute
+untuk anon & authenticated tidak hilang. Grant juga ditulis ulang eksplisit.
+Kolom `store_settings.max_per_order` sengaja **tidak** dihapus — tidak ada
+frontend yang membacanya, dan menahannya membuat perubahan ini bisa dibatalkan.
+
+**Verifikasi batas pesanan** (`pg`, semua dalam transaksi lalu ROLLBACK):
+
+| Percobaan | Hasil |
+| --- | --- |
+| qty 25, stok kategori 100 (dulu pasti kena plafon 10) | **lolos** |
+| qty 30, stok kategori 20 | ditolak `insufficient_stock` |
+| qty 0 | ditolak `invalid_quantity` (validasi bentuk data, bukan batas dagang) |
+
+Stok kategori dan jumlah baris `orders` setelah rollback: tidak berubah.
+
+**Verifikasi lain**
+
+- `tsc --noEmit` bersih · `npm run lint` bersih (0 warning) · `npm run build`
+  sukses, `/admin/vouchers` hilang dari daftar route.
+- `scripts/test-pages.mjs` **17/17 lulus**. Uji voucher dibalik jadi
+  "/admin/vouchers harus 404" + "menu admin tidak punya tautan Voucher".
+- headless lokal: `/order` tanpa strip kategori, kartu tanpa hati, tanpa teks
+  stok/like/penjualan; sidebar admin berisi 8 menu tanpa Vouchers; 0 console error.
+
+---
+
 ## 2026-10-11 — Logo + nama toko di top bar HP, section "Menu Baru" (label New) + pemilih di admin
 
 **Scope:** feat: dua permintaan Steven

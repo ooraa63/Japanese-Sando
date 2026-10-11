@@ -51,6 +51,19 @@ export function FlavorCard({
    * `null`/`undefined` = pakai perilaku lama (tampil kalau `is_featured`).
    */
   badgeLabel = null,
+  /**
+   * Tampilkan hati di pojok foto (mode `storefront`).
+   *
+   * Permintaan Steven (11-10-2026), kartu di halaman pre-order: "sisa stok,
+   * jumlah like dan penjualan tidak ditulis". Stok dan penjualan memang sudah
+   * tidak pernah ditulis di sana; yang tersisa hanyalah hati ini, jadi
+   * dimatikan lewat prop.
+   *
+   * Hanya berlaku untuk mode `storefront`. Mode `dense` (beranda) tetap
+   * menampilkan hati karena di situ_section "Menu" adalah satu-satunya tempat
+   * pembeli bisa likes.
+   */
+  showHeart = true,
   remainingStock = null,
   categoryName,
   /**
@@ -96,6 +109,8 @@ export function FlavorCard({
   showBadge?: boolean;
   /** Teks badge di foto; isi untuk menggantikan "Signature" (mis. "New"). */
   badgeLabel?: string | null;
+  /** Tampilkan hati di pojok foto. Hanya berlaku untuk mode `storefront`. */
+  showHeart?: boolean;
   /** Stok keseluruhan toko (bukan per rasa). null = tak terbatas. */
   remainingStock?: number | null;
   /** Nama kategori, ditampilkan sebagai label kecil di atas nama rasa. */
@@ -181,26 +196,30 @@ export function FlavorCard({
             </div>
           )}
 
-          {/* Hati pojok kanan atas — penanda "disukai" ala referensi. */}
-          {readOnlySocial ? (
-            <span className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm">
-              <Heart
-                className={`size-4 text-berry-500 ${isLiked ? "fill-current" : ""}`}
-              />
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={toggleLike}
-              aria-pressed={isLiked}
-              aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
-              className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm transition hover:bg-white active:scale-95"
-            >
-              <Heart
-                className={`size-4 transition ${isLiked ? "fill-current text-berry-500" : "text-cocoa-400"}`}
-              />
-            </button>
-          )}
+          {/* Hati pojok kanan atas — penanda "disukai" ala referensi.
+              Di halaman pre-order (`showHeart={false}`) seluruh blok ini
+              dihapus: kartu di sana tidak menulis info like sama sekali. */}
+          {showHeart ? (
+            readOnlySocial ? (
+              <span className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm">
+                <Heart
+                  className={`size-4 text-berry-500 ${isLiked ? "fill-current" : ""}`}
+                />
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={toggleLike}
+                aria-pressed={isLiked}
+                aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
+                className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm transition hover:bg-white active:scale-95"
+              >
+                <Heart
+                  className={`size-4 transition ${isLiked ? "fill-current text-berry-500" : "text-cocoa-400"}`}
+                />
+              </button>
+            )
+          ) : null}
 
           {soldOut ? (
             <div className="absolute inset-0 grid place-items-center bg-cocoa-950/65">

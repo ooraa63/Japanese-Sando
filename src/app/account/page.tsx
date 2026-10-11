@@ -9,11 +9,9 @@ import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider";
 import { AccountClient } from "./AccountClient";
-import { VouchersSection } from "@/components/customer/VouchersSection";
 import { ContactDetails, ContactSection } from "@/components/customer/ContactSection";
 import { ContactMenuRow } from "@/components/customer/ContactMenuRow";
 import { CompleteProfileCard } from "@/components/customer/CompleteProfileCard";
-import { getMyVouchersAction } from "@/app/review-actions";
 import { ACCOUNT_FEATURE_ENABLED } from "@/lib/featureFlags";
 
 export const dynamic = "force-dynamic";
@@ -131,8 +129,6 @@ export default async function AccountPage() {
     });
   }
 
-  const vouchers = await getMyVouchersAction();
-
   return renderAccount({
     profile,
     orders,
@@ -141,7 +137,6 @@ export default async function AccountPage() {
     storeName,
     logoUrl,
     brandLine,
-    vouchers,
   });
 }
 
@@ -153,7 +148,6 @@ type RenderAccountArgs = {
   storeName: string;
   logoUrl: string | null;
   brandLine: string;
-  vouchers?: Awaited<ReturnType<typeof getMyVouchersAction>>;
 };
 
 function renderAccount({
@@ -164,7 +158,6 @@ function renderAccount({
   storeName,
   logoUrl,
   brandLine,
-  vouchers,
 }: RenderAccountArgs) {
   return (
     <CustomerAuthProvider initialProfile={profile}>
@@ -249,8 +242,6 @@ function renderAccount({
             initialOrders={orders}
             dict={dicts.account}
           />
-
-          {vouchers ? <VouchersSection vouchers={vouchers} /> : null}
 
           <ContactSection
             settings={settings ?? null}

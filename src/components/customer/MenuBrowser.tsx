@@ -263,18 +263,17 @@ export function OrderMenuBrowser({
   );
 
   /* ---------- State etalase ala UIUX 3 ---------- */
-  const [activeCategory, setActiveCategory] = useState<number | "all">("all");
+  /* State kategori DIHAPUS (permintaan Steven, 11-10-2026): kartu
+     'Semua' + kartu nama kategori di halaman pre-order dihapus. Strip itu
+     cuma menambah satu tap sebelum pembeli bisa lihat produk, dan yang
+     dibuka lewat strip tetap 'Semua' -- jadi tidak ada gunanya.
+     Kalau nanti ada kategori kedua, blok state ini tinggal dikembalikan. */
   const [hideSoldOut, setHideSoldOut] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
 
   // Pencarian dari kolom search di top bar: `/order?q=matcha`.
   const searchParams = useSearchParams();
   const searchQuery = (searchParams.get("q") ?? "").trim().toLowerCase();
-
-  const totalFlavors = useMemo(
-    () => withFlavors.reduce((sum, c) => sum + (c.flavors?.length ?? 0), 0),
-    [withFlavors]
-  );
 
   // Sisa stok per kategori setelah SELURUH isi keranjang diperhitungkan —
   // termasuk slot bundle yang sudah ada. Sebelumnya kartu rasa biasa hanya
@@ -291,12 +290,9 @@ export function OrderMenuBrowser({
   // `soldOut` dihitung di sini (bukan di kartu) supaya bisa dipakai untuk
   // tombol filter "sembunyikan yang habis" juga.
   const shownFlavors = useMemo(() => {
-    const pool =
-      activeCategory === "all"
-        ? withFlavors.flatMap((c) => (c.flavors ?? []).map((f) => ({ flavor: f, category: c })))
-        : withFlavors
-            .filter((c) => c.id === activeCategory)
-            .flatMap((c) => (c.flavors ?? []).map((f) => ({ flavor: f, category: c })));
+    const pool = withFlavors.flatMap((c) =>
+      (c.flavors ?? []).map((f) => ({ flavor: f, category: c }))
+    );
 
     const isSoldOut = ({ flavor: f, category: c }: (typeof pool)[number]) => {
       const isActive = f.is_active ?? true;
@@ -346,7 +342,7 @@ export function OrderMenuBrowser({
       sorted.sort((a, b) => a.flavor.sort_order - b.flavor.sort_order);
     }
     return sorted;
-  }, [withFlavors, activeCategory, hideSoldOut, sortKey, remainingByCategory, searchQuery]);
+  }, [withFlavors, hideSoldOut, sortKey, remainingByCategory, searchQuery]);
 
   const empty = withFlavors.length === 0 && bundles.length === 0;
   if (empty) {
@@ -382,7 +378,7 @@ export function OrderMenuBrowser({
                  menolak dua bundle dengan id yang sama — jadi di sini kita
                  buka modal dalam mode "ubah" (lihat `editingEntry`),
                  bukan menambah paket kedua.
-                 `sudah` sekarang cuma mengatur tampilan +文案, bukan
+                 `sudah` sekarang cuma mengatur tampilan dan label, bukan
                  `disabled`. */
               const sudah = inCart > 0;
               return (
@@ -474,90 +470,6 @@ export function OrderMenuBrowser({
         </div>
       ) : null}
 
-      {/* ---------- Strip kategori (UIUX 3) ---------- */}
-      {withFlavors.length > 0 ? (
-        <div className="mb-6">
-          <ul className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
-            <li className="shrink-0">
-              <button
-                type="button"
-                onClick={() => setActiveCategory("all")}
-                className={`flex w-24 flex-col items-center gap-2 rounded-2xl border-2 p-3 transition sm:w-28 ${
-                  activeCategory === "all"
-                    ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
-                    : "border-cocoa-200 bg-white text-cocoa-600 hover:border-cocoa-300"
-                }`}
-              >
-                <span className="grid size-11 place-items-center rounded-xl bg-cocoa-100">
-                  <LayoutGrid
-                    className={`size-5 ${
-                      activeCategory === "all" ? "text-cocoa-700" : "text-cocoa-500"
-                    }`}
-                  />
-                </span>
-                <span className="text-[11px] font-bold leading-tight">
-                  {t.storefront.allCategories}
-                </span>
-                <span
-                  className={`text-[10px] tabular ${
-                    activeCategory === "all" ? "text-cream-300" : "text-cocoa-400"
-                  }`}
-                >
-                  {totalFlavors}
-                </span>
-              </button>
-            </li>
-
-            {withFlavors.map((c) => {
-              const name = lang === "en" ? c.name_en : c.name_id;
-              const count = c.flavors?.length ?? 0;
-              const isActive = activeCategory === c.id;
-              return (
-                <li key={c.id} className="shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategory(c.id)}
-                    aria-current={isActive}
-                    className={`flex w-24 flex-col items-center gap-2 rounded-2xl border-2 p-3 transition sm:w-28 ${
-                      isActive
-                        ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
-                        : "border-cocoa-200 bg-white text-cocoa-600 hover:border-cocoa-300"
-                    }`}
-                  >
-                    <span
-                      className={`relative grid size-11 place-items-center overflow-hidden rounded-xl ${
-                        c.image_url ? "bg-cocoa-100" : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
-                      }`}
-                    >
-                      {c.image_url ? (
-                        <Image
-                          src={c.image_url}
-                          alt=""
-                          fill
-                          sizes="44px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <LayoutGrid className="size-5 text-white/70" />
-                      )}
-                    </span>
-                    <span className="line-clamp-2 text-[11px] leading-tight font-bold">
-                      {name}
-                    </span>
-                    <span
-                      className={`text-[10px] tabular ${
-                        isActive ? "text-cream-300" : "text-cocoa-400"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
 
       {/* ---------- Toolbar: filter / jumlah produk / urutan (UIUX 3) ---------- */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-y border-cocoa-200/70 py-3">
@@ -599,7 +511,6 @@ export function OrderMenuBrowser({
       {/* ---------- Grid produk (UIUX 3) ---------- */}
       {withFlavors.length > 0 ? (
         <div>
-          <div className="sr-only" id={`category-${activeCategory ?? "all"}`} />
           <ul className="density-flavor-grid grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {shownFlavors.map(({ flavor: f, category: c }) => {
               const fid = String(f.id);
@@ -616,6 +527,10 @@ export function OrderMenuBrowser({
                     remainingStock={catLeft}
                     showSocial={false}
                     soldCount={soldCounts[f.id] ?? 0}
+                    /* Hati dimatikan: kartu pre-order tidak menulis info like,
+                       stok, maupun penjualan (permintaan Steven, 11-10-2026).
+                       "Menu" di beranda tetap jadi satu-satunya tempat likes. */
+                    showHeart={false}
                     readOnlySocial
                     showStock={false}
                     selectable
