@@ -246,6 +246,22 @@ export function OrderMenuBrowser({
   const [openBundleId, setOpenBundleId] = useState<number | null>(null);
   const activeBundle = bundles.find((b) => b.id === openBundleId) ?? null;
 
+  /**
+   * Entry keranjang dari bundle yang sedang dibuka.
+   *
+   * Kalau ada, modal dibuka dalam mode "ubah": slot terisi dari entry itu dan
+   * tombol konfirmasi menulis ulang entry yang sama (bukan menambah paket
+   * kedua). Ini yang membuat kartu bundle tetap bisa ditekan setelah masuk
+   * keranjang — permintaan Steven, 11-10-2026.
+   */
+  const editingEntry = useMemo(
+    () =>
+      activeBundle
+        ? (cartBundles.find((cb) => cb.bundle.id === activeBundle.id) ?? null)
+        : null,
+    [cartBundles, activeBundle]
+  );
+
   /* ---------- State etalase ala UIUX 3 ---------- */
   const [activeCategory, setActiveCategory] = useState<number | "all">("all");
   const [hideSoldOut, setHideSoldOut] = useState(false);
@@ -360,26 +376,28 @@ export function OrderMenuBrowser({
           <ul className="density-bundle-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {bundles.map((b) => {
               const inCart = cartBundles.filter((cb) => cb.bundle.id === b.id).length;
-              // Steven: satu bundle hanya boleh masuk keranjang SEKALI. Kalau
-              // sudah ada, kartu dikunci supaya tidak bisa ditambah lagi
-              // (backend juga akan menolak slot ganda untuk paket yang sama).
+              /* Bundle yang sudah di keranjang TIDAK lagi dikunci.
+                 Permintaan Steven (11-10-2026): pembeli tetap boleh menekan
+                 kartunya untuk mengganti rasa yang terisi. Backend tetap
+                 menolak dua bundle dengan id yang sama — jadi di sini kita
+                 buka modal dalam mode "ubah" (lihat `editingEntry`),
+                 bukan menambah paket kedua.
+                 `sudah` sekarang cuma mengatur tampilan +文案, bukan
+                 `disabled`. */
               const sudah = inCart > 0;
               return (
                 <li key={b.id}>
                   <button
                     type="button"
-                    disabled={sudah}
                     onClick={() => setOpenBundleId(b.id)}
                     aria-label={
                       sudah
-                        ? lang === "en"
-                          ? `${b.name_en} already in cart`
-                          : `${b.name_id} sudah ada di keranjang`
+                        ? `${lang === "en" ? b.name_en : b.name_id} — ${t.menu.bundleEditHint}`
                         : undefined
                     }
                     className={`group block h-full w-full overflow-hidden rounded-2xl border-2 bg-white text-left transition ${
                       sudah
-                        ? "cursor-not-allowed border-matcha-500 opacity-80"
+                        ? "border-matcha-500 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99]"
                         : "border-cocoa-200 hover:-translate-y-0.5 hover:border-matcha-400 hover:shadow-lg hover:shadow-cocoa-900/10 active:scale-[0.99]"
                     }`}
                   >
@@ -422,7 +440,7 @@ export function OrderMenuBrowser({
                           {sudah ? (
                             <span className="chip shrink-0 bg-matcha-500 text-white">
                               <Check className="size-3" />
-                              {lang === "en" ? "In cart" : "Di keranjang"}
+                              {t.menu.bundleInCartChip}
                             </span>
                           ) : null}
                         </div>
@@ -439,6 +457,13 @@ export function OrderMenuBrowser({
                         <p className="mt-2 text-[12px] font-bold text-matcha-700">
                           {t.menu.bundleIncludes.replace("{n}", String(b.required_qty))}
                         </p>
+                        {/* Petunjuk bahwa kartu ini masih bisa ditekan
+                            meski sudah di keranjang. */}
+                        {sudah ? (
+                          <p className="mt-1.5 text-[11px] font-bold text-cocoa-400">
+                            {t.menu.bundleEditHint}
+                          </p>
+                        ) : null}
                       </div>
                     </article>
                   </button>
@@ -611,14 +636,17 @@ export function OrderMenuBrowser({
 
       {activeBundle ? (
         <OrderBundleModal
-          // Pakai `key` agar state `slots` di dalam modal otomatis reset
-          // ketika bundle yang dibuka berbeda (id / required_qty berubah).
+          // `key` sengaja TIDAK memuat `editingEntry.id`: kalau memuat,
+          // setiap kali entry berubah modal remount dan isian yang sedang
+          // dikerjakan purchaser hilang di tengah jalan. Reset isian
+          // ditangani `seededFor` di dalam modal (hanya saat dibuka).
           key={activeBundle.id}
           bundle={activeBundle}
           categories={withFlavors}
           open={activeBundle !== null}
           onClose={() => setOpenBundleId(null)}
           soldCounts={soldCounts}
+          editingEntry={editingEntry}
         />
       ) : null}
     </>

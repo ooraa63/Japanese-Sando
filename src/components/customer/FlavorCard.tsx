@@ -138,11 +138,18 @@ export function FlavorCard({
   /* ------------------------------------------------------------------
    * Gaya etalase (UIUX 3): foto di atas, hati pojok kanan atas, baris
    * bawah berisi harga + tombol tambah. Dipakai di halaman /order.
+   *
+   * `w-full` WAJIB di sini: kartu ini juga dibungkus `<li className="flex">`
+   * di `OrderMenuBrowser`. Pada flex baris, `align-items: stretch` hanya
+   * meregangkan sumbu tegak — tanpa `w-full` lebar kartu mengikuti isi
+   * teksnya, sehingga kartu dengan deskripsi panjang lebih lebar dari yang
+   * tidak punya deskripsi. Gejalanya persis seperti di kartu dense
+   * (lihat catatan panjang di branch `dense` di bawah).
    * ------------------------------------------------------------------ */
   if (storefront) {
     return (
       <article
-        className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
+        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border bg-white transition ${
           soldOut
             ? "border-cocoa-100 opacity-70"
             : "border-cocoa-200/70 hover:-translate-y-1 hover:border-cocoa-300 hover:shadow-xl hover:shadow-cocoa-900/10"

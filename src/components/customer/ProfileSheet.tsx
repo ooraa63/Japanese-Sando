@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -17,6 +17,7 @@ import {
 import type { ProfileMenuItem } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
+import { ACCOUNT_FEATURE_ENABLED } from "@/lib/featureFlags";
 
 /**
  * Tab "Profil" di bottom nav + sheet daftar menu.
@@ -116,6 +117,22 @@ export function ProfileSheet({ items }: { items: ProfileMenuItem[] }) {
   const open = useSyncExternalStore(subscribeSheet, getSheetOpen, () => false);
   const [active, setActive] = useState<ProfileMenuItem | null>(null);
 
+  /**
+   * Bar "Account" disembunyikan sementara selama fitur Account dimatikan
+   * (permintaan Steven, 11-10-2026). Bar ini tetap ADA di database dan
+   * tetap dikelola penuh dari dashboard — hanya tidak dirender di sini,
+   * jadi menyalakannya lagi cukup mengubah `ACCOUNT_FEATURE_ENABLED`.
+   *
+   * Bar lain (Contact, FAQ, Jam Buka, Ketentuan) tidak terpengaruh.
+   */
+  const visibleItems = useMemo(
+    () =>
+      ACCOUNT_FEATURE_ENABLED
+        ? items
+        : items.filter((i) => i.code !== "account"),
+    [items]
+  );
+
   const closeSheet = useCallback(() => {
     setActive(null);
     setSheetOpen(false);
@@ -173,13 +190,13 @@ export function ProfileSheet({ items }: { items: ProfileMenuItem[] }) {
             </button>
           </div>
 
-          {items.length === 0 ? (
+          {visibleItems.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-cocoa-400">
               {t.profile.menuEmpty}
             </p>
           ) : (
             <ul className="divide-y divide-cocoa-100 px-5 py-1">
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <ProfileRow key={item.id} item={item} onOpen={() => setActive(item)} />
               ))}
             </ul>

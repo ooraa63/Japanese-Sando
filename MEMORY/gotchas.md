@@ -850,3 +850,50 @@ harus dijaga persis (foto, ikon, thumbnail).
 Bug "kartu tidak sama tinggi" hampir selalu terlihat sebagai angka yang
 tidak sama, bukan sebagai selisih halus yang perlu dilihat mata.
 
+## 50. Mode "ubah" harus dikeluarkan dari perhitungan stok sendiri
+
+Setiap kali sebuah item bisa diedit (bukan hanya ditambah), perhitungannya
+harus bisa mengeluarkan kontribusinya sendiri lalu menghitung ulang.
+
+Kasus di project ini (11-10-2026): bundle yang sudah di keranjang boleh dibuka
+lagi untuk mengganti rasa. `OrderBundleModal` menghitung sisa stok lewat
+`remainingStockByCategory(categories, quantities, cart.bundles, slots)` — dan
+`cart.bundles` **sudah memuat** bundle yang sedang diedit. Ditambah `slots`
+baru, slot lama ikut mengurangi stok dua kali. Efeknya pembeli melihat
+"Tersedia 0" padahal stoknya masih ada, dan tidak bisa menyelesaikan paket.
+
+Perbaikannya: filter entry yang sedang diedit keluar sebelum menghitung.
+
+```ts
+const otherBundles = editingEntry
+  ? cart.bundles.filter((b) => b.id !== editingEntry.id)
+  : cart.bundles;
+```
+
+Aturan umum: kalau sebuah fitur bisa menambah DAN mengubah item yang sama,
+cek ulang semua tempat yang menghitung agregat (stok, total harga, jumlah
+item). Perbaikannya hampir selalu "kurangi dulu, lalu hitung ulang".
+
+## 51. Halaman `/order` adalah wizard 4 langkah — produk ada di langkah 2
+
+Uji UI `/order` dengan headless browser TIDAK bisa langsung
+`querySelector` kartu produk. Halaman ini stepwise:
+`01/04 Data Kamu` → `02/04 Pilih Rasa` (produk + bundle) → `03/04 Pembayaran`
+→ `04/04 Konfirmasi`.
+
+Di langkah 1 semua input kosong (bahkan `required` pun `false`, validasinya
+berbasis state React), jadi `button.click()` biasa tidak cukup.
+
+Cara yang berhasil:
+1. isi `input#name` & `input#phone` lewat native setter
+   (`Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set`)
+   lalu dispatch `input` + `change` — menulis langsung ke `.value` tidak memicu
+   state React;
+2. klik tombol "Lanjut";
+3. tunggu ~3 detik, karena langkah ini memuat banyak komponen client
+   (keranjang, hitung stok, bundle).
+
+Konsekuensi: tes apa pun yang menyentuh `/order` harus melewati langkah ini
+dulu. Gagal mengisinya membuat tes salah menyimpulkan "kartu tidak ada" padahal
+hanya salah langkah.
+

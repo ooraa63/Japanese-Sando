@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Gift,
@@ -16,6 +16,7 @@ import {
 import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { useCart } from "@/components/customer/CartProvider";
+import type { CartBundleEntry } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
 import { Modal } from "@/components/ui/Modal";
 import { formatIDR } from "@/lib/utils";
@@ -52,12 +53,21 @@ export function OrderBundleModal({
   open,
   onClose,
   soldCounts: soldCountsProp = {},
+  editingEntry = null,
 }: {
   bundle: Bundle | null;
   categories: Category[];
   open: boolean;
   onClose: () => void;
   soldCounts?: Record<number, number>;
+  /**
+   * Entry keranjang yang sedang diubah (permintaan Steven, 11-10-2026).
+   *
+   * Kalau diisi, modal dibuka dalam mode "ubah": slot terisi dari entry itu
+   * dan tombol konfirmasi menulis ulang entry yang sama — bukan menambah
+   * bundle kedua. Tanpa prop ini, perilaku lama (tambah baru) berlaku.
+   */
+  editingEntry?: CartBundleEntry | null;
 }) {
   const { t, lang } = useI18n();
   const cart = useCart();
@@ -66,9 +76,29 @@ export function OrderBundleModal({
   // Daftar slot rasa (Array<flavorId>). Boleh ada flavor yang sama
   // muncul beberapa kali — yaitu cara user pesan bundle "2x Cookies".
   // Reset otomatis oleh React karena parent (MenuBrowser) memberikan
-  // `key={activeBundle.id}` ke modal ini.
+  // `key` ke modal ini.
   const [slots, setSlots] = useState<Array<number>>([]);
   const [note, setNote] = useState<string>("");
+
+  // Mode ubah: isi slot dari bundle yang sudah di keranjang supaya pembeli
+  // melihat rasa yang sekarang terpakai dan tinggal menukarnya.
+  // Dipakai SEKALI saat modal dibuka lewat `seededFor` (lihat di bawah)
+  // supaya perubahan `editingEntry` tidak menimpa isian yang sedang dikerjakan.
+  const seededFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open || !bundle) {
+      seededFor.current = null;
+      return;
+    }
+    const seedKey = editingEntry ? `${bundle.id}:${editingEntry.id}` : `${bundle.id}:new`;
+    if (seededFor.current === seedKey) return;
+    seededFor.current = seedKey;
+    // `slots` di keranjang bertipe `(number | null)[]` (slot kosong masih
+    // mungkin tersisa kalau produk dihapus). Slot null tidak bisa dipakai
+    // sebagai pilihan, jadi dibuang saat diisi di sini.
+    setSlots(editingEntry ? editingEntry.slots.filter((x): x is number => x !== null) : []);
+    setNote(editingEntry?.note ?? "");
+  }, [open, bundle, editingEntry]);
 
   // Rasa yang boleh dipilih.
   const allowedFlavors: Array<Flavor & { categoryName: string }> = useMemo(() => {
@@ -90,17 +120,23 @@ export function OrderBundleModal({
    * `remainingStockByCategory()`, supaya angka "Tersedia N" di modal dan di
    * kartu biasa selalu sama. Slot bundle yang sedang dipilih di modal ini
    * diteruskan sebagai `extraSlots`.
+   *
+   * PENTING saat mode ubah (`editingEntry`): entry yang sedang diubah harus
+   * DIKECUALIKAN dari `cart.bundles`. Kalau tidak, slot lamanya ikut
+   * mengurangi stok DAN `slots` baru juga mengurangi lagi — hasilnya stok
+   * terlihat berkurang dobel dan pembeli bisa dikira "habis" padahal tidak.
    */
-  const remainingByCategory = useMemo(
-    () =>
-      remainingStockByCategory(
-        categories,
-        cart.quantities,
-        cart.bundles ?? [],
-        slots
-      ),
-    [categories, cart.quantities, cart.bundles, slots]
-  );
+  const remainingByCategory = useMemo(() => {
+    const otherBundles = editingEntry
+      ? (cart.bundles ?? []).filter((b) => b.id !== editingEntry.id)
+      : (cart.bundles ?? []);
+    return remainingStockByCategory(
+      categories,
+      cart.quantities,
+      otherBundles,
+      slots
+    );
+  }, [categories, cart.quantities, cart.bundles, slots, editingEntry]);
 
   if (!bundle) return null;
 
@@ -167,8 +203,12 @@ export function OrderBundleModal({
       toast.warning(name, t.menu.bundleEmpty.replace("{n}", String(requiredQty)));
       return;
     }
-    cart.addBundle(bundle, slots, note || undefined);
-    // Toast removed — see FlavorCard.tsx untuk alasannya.
+    // Mode ubah: tulis ulang entry yang sama supaya bundle tidak jadi dobel.
+    if (editingEntry) {
+      cart.updateBundle(editingEntry.id, slots, note || undefined);
+    } else {
+      cart.addBundle(bundle, slots, note || undefined);
+    }
     onClose();
   }
 
@@ -193,7 +233,7 @@ export function OrderBundleModal({
             className="btn-matcha disabled:opacity-50"
           >
             <Check className="size-4" />
-            {t.common.confirm}
+            {editingEntry ? t.menu.bundleSaveChange : t.common.confirm}
           </button>
         </div>
       }

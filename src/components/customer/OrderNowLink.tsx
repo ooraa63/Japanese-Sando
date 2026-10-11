@@ -6,6 +6,7 @@ import { Lock, LogIn, ShoppingBag, UserRound } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
 import { Modal } from "@/components/ui/Modal";
+import { ACCOUNT_FEATURE_ENABLED } from "@/lib/featureFlags";
 
 /**
  * Tombol CTA "Pesan Sekarang".
@@ -61,14 +62,21 @@ export function OrderNowLink({
         <button
           type="button"
           className={className}
-          onClick={() => setAskOpen(true)}
-          aria-haspopup="dialog"
-          aria-expanded={askOpen}
+          // Fitur Account mati -> langsung ke /order, tanpa popup.
+          // Fitur Account hidup -> tampilkan popup "pakai akun atau tamu?".
+          onClick={() => (ACCOUNT_FEATURE_ENABLED ? setAskOpen(true) : goToOrder())}
+          aria-haspopup={ACCOUNT_FEATURE_ENABLED ? "dialog" : undefined}
+          aria-expanded={ACCOUNT_FEATURE_ENABLED ? askOpen : undefined}
         >
           <ShoppingBag className="size-5" />
           {cta}
         </button>
 
+        {/* Fitur Account dimatikan (lihat ACCOUNT_FEATURE_ENABLED): pertanyaan
+            "pakai akun atau tamu?" sudah tidak relevan — pembeli tidak punya
+            pilihan akun lagi. Yang tersisa hanya "Pesan sebagai tamu", jadi
+            popup ini dilewati dan tombol langsung menuju /order. */}
+        {ACCOUNT_FEATURE_ENABLED ? (
         <Modal
           open={askOpen}
           onClose={() => setAskOpen(false)}
@@ -117,6 +125,7 @@ export function OrderNowLink({
             </button>
           </div>
         </Modal>
+        ) : null}
       </>
     );
   }

@@ -176,6 +176,13 @@ export const id: Dict = {
     bundleAnyCategory: "Bebas pilih dari semua rasa",
     bundleNoteLabel: "Catatan untuk paket ini",
     bundleNoteHint: "Opsional. Berlaku untuk semua slot di paket ini.",
+    // Dipakai saat pembeli menekan bundle yang sudah di keranjang untuk
+    // mengganti rasa (permintaan Steven, 11-10-2026).
+    // CATATAN: nama kuncinya `bundleInCartChip`, bukan `bundleInCart` —
+    // yang itu sudah dipakai untuk pesan jumlah ("{n} paket di keranjang").
+    bundleSaveChange: "Simpan perubahan",
+    bundleInCartChip: "Di keranjang",
+    bundleEditHint: "Ketuk untuk ubah rasa",
   },
   howItWorks: {
     title: "Cara Pre-order",
@@ -211,7 +218,9 @@ export const id: Dict = {
   },
   order: {
     title: "Pesan Sandonya Sekarang",
-    subtitle: "Boleh pakai akun, boleh juga tidak. Cuma butuh satu menit.",
+    // Fitur Account dimatikan sementara (11-10-2026), jadi jangan menjanjikan
+    // akun di sini. Sekarang teksnya jujur: tanpa daftar, cukup isi data.
+    subtitle: "Tanpa daftar akun. Cuma isi data, lalu pilih rasa favoritmu.",
     stepIdentity: "Data Kamu",
     stepMenu: "Pilih Rasa",
     stepPayment: "Pembayaran",

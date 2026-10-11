@@ -177,6 +177,13 @@ export const en = {
     bundleAnyCategory: "Pick from any flavor",
     bundleNoteLabel: "Note for this bundle",
     bundleNoteHint: "Optional. Applies to every slot in this bundle.",
+    // Shown when the buyer taps a bundle already in the cart to change
+    // its flavors (Steven, 11-10-2026).
+    // NOTE: keyed `bundleInCartChip` — plain `bundleInCart` is already
+    // used for the count message ("{n} bundle in cart").
+    bundleSaveChange: "Save changes",
+    bundleInCartChip: "In cart",
+    bundleEditHint: "Tap to change flavors",
   },
   howItWorks: {
     title: "How pre-ordering works",
@@ -212,7 +219,9 @@ export const en = {
   },
   order: {
     title: "Pre-order your sando",
-    subtitle: "Optional account. Takes about a minute.",
+    // Account feature is temporarily off (11-10-2026), so don't promise an
+    // account here. Honest copy instead: no sign-up, just your details.
+    subtitle: "No sign-up needed. Just your details, then pick your flavors.",
     stepIdentity: "Your details",
     stepMenu: "Choose flavors",
     stepPayment: "Payment",

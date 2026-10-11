@@ -64,6 +64,15 @@ interface CartContextValue {
    */
   addBundle: (bundle: Bundle, slots: number[], note?: string) => string;
   removeBundle: (entryId: string) => void;
+  /**
+   * Ganti isi slot bundle yang SUDAH ada di keranjang.
+   *
+   * Dipakai saat pembeli menekan kartu bundle yang isinya sudah terisi lalu
+   * mengganti rasa (permintaan Steven, 11-10-2026). Entry-nya tetap sama —
+   * hanya `slots` (dan catatan) yang ditulis ulang — supaya tidak muncul
+   * sebagai bundle kedua yang dobel.
+   */
+  updateBundle: (entryId: string, slots: number[], note?: string) => void;
   /** Set catatan untuk satu bundle entry (entryId, bukan bundleId). */
   setBundleNote: (entryId: string, note: string) => void;
   /** Kosongkan semuanya (keranjang + data). */
@@ -250,6 +259,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
     write({ ...store, bundles: next });
   }, []);
 
+  const updateBundle = useCallback(
+    (entryId: string, slots: number[], note?: string) => {
+      const trimmedNote = note?.trim();
+      let berubah = false;
+      const next = store.bundles.map((b) => {
+        if (b.id !== entryId) return b;
+        berubah = true;
+        const copy: CartBundleEntry = { ...b, slots: [...slots] };
+        if (trimmedNote) copy.note = trimmedNote;
+        else delete copy.note;
+        return copy;
+      });
+      if (!berubah) return;
+      write({ ...store, bundles: next });
+    },
+    []
+  );
+
   const setBundleNote = useCallback((entryId: string, note: string) => {
     const next = store.bundles.map((b) => {
       if (b.id !== entryId) return b;
@@ -329,6 +356,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setNote,
     addBundle,
     removeBundle,
+    updateBundle,
     setBundleNote,
     clear,
     reset,

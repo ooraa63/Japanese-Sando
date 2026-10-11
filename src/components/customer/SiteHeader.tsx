@@ -17,6 +17,10 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
+import {
+  ACCOUNT_FEATURE_ENABLED,
+  TOPBAR_SEARCH_ENABLED,
+} from "@/lib/featureFlags";
 
 export function SiteHeader({
   storeName = "Rumakomugi",
@@ -57,6 +61,13 @@ export function SiteHeader({
     router.push(`/order?q=${encodeURIComponent(q)}`);
   }
 
+  /**
+   * Kolom pencarian disembunyikan sementara (permintaan Steven, 11-10-2026).
+   * `submitSearch` dan `query` sengaja dibiarkan utuh — kalau flag-nya
+   * dinyalakan lagi, form-nya langsung hidup tanpa menulis ulang logika.
+   */
+  const tampilkanSearch = TOPBAR_SEARCH_ENABLED;
+
   // "Kontak" sengaja tidak ada di daftar ini (dokumen "Perbaikan Ruma Komugi 2",
   // item 2): link Kontak dihapus dari navigasi dan info kontaknya dipindah ke
   // halaman /account — tekan "Kontak" di sana untuk membuka popup.
@@ -74,7 +85,8 @@ export function SiteHeader({
       }`}
     >
       {/* ---------- Mobile: top bar ala UIUX 4 ----------
-          Urutannya: tombol menu · kolom pencarian · lonceng · avatar.
+          Urutannya: tombol menu · [pencarian, sementara disembunyikan] ·
+          lonceng · avatar.
           Desktop masih pakai bar logo + nav di bawah. */}
       <div className="flex h-16 items-center gap-2.5 px-4 md:hidden">
         <button
@@ -87,19 +99,25 @@ export function SiteHeader({
           {open ? <X className="size-5" /> : <Menu className="size-5" />}
         </button>
 
-        <form onSubmit={submitSearch} className="min-w-0 flex-1" role="search">
-          <label className="flex items-center gap-2 rounded-full border border-cocoa-200 bg-white px-3.5 py-2">
-            <Search className="size-4 shrink-0 text-cocoa-400" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t.home.searchPlaceholder}
-              aria-label={t.home.searchPlaceholder}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-cocoa-400"
-            />
-          </label>
-        </form>
+        {tampilkanSearch ? (
+          <form onSubmit={submitSearch} className="min-w-0 flex-1" role="search">
+            <label className="flex items-center gap-2 rounded-full border border-cocoa-200 bg-white px-3.5 py-2">
+              <Search className="size-4 shrink-0 text-cocoa-400" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t.home.searchPlaceholder}
+                aria-label={t.home.searchPlaceholder}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-cocoa-400"
+              />
+            </label>
+          </form>
+        ) : (
+          /* Spacer: tanpa kolom search, lonceng + avatar harus tetap
+             terdorong ke kanan. */
+          <span aria-hidden className="flex-1" />
+        )}
 
         {/* Belum ada fitur notifikasi, jadi lonceng ini diarahkan ke /account
             (riwayat pesanan) — bukan tombol mati. */}
@@ -112,33 +130,38 @@ export function SiteHeader({
           <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-honey-400 ring-2 ring-cream-50" />
         </Link>
 
-        {loading && !profile ? (
-          <span
-            aria-hidden
-            className="size-9 shrink-0 animate-pulse rounded-full bg-cocoa-100"
-          />
-        ) : profile ? (
-          <Link
-            href="/account"
-            className="size-9 shrink-0 overflow-hidden rounded-full bg-matcha-500"
-            aria-label={t.customerAuth.accountChip}
-          >
-            <span className="grid h-full w-full place-items-center text-white">
-              <UserCircle className="size-5" />
-            </span>
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={() => openAuthModal("login")}
-            className="size-9 shrink-0 overflow-hidden rounded-full bg-cocoa-100"
-            aria-label={t.customerAuth.loginCta}
-          >
-            <span className="grid h-full w-full place-items-center text-cocoa-500">
-              <UserCircle className="size-5" />
-            </span>
-          </button>
-        )}
+        {/* Chip avatar / "Masuk" disembunyikan sementara — fitur Account
+            dimatikan (lihat `ACCOUNT_FEATURE_ENABLED`). Halaman /account
+            tetap bisa dibuka lewat lonceng di sebelahnya dan tab "Pesanan". */}
+        {ACCOUNT_FEATURE_ENABLED ? (
+          loading && !profile ? (
+            <span
+              aria-hidden
+              className="size-9 shrink-0 animate-pulse rounded-full bg-cocoa-100"
+            />
+          ) : profile ? (
+            <Link
+              href="/account"
+              className="size-9 shrink-0 overflow-hidden rounded-full bg-matcha-500"
+              aria-label={t.customerAuth.accountChip}
+            >
+              <span className="grid h-full w-full place-items-center text-white">
+                <UserCircle className="size-5" />
+              </span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openAuthModal("login")}
+              className="size-9 shrink-0 overflow-hidden rounded-full bg-cocoa-100"
+              aria-label={t.customerAuth.loginCta}
+            >
+              <span className="grid h-full w-full place-items-center text-cocoa-500">
+                <UserCircle className="size-5" />
+              </span>
+            </button>
+          )
+        ) : null}
       </div>
 
       {/* ---------- Desktop ---------- */}
@@ -186,33 +209,37 @@ export function SiteHeader({
 
         <div className="flex items-center gap-2">
           <LanguageToggle />
-          {loading && !profile ? (
-            <span
-              aria-hidden="true"
-              className="h-10 w-10 animate-pulse rounded-full bg-cocoa-100"
-            />
-          ) : profile ? (
-            <Link
-              href="/account"
-              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-matcha-500 px-3.5 text-[13px] font-bold text-white shadow-sm shadow-matcha-900/20 transition hover:bg-matcha-600"
-              aria-label={t.customerAuth.accountChip}
-              title={t.customerAuth.accountChip}
-            >
-              <UserCircle className="size-4" />
-              <span className="hidden lg:inline">
-                {profile.full_name.split(" ")[0]}
-              </span>
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={() => openAuthModal("login")}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-cocoa-200 bg-white px-3.5 text-[13px] font-bold text-cocoa-700 transition hover:bg-cocoa-100"
-            >
-              <LogIn className="size-4" />
-              <span>{t.customerAuth.loginCta}</span>
-            </button>
-          )}
+          {/* Sama seperti di mobile: chip avatar / "Masuk" ikut disembunyikan
+              selama fitur Account dimatikan. */}
+          {ACCOUNT_FEATURE_ENABLED ? (
+            loading && !profile ? (
+              <span
+                aria-hidden="true"
+                className="h-10 w-10 animate-pulse rounded-full bg-cocoa-100"
+              />
+            ) : profile ? (
+              <Link
+                href="/account"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-matcha-500 px-3.5 text-[13px] font-bold text-white shadow-sm shadow-matcha-900/20 transition hover:bg-matcha-600"
+                aria-label={t.customerAuth.accountChip}
+                title={t.customerAuth.accountChip}
+              >
+                <UserCircle className="size-4" />
+                <span className="hidden lg:inline">
+                  {profile.full_name.split(" ")[0]}
+                </span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAuthModal("login")}
+                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-cocoa-200 bg-white px-3.5 text-[13px] font-bold text-cocoa-700 transition hover:bg-cocoa-100"
+              >
+                <LogIn className="size-4" />
+                <span>{t.customerAuth.loginCta}</span>
+              </button>
+            )
+          ) : null}
           <Link
             href="/order"
             className="btn-primary !px-4 !py-2.5 text-[13px]"
@@ -271,25 +298,30 @@ export function SiteHeader({
               ))}
             </ul>
 
-            {/* Section: account */}
-            <p className="mt-6 text-[10px] font-bold tracking-[0.2em] text-cocoa-400 uppercase">
-              {lang === "en" ? "Account" : "Akun"}
-            </p>
-            <div className="mt-2">
-              <Link
-                href="/account"
-                onClick={() => setOpen(false)}
-                className="flex items-center justify-between rounded-xl border border-cocoa-200 bg-white px-4 py-3 text-sm font-semibold text-cocoa-800"
-              >
-                <span className="flex items-center gap-2.5">
-                  <UserCircle className="size-5 text-cocoa-500" />
-                  {profile
-                    ? profile.full_name.split(" ")[0]
-                    : t.customerAuth.loginCta}
-                </span>
-                <ChevronRight className="size-4 text-cocoa-300" />
-              </Link>
-            </div>
+            {/* Section: account — ikut disembunyikan selama fitur Account mati.
+                Section "Pengaturan" (pilihan bahasa) tetap ada. */}
+            {ACCOUNT_FEATURE_ENABLED ? (
+              <>
+                <p className="mt-6 text-[10px] font-bold tracking-[0.2em] text-cocoa-400 uppercase">
+                  {lang === "en" ? "Account" : "Akun"}
+                </p>
+                <div className="mt-2">
+                  <Link
+                    href="/account"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center justify-between rounded-xl border border-cocoa-200 bg-white px-4 py-3 text-sm font-semibold text-cocoa-800"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <UserCircle className="size-5 text-cocoa-500" />
+                      {profile
+                        ? profile.full_name.split(" ")[0]
+                        : t.customerAuth.loginCta}
+                    </span>
+                    <ChevronRight className="size-4 text-cocoa-300" />
+                  </Link>
+                </div>
+              </>
+            ) : null}
 
             {/* Settings row */}
             <div className="mt-6 flex items-center justify-between rounded-xl border border-cocoa-200 bg-white px-4 py-3">

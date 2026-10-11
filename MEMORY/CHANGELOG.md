@@ -4,6 +4,68 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-11 — Bundle bisa diubah, kartu /order seragam, fitur Account & search di-hide
+
+**Scope:** feat+fix: empat permintaan Steven
+
+1. Bundle yang sudah di keranjang **tetap bisa ditekan** untuk mengganti rasa.
+2. Kartu di halaman pre-order **belum seimbang** (lebar tidak sama).
+3. **Fitur Account di-hide** sementara — "jangan ada fitur account dulu karena
+   belum terpakai".
+4. **Kolom search di top bar dihapus.**
+
+**1. Bundle bisa diubah (bukan dikunci)**
+
+Sebelumnya kartu bundle di `/order` diberi `disabled` begitu isinya masuk
+keranjang, jadi pembeli terkunci. Sekarang:
+- `CartProvider` dapat aksi baru `updateBundle(entryId, slots, note)` —
+  menulis ulang entry yang **sama**, bukan menambah entry kedua.
+- `OrderBundleModal` dapat prop `editingEntry`. Kalau diisi, slot terisi dari
+  entry itu (pembeli melihat rasa yang sekarang terpakai) dan tombolnya jadi
+  "Simpan perubahan".
+- Pengisian slot awal memakai ref `seededFor` — hanya sekali saat modal dibuka,
+  supaya perubahan `editingEntry` di tengah jalan tidak menimpa isian yang
+  sedang dikerjakan.
+- `key` modal sengaja **tidak** memuat `editingEntry.id`: kalau memuat, setiap
+  kali entry berubah modal remount dan isian hilang di tengah jalan.
+- **Perbaikan stok:** di mode ubah, entry yang sedang diubah **dikecualikan**
+  dari `remainingStockByCategory()`. Kalau tidak, slot lama dan slot baru sama-
+  sama mengurangi stok sehingga pembeli melihat "habis" padahal tidak.
+
+**2. Kartu /order tidak seimbang**
+
+Bug yang SAMA dengan kartu dense di beranda (gotcha #48): `OrderMenuBrowser`
+membungkus kartu dengan `<li className="flex">`, dan pada flex baris
+`align-items: stretch` hanya meregangkan sumbu tegak — lebar kartu ikut isi
+teks, sehingga kartu berdeskripsi panjang lebih lebar dari yang tanpa
+deskripsi. Diperbaiki dengan `w-full` pada `<article>` gaya `storefront`.
+
+**3 & 4. Flag fitur**
+
+`src/lib/featureFlags.ts` (BARU) dengan dua flag:
+- `ACCOUNT_FEATURE_ENABLED = false` — menyembunyikan bar "Account" di sheet
+  Profil, chip avatar/"Masuk" di top bar (mobile + desktop + menu full-screen),
+  dan popup "pakai akun atau tamu?" di tombol "Pesan Sekarang" (sekarang
+  langsung ke `/order`). Teks `order.subtitle` juga diubah supaya tidak
+  menjanjikan akun.
+- `TOPBAR_SEARCH_ENABLED = false` — kolom search top bar disembunyikan.
+  `submitSearch` dan dukungan `?q=` di `OrderMenuBrowser` dibiarkan utuh.
+
+Yang SENGAJA tetap ada: halaman `/account` + lonceng notifikasi (dipakai tab
+"Pesanan" untuk riwayat & status pre-order — itu fitur pesanan, bukan akun),
+dan bar menu Profil selain Account yang masih dikelola dashboard.
+
+**Verifikasi (headless, viewport 390px):** kartu `/order` lebar 174×5, tinggi
+291×5, foto 129×5 (sebelumnya tidak sama). Bundle: kartu tidak `disabled`,
+setelah masuk keranjang labelnya "Sando 2 — Ketuk untuk ubah rasa" + chip "Di
+keranjang", ditekan lagi membuka modal mode ubah dengan counter `2/2` terisi
+dan tombol "Simpan perubahan". Beranda: 0 `input[type=search]`, 0 `role=search`,
+0 avatar, 0 tombol "Masuk", CTA langsung ke `/order` tanpa popup. Sheet Profil:
+4 bar (Hubungi Kami, FAQ, Jam Buka, Syarat & Ketentuan), tanpa Account.
+`test-pages` 16/16, tsc + eslint bersih, 0 console error.
+
+---
+
 ## 2026-10-10 — Perbaikan kartu 3 kolom: ukuran sama, terjual selalu tampil, tanpa "Lihat Semua", tanpa efek transparan
 
 **Scope:** fix: kartu Populer/Menu kembali sama besar dan seragam
