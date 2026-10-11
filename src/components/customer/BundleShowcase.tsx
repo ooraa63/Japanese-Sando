@@ -7,12 +7,16 @@ import { useI18n } from "@/lib/i18n";
 import { PriceTag } from "./PriceTag";
 
 /**
- * Deretan kartu "Paket Hemat".
+ * Deretan kartu "Paket Hemat" di beranda.
  *
- * Dipisah dari `MenuBrowser` supaya bisa dipakai di dua tempat:
- * beranda (di atas section "Populer", permintaan Steven 10-10-2026) dan
- * halaman menu. Bundle adalah item eksplisit yang penjual jual sendiri,
- * jadi tampilannya sama di mana pun — hanya posisinya yang beda.
+ * Ukuran kartu SENGAJA dibuat sama dengan section "Menu Baru" dan "Populer":
+ * grid 3 kolom, foto persegi, nama 1 baris, harga di bawah (permintaan
+ * Steven 12-10-2026 — "itu antara New, Bundle dan Popular beda ukuran, kita
+ * samakan seperti yang popular aja, 1 baris bisa 3").
+ *
+ * Sebelumnya kartu bundle pakai layout besar sendiri (`aspect-[5/3]`,
+ * `p-4`, `PriceTag size="lg"`), sementara "Menu Baru" pakai baris mendatar
+ * `w-36` yang bisa di-scroll. Tiga section itu jadi kelihatan bedaUkuran.
  */
 export function BundleShowcase({ bundles }: { bundles: Bundle[] }) {
   const { t } = useI18n();
@@ -25,9 +29,11 @@ export function BundleShowcase({ bundles }: { bundles: Bundle[] }) {
         <Gift className="size-4 text-berry-500" />
         {t.menu.bundlesTitle}
       </p>
-      <ul className="density-bundle-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid grid-cols-3 gap-2.5 sm:gap-3">
         {bundles.map((b) => (
-          <BundleCard key={b.id} bundle={b} />
+          <li key={b.id} className="flex">
+            <BundleCard bundle={b} />
+          </li>
         ))}
       </ul>
     </section>
@@ -35,9 +41,13 @@ export function BundleShowcase({ bundles }: { bundles: Bundle[] }) {
 }
 
 /**
- * Kartu bundle untuk beranda & modal. Bundle adalah item eksplisit
- * yang penjual jual (mis. "Bundle 2 Sando Sandwich = 35k"). Saat ini
- * hanya dilihat-saja — pembelian bundle menyusul di iterasi berikut.
+ * Kartu bundle. Bundle adalah item eksplisit yang penjual jual sendiri
+ * (mis. "Bundle 2 Sando Sandwich = 35k"), jadi tampilannya mengikuti kartu
+ * `FlavorCard` mode `dense` — bukan kartu besar.
+ *
+ * `w-full` + `shrink-0` pada foto wajib, sama seperti di `FlavorCard`:
+ * `<li className="flex">` hanya meregangkan sumbu tegak, jadi tanpa `w-full`
+ * lebar kartu ikut panjang teksnya dan grid terlihat tidak rata.
  */
 function BundleCard({ bundle }: { bundle: Bundle }) {
   const { t, lang } = useI18n();
@@ -45,59 +55,58 @@ function BundleCard({ bundle }: { bundle: Bundle }) {
   const desc = lang === "en" ? bundle.desc_en : bundle.desc_id;
 
   return (
-    <li>
-      <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-cocoa-200/70 bg-white transition hover:-translate-y-1 hover:border-cocoa-300 hover:shadow-xl hover:shadow-cocoa-900/10">
-        <div className="relative aspect-[5/3] overflow-hidden bg-gradient-to-br from-honey-300 to-berry-500 sm:aspect-[4/3]">
-          {bundle.image_url ? (
-            <Image
-              src={bundle.image_url}
-              alt={name}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover transition duration-500 group-hover:scale-105"
-            />
-          ) : (
-            <div className="absolute inset-0 grid place-items-center bg-grain">
-              <Gift className="size-12 text-white/50" />
-            </div>
-          )}
-          <span className="absolute left-3 top-3 chip bg-honey-400/95 text-cocoa-900 shadow">
-            <Sparkles className="size-3 fill-current" />
-            {t.menu.bundleLabel}
-          </span>
-          {bundle.compare_price != null &&
-          bundle.compare_price > bundle.price ? (
-            <span className="absolute right-3 top-3 chip bg-berry-500 text-white shadow tabular">
-              −
-              {Math.round(
-                ((bundle.compare_price - bundle.price) / bundle.compare_price) * 100
-              )}
-              %
-            </span>
-          ) : null}
-        </div>
-        <div className="flex flex-1 flex-col p-4">
-          <h3 className="font-display text-lg leading-tight font-bold text-cocoa-900">
-            {name}
-          </h3>
-          {desc ? (
-            <p className="bundle-desc mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-cocoa-500">
-              {desc}
-            </p>
-          ) : null}
-          <div className="mt-2">
-            <PriceTag
-              price={bundle.price}
-              comparePrice={bundle.compare_price}
-              lang={lang}
-              size="lg"
-            />
+    <article className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-cocoa-200/70 bg-white transition hover:border-cocoa-300">
+      <div className="bundle-photo relative aspect-square shrink-0 overflow-hidden bg-gradient-to-br from-honey-300 to-berry-500">
+        {bundle.image_url ? (
+          <Image
+            src={bundle.image_url}
+            alt={name}
+            fill
+            sizes="(max-width: 640px) 32vw, (max-width: 1024px) 22vw, 200px"
+            className="object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center bg-grain">
+            <Gift className="size-10 text-white/50" />
           </div>
-          <p className="mt-2 text-[12px] font-bold text-matcha-700">
-            {t.menu.bundleIncludes.replace("{n}", String(bundle.required_qty))}
-          </p>
+        )}
+
+        {/* Badge pojo kiri atas, badge diskon kanan atas. Padding dan ukuran
+            teks sengaja ramping supaya label tidak terpotong di kartu
+            3 kolom yang cuma ~113px di HP. */}
+        <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-honey-400/95 px-1.5 py-0.5 text-[9px] leading-none font-bold text-cocoa-900 shadow">
+          <Sparkles className="size-2.5 shrink-0" />
+          <span className="truncate">{t.menu.bundleLabel}</span>
+        </span>
+        {bundle.compare_price != null &&
+        bundle.compare_price > bundle.price ? (
+          <span className="absolute right-1.5 top-1.5 inline-flex items-center rounded-full bg-berry-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white shadow tabular">
+            −
+            {Math.round(
+              ((bundle.compare_price - bundle.price) / bundle.compare_price) * 100
+            )}
+            %
+          </span>
+        ) : null}
+      </div>
+
+      <div className="flex flex-1 flex-col p-2">
+        <p className="line-clamp-1 text-[11px] font-bold text-cocoa-900 sm:text-xs">
+          {name}
+        </p>
+        <p className="bundle-desc mt-0.5 line-clamp-2 min-h-[1.9em] text-[10px] leading-snug text-cocoa-500">
+          {desc ?? " "}
+        </p>
+        <div className="mt-auto pt-1.5">
+          <PriceTag
+            price={bundle.price}
+            comparePrice={bundle.compare_price}
+            lang={lang}
+            size="sm"
+            className="text-honey-600"
+          />
         </div>
-      </article>
-    </li>
+      </div>
+    </article>
   );
 }

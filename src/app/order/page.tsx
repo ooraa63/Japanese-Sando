@@ -5,7 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { OrderFlow } from "@/components/customer/OrderFlow";
-import type { DeliveryZone, StoreSettings } from "@/lib/types";
+import type {
+  DeliveryZone,
+  ShippingDiscount,
+  StoreSettings,
+} from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
   const dicts = await getI18nDict();
@@ -73,6 +77,7 @@ async function loadDeliveryZones(): Promise<DeliveryZone[]> {
       kind?: string | null;
       note_id?: string | null;
       note_en?: string | null;
+      shipping_discounts?: ShippingDiscount[] | null;
     }>).map((z) => ({
       id: z.id,
       name_id: z.name_id,
@@ -89,6 +94,11 @@ async function loadDeliveryZones(): Promise<DeliveryZone[]> {
       kind: z.kind === "pickup" ? "pickup" : "delivery",
       note_id: z.note_id ?? undefined,
       note_en: z.note_en ?? undefined,
+      // Diskon ongkir bertingkat per zona (migration-46). Tanpa ini pembeli
+      // tidak pernah melihat baris "Potongan ongkir" di ringkasan pesanan.
+      shipping_discounts: Array.isArray(z.shipping_discounts)
+        ? z.shipping_discounts
+        : [],
     }));
   } catch {
     return fallback;

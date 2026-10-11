@@ -36,6 +36,7 @@ import {
   getInvoiceSnapshot,
   loadInvoiceFromApi,
   paymentLabel,
+  pushOrderHistory,
   subscribeInvoice,
   waLink,
 } from "@/lib/utils";
@@ -108,6 +109,26 @@ export function SuccessClient({
     // `code` stabil dari URL — tidak perlu jadi dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Catat pesanan ini ke riwayat LOKAL perangkat (localStorage), begitu
+  // invoice-nya sudah ada. Ini yang ditampilkan di halaman /riwayat —
+  // sengaja lokal, bukan database: permintaan Steven "beda HP beda history",
+  // jadi pembeli yang tidak punya akun tetap bisa melihat pesanannya sendiri.
+  useEffect(() => {
+    if (!invoice) return;
+    const qty =
+      resolveItems(invoice).reduce((s, it) => s + it.qty, 0) ||
+      (invoice.flat_items ?? []).reduce((s, it) => s + it.quantity, 0) ||
+      (invoice.bundles ?? []).reduce((s, bg) => s + bg.slots.length, 0);
+    pushOrderHistory({
+      order_code: invoice.order_code,
+      customer_name: invoice.customer_name,
+      phone: invoice.phone ?? "",
+      total_price: invoice.total,
+      item_count: qty,
+      created_at: invoice.created_at,
+    });
+  }, [invoice]);
 
   const { t, lang } = useI18n();
 

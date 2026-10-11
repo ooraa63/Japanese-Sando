@@ -8,6 +8,7 @@ import {
   Plus,
   Save,
   Store,
+  Tag,
   Trash2,
 } from "lucide-react";
 import type { AdminDeliveryZone } from "@/app/admin/actions";
@@ -16,10 +17,35 @@ import {
   getDeliveryZonesAction,
   saveDeliveryZoneAction,
 } from "@/app/admin/actions";
+import type { ShippingDiscount } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatIDR } from "@/lib/utils";
 import { InlineMapPicker } from "./InlineMapPicker";
+
+/**
+ * Rapikan nilai `shipping_discounts` yang datang dari database.
+ *
+ * Kolomnya jsonb dan bebas diisi apa saja (penjual bisa menyunting langsung
+ * dari SQL), jadi bentuknya tidak selalu rapi: bisa bukan array, bisa berisi
+ * `null`, `min` bukan angka, atau `percent` di luar 0-100. Semua itu dibuang
+ * di sini supaya form admin tidak pernah crash.
+ */
+function normalizeDiscounts(value: unknown): ShippingDiscount[] {
+  if (!Array.isArray(value)) return [];
+  const out: ShippingDiscount[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw as { min?: unknown; percent?: unknown };
+    const min = Number(r.min);
+    const percent = Number(r.percent);
+    if (!Number.isFinite(min) || min < 0) continue;
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) continue;
+    out.push({ min: Math.floor(min), percent: Math.floor(percent) });
+  }
+  return out.sort((a, b) => a.min - b.min);
+}
 
 interface ZoneDraft {
   id: string;
@@ -37,6 +63,8 @@ interface ZoneDraft {
   /** Catatan untuk pembeli — mis. jam ambil. Dipakai titik pengambilan. */
   note_id: string;
   note_en: string;
+  /** Potongan ongkir bertingkat (migration-46). Hanya untuk 'delivery'. */
+  shipping_discounts: ShippingDiscount[];
 }
 
 const EMPTY: ZoneDraft = {
@@ -53,6 +81,7 @@ const EMPTY: ZoneDraft = {
   kind: "delivery",
   note_id: "",
   note_en: "",
+  shipping_discounts: [],
 };
 
 export function DeliveryZonesClient({
@@ -65,6 +94,7 @@ export function DeliveryZonesClient({
   const toast = useToast();
   const [rows, setRows] = useState<AdminDeliveryZone[]>([]);
   const [editing, setEditing] = useState<ZoneDraft | null>(null);
+  const [removing, setRemoving] = useState<AdminDeliveryZone | null>(null);
   const [pending, startTransition] = useTransition();
 
   const load = useCallback(() => {
@@ -114,6 +144,8 @@ export function DeliveryZonesClient({
       kind: row.kind === "pickup" ? "pickup" : "delivery",
       note_id: row.note_id ?? "",
       note_en: row.note_en ?? "",
+      shipping_discounts:
+        row.kind === "pickup" ? [] : normalizeDiscounts(row.shipping_discounts),
     });
   }
 
@@ -141,6 +173,13 @@ export function DeliveryZonesClient({
         kind: editing.kind,
         note_id: editing.note_id.trim(),
         note_en: editing.note_en.trim(),
+        // Hanya zona antaran yang bisa punya potongan. Titik pengambilan tidak
+        // pakai ongkir sama sekali, jadi database mengabaikannya juga — kita
+        // tetap kirim `[]` supaya tidak ada sisa aturan lama yang aktif.
+        shipping_discounts:
+          editing.kind === "delivery"
+            ? normalizeDiscounts(editing.shipping_discounts)
+            : [],
       };
       const res = await saveDeliveryZoneAction(payload);
       if (res.ok) {
@@ -154,13 +193,17 @@ export function DeliveryZonesClient({
   }
 
   function remove(row: AdminDeliveryZone) {
-    if (
-      !confirm(
-        t.admin.deliveryZones.confirmDelete.replace("{code}", row.id)
-      )
-    ) {
-      return;
-    }
+    // Dialog bawaan browser bisa ditutup tanpa umpan balik apa pun, jadi
+    // PENJUAL bisa mengira zona sudah terhapus padahal tidak ada RPC yang
+    // dipanggil (pola yang sama yang menimbulkan keluhan "menu sudah dihapus
+    // tapi masih muncul" di MenuClient).
+    setRemoving(row);
+  }
+
+  function confirmRemove() {
+    if (!removing) return;
+    const row = removing;
+    setRemoving(null);
     startTransition(async () => {
       const res = await deleteDeliveryZoneAction(row.id);
       if (res.ok) {
@@ -237,6 +280,26 @@ export function DeliveryZonesClient({
                           : t.admin.deliveryZones.addressRequiredLabel
                       }${row.radius_km ? ` · ${row.radius_km} km` : ""}`}
                 </p>
+                {row.kind === "pickup"
+                  ? null
+                  : (() => {
+                      const tiers = normalizeDiscounts(row.shipping_discounts);
+                      if (tiers.length === 0) return null;
+                      return (
+                        <p className="mt-1 flex items-start gap-1.5 text-xs text-matcha-700">
+                          <Tag className="mt-0.5 size-3 shrink-0" />
+                          <span className="min-w-0">
+                            {tiers
+                              .map((d) =>
+                                t.admin.deliveryZones.discountTierSummary
+                                  .replace("{min}", formatIDR(d.min, lang))
+                                  .replace("{pct}", String(d.percent))
+                              )
+                              .join(" · ")}
+                          </span>
+                        </p>
+                      );
+                    })()}
                 {row.note_id ? (
                   <p className="mt-1 flex items-start gap-1.5 text-xs text-matcha-700">
                     <Info className="mt-0.5 size-3 shrink-0" />
@@ -290,6 +353,26 @@ export function DeliveryZonesClient({
           kindFilter={kindFilter}
         />
       ) : null}
+
+      <ConfirmDialog
+        request={
+          removing
+            ? {
+                title: t.admin.deliveryZones.confirmDelete.replace(
+                  "{code}",
+                  removing.id
+                ),
+                body:
+                  lang === "en"
+                    ? removing.name_en || removing.name_id
+                    : removing.name_id || removing.name_en,
+              }
+            : null
+        }
+        busy={pending}
+        onCancel={() => setRemoving(null)}
+        onConfirm={confirmRemove}
+      />
     </section>
   );
 }
@@ -315,6 +398,33 @@ function EditZoneModal({
 }) {
   function patch(p: Partial<ZoneDraft>) {
     setDraft({ ...draft, ...p });
+  }
+
+  /** Ubah satu field satu tingkat diskon tanpa menyentuh tingkat lain. */
+  function patchTier(idx: number, field: keyof ShippingDiscount, value: number) {
+    const next = draft.shipping_discounts.map((tier, i) =>
+      i === idx ? { ...tier, [field]: value } : tier
+    );
+    patch({ shipping_discounts: normalizeDiscounts(next) });
+  }
+
+  /** Tambah tingkat baru. Minimal belanja default-nya 50.000 di atas tier
+   *  terakhir supaya tidak menabruk nilai yang sudah ada. */
+  function addTier() {
+    const current = draft.shipping_discounts;
+    const last = current.length ? current[current.length - 1].min : 0;
+    patch({
+      shipping_discounts: [
+        ...current,
+        { min: last + 50000, percent: current.length ? 100 : 50 },
+      ],
+    });
+  }
+
+  function removeTier(idx: number) {
+    patch({
+      shipping_discounts: draft.shipping_discounts.filter((_, i) => i !== idx),
+    });
   }
 
   return (
@@ -426,6 +536,93 @@ function EditZoneModal({
                   onChange={(e) => patch({ fee: Number(e.target.value) })}
                 />
               </label>
+
+              {/* Potongan ongkir bertingkat. Letak persis di bawah "Delivery
+                  fee" sesuai permintaan Steven: begitu belanja mencapai
+                  minimal, ongkir dipotong persentase tersebut (100% = gratis
+                  ongkir). Berlaku per zona, jadi zona dekat dan zona jauh bisa
+                  punya aturan berbeda. */}
+              <div className="rounded-xl border border-cocoa-200 bg-cream-50 p-3">
+                <p className="text-sm font-bold text-cocoa-800">
+                  {t.admin.deliveryZones.discountTitle}
+                </p>
+                <p className="mt-0.5 text-xs text-cocoa-500">
+                  {t.admin.deliveryZones.discountHint}
+                </p>
+
+                {draft.shipping_discounts.length === 0 ? (
+                  <p className="mt-2 text-xs text-cocoa-400">
+                    {t.admin.deliveryZones.discountEmpty}
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {draft.shipping_discounts.map((tier, idx) => (
+                      <li
+                        key={idx}
+                        className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 rounded-lg bg-white p-2"
+                      >
+                        <label className="block">
+                          <span className="label text-[10px]">
+                            {t.admin.deliveryZones.discountMinLabel}
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1000}
+                            className="input"
+                            value={tier.min}
+                            onChange={(e) =>
+                              patchTier(
+                                idx,
+                                "min",
+                                Math.max(0, Number(e.target.value) || 0)
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="label text-[10px]">
+                            {t.admin.deliveryZones.discountPercentLabel}
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={5}
+                            className="input"
+                            value={tier.percent}
+                            onChange={(e) =>
+                              patchTier(
+                                idx,
+                                "percent",
+                                Math.min(100, Math.max(0, Number(e.target.value) || 0))
+                              )
+                            }
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeTier(idx)}
+                          className="mb-1 rounded-md border border-berry-500/30 px-2 py-2 text-[11px] font-bold text-berry-500 hover:bg-berry-500/10"
+                          aria-label={t.admin.deliveryZones.discountRemove}
+                          title={t.admin.deliveryZones.discountRemove}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <button
+                  type="button"
+                  onClick={addTier}
+                  className="mt-2 flex items-center gap-1.5 rounded-md border border-cocoa-300 px-2.5 py-1.5 text-[12px] font-bold text-cocoa-700 hover:bg-white"
+                >
+                  <Plus className="size-3.5" />
+                  {t.admin.deliveryZones.discountAdd}
+                </button>
+              </div>
 
               <label className="flex cursor-pointer items-start gap-2 rounded-xl bg-cream-100 p-3">
                 <input

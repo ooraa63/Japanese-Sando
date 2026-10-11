@@ -901,3 +901,75 @@ pembeli mengira mereka salah langkah.
 
 **Konsekuensi:** Langkah identitas tetap punya tombol "Lanjut" sendiri di
 dalam form, jadi tidak ada langkah yang buntu.
+
+## D37 - Diskon ongkir disimpan PER ZONA, bukan global
+
+**Keputusan:** Kolom `delivery_zones.shipping_discounts` jsonb, bentuk
+`[{ "min": 50000, "percent": 50 }]`. Tiap zona punya daftar sendiri.
+
+**Alasan:** Steven menunjuk form zona delivery di admin (gambar 4), jadi
+kontrolnya harus ada di situ. Sekaligus lebih masuk akal secara operasional:
+zona dekat (ongkir Rp3.000) dan zona jauh (Rp15.000) belum tentu perlu titik
+potongan yang sama.
+
+**Konsekuensi:** `resolveShipping()` dan `create_order` harus memilih aturan
+dengan `min` TERTINGGI yang terlampaui subtotal, bukan menjumlahkan persen -
+kalau tidak, dua tier yang sama-sama aktif bisa membuat ongkir minus.
+
+## D38 - Ongkir dibaca dari TABEL `delivery_zones`, bukan jsonb `store_settings`
+
+**Keputusan:** `create_order` (dan semua tampilan pembeli) memakai
+`delivery_zones.fee`. Kolom jsonb `store_settings.delivery_zones` tidak lagi
+dipakai untuk hitungan ongkir.
+
+**Alasan:** Dua sumber harga yang bisa berbeda persis adalah bug, bukan
+fitur. Sebelum ini pembeli melihat fee dari tabel (Rp5.000) tapi backend
+menagih fee dari jsonb (Rp10.000), dan zona yang tidak ada di jsonb (`antar`)
+ditagih Rp0 alias gratis ongkir. Bug ini ketahuan karena Steven mengutip
+angka ongkir yang berbeda dari yang muncul di aplikasi.
+
+**Konsekuensi:** Migrasi 46 mengganti pembacaannya. jsonb lamanya dibiarkan
+apa adanya (data historis), tapi tidak lagi jadi sumber kebenaran.
+
+## D39 - FAQ pindah dari kode ke database
+
+**Keputusan:** Tabel `faq_items` + RPC `public_faq()` /
+`admin_list_faq()` / `admin_save_faq()` / `admin_delete_faq()`. Halaman
+`/faq` dan section FAQ di `/contact` membaca dari situ.
+
+**Alasan:** Permintaan Steven: "untuk faq gini dimana kami bisa edit atau
+tambahkan nantinya, soalnya di admin tidak ada fiturnya, sama halnya dengan
+contact dll". Contact memang sudah bisa disunting dari dashboard; FAQ tidak.
+
+**Konsekuensi:** `src/lib/faq.ts` tidak dihapus, tapi turun kelas jadi isi
+cadangan (dipakai kalau `public_faq()` gagal) plus `normalizeFaq()` yang
+membuat jsonb dari database aman dibaca. Sempre sediakan fallback: halaman
+publik tidak boleh kosong hanya karena satu RPC error.
+
+## D40 - Riwayat pesanan disimpan di localStorage, bukan database
+
+**Keputusan:** `/riwayat` membaca `localStorage` (kunci
+`js_order_history_v1`), ditulis dari halaman `/order/success/[code]`.
+
+**Alasan:** Permintaan Steven eksplisit: "saya mau satu untuk track, dan satu
+untuk history... dan itu pakai local storage aja jadi beda hp beda history".
+Itu memang perilaku yang dia mau - bukan kelemahan yang perlu diperbaiki.
+
+**Konsekuensi:** Maksimal 30 baris, riwayat hilang kalau pengguna clears data
+browser, dan tidak terlihat di HP lain. Perlakukan ini sebagai fitur (privasi +
+tanpa akun), dan halaman /riwayat harus menjelaskan bahwa datanya lokal. Jangan
+diam-diam mengubahnya ke database tanpa diminta.
+
+## D41 - Bar quick-action menyatu dengan bottom nav, bukan elemen fixed terpisah
+
+**Keputusan:** "Cek Pesanan" + "Riwayat" dirender DI DALAM elemen `<nav>` yang
+sama dengan bar tab, bukan sebagai `div fixed` kedua yang diposisikan dengan
+`bottom-[58px]`.
+
+**Alasan:** Tinggi bar quick-action tidak konstan, dan `pb-[env(safe-area-inset-bottom)]`
+pada nav membuat posisinya bergeser di HP bergerigi. Dua elemen `fixed` berarti
+satu harus mengarang offset yang cepat salah - gejalanya bar menutupi tab
+Profil.
+
+**Konsekuensi:** Spacer bawah halaman harus ikut naik (68px -> 114px). Kalau
+tidak, kartu terakhir di beranda tertutup bar Riwayat.

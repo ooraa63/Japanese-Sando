@@ -24,6 +24,7 @@ import type {
   Category,
   CustomerProfile,
   DeliveryZone,
+  Language,
   StoreSettings,
 } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -36,7 +37,8 @@ import { AddressPicker } from "@/components/customer/AddressPicker";
 import { CartDrawer } from "@/components/customer/CartDrawer";
 import { QrisPaymentModal } from "@/components/customer/QrisPaymentModal";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
-import { formatIDR, formatPhone, saveInvoice } from "@/lib/utils";
+import { formatIDR, formatPhone, resolveShipping, saveInvoice } from "@/lib/utils";
+import type { ShippingQuote } from "@/lib/utils";
 
 const FULL_STEPS = ["identity", "menu", "payment", "review"] as const;
 const LOGGED_IN_STEPS = ["menu", "payment", "review"] as const;
@@ -79,6 +81,57 @@ function subscribeOrderStep(): () => void {
  *  lengkap = bisa skip identity di OrderFlow. */
 const isProfileComplete = (p: CustomerProfile | null | undefined) =>
   !!(p?.user_id && p.full_name && p.phone);
+
+/**
+ * Baris Potongan ongkir + petunjuk tier berikutnya.
+ *
+ * Hanya dirender kalau zona yang dipilih punya aturan diskon (lihat
+ * `DeliveryZone.shipping_discounts`, migration-46). Kalau belum ada tier yang
+ * terlampaui, yang muncul cuma petunjuk supaya pembeli tahu kalau belanja
+ * sedikit lagi bisa gratis ongkir.
+ */
+function ShippingDiscountRows({
+  shipping,
+  subtotal,
+  t,
+  lang,
+}: {
+  shipping: ShippingQuote;
+  subtotal: number;
+  t: ReturnType<typeof useI18n>["t"];
+  lang: Language;
+}) {
+  const { percent, discount, hitMin, next } = shipping;
+  const hasTier = percent > 0 || Boolean(next);
+
+  if (!hasTier) return null;
+
+  return (
+    <>
+      {percent > 0 ? (
+        <div className="mt-1 flex justify-between text-sm font-bold text-matcha-600">
+          <span>{t.order.review.shippingDiscount}</span>
+          <span className="tabular">−{formatIDR(discount, lang)}</span>
+        </div>
+      ) : null}
+      {percent > 0 && hitMin ? (
+        <p className="mt-0.5 text-right text-[11px] text-matcha-600/80">
+          {t.order.review.shippingDiscountNote
+            .replace("{pct}", String(percent))
+            .replace("{min}", formatIDR(hitMin, lang))}
+        </p>
+      ) : null}
+      {next ? (
+        <p className="mt-0.5 text-right text-[11px] text-cocoa-500">
+          {t.order.review.shippingTierHint.replace(
+            "{amount}",
+            formatIDR(Math.max(0, next.min - subtotal), lang)
+          )}
+        </p>
+      ) : null}
+    </>
+  );
+}
 
 export function OrderFlow({
   categories,
@@ -338,8 +391,23 @@ export function OrderFlow({
 
   // Ongkir dari zona delivery (kalau pickup = 0).
   const currentZone = deliveryZones.find((z) => z.id === draft.deliveryZone);
-  const deliveryFee =
+  const rawDeliveryFee =
     draft.deliveryMethod === "delivery" && currentZone ? currentZone.fee : 0;
+  // Potongan ongkir bertingkat per zona (migration-46). `finalFee` yang dipakai
+  // di total, karena `create_order` menerapkan aturan yang sama persis di
+  // database — jadi yang dilihat pembeli sama dengan yang ditagih.
+  const shipping = useMemo(
+    () =>
+      resolveShipping(
+        draft.deliveryMethod === "delivery"
+          ? currentZone?.shipping_discounts
+          : undefined,
+        subtotal,
+        rawDeliveryFee
+      ),
+    [draft.deliveryMethod, currentZone, subtotal, rawDeliveryFee]
+  );
+  const deliveryFee = shipping.finalFee;
   const total = subtotal + deliveryFee;
 
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
@@ -1357,14 +1425,22 @@ export function OrderFlow({
                 ) : null}
 
                 {draft.deliveryMethod === "delivery" ? (
-                  <div className="mt-2 flex justify-between text-sm text-cocoa-600">
-                    <span>{t.order.review.deliveryFee}</span>
-                    <span className="tabular">
-                      {deliveryFee === 0
-                        ? t.order.review.freeShipping
-                        : formatIDR(deliveryFee, lang)}
-                    </span>
-                  </div>
+                  <>
+                    <div className="mt-2 flex justify-between text-sm text-cocoa-600">
+                      <span>{t.order.review.deliveryFee}</span>
+                      <span className="tabular">
+                        {deliveryFee === 0
+                          ? t.order.review.freeShipping
+                          : formatIDR(deliveryFee, lang)}
+                      </span>
+                    </div>
+                    <ShippingDiscountRows
+                      shipping={shipping}
+                      subtotal={subtotal}
+                      t={t}
+                      lang={lang}
+                    />
+                  </>
                 ) : null}
                 <div className="mt-3 flex justify-between border-t border-cocoa-200 pt-3 text-lg font-extrabold text-cocoa-900">
                   <span>{t.order.review.totalLabel}</span>
@@ -1502,14 +1578,22 @@ export function OrderFlow({
               </div>
 
               {draft.deliveryMethod === "delivery" ? (
-                <div className="flex justify-between text-cocoa-600">
-                  <span>{t.order.review.deliveryFee}</span>
-                  <span className="tabular">
-                    {deliveryFee === 0
-                      ? t.order.review.freeShipping
-                      : formatIDR(deliveryFee, lang)}
-                  </span>
-                </div>
+                <>
+                  <div className="flex justify-between text-cocoa-600">
+                    <span>{t.order.review.deliveryFee}</span>
+                    <span className="tabular">
+                      {deliveryFee === 0
+                        ? t.order.review.freeShipping
+                        : formatIDR(deliveryFee, lang)}
+                    </span>
+                  </div>
+                  <ShippingDiscountRows
+                    shipping={shipping}
+                    subtotal={subtotal}
+                    t={t}
+                    lang={lang}
+                  />
+                </>
               ) : null}
               <div className="flex justify-between border-t border-cocoa-200 pt-2 text-base font-extrabold text-cocoa-900">
                 <span>{t.common.total}</span>

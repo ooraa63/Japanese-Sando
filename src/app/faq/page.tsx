@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getI18nDict, getLang } from "@/lib/i18n-server";
-import { getSettings } from "@/lib/data";
-import { FAQ } from "@/lib/faq";
+import { getSettings, getFaq } from "@/lib/data";
 import { FaqList } from "@/components/customer/FaqList";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
@@ -21,18 +20,24 @@ export async function generateMetadata(): Promise<Metadata> {
  * membuka popup statis; sekarang pembeli mendapat halaman yang bisa dicari dan
  * dibaca per pertanyaan.
  *
- * Isi diambil dari `src/lib/faq.ts` yang sama dengan section FAQ di
- * `/contact`, jadi keduanya tidak pernah berbeda isi.
+ * Isi diambil dari tabel `faq_items` lewat RPC `public_faq` (migration-46),
+ * jadi penjual bisa menambah / mengubah / menyembunyikan pertanyaan dari
+ * dashboard. Section FAQ di `/contact` membaca sumber yang sama, jadi keduanya
+ * tidak pernah berbeda isi.
  */
 export default async function FaqPage() {
-  const [settings, dicts, lang] = await Promise.all([
+  const [settings, dicts, lang, faq] = await Promise.all([
     getSettings(),
     getI18nDict(),
     getLang(),
+    getFaq(),
   ]);
   const fp = dicts.faqPage;
 
-  const entries = FAQ.map((f) => ({ q: f.q[lang], a: f.a[lang] }));
+  const entries = faq.map((f) => ({
+    q: lang === "en" ? f.question_en || f.question_id : f.question_id,
+    a: lang === "en" ? f.answer_en || f.answer_id : f.answer_id,
+  }));
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col">

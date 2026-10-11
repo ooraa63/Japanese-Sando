@@ -763,3 +763,59 @@ export async function deleteProfileMenuItemAction(
   revalidatePath("/admin/profile-menu");
   return { ok: true };
 }
+
+/* =============================================================================
+ *  FAQ (isi halaman /faq + section FAQ di /contact)
+ *  Sebelumnya hardcoded di src/lib/faq.ts. Sekarang pindah ke tabel
+ *  `faq_items` (supabase/migration-46.sql) supaya penjual bisa menambah,
+ *  mengubah, dan menyembunyikan pertanyaan dari dashboard.
+ * ========================================================================== */
+
+/** Bar FAQ versi admin: termasuk yang disembunyikan dari pembeli. */
+export interface AdminFaqItem {
+  id: number;
+  question_id: string;
+  question_en: string;
+  answer_id: string;
+  answer_en: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export async function listFaqAction(): Promise<ActionResult<AdminFaqItem[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error || !data) return { ok: false, error: "not_authorized" };
+
+  const { data: rows, error: sErr } = await supabase.rpc("admin_list_faq");
+  if (sErr) return { ok: false, error: humanize(sErr.message) };
+
+  const payload = (rows ?? {}) as { items?: AdminFaqItem[] };
+  return { ok: true, data: payload.items ?? [] };
+}
+
+export async function saveFaqAction(
+  payload: Record<string, unknown>
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_save_faq", { p_payload: payload });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  // `/faq` dan `/contact` dua-duanya membaca isi yang sama, jadi keduanya
+  // harus disegarkan.
+  revalidatePath("/faq");
+  revalidatePath("/contact");
+  revalidatePath("/admin/faq");
+  return { ok: true };
+}
+
+export async function deleteFaqAction(id: number): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_delete_faq", { p_id: id });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/faq");
+  revalidatePath("/contact");
+  revalidatePath("/admin/faq");
+  return { ok: true };
+}

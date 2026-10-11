@@ -120,12 +120,27 @@ await openPage("/admin/pickup-delivery", {
 await openPage("/admin/profile-menu", {
   mustContain: ["Menu Profil", "Tambah bar menu"],
 });
+// Menu FAQ (migration-46): isi /faq + section FAQ di /contact pindah dari kode
+// ke tabel `faq_items`, jadi sekarang bisa disunting dari dashboard.
+await openPage("/admin/faq", {
+  mustContain: ["FAQ", "Tambah pertanyaan"],
+});
 
 console.log("\n=== 4. Halaman publik tetap terbuka ===");
 // Nama merek = "Rumakomugi" (dari store_settings.store_name).
 await openPage("/", { mustContain: ["Rumakomugi", "Pesan Sekarang"] });
 await openPage("/order", { mustContain: ["Pre-order", "Siapa yang memesan"] });
 await openPage("/track", { mustContain: ["Cek Status Pesanan"] });
+// Halaman FAQ (item 5, 12-10-2026) + halaman riwayat lokal (item 3).
+// /faq harus menampilkan isi dari database: pertanyaan seed pertama.
+await openPage("/faq", {
+  mustContain: ["FAQ", "Bagaimana cara memesan?"],
+});
+await openPage("/riwayat", { mustContain: ["Riwayat Pesanan"] });
+// /contact juga memuat FAQ yang sama (sumbernya satu tabel).
+await openPage("/contact", {
+  mustContain: ["Hubungi", "Bagaimana cara memesan?"],
+});
 
 console.log("\n=== 5. Admin tidak bisa melihat halaman pengaturan tanpa login ===");
 const anon = await fetch(`${APP}/admin/settings`, { redirect: "manual" });

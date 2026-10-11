@@ -4,6 +4,116 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Stok bisa diketik, konfirmasi hapus in-app, bar Cek Pesanan + Riwayat, diskon ongkir bertingkat, FAQ dari admin, kartu beranda seragam
+
+**Scope:** feat + fix - enam permintaan Steven dengan screenshot (stok, menu nyangkut, bar bawah, zona ongkir, halaman FAQ, ukuran kartu)
+**Migrasi:** `supabase/migration-46.sql` (sudah diterapkan)
+
+### 1. Field stok di admin bisa DIKETIK (bukan hanya -/+)
+
+Header kategori di `/admin/menu` tadinya hanya punya tombol -1 / +1 / +10, jadi
+set stok jadi 250 harus menekan tombol hundreds kali atau membuka form kategori
+terpisah. Sekarang angka stok jadi `<input>` biasa (`QuickStockInput`):
+
+- mengetik hanya mengubah teks di layar, TIDAK menyentuh database;
+- `Enter` atau blur = commit sekali (bukan tiap ketikan, supaya mengetik "250"
+  tidak menulis 2 -> 25 -> 250);
+- `Escape` = batal, kembali ke nilai terakhir;
+- angka non-digit dibuang, nilai dikunci `>= 0`.
+
+Fungsi `changeCategoryStock` (+/-) sekarang berbagi helper yang sama dengan
+versi absolut, lewat prop baru `setCategoryStockTo` di `FlavorList`.
+
+### 2. Hapus tanpa jejak: `window.confirm` diganti dialog in-app
+
+Keluhan Steven "menu sudah dihapus tapi masih tampil di web". Setelah menelusuri
+database, penyebabnya bukan backend: `MenuClient` memakai `window.confirm()`
+untuk konfirmasi hapus. Dialog itu bisa ditutup (Esc / Cancel) tanpa umpan
+balik apa pun di aplikasi, jadi PENJUAL bisa mengira hapus sudah jalan padahal
+tidak ada RPC yang dipanggil sama sekali.
+
+- Komponen baru `src/components/ui/ConfirmDialog.tsx`.
+- `MenuClient` (kategori, rasa, bundle) dan `DeliveryZonesClient` sekarang
+  menyimpan target hapus di state `pendingDelete` lalu memanggil `removeX()`
+  dari tombol "Hapus" pada dialognya.
+- Efeknya membatalkan jadi tidak mungkin disalahartikan.
+
+Catatan data: rasa "Mala" (id 441) sudah TIDAK ADA di database - sudah dihapus
+sebelum iterasi ini, dan produksi (`https://japanese-sando.vercel.app`) sudah
+terverifikasi tidak menampilkannya lagi (5 rasa, `is_new` kosong).
+
+### 3. Bar cepat di atas bottom nav: Cek Pesanan + Riwayat
+
+- `MobileBottomNav` sekarang dua lapis dalam SATU elemen `<nav>`: bar quick
+  action ("Cek Pesanan" -> /track, "Riwayat" -> /riwayat) lalu bar tab. Spacer
+  bawah naik dari 68px ke 114px.
+- Halaman baru `/riwayat` (`src/app/riwayat/page.tsx` +
+  `HistoryList.tsx`). Isinya dibaca dari `localStorage` perangkat, bukan
+  database - sesuai permintaan "beda HP beda history".
+- `pushOrderHistory` dipanggil dari `SuccessClient` begitu invoice termuat, jadi
+  pesanan otomatis masuk riwayat tanpa aksi pembeli.
+- Pembacaan pakai `useSyncExternalStore` dengan snapshot stabil
+  (`getOrderHistorySnapshot` / `subscribeOrderHistory` di `src/lib/utils.ts`),
+  bukan `useState` + `useEffect` - React menandai `setState` sinkron di dalam
+  effect sebagai pola yang memicu render berlapis.
+
+### 4. Diskon ongkir bertingkat per zona
+
+- Kolom baru `delivery_zones.shipping_discounts jsonb` bentuk
+  `[{ "min": 50000, "percent": 50 }, ...]`, per zona (bukan global).
+- Form zona di `/admin/pickup-delivery` dapat blok "Potongan ongkir" tepat di
+  bawah field "Ongkir (Rp)": tambah/hapus tingkat, minimal belanja + persen.
+  Titik pengambilan tidak punya blok ini (ongkirnya 0).
+- `create_order` menerapkan aturan dengan `min` TERTINGGI yang terlampaui
+  subtotal (potongan tidak menumpuk), `100%` = gratis ongkir.
+- `resolveShipping()` di `src/lib/utils.ts` menghitung angka yang sama di sisi
+  pembeli, jadi yang tampil di ringkasan order = yang ditagih. Bar "Potongan
+  ongkir" muncul di bawah "Ongkos kirim", plus petunjuk "belanja Rp x lagi".
+
+BUG YANG IKUT TERPERBAIKI: `create_order` selama ini membaca ongkir dari jsonb
+lama `store_settings.delivery_zones` (vihara/uvers = Rp10.000, zona `antar` =
+Rp0 alias gratis), sementara frontend memakai tabel `delivery_zones` (fee
+Rp5.000). Akibatnya pembeli melihat Rp5.000 tapi backend menagih Rp10.000, dan
+zona "antar" gratis ongkir. Sekarang fee dibaca dari TABEL.
+
+### 5. FAQ bisa diedit dari admin
+
+- Tabel baru `faq_items` + RLS + trigger `faq_items_touch`, diisi 6 pertanyaan
+  lama (seed dibungkus `do $$ ... if not exists ... $$` supaya idempoten).
+- RPC baru: `public_faq()`, `admin_list_faq()`, `admin_save_faq(jsonb)`,
+  `admin_delete_faq(bigint)`.
+- Halaman admin baru `/admin/faq` (sidebar, di antara "Menu Profil" dan
+  "Pengaturan") + `FaqClient.tsx`: tambah, ubah, sembunyikan, hapus.
+- `/faq` dan section FAQ di `/contact` sekarang baca `getFaq()` dari database,
+  jadi keduanya tidak pernah berbeda isi. `src/lib/faq.ts` berubah jadi isi
+  cadangan (dipakai kalau RPC gagal) plus `normalizeFaq()`.
+
+### 6. Ukuran kartu New / Bundle / Popular diseragamkan
+
+"Menu Baru" tadinya baris mendatar yang bisa di-scroll (`w-36 sm:w-40`), Bundle
+punya kartu besar sendiri (`aspect-[5/3]`, `PriceTag size="lg"`), sementara
+"Populer" sudah grid 3 kolom. Ketiganya sekarang satu pola: `grid grid-cols-3
+gap-2.5 sm:gap-3`, foto persegi, nama 1 baris, `PriceTag size="sm"`.
+`BundleShowcase` ditulis ulang tanpa varian `wide` (tidak ada pemakainya lagi).
+
+### Verifikasi
+
+- `npx tsc --noEmit` bersih, `npm run lint` 0 error, `npm run build` sukses
+  (route baru `/admin/faq` dan `/riwayat` muncul di daftar).
+- `scripts/test-pages.mjs` 21/21 lulus (dinaikkan dari 17, ditambah 4 cek baru:
+  `/admin/faq`, `/faq`, `/riwayat`, `/contact`).
+- Headless Edge lokal: 6 pemeriksaan lolos, 0 console error. Semua form admin
+  dibuka lalu dibatalkan (BATAL / dialog ditutup) - tidak ada yang menekan
+  Simpan, jadi tidak ada data produksi yang tersentuh.
+- Uji tulis ke database (tidak lewat UI): `admin_save_faq` tambah -> ubah ->
+  `admin_delete_faq` (sisa 0 bar, total kembali 6). Bar uji dibuat dengan
+  `is_active: false` supaya tidak pernah tayang di halaman publik.
+- Aturan diskon diuji read-only: 49.999 -> 0%, 50.000 -> 50% (Rp5.000 jadi
+  Rp2.500), 150.000 -> 100% (gratis).
+- Produksi terverifikasi: beranda tidak menampilkan "Mala".
+
+---
+
 ---
 
 ---

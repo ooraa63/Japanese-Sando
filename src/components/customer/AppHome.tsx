@@ -177,19 +177,22 @@ export function NewShowcase({ flavors }: { flavors: Flavor[] }) {
   return (
     <section>
       <SectionHead title={t.home.newSection} />
-      {/* Padding negatif + padding kembali supaya baris menyentuh tepi layar
-          di HP (kartu pertama rata dengan kartu section lain) tapi kartu
-          terakhir tetap bisa di-scroll sampai habis. */}
-      <ul className="-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:gap-3 sm:px-6">
+      {/* Grid 3 kolom yang SAMA persis dengan section "Populer" di bawah
+          (permintaan Steven, 12-10-2026: "New, Bundle dan Popular beda
+          ukuran, samakan seperti yang popular aja, 1 baris bisa 3").
+          Sebelumnya section ini baris mendatar yang bisa di-scroll dengan
+          lebar tetap (w-36 / sm:w-40), jadi ukurannya tidak sama dengan
+          "Populer" dan "Paket Hemat". Sekarang ketiganya satu grid. */}
+      <ul className="grid grid-cols-3 gap-2.5 sm:gap-3">
         {flavors.map((f) => (
-          <li key={f.id} className="w-36 shrink-0 snap-start sm:w-40">
+          <li key={f.id} className="flex">
             <FlavorCard
               flavor={f}
               dense
               badgeLabel={t.home.newBadge}
               showSocial
               readOnlySocial
-              showSold
+              showSold={false}
             />
           </li>
         ))}

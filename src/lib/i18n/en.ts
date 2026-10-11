@@ -62,6 +62,7 @@ export const en = {
     myOrder: "My order",
     orders: "Orders",
     track: "Track order",
+    history: "History",
     contact: "Contact",
     admin: "Seller dashboard",
     account: "Account",
@@ -359,6 +360,10 @@ export const en = {
       deliveryLabel: "Delivery",
       deliveryFee: "Delivery fee",
       freeShipping: "Free delivery",
+      shippingDiscount: "Shipping discount",
+      shippingDiscountNote: "{pct}% off for orders over {min}",
+      shippingTierHint: "Spend {amount} more for free delivery",
+      shippingTierUnlocked: "Nice, your delivery fee is {pct}% off",
       totalLabel: "Total to pay",
       bundle: "bundle(s)",
       bundleOffer: "Buy {n} pcs = {price} (you save!)",
@@ -473,6 +478,17 @@ export const en = {
       "The questions we get most. Search below first, and ask on WhatsApp if it is not here.",
     search: "Search a topic or question",
     empty: "No match. Try another keyword.",
+    back: "Back to home",
+  },
+  /** Halaman /riwayat — daftar pesanan dari localStorage perangkat ini. */
+  historyPage: {
+    title: "My order history",
+    subtitle:
+      "Orders placed on this phone. Stored on the device only, so it does not appear on another phone.",
+    empty: "No orders on this device yet.",
+    emptyHint: "Once you finish an order it shows up here automatically.",
+    itemCount: "{n} item(s)",
+    viewOrder: "View order",
     back: "Back to home",
   },
   errors: {
@@ -877,6 +893,34 @@ export const en = {
       pageTitle: "Pickup & Delivery",
       pageSubtitle:
         "Manage pickup points (with their opening hours) and delivery zones with their fees.",
+      // --- Tiered shipping discount (item 4, migration-46) ---
+      discountTitle: "Shipping discount tiers",
+      discountHint:
+        "Set tiers per zone. When the cart total reaches the minimum, that percent is taken off the delivery fee. Example: spend 100000, 100% off, free delivery.",
+      discountEmpty: "No tiers yet. Add one to start giving discounts.",
+      discountAdd: "Add tier",
+      discountMinLabel: "Minimum spend (Rp)",
+      discountPercentLabel: "Delivery fee off (%)",
+      discountTierSummary: "Spend {min} = {pct}% off delivery",
+      discountRemove: "Remove tier",
+      discountSaved: "Shipping discounts saved.",
+    },
+    faq: {
+      title: "FAQ",
+      subtitle:
+        "Questions shown on the /faq page and in the FAQ section of /contact. Changes go live immediately.",
+      new: "Add question",
+      empty: "No questions yet.",
+      questionIdLabel: "Question (ID)",
+      questionEnLabel: "Question (EN)",
+      answerIdLabel: "Answer (ID)",
+      answerEnLabel: "Answer (EN)",
+      sortOrderLabel: "Display order",
+      activeLabel: "Visible to customers",
+      saved: "FAQ saved.",
+      deleted: "Question deleted.",
+      confirmDelete: "Delete this question?",
+      errorQuestionRequired: "The question text is required.",
     },
     menu: {
       title: "Menu & stock",

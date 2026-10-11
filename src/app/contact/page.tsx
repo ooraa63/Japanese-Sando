@@ -9,12 +9,11 @@ import {
   Sparkles,
   Timer,
 } from "lucide-react";
-import { getSettings } from "@/lib/data";
+import { getSettings, getFaq } from "@/lib/data";
 import { getI18nDict, getLang } from "@/lib/i18n-server";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { waLink } from "@/lib/utils";
-import { FAQ } from "@/lib/faq";
 
 export async function generateMetadata(): Promise<Metadata> {
   const dicts = await getI18nDict();
@@ -22,11 +21,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ContactPage() {
-  const [settings, dicts, lang] = await Promise.all([
+  const [settings, dicts, lang, faq] = await Promise.all([
     getSettings(),
     getI18nDict(),
     getLang(),
+    getFaq(),
   ]);
+
+  // Sumber yang sama dengan halaman /faq (tabel `faq_items`, migration-46),
+  // jadi admin cukup mengedit satu tempat.
+  const faqEntries = faq.map((f) => ({
+    q: lang === "en" ? f.question_en || f.question_id : f.question_id,
+    a: lang === "en" ? f.answer_en || f.answer_id : f.answer_id,
+  }));
 
   const hours = lang === "en" ? settings?.hours_en : settings?.hours_id;
   const deadline = lang === "en" ? settings?.deadline_en : settings?.deadline_id;
@@ -210,14 +217,14 @@ export default async function ContactPage() {
           </Link>
 
           <div className="mt-4 divide-y divide-cocoa-100 overflow-hidden rounded-2xl border border-cocoa-200 bg-cream-50">
-            {FAQ.map((item, i) => (
+            {faqEntries.map((item, i) => (
               <details key={i} className="group">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-bold text-cocoa-900 transition hover:bg-cream-100 [&::-webkit-details-marker]:hidden">
-                  <span>{item.q[lang]}</span>
+                  <span>{item.q}</span>
                   <ChevronDown className="size-4 shrink-0 text-cocoa-400 transition group-open:rotate-180" />
                 </summary>
                 <p className="px-5 pb-4 text-sm leading-relaxed text-cocoa-600">
-                  {item.a[lang]}
+                  {item.a}
                 </p>
               </details>
             ))}

@@ -60,6 +60,7 @@ export const id: Dict = {
     myOrder: "Pesanan Saya",
     orders: "Pesanan",
     track: "Cek Pesanan",
+    history: "Riwayat",
     contact: "Kontak",
     admin: "Dashboard Penjual",
     account: "Akun",
@@ -363,6 +364,10 @@ export const id: Dict = {
       deliveryLabel: "Pengiriman",
       deliveryFee: "Ongkos kirim",
       freeShipping: "Gratis ongkir",
+      shippingDiscount: "Potongan ongkir",
+      shippingDiscountNote: "Potongan {pct}% karena belanja di atas {min}",
+      shippingTierHint: "Belanja {amount} lagi untuk gratis ongkir",
+      shippingTierUnlocked: "Selamat, ongkir kamu dipotong {pct}%",
       totalLabel: "Total yang dibayar",
       bundle: "paket",
       bundleOffer: "Beli {n} pcs = {price} (lebih hemat!)",
@@ -477,6 +482,17 @@ export const id: Dict = {
       "Pertanyaan yang sering masuk. Cari dulu di bawah, kalau belum ketemu tanya lewat WhatsApp.",
     search: "Cari topik atau pertanyaan",
     empty: "Tidak ada yang cocok. Coba kata kunci lain.",
+    back: "Kembali ke beranda",
+  },
+  /** Halaman /riwayat — daftar pesanan dari localStorage perangkat ini. */
+  historyPage: {
+    title: "Riwayat Pesanan",
+    subtitle:
+      "Pesanan yang pernah dibuat di HP ini. Disimpan hanya di perangkat, jadi tidak muncul di HP lain.",
+    empty: "Belum ada pesanan di perangkat ini.",
+    emptyHint: "Begitu pesanan selesai, otomatis muncul di sini.",
+    itemCount: "{n} item",
+    viewOrder: "Lihat pesanan",
     back: "Kembali ke beranda",
   },
   errors: {
@@ -882,6 +898,34 @@ export const id: Dict = {
       pageTitle: "Catatan Pengambilan & Pengiriman",
       pageSubtitle:
         "Atur titik pengambilan (bersama jam ambilnya) dan zona pengantaran beserta ongkir.",
+      // --- Diskon ongkir bertingkat (item 4, migration-46) ---
+      discountTitle: "Potongan ongkir",
+      discountHint:
+        "Atur bertingkat per zona. Kalau total belanja sudah mencapai minimal, ongkir dipotong sesuai persen. Contoh: belanja 100000, 100% jadi gratis ongkir.",
+      discountEmpty: "Belum ada potongan. Tambahkan dulu biar pembeli dapat promo.",
+      discountAdd: "Tambah tingkat",
+      discountMinLabel: "Minimal belanja (Rp)",
+      discountPercentLabel: "Potongan ongkir (%)",
+      discountTierSummary: "Belanja {min} = potongan {pct}%",
+      discountRemove: "Hapus tingkat ini",
+      discountSaved: "Potongan ongkir disimpan.",
+    },
+    faq: {
+      title: "FAQ",
+      subtitle:
+        "Pertanyaan yang muncul di halaman /faq dan section FAQ di /contact. Langsung tampil setelah disimpan.",
+      new: "Tambah pertanyaan",
+      empty: "Belum ada pertanyaan.",
+      questionIdLabel: "Pertanyaan (ID)",
+      questionEnLabel: "Pertanyaan (EN)",
+      answerIdLabel: "Jawaban (ID)",
+      answerEnLabel: "Jawaban (EN)",
+      sortOrderLabel: "Urutan tampil",
+      activeLabel: "Tampil untuk pembeli",
+      saved: "FAQ disimpan.",
+      deleted: "Pertanyaan dihapus.",
+      confirmDelete: "Hapus pertanyaan ini?",
+      errorQuestionRequired: "Teks pertanyaannya wajib diisi.",
     },
     menu: {
       title: "Menu & Stok",

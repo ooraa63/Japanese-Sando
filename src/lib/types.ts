@@ -200,8 +200,24 @@ export interface DeliveryZone {
    * (fee selalu 0). Default 'delivery' untuk backward compat.
    * Migration-32. */
   kind?: "delivery" | "pickup";
+  /**
+   * Diskon ongkir bertingkat per zona, bentuk:
+   * `[{ min: 50000, percent: 50 }, { min: 150000, percent: 100 }]`.
+   * `min` = minimal belanja (Rp) supaya aturan aktif, `percent` = potongan
+   * ongkir 0-100 (100 = gratis ongkir). Berlaku per zona; aturan dengan `min`
+   * tertinggi yang terlampaui subtotal yang dipakai. Ditambah migration-46.
+   */
+  shipping_discounts?: ShippingDiscount[];
   sort_order?: number;
   is_active?: boolean;
+}
+
+/** Satu tingkat diskon ongkir. Lihat `DeliveryZone.shipping_discounts`. */
+export interface ShippingDiscount {
+  /** Minimal belanja (Rp) supaya-diskon ini aktif. */
+  min: number;
+  /** Potongan ongkir dalam persen, 0-100. */
+  percent: number;
 }
 
 /**

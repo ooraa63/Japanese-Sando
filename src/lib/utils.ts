@@ -5,6 +5,7 @@ import type {
   Order,
   OrderStatus,
   PaymentMethod,
+  ShippingDiscount,
 } from "./types";
 
 export const SITE_NAME = "Japanese Sando";
@@ -362,8 +363,9 @@ export const MAX_HOME_PICKS = 3;
  * migration-43).
  *
  * Sengaja LEBIH BESAR dari {@link MAX_HOME_PICKS}: menu baru biasanya datang
- * beberapa item sekaligus, dan section ini dirender sebagai baris mendatar
- * (bukan grid 3 kolom) jadi lebih banyak item masih enak dilihat.
+ * beberapa item sekaligus, jadi batas 6 berarti bisa jadi dua baris penuh di
+ * grid 3 kolom (permintaan Steven 12-10-2026: satu baris 3 kartu, sama seperti
+ * section "Populer" dan "Paket Hemat").
  *
  * Sama seperti di atas, angka ini harus sama di tiga tempat: di sini, di
  * tombol dashboard, dan CHECK constraint `settings_new_flavor_ids_ok`.
@@ -396,4 +398,208 @@ export function normalizeFlavorIds(
     if (out.length >= limit) break;
   }
   return out;
+}
+
+/* =============================================================================
+ *  DISKON ONGKIR BERTINGKAT (migration-46)
+ * ========================================================================== */
+
+/** Hasil hitungan ongkir setelah potongan bertingkat diterapkan. */
+export interface ShippingQuote {
+  /** Ongkir mentah dari zona. */
+  fee: number;
+  /** Potongan yang terpakai, dalam persen (0 = tidak ada aturan yang aktif). */
+  percent: number;
+  /** Nominal rupiah yang dipotong dari ongkir. */
+  discount: number;
+  /** Ongkir yang benar-benar ditagih. */
+  finalFee: number;
+  /**
+   * Minimal belanja dari tier yang terpakai, atau null kalau belum ada tier
+   * yang terlampaui. Dipakai untuk teks "potongan X% untuk belanja di atas Y".
+   */
+  hitMin: number | null;
+  /**
+   * Tier berikutnya yang BELUM terlampaui. Dipakai untuk teks "belanja lagi
+   * Rp x lagi gratis ongkir". Null kalau sudah di tier teratas.
+   */
+  next: ShippingDiscount | null;
+}
+
+/**
+ * Hitung ongkir akhir setelah melihat aturan diskon bertingkat pada zona.
+ *
+ * Aturan yang dipakai adalah tier dengan `min` TERTINGGI yang sudah
+ * terlampaui subtotal — jadi diskon tidak bisa saling menumpuk. Ini persis
+ * aturan yang dipakai `create_order` di database, jadi angka yang dilihat
+ * pembeli sama dengan yang ditagih.
+ *
+ * `percent` di-clamp ke 0-100 dan `fee` tidak boleh jadi negatif.
+ */
+export function resolveShipping(
+  discounts: ShippingDiscount[] | null | undefined,
+  subtotal: number,
+  fee: number
+): ShippingQuote {
+  const base = Math.max(0, Number.isFinite(fee) ? fee : 0);
+  const tiers = (Array.isArray(discounts) ? discounts : [])
+    .filter(
+      (d) =>
+        d &&
+        Number.isFinite(Number(d.min)) &&
+        Number.isFinite(Number(d.percent))
+    )
+    .map((d) => ({
+      min: Math.max(0, Number(d.min)),
+      percent: Math.min(100, Math.max(0, Number(d.percent))),
+    }))
+    .sort((a, b) => a.min - b.min);
+
+  const sub = Math.max(0, Number.isFinite(subtotal) ? subtotal : 0);
+  let hit: ShippingDiscount | null = null;
+  for (const tier of tiers) {
+    if (sub >= tier.min) hit = tier;
+  }
+
+  const percent = hit ? hit.percent : 0;
+  const discount = Math.round((base * percent) / 100);
+  const next = tiers.find((tier) => tier.min > sub) ?? null;
+
+  return {
+    fee: base,
+    percent,
+    discount,
+    finalFee: Math.max(0, base - discount),
+    hitMin: hit ? hit.min : null,
+    next,
+  };
+}
+
+/* =============================================================================
+ *  RIWAYAT PESANAN LOKAL (localStorage)
+ * ========================================================================== */
+
+/**
+ * Satu baris riwayat pesanan di perangkat pembeli.
+ *
+ * Sengaja TIDAK disimpan di database: permintaan Steven adalah "beda HP beda
+ * history", jadi ini murni lokal di browser. Ditambah 12-10-2026.
+ */
+export interface OrderHistoryEntry {
+  order_code: string;
+  customer_name: string;
+  /** Dipakai untuk membuka /track tanpa mengetik ulang. */
+  phone: string;
+  /** Total yang dibayar (sudah termasuk ongkir). */
+  total_price: number;
+  /** Jumlah item, cuma buat tampilan ringkas. */
+  item_count: number;
+  /** ISO timestamp saat disimpan. */
+  created_at: string;
+}
+
+/** Maksimal baris yang disimpan, supaya localStorage tidak membengkak. */
+const ORDER_HISTORY_LIMIT = 30;
+const ORDER_HISTORY_KEY = "js_order_history_v1";
+
+function parseHistory(raw: string | null): OrderHistoryEntry[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e): e is OrderHistoryEntry =>
+        !!e && typeof e.order_code === "string" && e.order_code.length > 0
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Baca riwayat pesanan di perangkat ini. Selalu array, pernah `[]`. */
+export function readOrderHistory(): OrderHistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return parseHistory(window.localStorage.getItem(ORDER_HISTORY_KEY));
+  } catch {
+    return [];
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ *  Store untuk `useSyncExternalStore`.
+ *
+ *  Snapshot WAJIB mengembalikan referensi yang stabil: kalau tiap panggilan
+ *  membuat array baru, React menganggap datanya selalu berubah dan render
+ *  loop takFinite. Karena itu hasil `JSON.parse` dicache, dan hanya dihitung
+ *  ulang kalau string mentah di localStorage benar-benar berbeda.
+ *
+ *  Ini juga alasan halaman /riwayat tidak memakai `useState` + `useEffect`:
+ *  React menandai pemanggilan `setState` sinkron di dalam effect sebagai
+ *  pola yang memicu render berlapis.
+ * ------------------------------------------------------------------------- */
+
+let historyCache: { raw: string | null; value: OrderHistoryEntry[] } = {
+  raw: null,
+  value: [],
+};
+let historyCacheReady = false;
+const historyListeners = new Set<() => void>();
+
+function readHistoryStable(): OrderHistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(ORDER_HISTORY_KEY);
+  } catch {
+    raw = null;
+  }
+  if (!historyCacheReady || historyCache.raw !== raw) {
+    historyCache = { raw, value: parseHistory(raw) };
+    historyCacheReady = true;
+  }
+  return historyCache.value;
+}
+
+/** Snapshot stabil untuk `useSyncExternalStore`. */
+export function getOrderHistorySnapshot(): OrderHistoryEntry[] {
+  return readHistoryStable();
+}
+
+/**
+ * Dengarkan perubahan riwayat: baik dari tab lain (event `storage`) maupun
+ * dari tab ini (setelah `pushOrderHistory`).
+ */
+export function subscribeOrderHistory(listener: () => void): () => void {
+  historyListeners.add(listener);
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", listener);
+  }
+  return () => {
+    historyListeners.delete(listener);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", listener);
+    }
+  };
+}
+
+/**
+ * Simpan satu pesanan ke riwayat lokal.
+ *
+ * Kalau kodenya sudah ada, entri lama DIGANTI dan dikembalikan ke posisi
+ * paling atas — jadi pembeli tidak melihat baris kembar setelah menekan
+ * "Pesan lagi" dari halaman sukses.
+ */
+export function pushOrderHistory(entry: OrderHistoryEntry): void {
+  if (typeof window === "undefined") return;
+  const rest = readOrderHistory().filter((e) => e.order_code !== entry.order_code);
+  const next = [entry, ...rest].slice(0, ORDER_HISTORY_LIMIT);
+  try {
+    window.localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    // localStorage penuh / ditolak (mode privat) — riwayat tidak tersimpan,
+    // tapi pesanan tetap normal karena pemanggil tidak bergantung pada ini.
+    return;
+  }
+  for (const l of historyListeners) l();
 }

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   ClipboardList,
   ExternalLink,
+  HelpCircle,
   LayoutDashboard,
   List,
   LogOut,
@@ -30,6 +31,7 @@ const NAV = [
   { href: "/admin/customers", key: "customers" as const, icon: Users, exact: false },
   { href: "/admin/pickup-delivery", key: "pickupDelivery" as const, icon: Store, exact: false },
   { href: "/admin/profile-menu", key: "profileMenu" as const, icon: List, exact: false },
+  { href: "/admin/faq", key: "faq" as const, icon: HelpCircle, exact: false },
   { href: "/admin/settings", key: "settings" as const, icon: Settings, exact: false },
 ];
 
@@ -55,6 +57,7 @@ export function AdminShell({
     sales: string;
     pickupDelivery: string;
     profileMenu: string;
+    faq: string;
     viewSite: string;
     signOut: string;
   };

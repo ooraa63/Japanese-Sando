@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { FAQ_FALLBACK, normalizeFaq, type FaqEntry } from "@/lib/faq";
 import type {
   Category,
   CustomerOrderSummary,
@@ -27,6 +28,26 @@ export const getProfileMenuItems = cache(async (): Promise<ProfileMenuItem[]> =>
     return [];
   }
   return (data as ProfileMenuItem[] | null) ?? [];
+});
+
+/**
+ * Isi FAQ aktif, dibaca dari tabel `faq_items` lewat RPC `public_faq`
+ * (migration-46).
+ *
+ * Dipakai `/faq` dan section FAQ di `/contact`. Kalau RPC gagal, balikin isi
+ * cadangan supaya pembeli tidak pernah melihat halaman kosong.
+ */
+export const getFaq = cache(async (): Promise<FaqEntry[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("public_faq");
+
+  if (error) {
+    console.error("Gagal memuat FAQ:", error.message);
+    return FAQ_FALLBACK;
+  }
+  // Tabel sengaja boleh kosong (penjual bisa menyembunyikan semua pertanyaan),
+  // jadi array kosong dari RPC itu jawaban yang sah, bukan kegagalan.
+  return normalizeFaq(data);
 });
 
 /** Ambil pengaturan toko. Aman dipanggil tanpa login. */

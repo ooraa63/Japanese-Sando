@@ -32,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         sales: dicts.admin.nav.sales,
         pickupDelivery: dicts.admin.nav.pickupDelivery,
         profileMenu: dicts.admin.settings.profileMenuTitle,
+        faq: dicts.admin.faq.title,
         viewSite: dicts.admin.nav.viewSite,
         signOut: dicts.admin.login.signOut,
       }}

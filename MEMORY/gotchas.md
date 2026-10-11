@@ -1150,3 +1150,69 @@ beralih jadi "modal tidak ketemu".
 Kalau selector tidak ketemu, dump dulu
 `[...document.querySelectorAll('button')].map(b => b.innerText)`. Membaca
 daftar tombol lebih cepat daripada menebak struktur DOM.
+
+## 70 - `window.confirm` = hapus yang bisa "menghilang sendiri"
+
+`window.confirm()` bisa ditutup (Esc / Cancel) tanpa callback apa pun yang jalan.
+Artinya aksi merusak bisa dilewati begitu saja dan PENJUAL tidak mendapat umpan
+balik - Persisyin yang dilaporkan Steven 12-10-2026: "menu sudah delete tapi di
+web ga kehapus".
+
+Diagnosis yang benar: cek dulu apakah bar-nya benar-benar ada di database
+(`select ... from flavors where name_id ilike '%mala%'`), baru telusuri RPC-nya.
+Kalau backend-nya sehat, masalahnya di lapisan konfirmasi UI, bukan di
+database.
+
+## 71 - Skrip Node: `set_config('request.jwt.claims', ..., true)` hilang di query berikutnya
+
+`pg.Client` menjalankan tiap query dalam transaksi implisit sendiri. Kalau
+`set_config(..., is_local => true)`, setting-nya ikut hilang di akhir transaksi
+itu, jadi query berikutnya jalan sebagai `postgres` biasa dan RPC admin membalas
+`not_authorized`.
+
+Untuk menguji RPC admin lewat skrip, pakai `is_local => false` (level sesi).
+
+## 72 - Skrip Node: kolom `id` tidak ada di `public.admins`
+
+Primary key tabel `admins` adalah `user_id` (uuid), bukan `id`. `select id from
+public.admins` langsung gagal `42703 column "id" does not exist`. Isinya:
+`user_id, email, full_name, role, is_active, created_at`.
+
+## 73 - `pg_get_functiondef` TIDAK menutup statement dengan titik koma
+
+Hasil `pg_get_functiondef()` berakhir dengan `$function$` tanpa `;`. Kalau
+hasilnya langsung disambung dengan statement berikutnya (`grant execute ...`),
+file migrasi gagal dengan `syntax error at or near "grant"` - dan karena
+`create or replace function` sudah dieksekusi statement sebelumnya, sebagian
+DDL sudah terlanjur terpasang di database.
+
+Jadi tiap definisi fungsi harus diakhiri sendiri sebelum digabung. Yang paling
+aman: jalankan migrasi per-statement (dengan pemisah dollar-quote yang benar)
+supaya nomor statement yang gagal langsung diketahui.
+
+## 74 - `RETURNS TABLE` yang berubah -&gt; `create or replace function` DITOLAK
+
+Kalau bentuk tabel balik sebuah fungsi berubah (mis. nambah kolom
+`shipping_discounts`), Postgres menolak dengan `42P13 cannot change return type
+of existing function`. Yang benar: `drop function if exists ...;` -&gt;
+`create function ...` (bukan or replace) -&gt; pasang ulang grant
+(`anon`, `authenticated`, `service_role`).
+
+## 75 - `react-hooks/set-state-in-effect` (React Compiler lint)
+
+`useState` + `useEffect` untuk membaca `localStorage` kena aturan
+`react-hooks/set-state-in-effect` di `npm run lint` (ERROR, bukan warning).
+Ganti dengan `useSyncExternalStore` + snapshot yang referensinya stabil
+(cache `JSON.parse` berdasarkan string mentah, jangan parse ulang tiap call).
+
+## 76 - Scanner karakter asing perlu dua lapis
+
+Non-Latin/mojibake saja tidak cukup. Bug penulisan yang paling sering muncul
+adalah DUA KATA TEMPEL ("yangdiedit", "fee yangdiedit", "memakաղai") karena
+spasi hilang - lolos dari scanner karakter asing dan baru kelihatan saat
+membaca SQL/komentarnya di database. Scanner `.tmp-scan2.mjs` menambahkan
+pola `<partikel Indonesia><huruf>` untuk menangkap ini.
+
+Karantanya: pakai `\b(yang|dan|...)[a-z]{2,}\b` (kata yang HARUS diikuti
+spasi), bukan `[a-z](yang|dan|...)\b` (kata yang jadi akhiran) - versi kedua
+salah semua karena "selalu"/"boleh"/"terlalu" jadi false positive.

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Home } from "lucide-react";
+import { ClipboardList, History, Home } from "lucide-react";
 import type { ProfileMenuItem } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { ProfileSheet, ProfileTabButton } from "@/components/customer/ProfileSheet";
@@ -39,6 +39,15 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
 
   if (hidden) return null;
 
+  // Bar quick-action: dua pintasan yang sering dipakai pembeli, diletakkan
+  // DI ATAS bottom nav (permintaan Steven, 12-10-2026, referensinya GoFood).
+  // - "Cek Pesanan" -> /track, lacak satu pesanan lewat kode + nomor HP.
+  // - "Riwayat"    -> /riwayat, daftar pesanan di HP ini (localStorage).
+  const quickActions = [
+    { href: "/track", label: t.nav.track, icon: ClipboardList },
+    { href: "/riwayat", label: t.nav.history, icon: History },
+  ];
+
   const items = [
     { href: "/", label: t.nav.home, icon: Home },
     { href: "/track", label: t.nav.track, icon: ClipboardList },
@@ -49,6 +58,15 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
       {/* Spacer: nav di bawah ini `fixed`, jadi tidak ikut menambah tinggi
           halaman. Tanpa spasi ini, elemen terakhir halaman bisa tertutup nav.
 
+          Nav sekarang dua lapis: bar quick-action (Cek Pesanan + Riwayat)
+          lalu bar tab. Keduanya sengajakept dalam SATU elemen `<nav>`, bukan
+          dua elemen `fixed` terpisah — kalau dipisah, tinggi bar quick-action
+          harus dihitung manual dan akan meleset di HP yang punya safe-area
+          (gejalanya bar itu menutupi tab Profil).
+
+          Totalnya sekitar 108px, jadi spacer 114px supaya kartu terakhir di
+          beranda tidak ketutup.
+
           Perlu karena footer (blok info toko) disembunyikan di HP. Sebelumnya
           footer ikut memberi ~24px padding bawah di akhir halaman, dan itu
           yang jadi jarak aman terhadap nav ini. Sekarang footer tidak ada, jadi
@@ -57,12 +75,38 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
           Hanya di HP (`md:hidden`), dan hanya di halaman yang nav-nya tampil —
           di /order, /admin, /login, /register nav-nya disembunyikan
           sehingga spacer ini ikut hilang. */}
-      <div aria-hidden className="h-[68px] md:hidden" />
+      <div aria-hidden className="h-[114px] md:hidden" />
 
       <nav
         aria-label="Mobile navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-cocoa-200 bg-cream-50 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
+        {/* Bar quick-action (permintaan Steven 12-10-2026, referensinya
+            GoFood): dua pintasan yang paling sering dipakai pembeli,
+            Cek Pesanan dan Riwayat. */}
+        <div className="border-b border-cocoa-100 px-3 pt-2 pb-1">
+          <div className="grid grid-cols-2 gap-2">
+            {quickActions.map((a) => {
+              const Icon = a.icon;
+              const active = pathname.startsWith(a.href);
+              return (
+                <Link
+                  key={a.href}
+                  href={a.href}
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
+                    active
+                      ? "bg-honey-400/25 text-honey-600"
+                      : "bg-cream-100 text-cocoa-600 hover:bg-cocoa-200/70"
+                  }`}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span className="truncate">{a.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
         <ul className="grid grid-cols-3">
           {items.map((item) => {
             const active =

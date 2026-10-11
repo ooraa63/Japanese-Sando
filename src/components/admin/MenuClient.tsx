@@ -26,6 +26,7 @@ import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatIDR } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import {
   deleteCategoryAction,
@@ -115,6 +116,26 @@ export function MenuClient({
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [saving, startSaving] = useTransition();
+
+  /**
+   * Data yang sedang menunggu konfirmasi hapus, atau null kalau tidak ada.
+   *
+   * SEBELUMNYA hapus memakai `window.confirm()`. Itu sebabnya laporan Steven
+   * 12-10-2026 "menu sudah delete tapi di web ga kehapus" bisa terjadi tanpa
+   * jejak apa pun: dialog browser bisa ditutup (Esc / Cancel) dan aplikasi
+   * tidak memberi umpan balik apa pun, jadi PENJUAL mengira hapus sudah jalan
+   * padahal tidak ada RPC yang dipanggil.
+   *
+   * Sekarang konfirmasi memakai `ConfirmDialog` di dalam aplikasi: selalu ada
+   * teks yang menjelaskan apa yang dihapus, dan membatalkan hanya menutup
+   * dialog tanpa efek.
+   */
+  const [pendingDelete, setPendingDelete] = useState<
+    | { kind: "category"; item: Category }
+    | { kind: "flavor"; item: Flavor }
+    | { kind: "bundle"; item: Bundle }
+    | null
+  >(null);
 
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingFlavor, setEditingFlavor] = useState<FlavorDraft | null>(null);
@@ -236,7 +257,6 @@ export function MenuClient({
   }
 
   async function removeCategory(c: Category) {
-    if (!window.confirm(t.admin.menu.deleteCategoryConfirm)) return;
     setBusyId(c.id);
     const res = await deleteCategoryAction(c.id);
     setBusyId(null);
@@ -255,6 +275,11 @@ export function MenuClient({
       toast.success(t.admin.menu.categoryDeleted);
     }
     router.refresh();
+  }
+
+  /** Buka dialog konfirmasi hapus kategori (ganti `window.confirm`). */
+  function askRemoveCategory(c: Category) {
+    setPendingDelete({ kind: "category", item: c });
   }
 
   /* ---------------- Rasa ---------------- */
@@ -371,7 +396,6 @@ export function MenuClient({
   }
 
   async function removeFlavor(f: Flavor) {
-    if (!window.confirm(t.admin.menu.deleteConfirm)) return;
     setBusyId(f.id);
     const res = await deleteFlavorAction(f.id);
     setBusyId(null);
@@ -390,6 +414,11 @@ export function MenuClient({
       toast.success(t.admin.menu.deleted);
     }
     router.refresh();
+  }
+
+  /** Buka dialog konfirmasi hapus rasa (ganti `window.confirm`). */
+  function askRemoveFlavor(f: Flavor) {
+    setPendingDelete({ kind: "flavor", item: f });
   }
 
   async function toggleFlavorActive(f: Flavor) {
@@ -552,7 +581,6 @@ export function MenuClient({
   }
 
   async function removeBundle(b: Bundle) {
-    if (!window.confirm(t.admin.menu.deleteBundleConfirm)) return;
     setBusyId(b.id);
     const res = await deleteBundleAction(b.id);
     setBusyId(null);
@@ -571,6 +599,11 @@ export function MenuClient({
       toast.success(t.admin.menu.bundleDeleted);
     }
     router.refresh();
+  }
+
+  /** Buka dialog konfirmasi hapus paket (ganti `window.confirm`). */
+  function askRemoveBundle(b: Bundle) {
+    setPendingDelete({ kind: "bundle", item: b });
   }
 
   async function toggleBundleFeatured(b: Bundle) {
@@ -637,7 +670,18 @@ export function MenuClient({
   /* ---------------- Stok per kategori ---------------- */
 
   async function changeCategoryStock(c: Category, delta: number) {
-    const target = Math.max(0, (c.stock ?? 0) + delta);
+    await saveCategoryStock(c, Math.max(0, (c.stock ?? 0) + delta));
+  }
+
+  /**
+   * Simpan stok kategori ke nilai ABSOLUT (bukan tambah/kurang).
+   *
+   * Dipakai oleh input stok yang bisa diketik (permintaan Steven 12-10-2026,
+   * "stock disitu buat bisa pakai ketik"). Nilai dikunci ke >= 0 supaya tidak
+   * ada stok negatif yang lolos ke database.
+   */
+  async function saveCategoryStock(c: Category, rawTarget: number) {
+    const target = Math.max(0, Math.floor(Number(rawTarget) || 0));
     setBusyId(c.id);
     const res = await setCategoryStockAction(c.id, target);
     setBusyId(null);
@@ -717,15 +761,16 @@ export function MenuClient({
             setSearch,
             openNewCategory,
             openEditCategory,
-            removeCategory,
+            removeCategory: askRemoveCategory,
             setActiveCategoryId,
             openNewFlavor,
             openEditFlavor,
-            removeFlavor,
+            removeFlavor: askRemoveFlavor,
             toggleFlavorActive,
             toggleFlavorFeatured,
             busyId,
             changeCategoryStock,
+            setCategoryStockTo: saveCategoryStock,
           }}
         />
       ) : (
@@ -738,7 +783,7 @@ export function MenuClient({
             setSearch,
             openNewBundle,
             openEditBundle,
-            removeBundle,
+            removeBundle: askRemoveBundle,
             toggleBundleActive,
             toggleBundleFeatured,
             busyId,
@@ -863,6 +908,44 @@ export function MenuClient({
           />
         ) : null}
       </Modal>
+
+      {/* ---------- Konfirmasi hapus (ganti window.confirm) ---------- */}
+      <ConfirmDialog
+        request={
+          pendingDelete
+            ? {
+                title:
+                  pendingDelete.kind === "category"
+                    ? t.admin.menu.deleteCategoryConfirm
+                    : pendingDelete.kind === "bundle"
+                      ? t.admin.menu.deleteBundleConfirm
+                      : t.admin.menu.deleteConfirm,
+                body:
+                  pendingDelete.kind === "category"
+                    ? lang === "en"
+                      ? pendingDelete.item.name_en || pendingDelete.item.name_id
+                      : pendingDelete.item.name_id || pendingDelete.item.name_en
+                    : pendingDelete.kind === "bundle"
+                      ? lang === "en"
+                        ? pendingDelete.item.name_en || pendingDelete.item.name_id
+                        : pendingDelete.item.name_id || pendingDelete.item.name_en
+                      : lang === "en"
+                        ? pendingDelete.item.name_en || pendingDelete.item.name_id
+                        : pendingDelete.item.name_id || pendingDelete.item.name_en,
+              }
+            : null
+        }
+        busy={busyId !== null}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const req = pendingDelete;
+          setPendingDelete(null);
+          if (!req) return;
+          if (req.kind === "category") void removeCategory(req.item);
+          else if (req.kind === "flavor") void removeFlavor(req.item);
+          else void removeBundle(req.item);
+        }}
+      />
     </div>
   );
 }
@@ -881,15 +964,17 @@ function CategoriesView(props: {
   setSearch: (s: string) => void;
   openNewCategory: () => void;
   openEditCategory: (c: Category) => void;
-  removeCategory: (c: Category) => Promise<void>;
+  removeCategory: (c: Category) => void;
   setActiveCategoryId: (id: number | null) => void;
   openNewFlavor: () => void;
   openEditFlavor: (f: Flavor) => void;
-  removeFlavor: (f: Flavor) => Promise<void>;
+  removeFlavor: (f: Flavor) => void;
   toggleFlavorActive: (f: Flavor) => Promise<void>;
   toggleFlavorFeatured: (f: Flavor) => Promise<void>;
   busyId: number | null;
   changeCategoryStock: (c: Category, delta: number) => Promise<void>;
+  /** Simpan stok ke nilai absolut — dipakai input stok yang bisa diketik. */
+  setCategoryStockTo: (c: Category, next: number) => Promise<void>;
 }) {
   const {
     t,
@@ -910,6 +995,7 @@ function CategoriesView(props: {
     toggleFlavorFeatured,
     busyId,
     changeCategoryStock,
+    setCategoryStockTo,
   } = props;
 
   return (
@@ -1083,6 +1169,7 @@ function CategoriesView(props: {
             toggleFlavorFeatured,
             busyId,
             changeCategoryStock,
+            setCategoryStockTo,
           }}
         />
       )}
@@ -1097,11 +1184,13 @@ function FlavorList(props: {
   flavorsInCategory: Flavor[];
   openNewFlavor: () => void;
   openEditFlavor: (f: Flavor) => void;
-  removeFlavor: (f: Flavor) => Promise<void>;
+  removeFlavor: (f: Flavor) => void;
   toggleFlavorActive: (f: Flavor) => Promise<void>;
   toggleFlavorFeatured: (f: Flavor) => Promise<void>;
   busyId: number | null;
   changeCategoryStock: (c: Category, delta: number) => Promise<void>;
+  /** Simpan stok ke nilai absolut — dipakai input stok yang bisa diketik. */
+  setCategoryStockTo: (c: Category, next: number) => Promise<void>;
 }) {
   const {
     t,
@@ -1115,6 +1204,7 @@ function FlavorList(props: {
     toggleFlavorFeatured,
     busyId,
     changeCategoryStock,
+    setCategoryStockTo,
   } = props;
 
   return (
@@ -1149,9 +1239,12 @@ function FlavorList(props: {
             >
               <Minus className="size-4" />
             </button>
-            <span className="min-w-10 text-center font-display text-lg font-extrabold text-cocoa-900 tabular">
-              {activeCategory.stock}
-            </span>
+            <QuickStockInput
+              value={activeCategory.stock ?? 0}
+              disabled={busyId === activeCategory.id}
+              ariaLabel={t.admin.menu.stockQuick}
+              onCommit={(next) => void setCategoryStockTo(activeCategory, next)}
+            />
             <button
               type="button"
               onClick={() => void changeCategoryStock(activeCategory, 1)}
@@ -1309,7 +1402,7 @@ function BundlesView(props: {
   setSearch: (s: string) => void;
   openNewBundle: () => void;
   openEditBundle: (b: Bundle) => void;
-  removeBundle: (b: Bundle) => Promise<void>;
+  removeBundle: (b: Bundle) => void;
   toggleBundleActive: (b: Bundle) => Promise<void>;
   toggleBundleFeatured: (b: Bundle) => Promise<void>;
   busyId: number | null;
@@ -2119,6 +2212,67 @@ function Toggle({
         <span className="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
       </span>
     </label>
+  );
+}
+
+/**
+ * Angka stok yang juga bisa DIKETIK (permintaan Steven 12-10-2026).
+ *
+ * Sebelumnya di header kategori hanya ada tombol -1 / +1 / +10, jadi untuk
+ *misal set stok jadi 250 harus menekan tombol hundreds kali atau buka form
+ * kategori terpisah.
+ *
+ * Sifatnya:
+ *  - mengetik = mengubah teks di layar saja, TIDAK menyentuh database
+ *    (kalau tiap ketikan langsung disimpan, mengetik "250" akan menulis
+ *    2 -> 25 -> 250 dan membanjiri history);
+ *  - `Enter` atau blur = commit sekali;
+ *  - `Escape` = batal, kembali ke nilai terakhir;
+ *  - nilai dikunci jadi digit saja dan >= 0.
+ */
+function QuickStockInput({
+  value,
+  disabled,
+  ariaLabel,
+  onCommit,
+}: {
+  value: number;
+  disabled?: boolean;
+  ariaLabel: string;
+  onCommit: (next: number) => void;
+}) {
+  // `null` = belum diketik, jadi tampilkan nilai dari server apa adanya.
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const shown = draft ?? String(value);
+
+  function commit() {
+    if (draft === null) return;
+    const parsed = Math.max(0, Math.floor(Number(draft.replace(/\D/g, "")) || 0));
+    setDraft(null);
+    if (parsed !== value) onCommit(parsed);
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={shown}
+      disabled={disabled}
+      onChange={(e) => setDraft(e.target.value.replace(/\D/g, ""))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.currentTarget as HTMLInputElement).blur();
+        } else if (e.key === "Escape") {
+          setDraft(null);
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+      }}
+      aria-label={ariaLabel}
+      className="h-9 w-16 rounded-md border border-cocoa-200 bg-white text-center font-display text-lg font-extrabold text-cocoa-900 tabular transition focus:border-cocoa-400 focus:outline-none disabled:opacity-40"
+    />
   );
 }
 
