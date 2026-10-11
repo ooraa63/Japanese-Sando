@@ -100,13 +100,23 @@ export function OrderBundleModal({
     setNote(editingEntry?.note ?? "");
   }, [open, bundle, editingEntry]);
 
-  // Rasa yang boleh dipilih.
+  /**
+   * Rasa yang boleh dipilih — daftar ini ditentukan PENJUAL, bukan tebakan.
+   *
+   * Aturan (migration-45):
+   *   1. Kalau penjual memilih rasa untuk bundle ini (`flavor_ids` tidak
+   *      kosong), HANYA rasa itu yang tampil, dari kategori mana pun.
+   *   2. Kalau daftar kosong, semua rasa aktif boleh dipakai — tidak ada lagi
+   *      kuncian ke kategori "Sando Sandwich".
+   */
   const allowedFlavors: Array<Flavor & { categoryName: string }> = useMemo(() => {
     if (!bundle) return [];
+    const picked = bundle.flavor_ids ?? [];
+    const pickedSet = picked.length > 0 ? new Set(picked) : null;
     const list: Array<Flavor & { categoryName: string }> = [];
     for (const c of categories) {
-      if (bundle.category_id !== null && c.id !== bundle.category_id) continue;
       for (const f of c.flavors ?? []) {
+        if (pickedSet && !pickedSet.has(f.id)) continue;
         list.push({ ...f, categoryName: lang === "en" ? c.name_en : c.name_id });
       }
     }
@@ -145,15 +155,9 @@ export function OrderBundleModal({
   const requiredQty = bundle.required_qty;
   const filledCount = slots.length;
   const allFilled = filledCount === requiredQty;
-  const isCategoryScoped = bundle.category_id !== null;
-  const scopeCategory = isCategoryScoped
-    ? categories.find((c) => c.id === bundle.category_id) ?? null
-    : null;
-  const scopeName = scopeCategory
-    ? lang === "en"
-      ? scopeCategory.name_en
-      : scopeCategory.name_id
-    : "";
+  // Penjual yang menentukan isi bundle: kalau `flavor_ids` terisi, pembeli
+  // hanya boleh memilih rasa dari daftar itu. Kalau kosong, semua rasa bebas.
+  const isCurated = (bundle.flavor_ids ?? []).length > 0;
 
   function addOne(flavorId: number) {
     const catId = allowedFlavors.find((f) => f.id === flavorId)?.category_id;
@@ -281,10 +285,10 @@ export function OrderBundleModal({
       </div>
 
       {/* Catatan scope */}
-      {isCategoryScoped ? (
+      {isCurated ? (
         <div className="mb-4 flex items-center gap-2 rounded-xl bg-cocoa-50 px-3 py-2 text-[12px] text-cocoa-600">
           <AlertTriangle className="size-3.5 shrink-0 text-cocoa-400" />
-          <span>{t.menu.bundlePickFromCategory.replace("{name}", scopeName)}</span>
+          <span>{t.menu.bundleCuratedPick}</span>
         </div>
       ) : (
         <div className="mb-4 flex items-center gap-2 rounded-xl bg-matcha-50 px-3 py-2 text-[12px] text-matcha-700">
@@ -366,7 +370,7 @@ export function OrderBundleModal({
                   <p className="truncate font-display text-base leading-tight font-bold text-cocoa-900">
                     {lang === "en" ? f.name_en : f.name_id}
                   </p>
-                  {!isCategoryScoped ? (
+                  {!isCurated ? (
                     <p className="mt-0.5 truncate text-[11px] text-cocoa-400">
                       {f.categoryName}
                     </p>

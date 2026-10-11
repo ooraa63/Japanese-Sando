@@ -57,6 +57,10 @@ function toFlavorDraft(f: Flavor): FlavorDraft {
 
 /**
  * Bundle form state — price & sort_order string biar enak diketik.
+ *
+ * `flavor_ids` = daftar rasa yang dipilih PENJUAL untuk isi bundle ini.
+ * Kosong = semua rasa aktif boleh dipakai, jadi bundle tidak terkunci ke
+ * kategori tertentu (migration-45, tabel `bundle_flavors`).
  */
 interface BundleDraft extends Omit<Bundle, "price" | "sort_order"> {
   price: string;
@@ -64,6 +68,7 @@ interface BundleDraft extends Omit<Bundle, "price" | "sort_order"> {
   compare_price_str: string;
   sort_order: string;
   category_id_str: string; // <select> butuh string
+  flavor_ids: number[];
 }
 
 function toBundleDraft(b: Bundle): BundleDraft {
@@ -73,6 +78,7 @@ function toBundleDraft(b: Bundle): BundleDraft {
     compare_price_str: b.compare_price == null ? "" : String(b.compare_price),
     sort_order: String(b.sort_order),
     category_id_str: b.category_id == null ? "" : String(b.category_id),
+    flavor_ids: b.flavor_ids ?? [],
   };
 }
 
@@ -266,6 +272,7 @@ export function MenuClient({
       image_url: null,
       is_active: true,
       is_featured: false,
+      is_new: false,
       stock_enabled: true,
       stock: 0,
       sort_order: String(nextOrder),
@@ -303,6 +310,7 @@ export function MenuClient({
         image_url: editingFlavor.image_url ?? "",
         is_active: editingFlavor.is_active,
         is_featured: editingFlavor.is_featured,
+        is_new: editingFlavor.is_new,
         stock_enabled: true,
         stock: 0,
         sort_order: Number(editingFlavor.sort_order) || 0,
@@ -448,7 +456,7 @@ export function MenuClient({
     setEditingBundle({
       id: 0,
       category_id: null,
-      category_id_str: activeCategory?.id ? String(activeCategory.id) : "",
+      category_id_str: "",
       slug: "",
       name_id: "",
       name_en: "",
@@ -460,6 +468,7 @@ export function MenuClient({
       image_url: null,
       is_active: true,
       is_featured: false,
+      flavor_ids: [],
       sort_order: String(nextOrder),
     });
   }
@@ -502,10 +511,10 @@ export function MenuClient({
         is_active: editingBundle.is_active,
         is_featured: editingBundle.is_featured,
         sort_order: Number(editingBundle.sort_order) || 0,
-        category_id:
-          editingBundle.category_id_str === ""
-            ? null
-            : Number(editingBundle.category_id_str),
+        // Kategori tidak lagi membatasi isi bundle. Penjual yang menentukan
+        // lewat `flavor_ids`; daftar kosong = semua rasa boleh dipakai.
+        category_id: null,
+        flavor_ids: editingBundle.flavor_ids,
       });
 
       if (!res.ok) {
@@ -526,10 +535,8 @@ export function MenuClient({
               .replace(/[^a-z0-9]+/g, "-")
               .replace(/^-|-$/g, ""),
           price,
-          category_id:
-            editingBundle.category_id_str === ""
-              ? null
-              : Number(editingBundle.category_id_str),
+          category_id: null,
+          flavor_ids: editingBundle.flavor_ids,
           sort_order: Number(editingBundle.sort_order) || 0,
         };
         const exists = prev.some((b) => b.id === id);
@@ -851,6 +858,7 @@ export function MenuClient({
             bundle={editingBundle}
             setBundle={setEditingBundle}
             categories={categories}
+            flavors={flavors}
             t={t}
           />
         ) : null}
@@ -1236,8 +1244,13 @@ function FlavorList(props: {
                         />
                       </button>
                     </div>
-                    <p className="mt-0.5 text-sm font-bold text-cocoa-600 tabular">
+                    <p className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-cocoa-600 tabular">
                       {formatIDR(f.price, lang)}
+                      {f.is_new ? (
+                        <span className="rounded-full bg-honey-300/35 px-1.5 py-0.5 font-sans text-[9px] font-bold tracking-wide text-honey-700 uppercase">
+                          New
+                        </span>
+                      ) : null}
                     </p>
                     <p className="mt-0.5 truncate font-mono text-[10px] text-cocoa-300">
                       {f.slug}
@@ -1793,6 +1806,13 @@ function FlavorForm({
             onChange={(v) => setFlavor({ ...flavor, is_featured: v })}
             label={t.admin.menu.favorite}
           />
+          {/* Label "New" untuk produk baru. Section "Menu Baru" di beranda
+              diambil dari sini — dipilih PENJUAL, bukan ditebak dari tanggal. */}
+          <Toggle
+            checked={flavor.is_new}
+            onChange={(v) => setFlavor({ ...flavor, is_new: v })}
+            label={t.admin.menu.newFlag}
+          />
         </div>
       </div>
     </div>
@@ -1803,13 +1823,27 @@ function BundleForm({
   bundle,
   setBundle,
   categories,
+  flavors,
   t,
 }: {
   bundle: BundleDraft;
   setBundle: (next: BundleDraft | null) => void;
   categories: Category[];
+  flavors: Flavor[];
   t: ReturnType<typeof useI18n>["t"];
 }) {
+  // Isi bundle = pilihan PENJUAL. Daftar kosong = semua rasa aktif boleh
+  // dipakai, jadi bundle tidak lagi terkunci ke kategori tertentu.
+  const picked = new Set(bundle.flavor_ids);
+  const activeFlavors = flavors.filter((f) => f.is_active);
+
+  function toggleFlavor(id: number) {
+    const next = new Set(bundle.flavor_ids);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setBundle({ ...bundle, flavor_ids: [...next].sort((a, b) => a - b) });
+  }
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -1913,26 +1947,70 @@ function BundleForm({
       </div>
 
       <div>
-        <label htmlFor="b-category" className="label">
-          {t.admin.menu.bundleCategory}
-        </label>
-        <select
-          id="b-category"
-          className="input"
-          value={bundle.category_id_str}
-          onChange={(e) =>
-            setBundle({ ...bundle, category_id_str: e.target.value })
-          }
-        >
-          <option value="">{t.admin.menu.bundleStandalone}</option>
-          {categories.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.name_id}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="label">{t.admin.menu.bundleFlavors}</span>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="text-[11px] font-semibold text-cocoa-600 underline underline-offset-2 hover:text-cocoa-900"
+              onClick={() =>
+                setBundle({
+                  ...bundle,
+                  flavor_ids: activeFlavors.map((f) => f.id),
+                })
+              }
+            >
+              {t.admin.menu.bundleFlavorsAll}
+            </button>
+            <button
+              type="button"
+              className="text-[11px] font-semibold text-cocoa-600 underline underline-offset-2 hover:text-cocoa-900"
+              onClick={() => setBundle({ ...bundle, flavor_ids: [] })}
+            >
+              {t.admin.menu.bundleFlavorsClear}
+            </button>
+          </div>
+        </div>
+
+        {activeFlavors.length === 0 ? (
+          <p className="text-[11px] text-cocoa-400">{t.admin.menu.bundleFlavorsEmpty}</p>
+        ) : (
+          <div className="mt-2 max-h-64 space-y-3 overflow-y-auto rounded-xl border border-cocoa-200 bg-cocoa-50/40 p-3">
+            {categories.map((c) => {
+              const inCat = activeFlavors.filter((f) => f.category_id === c.id);
+              if (inCat.length === 0) return null;
+              return (
+                <div key={c.id}>
+                  <p className="mb-1.5 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                    {c.name_id}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {inCat.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        aria-pressed={picked.has(f.id)}
+                        onClick={() => toggleFlavor(f.id)}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          picked.has(f.id)
+                            ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
+                            : "border-cocoa-200 bg-white text-cocoa-600 hover:border-cocoa-300"
+                        }`}
+                      >
+                        {f.name_id}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <p className="mt-1 text-[11px] text-cocoa-400">
-          {t.admin.menu.bundleCategoryHint}
+          {bundle.flavor_ids.length === 0
+            ? t.admin.menu.bundleFlavorsHintAll
+            : t.admin.menu.bundleFlavorsHint}
         </p>
       </div>
 

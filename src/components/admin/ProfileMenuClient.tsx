@@ -52,6 +52,7 @@ const EMPTY: Draft = {
   title_en: "",
   body_id: "",
   body_en: "",
+  href: null,
   buttons: [],
   sort_order: 50,
   is_active: true,
@@ -84,6 +85,7 @@ export function ProfileMenuClient({
       title_en: item.title_en,
       body_id: item.body_id,
       body_en: item.body_en,
+      href: item.href ?? null,
       buttons: Array.isArray(item.buttons) ? item.buttons : [],
       sort_order: item.sort_order,
       is_active: item.is_active,
@@ -117,6 +119,7 @@ export function ProfileMenuClient({
         title_en: draft.title_en,
         body_id: draft.body_id,
         body_en: draft.body_en,
+        href: draft.href?.trim() ? draft.href.trim() : null,
         buttons: draft.buttons.filter((b) => b.label_id.trim() && b.href.trim()),
         sort_order: Number(draft.sort_order) || 0,
         is_active: draft.is_active,
@@ -169,6 +172,7 @@ export function ProfileMenuClient({
         title_en: item.title_en,
         body_id: item.body_id,
         body_en: item.body_en,
+        href: item.href ?? null,
         buttons: item.buttons,
         sort_order: Math.max(0, item.sort_order + dir * 10),
         is_active: item.is_active,
@@ -219,7 +223,7 @@ export function ProfileMenuClient({
                     {item.is_active
                       ? t.admin.settings.profileMenu.active
                       : t.admin.settings.profileMenu.hidden}
-                    {item.body_id ? ` · ${item.body_id}` : ""}
+                    {item.href ? ` · ${item.href}` : item.body_id ? ` · ${item.body_id}` : ""}
                   </p>
                 </div>
 
@@ -402,6 +406,22 @@ function ItemForm({
             readOnly={isAccount}
             onChange={(e) => onPatch({ body_id: e.target.value })}
           />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="label" htmlFor="pm-href">
+            {t.admin.settings.profileMenu.href}
+          </label>
+          <input
+            id="pm-href"
+            className="input"
+            value={draft.href ?? ""}
+            readOnly={isAccount}
+            placeholder="/faq"
+            onChange={(e) => onPatch({ href: e.target.value })}
+          />
+          <p className="mt-1 text-[11px] text-cocoa-400">
+            {t.admin.settings.profileMenu.hrefHint}
+          </p>
         </div>
         <div className="sm:col-span-2">
           <label className="label" htmlFor="pm-body-en">

@@ -81,6 +81,12 @@ export interface PublicMenuResult {
     image_url: string | null;
     is_active: boolean;
     is_featured: boolean;
+    /**
+     * Id rasa yang dipilih penjual untuk bundle ini (migration-45). Kosong =
+     * semua rasa aktif boleh dipakai. Opsional supaya `Bundle` yang belum
+     * pernah dikirim field ini (mis. data lama di cache) tetap aman.
+     */
+    flavor_ids?: number[];
     sort_order: number;
   }>;
 }

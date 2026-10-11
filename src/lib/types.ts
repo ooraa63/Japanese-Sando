@@ -64,6 +64,12 @@ export interface Flavor {
   image_url: string | null;
   is_active: boolean;
   is_featured: boolean;
+  /**
+   * Label "New" — produk baru yang dipilih PENJUAL lewat toggle di form admin.
+   * Menghasilkan section "Menu Baru" di beranda. Kosong = section disembunyikan.
+   * Ditambah migration-45.
+   */
+  is_new: boolean;
   stock_enabled: boolean;
   stock: number;
   sort_order: number;
@@ -160,6 +166,11 @@ export interface ProfileMenuItem {
   title_en: string;
   body_id: string;
   body_en: string;
+  /**
+   * Halaman tujuan saat bar diklik (mis. "/faq"). NULL = perilaku lama, bar
+   * membuka popup dengan isi `body`. Ditambah migration-45.
+   */
+  href: string | null;
   buttons: ProfileMenuButton[];
   sort_order: number;
   is_active: boolean;
@@ -218,6 +229,12 @@ export interface Bundle {
   image_url: string | null;
   is_active: boolean;
   is_featured: boolean;
+  /**
+   * Id rasa yang PENJUAL pilih untuk bundle ini (tabel `bundle_flavors`,
+   * migration-45). Array kosong = semua rasa aktif boleh dipakai, jadi bundle
+   * tidak lagi terkunci ke `category_id` tertentu.
+   */
+  flavor_ids?: number[];
   sort_order: number;
 }
 

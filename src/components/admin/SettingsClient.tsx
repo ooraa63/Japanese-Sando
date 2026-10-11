@@ -620,16 +620,13 @@ export function SettingsClient({
             options={flavors}
             onChange={(ids) => patch({ popular_flavor_ids: ids })}
           />
-          <HomePickField
-            title={t.admin.settings.newPicker}
-            hint={t.admin.settings.newPickerHint.replace("{max}", String(MAX_NEW_PICKS))}
-            max={MAX_NEW_PICKS}
-            emptyLabel={t.admin.settings.newPickerEmpty}
-            emptyHint={t.admin.settings.newPickerEmptyHint}
-            selected={form.new_flavor_ids}
-            options={flavors}
-            onChange={(ids) => patch({ new_flavor_ids: ids })}
-          />
+          {/* Section "Menu Baru" TIDAK lagi dipilih di sini. Sekarang cukup
+              menyalakan toggle "New" di form flavor (Menu & Stok) — satu
+              sumber kebenaran, bukan dua tempat yang bisa berbeda.
+              Kolom `store_settings.new_flavor_ids` sengaja dibiarkan di DB. */}
+          <p className="rounded-xl bg-cocoa-50 px-3 py-2 text-[11px] text-cocoa-500">
+            {t.admin.settings.newPickerHint}
+          </p>
         </div>
       </Section>
       ) : null}

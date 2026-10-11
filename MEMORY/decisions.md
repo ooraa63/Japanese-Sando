@@ -813,3 +813,91 @@ kategori di /order dihapus, info like/stok/penjualan tidak ditulis di kartu
 - Uji `/admin/*` selalu butuh cookie session admin, kalau tidak yang diuji
   middleware, bukan route (gotcha #59).
 
+## D32 - Isi bundle ditentukan PENJUAL lewat daftar rasa, bukan kategori
+
+**Keputusan:** Bundle tidak lagi dibatasi `bundles.category_id`. Penjual
+mencentang rasa satu per satu di form "New bundle" (tabel `bundle_flavors`).
+Daftar kosong = semua rasa boleh dipilih.
+
+**Alasan:** Steven: "jangan fiks hanya Sando Sandwich, buat kita bisa pilih
+kyk bundlenya ada apa aja, jadi kita yang set isi bundlenya itu apa". Kategori
+adalah pengelompokan tampilan, bukan batasan dagang - memakainya sebagai
+pembatas memaksa penjual membuat kategori khusus hanya untuk paket.
+
+**Konsekuensi & pilihan yang diambil:**
+
+- `bundles.category_id` **tidak dihapus** dari database, tapi form tidak lagi
+  mengirimnya. Bundle lama tetap tampil, hanya jadi tidak terkunci.
+- Validasi backend (`create_order`) ditambahkan supaya daftar rasa bukan
+  hanya penjelasan di UI: slot di luar daftar ditolak `flavor_unavailable`.
+- `create_order` diredefinisi dengan `create or replace`, definisi diambil
+  verbatim dari versi live.
+- Daftar kosong berarti "semua rasa", jadi bundle yang belum pernah disentuh
+  penjual tetap bekerja persis seperti sebelumnya.
+
+## D33 - Label "New" menempel pada produk (toggle), bukan daftar di pengaturan
+
+**Keputusan:** Section "Menu Baru" di beranda dibaca dari kolom
+`flavors.is_new`, dinyalakan lewat toggle "New" di form flavor - tepat di
+bawah toggle "Favorite". Pemilih "Menu Baru" di Dashboard dihapus.
+
+**Alasan:** Steven meminta "tambahin fitur kayak New di bawah favorite".
+Toggle melekat pada produk yang dimaksud, sedangkan daftar terpisah mudah
+tidak sinkron dengan produk yang sebenarnya baru.
+
+**Konsekuensi:**
+
+- Ini menggantikan D30 (yang memakai `store_settings.new_flavor_ids`).
+  Kolom itu **dibiarkan di database** (data, bukan dibuang) tapi tidak ada
+  frontend yang membacanya lagi.
+- Masih **tanpa tebakan otomatis** dari tanggal dibuat - label "New" adalah
+  klaim dagang. Kalau tidak ada rasa yang ditandai, section disembunyikan
+  seluruhnya, bukan judul kosong.
+- Batas tetap 6 (`MAX_NEW_PICKS`), urutan mengikuti `sort_order`.
+
+## D34 - Bar menu Profil bisa diarahkan ke halaman nyata lewat kolom `href`
+
+**Keputusan:** `profile_menu_items` dapat kolom `href`. NULL = perilaku lama
+(popup isi). Terisi = bar jadi link ke halaman itu. Default diisi lewat
+migrasi: `faq` ke `/faq`, `contact` ke `/contact`.
+
+**Alasan:** Steven: "saya mau ketika diklik nnti masuk ke misal FAQ maka nnti
+ke /faq, kayak gambar 3 dan ada isinya bisa dilihat". Popup statis tidak
+cukup - isinya harus bisa dibaca dan dicari seperti halaman.
+
+**Konsekuensi & pilihan yang diambil:**
+
+- Validasi `href` di backend: hanya path internal (`/`) atau URL http(s),
+  maksimal 200 karakter. Nilai lain diabaikan, bukan error.
+- Bar `hours` dan `terms` **tetap popup** - isinya teks pendek, bukan
+  halaman. Mengarahkannya ke URL halaman fake hanya akan menambah 404.
+- Konten FAQ pindah ke `src/lib/faq.ts` supaya `/contact` dan `/faq` tidak
+  bisa berbeda isi.
+
+## D35 - Navigasi mundur ada di SETIAP langkah pre-order, bukan hanya dua
+terakhir
+
+**Keputusan:** Tombol back di mobile (panah di kiri pill langkah) dan
+desktop (langkah yang sudah dilewati bisa diklik). Isi form tetap terisi
+saat naik-turun.
+
+**Alasan:** Steven: "buat ada fitur bisa back, mana tau mereka mau check
+kembali tentang data mereka". Kebutuhan sebenarnya adalah mengecek ulang
+data identitas - jadi mundur harus menjangkau langkah pertama, bukan hanya
+pembayaran dan konfirmasi.
+
+**Konsekuensi:** Langkah yang belum dilewati dan langkah aktif tidak bisa
+diklik, supaya tidak ada langkah yang terlewat.
+
+## D36 - Keranjang disembunyikan di langkah identitas
+
+**Keputusan:** `<aside>` keranjang tidak dirender sama sekali di langkah
+identitas, dan grid jadi satu kolom penuh.
+
+**Alasan:** Steven: "pada pre-order saat isi identitas, itu cartnya dihapus".
+Di langkah itu keranjang dijamin masih kosong dan belum ada apa pun yang bisa
+ditambahkan, jadi panel "0 qty / Rp 0" hanya memenuhi ruang kosong dan membuat
+pembeli mengira mereka salah langkah.
+
+**Konsekuensi:** Langkah identitas tetap punya tombol "Lanjut" sendiri di
+dalam form, jadi tidak ada langkah yang buntu.

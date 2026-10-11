@@ -177,10 +177,12 @@ export const en = {
     bundlePickFlavors: "Pick {n} flavors for {name}",
     bundlePickFlavorsDesc:
       "Fill every slot. Stock follows the flavors you choose.",
-    bundlePickFromCategory: "Only from: {name}",
     bundleSlotsFull: "Every slot is already filled",
     bundleSection: "Value bundles",
     bundleAnyCategory: "Pick from any flavor",
+    // The seller can restrict a bundle to a chosen flavor list
+    // (migration-45). With no list, every flavor stays available.
+    bundleCuratedPick: "The flavors in this pack are picked by the seller.",
     bundleNoteLabel: "Note for this bundle",
     bundleNoteHint: "Optional. Applies to every slot in this bundle.",
     // Shown when the buyer taps a bundle already in the cart to change
@@ -233,6 +235,7 @@ export const en = {
     stepPayment: "Payment",
     stepReview: "Review & confirm",
     stepOf: "Step {n} of {total}",
+    goBackTo: "Back to {step}",
     guestPrompt: {
       title: "Order with an account or as a guest?",
       subtitle: "An account is optional. Takes about a minute.",
@@ -453,6 +456,7 @@ export const en = {
     subtitle: "Questions before ordering? Everything you need is here.",
     faqTitle: "FAQ",
     faqSubtitle: "The questions buyers ask most often.",
+    faqOpenFull: "Open the full FAQ page",
     contactTitle: "Contact us",
     contactSubtitle: "Chat with us directly — fastest way to get an answer.",
     storyTitle: "Our story",
@@ -461,6 +465,15 @@ export const en = {
     mapTitle: "Find us",
     otherQuestions: "Didn't find your answer?",
     otherQuestionsHint: "Send us a message, we usually reply within a few hours.",
+  },
+  /** Halaman /faq penuh — dibuka dari bar menu Profil. */
+  faqPage: {
+    title: "FAQ",
+    subtitle:
+      "The questions we get most. Search below first, and ask on WhatsApp if it is not here.",
+    search: "Search a topic or question",
+    empty: "No match. Try another keyword.",
+    back: "Back to home",
   },
   errors: {
     invalid_name: "Please enter your name.",
@@ -883,9 +896,13 @@ export const en = {
       editBundle: "Edit bundle",
       newBundle: "New bundle",
       bundleSlots: "Slot count (flavors)",
-      bundleCategory: "Category (if linked)",
-      bundleCategoryHint: "Pick a category to limit this bundle to its flavors. Leave empty for a standalone bundle.",
-      bundleStandalone: "Standalone",
+      bundleFlavors: "Flavors in this bundle",
+      bundleFlavorsAll: "Select all",
+      bundleFlavorsClear: "Clear",
+      bundleFlavorsEmpty: "No active flavors yet.",
+      bundleFlavorsHint: "Checked: buyers can only pick the flavors above.",
+      bundleFlavorsHintAll:
+        "None picked — buyers can choose from every flavor.",
       bundleSaved: "Bundle saved.",
       bundleDeleted: "Bundle deleted.",
       bundleDeactivated: "This bundle is still used by active orders, so it was hidden from the website.",
@@ -893,6 +910,7 @@ export const en = {
       searchBundle: "Search bundle...",
       noBundle: "No bundles yet. Create one to sell value packs.",
       favorite: "Favorite",
+      newFlag: "New",
       featuredHint: "Mark as favorite to highlight it on the website.",
       categorySaved: "Food category saved.",
       categoryDeleted: "Food category deleted.",
@@ -1064,12 +1082,11 @@ export const en = {
         "Choose which products to highlight on the homepage. Up to {max} per section. Leave a section empty and the site picks automatically.",
       popularPicker: "Popular",
       popularPickerHint: "Shown as cards near the top of the homepage.",
-      newPicker: "New arrivals",
+      // The "New arrivals" section is now filled from the "New" toggle in the
+      // flavor form (Menu & Stock), not from a picker here — one source of
+      // truth, so the "New" label can never drift from the list.
       newPickerHint:
-        "Shown as a row of cards above the value packs, each with a 'New' label. Up to {max} products.",
-      newPickerEmpty: "Section hidden",
-      newPickerEmptyHint:
-        "While nothing is selected, the 'New arrivals' section does not appear on the homepage at all.",
+        "The 'New arrivals' section on the homepage comes from Menu & Stock: switch on the 'New' toggle for each new product.",
       bestPicker: "Best sellers",
       bestPickerHint: "Shown as a row list on the homepage.",
       pickerAuto: "Automatic",
@@ -1084,10 +1101,13 @@ export const en = {
       profileMenu: {
         title: "Profile menu",
         subtitle:
-          "The rows shown when a customer taps the \"Profile\" tab in the app. Tapping a row opens its popup here.",
+          "The rows shown when a customer taps the \"Profile\" tab in the app. If a row has a page link, tapping it opens that page; otherwise its popup text is set here.",
         addItem: "Add menu row",
         newTitle: "New menu row",
         empty: "There are no menu rows yet.",
+        href: "Page link (optional)",
+        hrefHint:
+          "Empty = the row opens the usual content popup. Put e.g. /faq so it opens the FAQ page, or /contact for the contact page.",
         code: "Code",
         codeHint:
           "A short lowercase key. 'account' means the special row that opens the login form.",

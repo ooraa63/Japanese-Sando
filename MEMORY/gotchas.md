@@ -1084,3 +1084,69 @@ Yang sama berlaku untuk **kalimat** error-nya. "Maksimal {n} per rasa" membuat
 pembeli (dan Steven) mengira ada plafon per rasa padahal tidak ada — pakai
 `stockLeft` ("Sisa {n} pcs untuk semua rasa") atau `outOfStock`.
 
+## 63 - `pg_get_functiondef` TIDAK menutup statement dengan titik koma
+
+Menyalin definisi fungsi PostgreSQL ke file migrasi dengan
+`pg_get_functiondef` menghasilkan `... $function$` **tanpa** titik koma di
+akhirnya. Kalau dua definisi digabung, SQL gagal dengan
+`syntax error at or near "CREATE"` - pesan yang tidak mengarah ke penyebab
+sesungguhnya.
+
+Setiap definisi hasil dump harus diakhiri sendiri sebelum statement berikutnya.
+
+## 64 - Mengubah `create_order`: salin definisi LIVE, bukan dari file migrasi
+
+File migrasi bisa terlihat benar tapi TIDAK sama dengan yang benar-benar
+terpasang di database. Versi live bisa datang dari migrasi lain, atau sudah
+di-`create or replace` manual di luar riwayat repo.
+
+Alur yang benar: `select pg_get_functiondef(oid)` untuk versi live, pakai itu
+sebagai dasar, suntik baris baru, lalu `create or replace` (bukan `drop` +
+`create`, supaya grant execute tidak hilang).
+
+## 65 - `coalesce((payload->>'x')::boolean, default)` mereset kolom yang tidak dikirim
+
+Kalau sebuah kolom boolean baru bisa diubah dari lebih dari satu tempat
+(form DAN toggle cepat di daftar), pola `coalesce((p_payload ->> 'is_new')::boolean, false)`
+berarti: key tidak dikirim = nilai dipaksa jadi `false`. Toggle cepat yang
+mengirim sebagian field akan **memadamkan** kolom yang tidak ikut dikirim.
+
+Pola aman: `case when p_payload ? 'is_new' then coalesce(...) else is_new end`.
+Terapkan ke setiap kolom baru seperti ini.
+
+## 66 - `is_preorder_open`, bukan `preorder_enabled`
+
+Untuk menguji halaman `/order` saat pre-order tutup, halamannya merender layar
+"sedang tutup" sehingga `test-pages.mjs` gagal - itu bukan regresi kode. Buka
+sementara lewat `update public.store_settings set is_preorder_open = true`,
+tes, lalu kembalikan ke `false`.
+
+## 67 - Sheet profil: navigasi halaman nyata butuh callback TERPISAH dari `onOpen`
+
+Bar menu Profil punya dua perilaku: buka popup (`onOpen`) atau buka halaman
+(`href`). Kalau `href` memakai `onClick={onOpen}`, sheet akan tetap membuka
+popup **dan** navigasi sekaligus.
+
+Butuh dua callback terpisah: `onOpen` untuk popup, `onNavigate` (menutup
+sheet) untuk link.
+
+## 68 - Dua sumber kebenaran untuk label yang sama pasti tidak sinkron
+
+Menyimpan pilihan "New" di `store_settings.new_flavor_ids` DAN
+`flavors.is_new` berarti Steven punya dua cara menandai produk baru, dan
+akan ada state yang tidak sesuai maksudnya.
+
+Pilih **satu** sumber. Toggle di form flavor jauh lebih alami karena menempel
+pada produknya, jadi kolom settings yang lama dibiarkan (data) tapi UI-nya
+dibuang.
+
+## 69 - Screenshot headless admin: tombol "tambah rasa" hanya muncul SETELAH klik kartu kategori
+
+`/admin/menu` menampilkan daftar kategori lebih dulu. Tombol tambah rasa ada
+di dalam panel kategori, bukan di halaman utama. Skrip yang langsung mencari
+tombol "tambah rasa" tidak akan menemukan apa-apa, dan laporan verifikasi
+beralih jadi "modal tidak ketemu".
+
+Kalau selector tidak ketemu, dump dulu
+`[...document.querySelectorAll('button')].map(b => b.innerText)`. Membaca
+daftar tombol lebih cepat daripada menebak struktur DOM.

@@ -179,12 +179,14 @@ export const id: Dict = {
     bundlePickFlavors: "Pilih {n} rasa untuk paket {name}",
     bundlePickFlavorsDesc:
       "Tiap slot harus diisi. Stok mengikuti rasa yang kamu pilih.",
-    bundlePickFromCategory: "Hanya rasa dari: {name}",
     // Slot bundle sudah penuh. BEDA dari "Maksimal {n} per rasa" yang pernah
     // dipakai sebelumnya: itu bukan batas stok, tapi batas JUMLAH SLOT.
     bundleSlotsFull: "Semua slot sudah terisi",
     bundleSection: "Paket hemat",
     bundleAnyCategory: "Bebas pilih dari semua rasa",
+    // Isi bundle boleh dibatasi penjual lewat daftar rasa (migration-45).
+    // Kalau tidak ada daftar, semua rasa bebas dipilih.
+    bundleCuratedPick: "Rasa di paket ini sudah ditentukan penjual.",
     bundleNoteLabel: "Catatan untuk paket ini",
     bundleNoteHint: "Opsional. Berlaku untuk semua slot di paket ini.",
     // Dipakai saat pembeli menekan bundle yang sudah di keranjang untuk
@@ -237,6 +239,7 @@ export const id: Dict = {
     stepPayment: "Pembayaran",
     stepReview: "Konfirmasi",
     stepOf: "Langkah {n} dari {total}",
+    goBackTo: "Kembali ke {step}",
     guestPrompt: {
       title: "Mau pesan pakai akun atau tamu?",
       subtitle: "Boleh pakai akun, boleh juga tidak. Cuma butuh satu menit.",
@@ -457,6 +460,7 @@ export const id: Dict = {
     subtitle: "Ada pertanyaan sebelum pesan? Semua jawabannya ada di sini.",
     faqTitle: "FAQ",
     faqSubtitle: "Pertanyaan yang paling sering masuk dari pembeli.",
+    faqOpenFull: "Buka halaman FAQ lengkap",
     contactTitle: "Hubungi kami",
     contactSubtitle: "Chat langsung ke kami — cara tercepat dapat jawaban.",
     storyTitle: "Cerita kami",
@@ -465,6 +469,15 @@ export const id: Dict = {
     mapTitle: "Lokasi kami",
     otherQuestions: "Belum menemukan jawabannya?",
     otherQuestionsHint: "Kirim pesan ke kami, biasanya dibalas dalam beberapa jam.",
+  },
+  /** Halaman /faq penuh — dibuka dari bar menu Profil. */
+  faqPage: {
+    title: "FAQ",
+    subtitle:
+      "Pertanyaan yang sering masuk. Cari dulu di bawah, kalau belum ketemu tanya lewat WhatsApp.",
+    search: "Cari topik atau pertanyaan",
+    empty: "Tidak ada yang cocok. Coba kata kunci lain.",
+    back: "Kembali ke beranda",
   },
   errors: {
     invalid_name: "Mohon isi namamu dulu.",
@@ -889,9 +902,14 @@ export const id: Dict = {
       editBundle: "Ubah bundle",
       newBundle: "Bundle baru",
       bundleSlots: "Jumlah slot (rasa)",
-      bundleCategory: "Kategori (jika terikat)",
-      bundleCategoryHint: "Pilih kategori untuk membatasi bundle pada rasa dalam kategori itu. Kosongkan = bundle berdiri sendiri.",
-      bundleStandalone: "Berdiri sendiri",
+      bundleFlavors: "Rasa di dalam bundle",
+      bundleFlavorsAll: "Pilih semua",
+      bundleFlavorsClear: "Kosongkan",
+      bundleFlavorsEmpty: "Belum ada rasa aktif.",
+      bundleFlavorsHint:
+        "Yang dicentang: pembeli hanya boleh memilih rasa di atas.",
+      bundleFlavorsHintAll:
+        "Tidak ada rasa yang dicentang — pembeli bebas memilih semua rasa.",
       bundleSaved: "Bundle tersimpan.",
       bundleDeleted: "Bundle dihapus.",
       bundleDeactivated: "Bundle ini masih dipakai pesanan aktif, jadi disembunyikan dari website.",
@@ -899,6 +917,7 @@ export const id: Dict = {
       searchBundle: "Cari bundle...",
       noBundle: "Belum ada bundle. Buat satu untuk menjual paket hemat.",
       favorite: "Favorite",
+      newFlag: "New",
       featuredHint: "Tandai sebagai favorite untuk menyorotkan di website.",
       categorySaved: "Jenis makanan tersimpan.",
       categoryDeleted: "Jenis makanan dihapus.",
@@ -1069,14 +1088,11 @@ export const id: Dict = {
         "Pilih produk yang mau ditonjolkan di beranda. Maksimal {max} produk per section. Kalau dibiarkan kosong, website memilih sendiri.",
       popularPicker: "Populer",
       popularPickerHint: "Tampil sebagai kartu-kartu di bagian atas beranda.",
-      // Pemilih "Menu Baru" (permintaan Steven, 11-10-2026). Batasnya 6,
-      // terpisah dari batas "Populer" yang 3.
-      newPicker: "Menu Baru",
+      // Section "Menu Baru" sekarang diisi dari toggle "New" di form flavor
+      // (Menu & Stok), bukan dari pemilih di halaman ini — satu sumber
+      // kebenaran, supaya label "New" tidak bisa tidak sinkron dengan daftar.
       newPickerHint:
-        "Tampil sebagai baris kartu di atas Paket Hemat, tiap kartu diberi label 'New'. Maksimal {max} produk.",
-      newPickerEmpty: "Section disembunyikan",
-      newPickerEmptyHint:
-        "Selama belum ada produk yang dipilih, bagian 'Menu Baru' tidak muncul sama sekali di beranda.",
+        "Bagian 'Menu Baru' di beranda diisi dari tab Menu & Stok: nyalakan toggle 'New' pada produk yang baru.",
       bestPicker: "Terlaris",
       bestPickerHint: "Tampil sebagai daftar baris di beranda.",
       pickerAuto: "Otomatis",
@@ -1092,10 +1108,13 @@ export const id: Dict = {
       profileMenu: {
         title: "Menu Profil",
         subtitle:
-          "Bar menu yang muncul saat pembeli menekan tab \"Profil\" di aplikasi. Tekan sebuah bar -> isi popup-nya tampil di sini.",
+          "Bar menu yang muncul saat pembeli menekan tab \"Profil\" di aplikasi. Kalau bar punya link halaman, menekan bar membuka halaman itu; kalau tidak, isi popup-nya tampil di sini.",
         addItem: "Tambah bar menu",
         newTitle: "Bar menu baru",
         empty: "Belum ada bar menu.",
+        href: "Link halaman (opsional)",
+        hrefHint:
+          "Kosong = bar membuka popup isi seperti biasa. Isi misalnya /faq supaya bar itu membuka halaman FAQ, dan /contact untuk halaman kontak.",
         code: "Kode",
         codeHint:
           "Kunci kecil tanpa spasi. 'account' berarti bar khusus yang membuka form login.",

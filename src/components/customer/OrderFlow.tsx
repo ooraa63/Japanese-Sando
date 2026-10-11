@@ -677,22 +677,42 @@ export function OrderFlow({
     review: t.order.stepReview,
   };
 
+  // Langkah sebelumnya, untuk tombol "back". Pembeli perlu bisa naik lagi ke
+  // langkah identitas buat cek ulang data yang sudah diketik, jadi navigasi
+  // mundur ini harus ada di SETIAP langkah, bukan cuma di payment & review.
+  const prevStep: Step | null = stepIndex > 0 ? steps[stepIndex - 1] : null;
+
+  // Di langkah identitas BELUM ada yang bisa dimasukkan ke keranjang, jadi
+  // panel keranjang disembunyikan supaya tidak menampilkan pilihan kosong yang
+  // membingungkan. Grid pun jadi satu kolom penuh.
+  const showCartPanel = step !== "identity";
+
   return (
     <div className="mx-auto max-w-5xl">
       {/* ---------- Progress ---------- */}
       <div className="mb-8">
-        {/* Mobile: pill style dengan step name + bar progres */}
-        <div className="flex items-center justify-between gap-3 sm:hidden">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-7 items-center rounded-full bg-cocoa-100 px-2.5 text-[11px] font-extrabold tracking-wider text-cocoa-700 uppercase tabular-nums">
+        {/* Mobile: tombol back + pill step + bar progres */}
+        <div className="flex items-center justify-between gap-2 sm:hidden">
+          <div className="flex min-w-0 items-center gap-2">
+            {prevStep ? (
+              <button
+                type="button"
+                onClick={() => goTo(prevStep)}
+                aria-label={t.order.goBackTo.replace("{step}", stepTitles[prevStep])}
+                className="grid size-8 shrink-0 place-items-center rounded-full bg-cocoa-100 text-cocoa-700 transition active:bg-cocoa-200"
+              >
+                <ArrowLeft className="size-4" />
+              </button>
+            ) : null}
+            <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-cocoa-100 px-2.5 text-[11px] font-extrabold tracking-wider text-cocoa-700 uppercase tabular-nums">
               {String(stepIndex + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
             </span>
-            <span className="font-display text-base font-bold text-cocoa-900">
+            <span className="truncate font-display text-base font-bold text-cocoa-900">
               {stepTitles[step]}
             </span>
           </div>
           {stepIndex < steps.length - 1 ? (
-            <span className="text-[10px] font-bold tracking-wider text-cocoa-400 uppercase">
+            <span className="shrink-0 text-[10px] font-bold tracking-wider text-cocoa-400 uppercase">
               {stepTitles[steps[stepIndex + 1]]} →
             </span>
           ) : null}
@@ -708,8 +728,8 @@ export function OrderFlow({
           {steps.map((s, i) => {
             const done = i < stepIndex;
             const active = i === stepIndex;
-            return (
-              <li key={s} className="flex flex-1 flex-col gap-2">
+            const label = (
+              <>
                 <div className="flex items-center gap-2">
                   <span
                     className={`grid size-7 place-items-center rounded-full text-xs font-extrabold transition ${
@@ -741,12 +761,35 @@ export function OrderFlow({
                 >
                   {stepTitles[s]}
                 </span>
+              </>
+            );
+            // Langkah yang sudah dilewati bisa diklik untuk cek ulang isinya.
+            // Yang belum dilewati atau sedang aktif tidak bisa, supaya tidak
+            // ada langkah yang terlewat.
+            return (
+              <li key={s} className="flex flex-1 flex-col gap-2">
+                {done ? (
+                  <button
+                    type="button"
+                    onClick={() => goTo(s)}
+                    aria-label={t.order.goBackTo.replace("{step}", stepTitles[s])}
+                    className="flex w-full cursor-pointer flex-col gap-2 text-left transition hover:opacity-70"
+                  >
+                    {label}
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-2">{label}</div>
+                )}
               </li>
             );
           })}
         </ol>
       </div>
-<div className="grid gap-6 lg:grid-cols-[1fr_20rem] lg:items-start">
+<div
+        className={
+          showCartPanel ? "grid gap-6 lg:grid-cols-[1fr_20rem] lg:items-start" : "grid gap-6"
+        }
+      >
         <div className="min-w-0">
           {/* ============ LANGKAH 1: IDENTITAS ============ */}
           {step === "identity" ? (
@@ -1394,6 +1437,10 @@ export function OrderFlow({
         </div>
 
         {/* ---------- Ringkasan_order (sidebar) ---------- */}
+        {/* Sembunyi di langkah identitas: saat itu keranjang masih kosong dan
+            belum ada apa pun yang bisa ditambah, jadi panelnya cuma memenuhi
+            ruang kosong. Baris "Lanjut" tetap ada di dalam form identitas. */}
+        {showCartPanel ? (
         <aside className="lg:sticky lg:top-24">
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between gap-2 border-b border-cocoa-100 bg-cocoa-50 px-4 py-3">
@@ -1473,7 +1520,8 @@ export function OrderFlow({
             {/* min_order rule dihapus (migration-31 settings), gak dipake lagi */}
           </div>
 
-          </aside>
+        </aside>
+        ) : null}
       </div>
 
       <CartDrawer

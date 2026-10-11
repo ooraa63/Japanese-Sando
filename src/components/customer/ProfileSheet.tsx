@@ -197,7 +197,12 @@ export function ProfileSheet({ items }: { items: ProfileMenuItem[] }) {
           ) : (
             <ul className="divide-y divide-cocoa-100 px-5 py-1">
               {visibleItems.map((item) => (
-                <ProfileRow key={item.id} item={item} onOpen={() => setActive(item)} />
+                <ProfileRow
+                  key={item.id}
+                  item={item}
+                  onOpen={() => setActive(item)}
+                  onNavigate={closeSheet}
+                />
               ))}
             </ul>
           )}
@@ -226,9 +231,12 @@ export function ProfileSheet({ items }: { items: ProfileMenuItem[] }) {
 function ProfileRow({
   item,
   onOpen,
+  onNavigate,
 }: {
   item: ProfileMenuItem;
   onOpen: () => void;
+  /** Dipanggil saat bar punya `href` — sheet ditutup, lalu link navigated. */
+  onNavigate: () => void;
 }) {
   const { t, lang } = useI18n();
   const { profile, openAuthModal } = useCustomerAuth();
@@ -280,6 +288,31 @@ function ProfileRow({
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-cocoa-900">{title}</span>
             <span className="block truncate text-xs text-cocoa-500">{hint}</span>
+          </span>
+          <ArrowRight className="size-4 shrink-0 text-cocoa-300" />
+        </Link>
+      </li>
+    );
+  }
+
+  // Penjual bisa_arahkan bar ke halaman nyata (mis. "/faq") lewat kolom
+  // `href`. Kalau terisi, bar jadi link biasa dan sheet langsung tertutup --
+  // isi popup hanya dipakai kalau `href` kosong (perilaku lama).
+  const href = item.href?.trim() ? item.href.trim() : null;
+  if (href) {
+    return (
+      <li>
+        <Link
+          href={href}
+          onClick={onNavigate}
+          className="flex items-center gap-3 py-3.5 transition active:bg-cocoa-50"
+        >
+          {badge}
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-cocoa-900">{title}</span>
+            {hint ? (
+              <span className="block truncate text-xs text-cocoa-500">{hint}</span>
+            ) : null}
           </span>
           <ArrowRight className="size-4 shrink-0 text-cocoa-300" />
         </Link>

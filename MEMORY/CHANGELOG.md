@@ -10,6 +10,119 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 — Isi bundle bebas, label "New" per rasa, halaman nyata /faq, switch bahasa, back + tanpa cart di identitas
+
+**Scope:** feat — enam permintaan Steven dengan screenshot (bundle, menu admin, profil, header, pre-order back, pre-order identitas)
+
+### 1. Bundle tidak lagi terkunci ke kategori — PENJUAL yang menentukan isi
+
+Selama ini satu-satunya pembatas isi bundle adalah `bundles.category_id`: kalau
+tidak NULL, pembeli hanya boleh memilih rasa dari kategori itu (harus "Sando
+Sandwich"). Sekarang itertools:
+
+- **Tabel baru `bundle_flavors`** (`bundle_id`, `flavor_id`) — daftar rasa per
+  bundle. RLS + policy baca publik, tulis admin.
+- Form "New bundle" **menghapus** `<select>` kategori dan menggantinya dengan
+  pemilih rasa: chip per kategori, tombol "Pilih semua" / "Kosongkan".
+- `admin_save_bundle` menerima `flavor_ids` (jsonb array) lalu delete+insert
+  `bundle_flavors`.
+- `public_menu` & `admin_list_bundles` mengirim `flavor_ids` per bundle.
+- `OrderBundleModal.allowedFlavors`: daftar terisi → hanya rasa itu; kosong →
+  semua rasa. Bundle tidak terkunci kategori mana pun.
+- `bundles.category_id` sengaja **tidak dihapus** (data), tapi form tidak lagi
+  mengirimnya, jadi nilainya jadi NULL saat bundle disimpan ulang.
+
+**Validasi backend (`create_order`) diredefinisi** — slot bundle yang rasa
+nya di luar daftar penjual DITOLAK `flavor_unavailable`. Daftar kosong →
+semua rasa lolos (bundle berdiri sendiri). Diuji dalam transaksi lalu rollback:
+slot dari daftar = LOLOS, slot di luar daftar = DITOLAK.
+
+**Penting (gotcha #60 again):** definisi `create_order` diambil **VERBATIM
+dari versi live** lewat `pg_get_functiondef`, bukan dari migration-44. Semua
+fungsi lain di migration-45 juga disalin dari definisi live. `pg_get_functiondef`
+**tidak menutup statement dengan titik koma** — tiap definisi harus diakhiri
+`;` sendiri, kalau tidak SQL-nya gagal dengan `syntax error at or near "CREATE"`.
+
+### 2. Toggle "New" di form flavor
+
+- Kolom baru `flavors.is_new boolean not null default false`.
+- `admin_save_flavor` memakai pola aman: `case when p_payload ? 'is_new' ... else is_new end`,
+  jadi toggle cepat dari daftar (yang tidak mengirim `is_new`) **tidak** mereset
+  flag yang sudah menyala.
+- Toggle "New" duduk **tepat di bawah "Favorite"** di form "New flavor", plus
+  badge "New" di baris daftar produk.
+- Section "Menu Baru" di beranda sekarang dibaca dari `flavors.is_new`
+  (`allFlavors.filter(f => f.is_new)`, maks 6). Tetap **di atas Paket Hemat**.
+- Pemilih "Menu Baru" di Dashboard → Tampilan beranda **dihapus** (data
+  `store_settings.new_flavor_ids` dibiarkan). Satu sumber kebenaran: kalau dua
+  tempat bisa menandai "New", pasti bisa tidak sinkron.
+
+### 3. Bar menu Profil membuka halaman nyata
+
+- Kolom baru `profile_menu_items.href text`. NULL = popup seperti lama; terisi
+  (mis. `/faq`) = bar jadi `<Link>` dan sheet langsung tertutup.
+- `admin_save_profile_menu_item` menormalisasi `href`: harus diawali `/` atau
+  `http(s)`, maksimal 200 karakter, nilai lain diabaikan.
+- **Halaman baru `/faq`** — akordeon + kotak pencarian (gaya referensi Steven).
+  Isi dipindah ke `src/lib/faq.ts` supaya `/contact` dan `/faq` tidak pernah
+  berbeda isi. `/contact` sekarang juga punya link ke halaman penuh.
+- Nilai default diisi lewat migrasi: `faq` → `/faq`, `contact` → `/contact`.
+  Bar `hours` & `terms` tetap popup (isi-nya memang teks pendek, bukan halaman).
+- Field baru "Link halaman (opsional)" di form admin Menu Profil.
+
+### 4. Switch bahasa di top bar HP
+
+`LanguageToggle` dapat varian baru `mini`: **dua** tombol terpisah ID | EN
+(bukan satu tombol yang isinya berganti seperti versi `pill`), memakai
+`setLang`. Dipasang persis di sebelah kiri lonceng di top bar HP. Versi
+desktop (`pill`) tidak berubah. Header desktop sudah punya switch sejak dulu.
+
+### 5. Tombol back di pre-order
+
+Navigasi mundur ada di **setiap** langkah, bukan cuma payment/review:
+
+- Mobile: tombol panah di kiri pill langkah, `aria-label="Kembali ke <langkah>"`.
+- Desktop: langkah yang sudah dilewati (`done`) jadi bisa diklik untuk cek ulang.
+- Isi form **tidak hilang** — sudah terverifikasi: nama tetap "Steven" setelah
+  naik lalu turun.
+
+### 6. Keranjang disembunyikan di langkah identitas
+
+`showCartPanel = step !== "identity"`. Di langkah identitas grid jadi satu kolom
+penuh dan `<aside>` keranjang tidak dirender sama sekali. Alasannya: di langkah
+itu keranjang masih kosong dan belum ada apa pun yang bisa ditambah, jadi panel
+"0 qty / Rp 0" cuma memenuhi ruang kosong.
+
+### Verifikasi
+
+- `tsc --noEmit` bersih · `eslint` bersih · `npm run build` sukses, `/faq`
+  terdaftar di route.
+- `scripts/test-pages.mjs` **17/17 lulus**.
+- Headless lokal (Edge 430px & 1280px), **0 console error**:
+  - header: tombol ID + EN ada, tepi kanan ID di x=334, lonceng mulai x=374
+    (switch di sebelah kiri lonceng). Klik EN → `html.lang = "en"`.
+  - `/faq`: 6 pertanyaan, kotak cari ada, buka/utup akordeon jalan (1→2→1),
+    cari "QRIS" menyaring jadi 2, cari "zzzznada" → 0 + pesan kosong. Versi EN
+    terpisah rapi.
+  - sheet Profil: bar `/faq` dan `/contact` benar-benar link; klik `/faq`
+    → `location.pathname = /faq` dengan `<h1>FAQ`.
+  - pre-order identitas: `adaPanelCart: false`, `adaTombolBack: false` (benar,
+    ini langkah pertama). Langkah pilih rasa: `adaPanelCart: true`,
+    `labelBack: "Kembali ke Data Kamu"`. Klik back → kembali ke identitas,
+    `namaTerisi: "Steven"`, cart tetap tersembunyi.
+  - admin form flavor: toggle urut `Tampil di website → Favorite → New`.
+  - admin form bundle: `#b-category` **tidak ada**, judul "Rasa di dalam
+    bundle", 5 chip, "Pilih semua"/"Kosongkan" ada, hint berubah saat dicentang.
+  - admin menu profil: `#pm-href` ada, nilainya `/faq`.
+- Tidak ada yang disimpan ke database dari pengujian (tidak menekan Save).
+
+**Cara uji `/order` saat pre-order tutup:** `test-pages.mjs` gagal karena
+`store_settings.is_preorder_open = false` (data produksi Steven). Buka
+sementara, tes, kembalikan. Nama kolomnya `is_preorder_open`, bukan
+`preorder_enabled`.
+
+---
+
 ## 2026-10-11 — Batas "Maksimal N per rasa" yang palsu dihapus, info like/terjual/stok dikembalikan ke /order
 
 **Scope:** fix+feat: dua keluhan Steven dengan screenshot

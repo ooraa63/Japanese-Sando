@@ -150,6 +150,10 @@ export function SiteHeader({
           </Link>
         )}
 
+        {/* Switch bahasa ID / EN, persis di sebelah kiri lonceng. Varian
+            "mini" supaya muat di top bar HP tanpa membuat nama toko tergeser. */}
+        <LanguageToggle variant="mini" />
+
         {/* Belum ada fitur notifikasi, jadi lonceng ini diarahkan ke /track
             (lacak pesanan pakai kode + nomor telepon) — bukan tombol mati.
             Titik oranye di pojok DIHAPUS: tidak ada data notifikasi sungguhan

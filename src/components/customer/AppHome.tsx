@@ -325,7 +325,6 @@ export function AppHome({
   heroImages,
   userName,
   popularIds,
-  newIds,
   ctaSlot,
 }: {
   categories: Category[];
@@ -335,11 +334,6 @@ export function AppHome({
   userName?: string | null;
   /** Pilihan penjual untuk "Populer" (maks 3). Kosong = pakai otomatis. */
   popularIds?: number[];
-  /**
-   * Pilihan penjual untuk "Menu Baru" (maks 6, lihat `MAX_NEW_PICKS`).
-   * Kosong = section disembunyikan, bukan diisi tebakan.
-   */
-  newIds?: number[];
   ctaSlot: React.ReactNode;
 }) {
   const soldCounts = useSoldCounts();
@@ -349,13 +343,14 @@ export function AppHome({
     [categories]
   );
 
-  // Section "Menu Baru" — murni pilihan penjual, TIDAK ada fallback
-  // otomatis. Menebak "mana yang baru" dari tanggal dibuat akan sering
+  // Section "Menu Baru" — dibaca dari toggle "New" di form flavor admin
+  // (kolom `flavors.is_new`, migration-45). Murni pilihan PENJUAL, TIDAK ada
+  // fallback otomatis: menebak "mana yang baru" dari tanggal dibuat akan sering
   // salah (produk lama yang fotonya baru diupload), jadi lebih baik kosong
   // daripada menampilkan label "New" pada barang yang bukan baru.
   const newPicked = useMemo(
-    () => pickByIds(allFlavors, newIds, MAX_NEW_PICKS),
-    [allFlavors, newIds]
+    () => allFlavors.filter((f) => f.is_new).slice(0, MAX_NEW_PICKS),
+    [allFlavors]
   );
 
   // Pilihan penjual menang kalau ada. Kalau tidak ada pilihan, pakai
