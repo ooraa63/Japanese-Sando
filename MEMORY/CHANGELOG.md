@@ -4,7 +4,111 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
-## 2026-10-11 — Tab "Pesanan" jadi track order (kode + nomor telepon), accountDialihkan
+---
+
+## 2026-10-11 — Logo + nama toko di top bar HP, section "Menu Baru" (label New) + pemilih di admin
+
+**Scope:** feat: dua permintaan Steven
+
+1. "diatas sini mungkin bisa letak logo dan nama dari identitas toko?" — bagian
+   tengah top bar HP tadinya kosong total (hanya tombol menu kiri + lonceng
+   kanan).
+2. "Nanti akan ada menu baru, dan ingin diletak di mungkin atas
+   bundle lalu seperti biasa namun mau tambahin satu tulisan kayak 'New' jadi
+   orang bisa tertarik, dan di admin dia bisa set menu mana yang new kalau di
+   set new nanti masuk ke sana."
+
+**1. Logo + nama toko di top bar HP** — `src/components/customer/SiteHeader.tsx`
+
+Spacer `<span className="flex-1" />` diganti `Link` ke `/` berisi logo
+(`size-9`, bulat seperti versi desktop) + nama toko (`font-display`, `truncate`).
+Brand line disembunyikan di HP supaya bar tetap setinggi 64px. Ketuk logo atau
+nama = balik ke beranda.
+
+**Catatan untuk Steven:** file logo sekarang (`/logo-rumakomugi.jpg`) sudah
+memuat tulisan "Rumakomugi" di dalamnya, jadi di top bar terlihat
+"Rumakomugi Rumakomugi". Kalau ingin bersih, ganti ke logo **tanpa teks**.
+
+**2. Kolom baru `store_settings.new_flavor_ids`** — `supabase/migration-43.sql`
+
+Pola yang sama persis dengan `popular_flavor_ids` (migration-40): jsonb array of
+flavor id, terurut, dibersihkan `clean_flavor_id_list`, dan
+`admin_save_settings` ditulis ulang utuh (bukan sebagian — kalau sebagian, semua
+field lain ikut hilang).
+
+- CHECK constraint `settings_new_flavor_ids_ok`: harus array, maksimal **6**.
+- Batas **6** (bukan 3 seperti "Populer") karena section-nya baris mendatar.
+  Angka ini harus sama di tiga tempat: `MAX_NEW_PICKS` (utils), tombol dashboard,
+  dan CHECK constraint.
+- `admin_save_settings` sekarang mengembalikan `new_flavor_ids` di payload.
+
+**3. `FlavorCard` dapat prop `badgeLabel`** — `src/components/customer/FlavorCard.tsx`
+
+Kalau diisi, teks badge di foto **menggantikan** "Signature" (bukan menambah
+badge kedua, supaya dua label di pojok yang sama tidak tumpang tindih). Ikon
+ikut berganti: `Star` untuk Signature, `Sparkles` untuk "New". Warna badge tetap
+`honey-400` — palet coklat toko tidak berubah.
+
+**4. Section "Menu Baru" di beranda** — `src/components/customer/AppHome.tsx`
+
+Component baru `NewShowcase`, diletakkan DI ANTARA `HeroBanner` dan
+`BundleShowcase`. Urutan beranda sekarang:
+`sapaan → hero → Menu Baru → Paket Hemat → Populer → Menu`.
+
+- Kartu memakai `FlavorCard` mode `dense` yang SAMA dengan section "Menu" dan
+  "Populer", jadi ketiganya dijamin tidak melenceng.
+- **Baris mendatar** (`overflow-x-auto` + `snap-x`, kartu `w-36 sm:w-40`),
+  bukan grid 3 kolom — enam kartu jadi dua baris dan mendorong "Paket Hemat"
+  terlalu jauh ke bawah.
+- Padding negatif (`-mx-4 ... px-4`) supaya kartu pertama rata dengan kartu
+  section lain, tapi kartu terakhir tetap bisa di-scroll sampai habis.
+- **Hati READ-ONLY** (`readOnlySocial`), sama seperti "Populer" — section "Menu"
+  tetap jadi satu-satunya tempat like di beranda.
+- **TIDAK ada fallback otomatis.** Kalau daftar kosong, section disembunyikan
+  sama sekali (bukan menebak dari tanggal dibuat). Menebak sering salah — produk
+  lama yang fotonya baru diupload — dan label "New" pada barang yang bukan baru
+  itu klaim dagang yang salah.
+- `pickByIds()` dapat parameter `max` ketiga supaya batas per section berbeda.
+
+**5. Admin: pemilih "Menu Baru"** — `src/components/admin/SettingsClient.tsx`
+
+`HomePickField` dipakai ulang untuk section kedua, sekarang menerima `max`,
+`emptyLabel`, dan `emptyHint`. Perubahan itu perlu karena kotak kosongnya
+berbeda: "Populer" kosong = dipilih otomatis, "Menu Baru" kosong = section
+disembunyikan. `normalizeFlavorIds()` di `src/lib/utils.ts` juga mendapat
+parameter `limit` (default tetap `MAX_HOME_PICKS` supaya pemanggil lama tidak
+berubah perilaku).
+
+**6. i18n** — `src/lib/i18n/id.ts` + `en.ts`
+
+`home.newSection` ("Menu Baru" / "New Arrivals"), `home.newBadge` ("New" untuk
+kedua bahasa), serta `admin.settings.newPicker` / `newPickerHint` /
+`newPickerEmpty` / `newPickerEmptyHint`.
+
+**Verifikasi lokal**
+
+- `tsc --noEmit` bersih · `npm run lint` bersih · `npm run build` sukses
+- `scripts/test-pages.mjs` **16/16 lulus**
+- headless (Edge, 400×900) dengan `new_flavor_ids = [5, 3]`:
+  - top bar: tinggi 64px, logo 36px, nama "Rumakomugi" → link `/`, tombol menu
+    dan lonceng tetap ada;
+  - urutan section diukur dari posisi pixel: **Menu Baru (top 350) → Pilihan
+    Paket Hemat (635) → Populer → Menu**;
+  - 2 kartu, ukuran **144×221 keduanya** (seragam), badge "New" muncul,
+    **0 tombol like** (hati read-only);
+  - admin: login sungguhan lewat `/admin/login`, tab "Beranda" menampilkan
+    "Menu Baru", "Maksimal 6 produk", counter "2 dari 6 dipilih", daftar
+    terpilih + tombol tambah produk + link reset.
+- setelah `new_flavor_ids` dikembalikan ke `[]`: judul "Menu Baru" **tidak ada**
+  lagi di HTML (section benar-benar hilang, bukan judul kosong).
+- **0 console error.**
+
+Data uji `[5, 3]` **sudah dikembalikan ke `[]`** — produk mana yang ditandai
+"New" adalah keputusan Steven, bukan tebakan.
+
+---
+
+## 2026-10-11 — Tab "Pesanan" jadi track order (kode + nomor telepon), account dialihkan
 
 **Scope:** feat+chore: permintaan Steven — "Di order, masih ada account, di order
 yang saya mau, kita buat jadi track order aja, jadi mereka masukin code dan nomor

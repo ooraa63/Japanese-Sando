@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { MAX_HOME_PICKS } from "@/lib/utils";
+import { MAX_HOME_PICKS, MAX_NEW_PICKS } from "@/lib/utils";
 import { useSoldCounts } from "@/lib/useSoldCounts";
 import { BundleShowcase } from "@/components/customer/BundleShowcase";
 import { FlavorCard } from "@/components/customer/FlavorCard";
@@ -140,6 +140,65 @@ export function HeroBanner({
 }
 
 /* ==================================================================
+ * Section "Menu Baru" — produk yang PENJUAL tandai sendiri sebagai baru.
+ *
+ * Permintaan Steven (11-10-2026): "Nantinya akan ada menu baru, dan ingin
+ * diletak di mungkin atas bundle lalu seperti biasa namun mau tambahin satu
+ * tulisan kayak 'New' jadi orang bisa tertarik, dan di admin dia bisa set
+ * menu mana yang new kalau di set new nanti masuk ke sana."
+ *
+ * Tiga keputusan di sini:
+ *
+ * 1. **Posisi di atas "Paket Hemat"**, tepat setelah hero. Section ini
+ *    berisi hal yang paling ingin dilihat pembeli baru, jadi ia tidak boleh
+ *    menunggu sampai shopper menggulir melewati paket.
+ *
+ * 2. **Baris mendatar (scroll horizontal), bukan grid 3 kolom.** Batasnya 6
+ *    item; kalau grid, enam kartu jadi dua baris dan mendorong "Paket Hemat"
+ *    serta "Populer" terlalu jauh ke bawah. Baris mendatar selalu satu baris,
+ *    dan masih bisa menampilkan lebih banyak item sekaligus.
+ *
+ * 3. **Hati di sini READ-ONLY**, sama seperti section "Populer". Section
+ *    "Menu" di bawah tetap jadi satu-satunya tempat likes di beranda — kalau
+ *    "Menu Baru" juga bisa di-like, aturan itu jadi kabur.
+ *
+ * Kartu memakai `FlavorCard` mode `dense` yang SAMA dengan section "Menu"
+ * dan "Populer", jadi ketiganya dijamin tidak melenceng. Yang membedakan cuma
+ * prop `badgeLabel` (label "New") dan lebar kartunya.
+ * ================================================================ */
+export function NewShowcase({ flavors }: { flavors: Flavor[] }) {
+  const { t } = useI18n();
+
+  // Penjual belum menandai apa pun -> section disembunyikan total, bukan
+  // menampilkan judul kosong. Ini yang terjadi sampai Steven memilih produk
+  // dari dashboard.
+  if (flavors.length === 0) return null;
+
+  return (
+    <section>
+      <SectionHead title={t.home.newSection} />
+      {/* Padding negatif + padding kembali supaya baris menyentuh tepi layar
+          di HP (kartu pertama rata dengan kartu section lain) tapi kartu
+          terakhir tetap bisa di-scroll sampai habis. */}
+      <ul className="-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:gap-3 sm:px-6">
+        {flavors.map((f) => (
+          <li key={f.id} className="w-36 shrink-0 snap-start sm:w-40">
+            <FlavorCard
+              flavor={f}
+              dense
+              badgeLabel={t.home.newBadge}
+              showSocial
+              readOnlySocial
+              showSold
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ==================================================================
  * Produk populer — deretan kartu yang HANYA untuk dilihat.
  *
  * Permintaan Steven (10-10-2026): kartu di section ini tidak bisa
@@ -248,14 +307,14 @@ function SectionHead({
  * diam-diam dilewati supaya section tidak pernah menampilkan rongsokan.
  * Order admin dipakai apa adanya — itu yang dia susun lewat dashboard.
  */
-function pickByIds(flavors: Flavor[], ids: number[] | null | undefined): Flavor[] {
+function pickByIds(flavors: Flavor[], ids: number[] | null | undefined, max = MAX_HOME_PICKS): Flavor[] {
   if (!Array.isArray(ids) || ids.length === 0) return [];
   const byId = new Map(flavors.map((f) => [f.id, f]));
   const out: Flavor[] = [];
   for (const raw of ids) {
     const f = byId.get(Number(raw));
     if (f) out.push(f);
-    if (out.length >= MAX_HOME_PICKS) break;
+    if (out.length >= max) break;
   }
   return out;
 }
@@ -266,6 +325,7 @@ export function AppHome({
   heroImages,
   userName,
   popularIds,
+  newIds,
   ctaSlot,
 }: {
   categories: Category[];
@@ -275,6 +335,11 @@ export function AppHome({
   userName?: string | null;
   /** Pilihan penjual untuk "Populer" (maks 3). Kosong = pakai otomatis. */
   popularIds?: number[];
+  /**
+   * Pilihan penjual untuk "Menu Baru" (maks 6, lihat `MAX_NEW_PICKS`).
+   * Kosong = section disembunyikan, bukan diisi tebakan.
+   */
+  newIds?: number[];
   ctaSlot: React.ReactNode;
 }) {
   const soldCounts = useSoldCounts();
@@ -282,6 +347,15 @@ export function AppHome({
   const allFlavors = useMemo(
     () => categories.flatMap((c) => c.flavors ?? []),
     [categories]
+  );
+
+  // Section "Menu Baru" — murni pilihan penjual, TIDAK ada fallback
+  // otomatis. Menebak "mana yang baru" dari tanggal dibuat akan sering
+  // salah (produk lama yang fotonya baru diupload), jadi lebih baik kosong
+  // daripada menampilkan label "New" pada barang yang bukan baru.
+  const newPicked = useMemo(
+    () => pickByIds(allFlavors, newIds, MAX_NEW_PICKS),
+    [allFlavors, newIds]
   );
 
   // Pilihan penjual menang kalau ada. Kalau tidak ada pilihan, pakai
@@ -302,8 +376,8 @@ export function AppHome({
   }, [allFlavors, soldCounts]);
   const popular = popularPicked.length > 0 ? popularPicked : autoPopular;
 
-  // Urutan beranda (permintaan Steven, 10-10-2026):
-  //   sapaan -> hero -> paket hemat -> Populer -> (lanjut ke menu)
+  // Urutan beranda (permintaan Steven, 10-10-2026 + 11-10-2026):
+  //   sapaan -> hero -> Menu Baru -> paket hemat -> Populer -> (menu)
   // Section "Kategori" dan banner promo dihapus; menu langsung menyusul
   // section "Populer".
   return (
@@ -311,6 +385,8 @@ export function AppHome({
       <HomeGreeting userName={userName} />
 
       <HeroBanner images={heroImages} ctaSlot={ctaSlot} />
+
+      <NewShowcase flavors={newPicked} />
 
       <BundleShowcase bundles={bundles} />
 

@@ -124,6 +124,13 @@ export interface StoreSettings {
    * (urut berdasarkan like + terjual). Maksimal 3 — migration-40.
    */
   popular_flavor_ids: number[];
+  /**
+   * Id flavor yang dipilih penjual untuk section "Menu Baru" di beranda
+   * (diatas Paket Hemat, tiap kartu diberi label "New").
+   * Urutan array = urutan tampil. Kosong (`[]`) berarti section disembunyikan
+   * sama sekali. Maksimal 6 — migration-43.
+   */
+  new_flavor_ids: number[];
   updated_at: string;
 }
 

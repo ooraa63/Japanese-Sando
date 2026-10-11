@@ -934,3 +934,55 @@ sekali — jadi badge itu pemalsuan (gotcha #33). Saat lonceng diarahkan
 ke `/track`, titiknya ikut dihapus. Kalau nanti notifikasi sungguhan ada,
 tampilkan angka unread dari RPC, jangan pakai titik dekoratif.
 
+## 55. `Stop-Process` pada wrapper `cmd.exe` TIDAK mematikan server Next
+
+Server lokal untuk verifikasi dijalankan lewat
+`Start-Process cmd.exe /c "npm run start"`, jadi proses yang tercatat adalah
+`cmd.exe`, bukan `node`.
+
+`Stop-Process -Id <pid cmd>` hanya membunuh cmd-nya. Process `node` tetap
+duduk di port 3000 dengan **build lama**, dan `npm run start` yang baru akan
+gagal bind port (atau diam-diam tidak connect). Gejalanya sangat menyesatkan:
+setiap perubahan kode "tidak muncul" padahal `tsc`, `lint`, dan `build` hijau
+semua, dan `.next` sudah benar.
+
+Cara aman — cari pemilik portnya:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3000 -State Listen |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
+
+Lalu tunggu sampai `Get-NetTCPConnection -LocalPort 3000` kosong baru
+menjalankan server baru. Cara kedua yang lebih aman: **bangun ulang lalu cek
+HTML-nya langsung** sebelum_rules headless, misalnya `Menu Baru` muncul atau
+tidak.
+
+## 56. `node -e "..."` di PowerShell rusak oleh backtick, `$`, dan `'`
+
+PowerShell ikut memproses karakter di dalam string yang dikirim ke `node -e`:
+
+- backtick jadi escape (`\``n` = newline, `\``t` = tab, backtick lain hilang),
+- `$1` dianggap variabel sehingga hilang,
+- `'` di dalam string bisa menutup kutipan lebih awal.
+
+Akibatnya kode yang ditulis benar jadi salah, dan error-nya jauh dari penyebab
+(asli: "syntax error at or near \"::\"", karena `$1::jsonb` kehilangan `$1`).
+
+Untuk skrip yang memuat backtick atau `$`, **tulis skrip ke file** lalu jalankan
+`node <file>` — jangan `-e`. Contoh yang dipakai berulang kali: skrip sekali
+pakai di `%TEMP%`, hapus setelah selesai. Dan perhatikan: skrip di `%TEMP%`
+tidak bisa `import pg from "pg"` (lihat #53) — pakai path absolut ke
+`node_modules`.
+
+## 57. Hitung kemunculan teks badge dari `querySelectorAll` bisa menghasilkan angka 2x
+
+Badge "New" di kartu produk tersusun dari `<span>` luar (ikon + teks) dan
+`<span class="truncate">` di dalam. Keduanya punya `textContent.trim()` yang
+sama, jadi `filter(s => s.textContent.trim() === 'New')` menghitung **dua kali
+per kartu**.
+
+Saat memverifikasi badge, hitung per-kartu (`section.querySelectorAll('li')`)
+atau pakai `:scope >` — jangan menghitung span global, atau nanti terlihat
+seolah badge dobel padahal tidak.
+

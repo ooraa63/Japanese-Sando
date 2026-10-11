@@ -102,6 +102,14 @@ export const id: Dict = {
     heroCta: "Pesan Sekarang",
     categories: "Kategori",
     popular: "Populer",
+    // Section "Menu Baru" (permintaan Steven, 11-10-2026): produk yang
+    // PENJUAL tandai sendiri dari dashboard, muncul di atas Paket Hemat
+    // dengan label "New" di foto. Tidak ada tebakan otomatis.
+    newSection: "Menu Baru",
+    // "New" sengaja dibiarkan dalam bahasa Inggris untuk kedua bahasa:
+    // itu kata yang dipahami pembeli, dan label-nya tetap pendek supaya
+    // tidak memotong di kartu 3 kolom.
+    newBadge: "New",
     bestSelling: "Terlaris",
     promoFreeShip: "Gratis Ongkir",
     promoFreeShipDesc: "Untuk pesanan mulai {min}",
@@ -1059,6 +1067,14 @@ export const id: Dict = {
         "Pilih produk yang mau ditonjolkan di beranda. Maksimal {max} produk per section. Kalau dibiarkan kosong, website memilih sendiri.",
       popularPicker: "Populer",
       popularPickerHint: "Tampil sebagai kartu-kartu di bagian atas beranda.",
+      // Pemilih "Menu Baru" (permintaan Steven, 11-10-2026). Batasnya 6,
+      // terpisah dari batas "Populer" yang 3.
+      newPicker: "Menu Baru",
+      newPickerHint:
+        "Tampil sebagai baris kartu di atas Paket Hemat, tiap kartu diberi label 'New'. Maksimal {max} produk.",
+      newPickerEmpty: "Section disembunyikan",
+      newPickerEmptyHint:
+        "Selama belum ada produk yang dipilih, bagian 'Menu Baru' tidak muncul sama sekali di beranda.",
       bestPicker: "Terlaris",
       bestPickerHint: "Tampil sebagai daftar baris di beranda.",
       pickerAuto: "Otomatis",

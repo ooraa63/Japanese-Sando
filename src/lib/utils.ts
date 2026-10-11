@@ -358,14 +358,34 @@ export function clampQty(qty: number, max: number): number {
 export const MAX_HOME_PICKS = 3;
 
 /**
+ * Batas produk untuk section "Menu Baru" (`store_settings.new_flavor_ids`,
+ * migration-43).
+ *
+ * Sengaja LEBIH BESAR dari {@link MAX_HOME_PICKS}: menu baru biasanya datang
+ * beberapa item sekaligus, dan section ini dirender sebagai baris mendatar
+ * (bukan grid 3 kolom) jadi lebih banyak item masih enak dilihat.
+ *
+ * Sama seperti di atas, angka ini harus sama di tiga tempat: di sini, di
+ * tombol dashboard, dan CHECK constraint `settings_new_flavor_ids_ok`.
+ */
+export const MAX_NEW_PICKS = 6;
+
+/**
  * Rapaikan daftar id produk yang berasal dari kolom jsonb database.
  *
  * Nilai di DB tidak selalu bersih: bisa bukan array, bisa berisi teks,
  * bisa dobel, dan bisa lebih dari batas. Semua itu dibuang di sini supaya
  * komponen cukup percaya hasilnya. Array kosong berarti "penjual belum
  * memilih" — pemanggil lalu memakai urutan otomatis.
+ *
+ * `limit` ada karena batas tiap section berbeda (lihat {@link MAX_HOME_PICKS}
+ * dan {@link MAX_NEW_PICKS}). Default-nya batas "Populer" supaya pemanggil
+ * lama tidak ikut berubah perilaku.
  */
-export function normalizeFlavorIds(value: unknown): number[] {
+export function normalizeFlavorIds(
+  value: unknown,
+  limit: number = MAX_HOME_PICKS
+): number[] {
   if (!Array.isArray(value)) return [];
   const out: number[] = [];
   for (const v of value) {
@@ -373,7 +393,7 @@ export function normalizeFlavorIds(value: unknown): number[] {
     if (!Number.isInteger(n) || n <= 0) continue;
     if (out.includes(n)) continue;
     out.push(n);
-    if (out.length >= MAX_HOME_PICKS) break;
+    if (out.length >= limit) break;
   }
   return out;
 }

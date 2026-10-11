@@ -104,6 +104,11 @@ export const en = {
     heroCta: "Order Now",
     categories: "Categories",
     popular: "Popular",
+    // Section "Menu Baru" / "New Arrivals" (permintaan Steven,
+    // 11-10-2026): produk yang PENJUAL tandai sendiri dari dashboard,
+    // muncul di atas Paket Hemat dengan label "New" di foto.
+    newSection: "New Arrivals",
+    newBadge: "New",
     bestSelling: "Best Selling",
     promoFreeShip: "Free Shipping",
     promoFreeShipDesc: "On orders over {min}",
@@ -1059,6 +1064,12 @@ export const en = {
         "Choose which products to highlight on the homepage. Up to {max} per section. Leave a section empty and the site picks automatically.",
       popularPicker: "Popular",
       popularPickerHint: "Shown as cards near the top of the homepage.",
+      newPicker: "New arrivals",
+      newPickerHint:
+        "Shown as a row of cards above the value packs, each with a 'New' label. Up to {max} products.",
+      newPickerEmpty: "Section hidden",
+      newPickerEmptyHint:
+        "While nothing is selected, the 'New arrivals' section does not appear on the homepage at all.",
       bestPicker: "Best sellers",
       bestPickerHint: "Shown as a row list on the homepage.",
       pickerAuto: "Automatic",

@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { ShopInfo } from "@/components/customer/ShopInfo";
 import { AppHome } from "@/components/customer/AppHome";
-import { normalizeFlavorIds, waLink } from "@/lib/utils";
+import { normalizeFlavorIds, waLink, MAX_NEW_PICKS } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
 
@@ -63,6 +63,7 @@ export default async function HomePage() {
             heroImages={heroImages}
             userName={profile?.full_name ?? null}
             popularIds={normalizeFlavorIds(settings?.popular_flavor_ids)}
+            newIds={normalizeFlavorIds(settings?.new_flavor_ids, MAX_NEW_PICKS)}
             ctaSlot={
               <OrderNowLink
                 open={open}

@@ -739,3 +739,40 @@ mengalihkan ke `/track` selama `ACCOUNT_FEATURE_ENABLED === false`.
 - `/account` sengaja **tidak dihapus** — hanya kehilangan pintu masuk. Menyalakan
   flag menghidupkannya kembali tanpa perubahan kode.
 
+## D30 — Section "Menu Baru": dipilih penjual, tanpa tebakan otomatis
+
+**Keputusan:** Section "Menu Baru" (di atas Paket Hemat, tiap kartu berlabel
+"New") diisi dari `store_settings.new_flavor_ids`, maximum 6, dipilih penjual di
+Dashboard → Pengaturan → Tampilan beranda. Kalau daftarnya kosong, **section
+disembunyikan seluruhnya**.
+
+**Alasan:**
+
+- Steven yang menyatakan kebutuhannya: "di admin dia bisa set menu mana yang
+  new kalau di set new nanti masuk ke sana". Jadi penanda "baru" adalah
+  **klaim dagang**, dan klaim dagang tidak boleh dibuat otomatis.
+- Menebak dari `created_at` sering salah: produk lama yang fotonya baru
+  diupload akan terbaca baru. Label "New" pada barang yang bukan baru itu
+  klaim yang tidak bisa dibenarkan kalau ditanyakan pembeli.
+- Karena itu tidak ada fallback seperti yang dipakai section "Populer".
+  "Populer" aman ditebak (menampilkan yang paling disukai memang selalu wajar),
+  "Baru" tidak.
+
+**Konsekuensi & pilihan yang diambil:**
+
+- Batas **6** (bukan 3 seperti "Populer") karena section-nya baris mendatar
+  (`overflow-x-auto`) — selalu satu baris, tidak mendorong konten ke bawah.
+  Angka ini harus sama di `MAX_NEW_PICKS`, tombol dashboard, dan CHECK
+  constraint `settings_new_flavor_ids_ok`.
+- **Baris mendatar, bukan grid 3 kolom** — enam kartu di grid jadi dua baris.
+- Kartu memakai `FlavorCard` mode `dense` yang sama dengan "Menu" dan
+  "Populer"; `badgeLabel` mengganti teks "Signature" (bukan badge kedua), dan
+  ikon berganti ke `Sparkles`. Warna badge tetap `honey-400`.
+- **Hati READ-ONLY**, sama seperti "Populer" — "Menu" tetap satu-satunya tempat
+  like di beranda.
+- Produk yang ditandai "New" **tetap tampil** di section "Menu" juga. Steven
+  tidak minta sebaliknya, dan memindahkannya berarti produk jadi sulit dicari.
+- Data uji `[5, 3]` yang dipakai saat verifikasi **sudah dikembalikan ke `[]`**
+  supaya website tidak memamerkan label "New" pada produk yang Steven belum
+  pilih.
+

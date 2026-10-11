@@ -114,9 +114,40 @@ export function SiteHeader({
             </label>
           </form>
         ) : (
-          /* Spacer: tanpa kolom search, lonceng + avatar harus tetap
-             terdorong ke kanan. */
-          <span aria-hidden className="flex-1" />
+          /* Logo + nama toko (permintaan Steven, 11-10-2026). Sebelumnya
+             bagian tengah top bar HP kosong total — hanya tombol menu di
+             kiri dan lonceng di kanan, jadi pembeli tidak pernah tahu ini
+             toko siapa sebelum scroll ke bawah.
+
+             Sengaja `Link` ke "/" (bukan teks biasa) supaya ketuk logo/nama
+             langsung balik ke beranda — itulah yang orang harap dari logo
+             di app. Brand line disembunyikan di HP supaya top bar tetap
+             setinggi 64px (h-16) dan tidak melebar. */
+          <Link
+            href="/"
+            className="group flex min-w-0 flex-1 items-center gap-2"
+            aria-label={storeName}
+          >
+            {logoUrl ? (
+              <span className="relative size-9 shrink-0 overflow-hidden rounded-full bg-cocoa-900 ring-1 ring-cocoa-200 transition group-hover:scale-105">
+                <Image
+                  src={logoUrl}
+                  alt=""
+                  fill
+                  sizes="36px"
+                  className="object-cover"
+                  priority
+                />
+              </span>
+            ) : (
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-cocoa-800 text-cream-50 shadow-sm">
+                <span className="font-display text-base font-bold">日</span>
+              </span>
+            )}
+            <span className="min-w-0 font-display text-[15px] leading-tight font-bold text-cocoa-900">
+              <span className="block truncate">{storeName}</span>
+            </span>
+          </Link>
         )}
 
         {/* Belum ada fitur notifikasi, jadi lonceng ini diarahkan ke /track

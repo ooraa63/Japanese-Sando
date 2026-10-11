@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Flame, Heart, MessageSquare, Minus, PackageX, Plus, ShoppingBag, Star } from "lucide-react";
+import { Flame, Heart, MessageSquare, Minus, PackageX, Plus, ShoppingBag, Sparkles, Star } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
@@ -44,6 +44,13 @@ export function FlavorCard({
    * di sana bersih, mengikuti gambar referensi Steven yang tidak memakai badge.
    */
   showBadge = true,
+  /**
+   * Ganti teks badge di foto, misalnya "New" untuk section "Menu Baru".
+   * Kalau diisi, label ini menggantikan "Signature" — bukan menambah badge
+   * kedua, supaya dua label di pojok yang sama tidak saling tumpang tindih.
+   * `null`/`undefined` = pakai perilaku lama (tampil kalau `is_featured`).
+   */
+  badgeLabel = null,
   remainingStock = null,
   categoryName,
   /**
@@ -87,6 +94,8 @@ export function FlavorCard({
   dense?: boolean;
   /** Tampilkan badge "Signature" di foto. Default true. */
   showBadge?: boolean;
+  /** Teks badge di foto; isi untuk menggantikan "Signature" (mis. "New"). */
+  badgeLabel?: string | null;
   /** Stok keseluruhan toko (bukan per rasa). null = tak terbatas. */
   remainingStock?: number | null;
   /** Nama kategori, ditampilkan sebagai label kecil di atas nama rasa. */
@@ -291,16 +300,25 @@ export function FlavorCard({
           )}
 
           <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-1 p-1.5">
-            {/* Badge "Signature" (produk unggulan dari admin) di kiri atas.
+            {/* Badge di pojok kiri atas. Teksnya "Signature" untuk produk
+                unggulan, atau `badgeLabel` (mis. "New") kalau pemanggil
+                mengirimnya. Kalau label replacement ikut ada, produk ini
+                tetap tidak butuh `is_featured` — jadi section "Menu Baru"
+                bisa menandai produk apa pun tanpa menyentuh data produk.
+
                 Class `chip` bawaan TIDAK dipakai: default-nya `px-3 py-1
                 text-xs` terlalu lebar untuk kartu 3 kolom (~113px di HP)
                 dan akibatnya kata "Signature" jadi "Signat...". Teks 9px +
                 padding ramping membuatnya utuh; `truncate` tetap dipakai
                 sebagai jaring pengaman kalau labelnya nanti lebih panjang. */}
-            {showBadge && flavor.is_featured && !soldOut ? (
+            {!soldOut && (badgeLabel || (showBadge && flavor.is_featured)) ? (
               <span className="inline-flex min-w-0 shrink items-center gap-0.5 rounded-full bg-honey-400/95 px-1.5 py-0.5 text-[9px] leading-none font-bold text-cocoa-900 shadow">
-                <Star className="size-2.5 shrink-0 fill-current" />
-                <span className="truncate">{t.menu.signature}</span>
+                {badgeLabel ? (
+                  <Sparkles className="size-2.5 shrink-0" />
+                ) : (
+                  <Star className="size-2.5 shrink-0 fill-current" />
+                )}
+                <span className="truncate">{badgeLabel ?? t.menu.signature}</span>
               </span>
             ) : null}
 
@@ -458,7 +476,7 @@ export function FlavorCard({
           </p>
         ) : null}
         {/* Judul & deskripsi diberi tinggi minimum tetap supaya harga dan pil
-            like selalu sejajar antar kartu — даже kalau ada nama 1 baris
+            like selalu sejajar antar kartu — meskipun ada nama 1 baris
             dan ada 2 baris.
 
             PENTING: nama hanya boleh dirender SATU kali di sini. Sebelumnya

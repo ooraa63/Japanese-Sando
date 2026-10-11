@@ -31,7 +31,7 @@ import {
   getAdminAccountsAction,
   revokeAdminAction,
 } from "@/app/admin/actions";
-import { formatDateTime, formatIDR, MAX_HOME_PICKS, normalizeFlavorIds, waLink } from "@/lib/utils";
+import { formatDateTime, formatIDR, MAX_HOME_PICKS, MAX_NEW_PICKS, normalizeFlavorIds, waLink } from "@/lib/utils";
 
 type Draft = Omit<StoreSettings, "id" | "updated_at" | "bank_accounts"> & {
   bank_accounts: BankAccount[];
@@ -95,6 +95,7 @@ function toDraft(s: StoreSettings | null): Draft {
     logo_url: s?.logo_url ?? null,
     brand_line: s?.brand_line ?? "Japanese Bake & Pastry",
     popular_flavor_ids: normalizeFlavorIds(s?.popular_flavor_ids),
+    new_flavor_ids: normalizeFlavorIds(s?.new_flavor_ids, MAX_NEW_PICKS),
   };
 }
 
@@ -619,6 +620,16 @@ export function SettingsClient({
             options={flavors}
             onChange={(ids) => patch({ popular_flavor_ids: ids })}
           />
+          <HomePickField
+            title={t.admin.settings.newPicker}
+            hint={t.admin.settings.newPickerHint.replace("{max}", String(MAX_NEW_PICKS))}
+            max={MAX_NEW_PICKS}
+            emptyLabel={t.admin.settings.newPickerEmpty}
+            emptyHint={t.admin.settings.newPickerEmptyHint}
+            selected={form.new_flavor_ids}
+            options={flavors}
+            onChange={(ids) => patch({ new_flavor_ids: ids })}
+          />
         </div>
       </Section>
       ) : null}
@@ -641,9 +652,15 @@ export function SettingsClient({
 }
 
 /**
- * Pemilih produk untuk satu section beranda ("Populer" / "Terlaris").
- * Urutan klik = urutan tampil di website, maksimal MAX_HOME_PICKS.
- * Kalau kosong, section itu kembali otomatis (dipilih website).
+ * Pemilih produk untuk satu section beranda ("Populer" / "Menu Baru").
+ * Urutan klik = urutan tampil di website.
+ *
+ * `max` berbeda per section: "Populer" dibatasi 3 (satu baris kartu 3 kolom),
+ * "Menu Baru" dibatasi 6 (baris mendatar, jadi muat lebih banyak). Kalau
+ * kosong, `emptyLabel`/`emptyHint` menjelaskan apa yang terjadi — untuk
+ * "Populer" itu "dipilih otomatis", untuk "Menu Baru" justru "section
+ * disembunyikan". Batas dan isi kotak kosong ikut lewat prop supaya satu
+ * komponen tidak mengarang aturan yang tidak berlaku untuk section-nya.
  */
 function HomePickField({
   title,
@@ -651,21 +668,30 @@ function HomePickField({
   selected,
   options,
   onChange,
+  max = MAX_HOME_PICKS,
+  emptyLabel,
+  emptyHint,
 }: {
   title: string;
   hint: string;
   selected: number[];
   options: Flavor[];
   onChange: (ids: number[]) => void;
+  /** Batas item yang boleh dipilih. Harus sama dengan CHECK constraint di DB. */
+  max?: number;
+  /** Kalimat tebal di kotak kosong. Default: "Dipilih otomatis". */
+  emptyLabel?: string;
+  /** Penjelasan setelahnya. Default: penjelasan "dipilih otomatis". */
+  emptyHint?: string;
 }) {
   const { t, lang } = useI18n();
   const nameOf = (f: Flavor) => (lang === "en" ? f.name_en || f.name_id : f.name_id);
-  const isFull = selected.length >= MAX_HOME_PICKS;
+  const isFull = selected.length >= max;
   const remaining = options.filter((f) => !selected.includes(f.id));
 
   function toggle(id: number) {
     if (selected.includes(id)) onChange(selected.filter((x) => x !== id));
-    else if (selected.length < MAX_HOME_PICKS) onChange([...selected, id]);
+    else if (selected.length < max) onChange([...selected, id]);
   }
 
   return (
@@ -678,15 +704,17 @@ function HomePickField({
         <span className="shrink-0 rounded-full bg-cocoa-100 px-2.5 py-1 text-[11px] font-bold tabular text-cocoa-600">
           {t.admin.settings.pickerCounter
             .replace("{n}", String(selected.length))
-            .replace("{max}", String(MAX_HOME_PICKS))}
+            .replace("{max}", String(max))}
         </span>
       </div>
 
       {/* Yang sudah dipilih, urutannya penting — itu urutan tampil di website. */}
       {selected.length === 0 ? (
         <p className="mt-3 rounded-xl bg-cocoa-50 px-3.5 py-2.5 text-xs text-cocoa-500">
-          <span className="font-bold text-cocoa-700">{t.admin.settings.pickerAuto}.</span>{" "}
-          {t.admin.settings.pickerAutoHint}
+          <span className="font-bold text-cocoa-700">
+            {emptyLabel ?? t.admin.settings.pickerAuto}.
+          </span>{" "}
+          {emptyHint ?? t.admin.settings.pickerAutoHint}
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
@@ -736,7 +764,11 @@ function HomePickField({
                 type="button"
                 onClick={() => toggle(f.id)}
                 disabled={isFull}
-                title={isFull ? t.admin.settings.pickerLimitReached.replace("{max}", String(MAX_HOME_PICKS)) : undefined}
+                title={
+                  isFull
+                    ? t.admin.settings.pickerLimitReached.replace("{max}", String(max))
+                    : undefined
+                }
                 className="inline-flex items-center gap-1.5 rounded-full border border-cocoa-200 px-3 py-1.5 text-xs font-bold text-cocoa-700 transition hover:border-honey-400 hover:bg-honey-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Plus className="size-3.5" />
