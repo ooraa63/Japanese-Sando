@@ -963,13 +963,20 @@ diam-diam mengubahnya ke database tanpa diminta.
 ## D41 - Bar quick-action menyatu dengan bottom nav, bukan elemen fixed terpisah
 
 **Keputusan:** "Cek Pesanan" + "Riwayat" dirender DI DALAM elemen `<nav>` yang
-sama dengan bar tab, bukan sebagai `div fixed` kedua yang diposisikan dengan
-`bottom-[58px]`.
+sama dengan bar tab, sebagai bar kedua DI BAWAH bar tab.
 
-**Alasan:** Tinggi bar quick-action tidak konstan, dan `pb-[env(safe-area-inset-bottom)]`
-pada nav membuat posisinya bergeser di HP bergerigi. Dua elemen `fixed` berarti
-satu harus mengarang offset yang cepat salah - gejalanya bar menutupi tab
-Profil.
+**Alasan:** Dua alasan terpisah.
+
+1. *Struktur:* tinggi bar quick-action tidak konstan, dan
+   `pb-[env(safe-area-inset-bottom)]` pada nav membuat posisinya bergeser di HP
+   bergerigi. Dua elemen `fixed` berarti satu harus mengarang offset yang cepat
+   salah - gejalanya bar menutupi tab Profil.
+2. *Posisi:* Steven koreksi setelah versi pertama ditaruh DI ATAS bar tab
+   ("Track order dan history bukan sana, tapi setelah di bagian Track order
+   (kanan Home)"). Jadi urutan dari atas: Home / Cek Pesanan / Profil, lalu bar
+   Cek Pesanan + Riwayat paling bawah, menempel ke tepi bawah layar.
 
 **Konsekuensi:** Spacer bawah halaman harus ikut naik (68px -> 114px). Kalau
-tidak, kartu terakhir di beranda tertutup bar Riwayat.
+tidak, kartu terakhir di beranda tertutup bar Riwayat. Saat memindahkan bar,
+cek lagi tinggi `<nav>` dengan `getBoundingClientRect` di headless - jangan
+sekadar benar secara visual.

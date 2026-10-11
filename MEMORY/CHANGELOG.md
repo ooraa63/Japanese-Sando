@@ -4,6 +4,24 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Bar Cek Pesanan + Riwayat dipindah ke BAWAH bar tab
+
+**Scope:** fix - koreksi posisi dari permintaan sebelumnya
+
+Steven koreksi: bar quick-action "Cek Pesanan" + "Riwayat" jangan ditaruh di
+ATAS bottom nav, tapi setelah / di bawah bagian "Track order" (tab kedua,
+kanan Home).
+
+- `MobileBottomNav`: `<ul>` tab sekarang dirender lebih dulu, baru bar
+  quick-action di bawahnya (dulu kebalik). Keduanya tetap dalam SATU elemen
+  `<nav>`, jadi tidak ada offset `fixed` yang perlu dihitung ulang.
+- Spacer bawah tetap 114px (tinggi `<nav>` tidak berubah, hanya urutan isi).
+- Verifikasi headless: `<nav>` berisi 2 anak, `ul` (55px) lalu `div` bar (51px),
+  `barAtas 756 >= tabBawah 701` - jadi bar benar-benar di bawah. `/riwayat`
+  tetap terbuka, 0 console error.
+
+---
+
 ## 2026-10-12 - Stok bisa diketik, konfirmasi hapus in-app, bar Cek Pesanan + Riwayat, diskon ongkir bertingkat, FAQ dari admin, kartu beranda seragam
 
 **Scope:** feat + fix - enam permintaan Steven dengan screenshot (stok, menu nyangkut, bar bawah, zona ongkir, halaman FAQ, ukuran kartu)

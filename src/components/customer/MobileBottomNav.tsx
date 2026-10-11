@@ -58,11 +58,12 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
       {/* Spacer: nav di bawah ini `fixed`, jadi tidak ikut menambah tinggi
           halaman. Tanpa spasi ini, elemen terakhir halaman bisa tertutup nav.
 
-          Nav sekarang dua lapis: bar quick-action (Cek Pesanan + Riwayat)
-          lalu bar tab. Keduanya sengajakept dalam SATU elemen `<nav>`, bukan
-          dua elemen `fixed` terpisah — kalau dipisah, tinggi bar quick-action
-          harus dihitung manual dan akan meleset di HP yang punya safe-area
-          (gejalanya bar itu menutupi tab Profil).
+          Nav sekarang dua lapis: bar tab (Home / Track order / Profile)
+          lalu bar quick-action (Cek Pesanan + Riwayat) DI BAWAHNYA. Keduanya
+          sengaja kept dalam SATU elemen `<nav>`, bukan dua elemen `fixed`
+          terpisah — kalau dipisah, tinggi bar quick-action harus dihitung
+          manual dan akan meleset di HP yang punya safe-area (gejalanya bar itu
+          menutupi tab Profil).
 
           Totalnya sekitar 108px, jadi spacer 114px supaya kartu terakhir di
           beranda tidak ketutup.
@@ -81,32 +82,6 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
         aria-label="Mobile navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-cocoa-200 bg-cream-50 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
-        {/* Bar quick-action (permintaan Steven 12-10-2026, referensinya
-            GoFood): dua pintasan yang paling sering dipakai pembeli,
-            Cek Pesanan dan Riwayat. */}
-        <div className="border-b border-cocoa-100 px-3 pt-2 pb-1">
-          <div className="grid grid-cols-2 gap-2">
-            {quickActions.map((a) => {
-              const Icon = a.icon;
-              const active = pathname.startsWith(a.href);
-              return (
-                <Link
-                  key={a.href}
-                  href={a.href}
-                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
-                    active
-                      ? "bg-honey-400/25 text-honey-600"
-                      : "bg-cream-100 text-cocoa-600 hover:bg-cocoa-200/70"
-                  }`}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  <span className="truncate">{a.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
         <ul className="grid grid-cols-3">
           {items.map((item) => {
             const active =
@@ -140,6 +115,40 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
             <ProfileTabButton />
           </li>
         </ul>
+
+        {/* Bar quick-action (permintaan Steven 12-10-2026, referensinya
+            GoFood): dua pintasan yang paling sering dipakai pembeli,
+            Cek Pesanan dan Riwayat.
+
+            POSISINYA DI BAWAH bar tab, bukan di atasnya — Steven koreksi
+            setelah versi pertama ditaruh di atas. Jadi urutannya dari atas:
+            Home / Track order / Profile, lalu bar Cek Pesanan + Riwayat.
+
+            Tetap di dalam elemen <nav> yang sama (bukan `div fixed`
+            terpisah) supaya tidak perlu menghitung offset tinggi bar tab,
+            yang akan meleset di HP punya safe-area. */}
+        <div className="border-t border-cocoa-100 px-3 pt-2 pb-1.5">
+          <div className="grid grid-cols-2 gap-2">
+            {quickActions.map((a) => {
+              const Icon = a.icon;
+              const active = pathname.startsWith(a.href);
+              return (
+                <Link
+                  key={a.href}
+                  href={a.href}
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
+                    active
+                      ? "bg-honey-400/25 text-honey-600"
+                      : "bg-cream-100 text-cocoa-600 hover:bg-cocoa-200/70"
+                  }`}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span className="truncate">{a.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </nav>
 
       <ProfileSheet items={profileMenu} />
