@@ -178,6 +178,7 @@ export const en = {
     bundlePickFlavorsDesc:
       "Fill every slot. Stock follows the flavors you choose.",
     bundlePickFromCategory: "Only from: {name}",
+    bundleSlotsFull: "Every slot is already filled",
     bundleSection: "Value bundles",
     bundleAnyCategory: "Pick from any flavor",
     bundleNoteLabel: "Note for this bundle",
@@ -264,7 +265,6 @@ export const en = {
       cartEmpty: "Your cart is empty. Add at least one flavor above.",
       outOfStock: "Out of stock",
       stockLeft: "{n} pcs left in total for all flavors",
-      maxReached: "Maximum {n} per flavor",
       minOrderWarning: "Minimum order is {n} items.",
       remove: "Remove",
     },

@@ -525,14 +525,23 @@ export function OrderMenuBrowser({
                     flavor={f}
                     inCart={q}
                     remainingStock={catLeft}
-                    showSocial={false}
+                    /* Tiga informasi yang diminta Steven (11-10-2026):
+                       jumlah like, jumlah terjual, dan sisa stok.
+                       - `readOnlySocial` => angka like tampil tapi tanpa tombol,
+                         jadi section "Menu" di beranda tetap satu-satunya tempat
+                         pembeli bisa likes.
+                       - `showSold` => "N terjual".
+                       - `showStock` => sisa stok kategori (pembatas sebenarnya).
+                       `remainingStock` = sisa stok PER KATEGORI (lihat
+                       `create_order` yang mengurangi `categories.stock`), jadi
+                       angkanya sama untuk semua rasa di kategori itu — bukan
+                       sisa per rasa. Kalau Steven mau sisa per rasa, itu perlu
+                       kolom stok baru di `flavors`. */
+                    showSocial
                     soldCount={soldCounts[f.id] ?? 0}
-                    /* Hati dimatikan: kartu pre-order tidak menulis info like,
-                       stok, maupun penjualan (permintaan Steven, 11-10-2026).
-                       "Menu" di beranda tetap jadi satu-satunya tempat likes. */
-                    showHeart={false}
+                    showSold
                     readOnlySocial
-                    showStock={false}
+                    showStock
                     selectable
                     storefront
                   />

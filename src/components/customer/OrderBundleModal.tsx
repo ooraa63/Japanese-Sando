@@ -170,7 +170,7 @@ export function OrderBundleModal({
       const flavor = allowedFlavors.find((f) => f.id === flavorId);
       toast.warning(
         flavor ? (lang === "en" ? flavor.name_en : flavor.name_id) : "",
-        t.order.menu.maxReached.replace("{n}", String(left))
+        t.order.menu.stockLeft.replace("{n}", String(left))
       );
       return;
     }
@@ -443,13 +443,9 @@ export function OrderBundleModal({
                       type="button"
                       onClick={() => {
                         if (remaining <= 0) {
-                          toast.warning(
-                            name,
-                            t.order.menu.maxReached.replace(
-                              "{n}",
-                              String(requiredQty)
-                            )
-                          );
+                          // Semua slot sudah terisi. Ini batas JUMLAH SLOT
+                          // paket, sama sekali bukan batas per rasa.
+                          toast.warning(name, t.menu.bundleSlotsFull);
                           return;
                         }
                         addOne(f.id);

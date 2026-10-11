@@ -51,19 +51,6 @@ export function FlavorCard({
    * `null`/`undefined` = pakai perilaku lama (tampil kalau `is_featured`).
    */
   badgeLabel = null,
-  /**
-   * Tampilkan hati di pojok foto (mode `storefront`).
-   *
-   * Permintaan Steven (11-10-2026), kartu di halaman pre-order: "sisa stok,
-   * jumlah like dan penjualan tidak ditulis". Stok dan penjualan memang sudah
-   * tidak pernah ditulis di sana; yang tersisa hanyalah hati ini, jadi
-   * dimatikan lewat prop.
-   *
-   * Hanya berlaku untuk mode `storefront`. Mode `dense` (beranda) tetap
-   * menampilkan hati karena di situ_section "Menu" adalah satu-satunya tempat
-   * pembeli bisa likes.
-   */
-  showHeart = true,
   remainingStock = null,
   categoryName,
   /**
@@ -109,8 +96,6 @@ export function FlavorCard({
   showBadge?: boolean;
   /** Teks badge di foto; isi untuk menggantikan "Signature" (mis. "New"). */
   badgeLabel?: string | null;
-  /** Tampilkan hati di pojok foto. Hanya berlaku untuk mode `storefront`. */
-  showHeart?: boolean;
   /** Stok keseluruhan toko (bukan per rasa). null = tak terbatas. */
   remainingStock?: number | null;
   /** Nama kategori, ditampilkan sebagai label kecil di atas nama rasa. */
@@ -196,30 +181,26 @@ export function FlavorCard({
             </div>
           )}
 
-          {/* Hati pojok kanan atas — penanda "disukai" ala referensi.
-              Di halaman pre-order (`showHeart={false}`) seluruh blok ini
-              dihapus: kartu di sana tidak menulis info like sama sekali. */}
-          {showHeart ? (
-            readOnlySocial ? (
-              <span className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm">
-                <Heart
-                  className={`size-4 text-berry-500 ${isLiked ? "fill-current" : ""}`}
-                />
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={toggleLike}
-                aria-pressed={isLiked}
-                aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
-                className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm transition hover:bg-white active:scale-95"
-              >
-                <Heart
-                  className={`size-4 transition ${isLiked ? "fill-current text-berry-500" : "text-cocoa-400"}`}
-                />
-              </button>
-            )
-          ) : null}
+          {/* Hati pojok kanan atas — penanda "disukai" ala referensi. */}
+          {readOnlySocial ? (
+            <span className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm">
+              <Heart
+                className={`size-4 text-berry-500 ${isLiked ? "fill-current" : ""}`}
+              />
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleLike}
+              aria-pressed={isLiked}
+              aria-label={isLiked ? t.menu.likeRemove : t.menu.likeAdd}
+              className="absolute top-2.5 right-2.5 grid size-8 place-items-center rounded-full bg-white/90 shadow-sm transition hover:bg-white active:scale-95"
+            >
+              <Heart
+                className={`size-4 transition ${isLiked ? "fill-current text-berry-500" : "text-cocoa-400"}`}
+              />
+            </button>
+          )}
 
           {soldOut ? (
             <div className="absolute inset-0 grid place-items-center bg-cocoa-950/65">
@@ -238,6 +219,58 @@ export function FlavorCard({
           <p className="mt-1 line-clamp-2 min-h-[2.4em] text-[11px] leading-snug text-cocoa-500">
             {desc ?? " "}
           </p>
+
+          {/* Baris info: jumlah like + jumlah terjual + sisa stok.
+              Permintaan Steven (11-10-2026). Semuanya read-only di sini:
+              pembeli menekan like di beranda (section "Menu"), bukan di
+              halaman pemesanan.
+
+              Letaknya DI ATAS harga, bukan di bawah tombol: di grid 4 kolom
+              HP baris ini jadi bahan pembanding sebelum pembeli menekan
+              "Add", sementara tombolnya selalu di paling bawah. */}
+          <div className="mt-2 flex flex-col gap-1">
+            {showSocial ? (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px]">
+                <span className="flex items-center gap-1 text-berry-500">
+                  <Heart className="size-3.5 shrink-0 fill-current" />
+                  <span className="font-bold tabular">{likesCount}</span>
+                  <span className="text-cocoa-500">{t.menu.likesCount}</span>
+                </span>
+                {showSold ? (
+                  <span className="flex items-center gap-1 text-cocoa-500">
+                    <ShoppingBag className="size-3.5 shrink-0" />
+                    <span className="font-bold text-cocoa-700 tabular">
+                      {soldCount}
+                    </span>
+                    <span>{t.menu.soldCount}</span>
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
+            {showStock ? (
+              <div className="flex h-4 items-center text-[11px] font-bold">
+                {soldOut ? (
+                  <span className="text-berry-500">
+                    <PackageX className="mr-1 inline size-3" />
+                    {t.menu.soldOut}
+                  </span>
+                ) : stockEnabled ? (
+                  <span className={low ? "text-honey-500" : "text-matcha-600"}>
+                    <Flame className="mr-1 inline size-3" />
+                    {low
+                      ? t.menu.lowStock.replace("{n}", String(left))
+                      : t.menu.inStock.replace("{n}", String(left))}
+                  </span>
+                ) : (
+                  <span className="text-matcha-600">
+                    <Flame className="mr-1 inline size-3" />
+                    {t.menu.unlimited}
+                  </span>
+                )}
+              </div>
+            ) : null}
+          </div>
 
           {/* Baris bawah: harga di atas, tombol full-width di bawahnya.
               Di grid 4 kolom HP kartu ini sempit — kalau harga dan
@@ -692,13 +725,32 @@ function StorefrontAction({
         <button
           type="button"
           onClick={() => {
-            const next = qty + 1;
-            // Hormati sisa stok (kalau ada) supaya langkah berikutnya
-            // tidak menambah lebih dari yang dijual.
-            if (stockEnabled && left > 0 && next > left) {
+            // Hormati sisa stok supaya langkah berikutnya tidak menambah
+            // lebih dari yang dijual.
+            //
+            // PENTING: `left` itu SISA STOK kategori setelah SELURUH isi keranjang
+            // dikurangi, bukan sisa per rasa. Jadi satu-satuanya pertanyaan
+            // sebelum boleh nambah adalah "masih ada sisa?", bukan
+            // "berapa sisa?".
+            //
+            // Versi lama menulis `next > left` (jumlah rasa ini vs sisa
+            // stok) dan itu salah dua arah:
+            //   - stok 10, keranjang 5 rasa sama -> left 5, tambah jadi 6
+            //     Dicek 6 > 5 lalu DITOLAK, padahal 6 dari 10 masih aman.
+            //     Steven sempat beberapa kali melihat ini sebagai "Maksimal 5 per rasa"
+            //     padahal tidak ada plafon per rasa sama sekali;
+            //   - saat left = 0, syarat `left > 0` gagal sehingga guard
+            //     dilewati sepenuhnya dan pembeli bisa menambahkan melebihi
+            //     stok.
+            //
+            // Backend tetap memvalidasi `insufficient_stock`; ini hanya
+            // supaya UI tidak menjanjikan sesuatu yang tak Bisa dibayar.
+            if (stockEnabled && left <= 0) {
               toast.warning(
                 name,
-                t.order.menu.maxReached.replace("{n}", String(left))
+                left === 0
+                  ? t.order.menu.outOfStock
+                  : t.order.menu.stockLeft.replace("{n}", String(left))
               );
               return;
             }
@@ -784,13 +836,14 @@ function FlavorCardStepper({
           <button
             type="button"
             onClick={() => {
-              const next = qty + 1;
-              // Hormati sisa stok (kalau ada) supaya langkah berikutnya
-              // tidak menambah lebih dari yang dijual.
-              if (stockEnabled && left > 0 && next > left) {
+              // Lihat catatan panjang di stepper kartu etalase: satu-satunya
+              // syarat adalah "masih ada sisa stok kategori?".
+              if (stockEnabled && left <= 0) {
                 toast.warning(
                   name,
-                  t.order.menu.maxReached.replace("{n}", String(left))
+                  left === 0
+                    ? t.order.menu.outOfStock
+                    : t.order.menu.stockLeft.replace("{n}", String(left))
                 );
                 return;
               }

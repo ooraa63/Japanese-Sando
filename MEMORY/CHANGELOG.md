@@ -8,6 +8,87 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+---
+
+## 2026-10-11 — Batas "Maksimal N per rasa" yang palsu dihapus, info like/terjual/stok dikembalikan ke /order
+
+**Scope:** fix+feat: dua keluhan Steven dengan screenshot
+
+1. "Sudah dikatakan jangan ada maximum per rasa" — toast
+   "Choco Matcha — Maximum 5 per flavor" masih muncul.
+2. "Gambar 2, itu di pre-order belum ada jumlah like, terjual dan sisa stock".
+
+**1. Akar masalahnya bukan batas, tapi PENGECEKAN YANG SALAH**
+
+Steven diberi tahu bahwa batas 10 pcs per rasa di backend sudah dihapus
+sebelumnya (migration-44), dan chek-nya memang tidak lagi ada. Tapi toastnya
+masih muncul karena kode frontend menghitung:
+
+```js
+const next = qty + 1;
+if (stockEnabled && left > 0 && next > left) { toast("Maksimal {left} per rasa"); return; }
+```
+
+`left` itu **sisa stok kategori setelah SELURUH isi keranjang dikurangi**, bukan
+sisa per rasa. Bug-nya di dua arah:
+
+- stok 10, keranjang 5 rasa yang sama → `left = 5`, tambah jadi 6 dicek
+  `6 > 5` lalu **ditolak**, padahal 6 dari 10 masih aman. Itulah yang Steven
+  lihat sebagai "Maximum 5 per rasa" — padahal tidak ada plafon sama sekali;
+- saat `left = 0`, syarat `left > 0` gagal sehingga **guard dilewati
+  sepenuhnya** dan pembeli bisa menambahkan melebihi stok.
+
+Yang benar hanya satu pertanyaan: "masih ada sisa?". Jadi keduanya (stepper
+kartu etalase + stepper ringkas) sekarang:
+
+```js
+if (stockEnabled && left <= 0) {
+  toast.warning(name, left === 0 ? t.order.menu.outOfStock
+                                : t.order.menu.stockLeft.replace("{n}", String(left)));
+  return;
+}
+cart.add(flavor);
+```
+
+Ini juga sesuai dengan yang sudah dilakukan `OrderBundleModal.addOne()`.
+
+**Kalimat toast-nya ikut diganti.** Key `t.order.menu.maxReached`
+("Maksimal {n} per rasa" / "Maximum {n} per flavor") **dihapus** dari i18n
+karena justru menyuruh — sekarang pakai `stockLeft` ("Sisa {n} pcs untuk semua
+rasa") dan `outOfStock`. Satu pemakai lain, `OrderBundleModal` di tombol slot
+bundle, sekarang memakai key baru `t.menu.bundleSlotsFull` ("Semua slot sudah
+terisi") karena itu memang batas **jumlah slot**, bukan batas per rasa.
+
+**2. Jumlah like, terjual, dan sisa stok dikembalikan di kartu /order**
+
+Varian kartu yang dipakai `/order` adalah mode **`storefront`** — bukan varian
+"default". Baris info (like / terjual / stok) yang sudah ada di komponen
+ternyata hanya ada di varian **default**, jadi tidak pernah terlihat di
+`/order`. Baris itu sekarang ditambahkan ke varian `storefront`, di atas harga
+dan di bawah deskripsi:
+
+- **jumlah like** — read-only (`readOnlySocial`), jadi section "Menu" di
+  beranda tetap satu-satunya tempat pembeli bisa likes;
+- **jumlah terjual** — dari `useSoldCounts` (RPC publik, tidak pernah dikarang);
+- **sisa stok** — `Flame` + "Only {n} left", memakai `lowStock`/`inStock`
+  yang sudah ada.
+
+Prop `showHeart` yang sempat dibuat di iterasi sebelumnya **dicabut lagi** —
+hati pojok foto sekarang tampil kembali, jadi kartu punya hati + tiga angka.
+
+**Verifikasi lokal** (headless, stok kategori 10)
+
+| Aksi | Hasil |
+| --- | --- |
+| klik "+1" berulang | keranjang **10 Qty** (Rp 180.000) — jauh lewat angka 5 yang dulu muncul |
+| stok habis terpakai | semua kartu jadi "Sold out" + tombol "Unavailable" |
+| toast batas | tidak ada kalimat "Maximum N per flavor" |
+
+`tsc` bersih · `eslint` bersih · `build` sukses · `test-pages.mjs` **17/17** ·
+0 console error.
+
+---
+
 ## 2026-10-11 — Voucher dihapus, strip kategori & info like di /order dihapus, batas maksimal pesanan dihapus
 
 **Scope:** feat+fix: empat permintaan Steven dengan tiga screenshot

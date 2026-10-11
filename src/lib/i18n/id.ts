@@ -180,6 +180,9 @@ export const id: Dict = {
     bundlePickFlavorsDesc:
       "Tiap slot harus diisi. Stok mengikuti rasa yang kamu pilih.",
     bundlePickFromCategory: "Hanya rasa dari: {name}",
+    // Slot bundle sudah penuh. BEDA dari "Maksimal {n} per rasa" yang pernah
+    // dipakai sebelumnya: itu bukan batas stok, tapi batas JUMLAH SLOT.
+    bundleSlotsFull: "Semua slot sudah terisi",
     bundleSection: "Paket hemat",
     bundleAnyCategory: "Bebas pilih dari semua rasa",
     bundleNoteLabel: "Catatan untuk paket ini",
@@ -266,7 +269,6 @@ export const id: Dict = {
       cartEmpty: "Keranjang masih kosong. Tambahkan minimal satu rasa di atas.",
       outOfStock: "Stok habis",
       stockLeft: "Sisa {n} pcs untuk semua rasa",
-      maxReached: "Maksimal {n} per rasa",
       minOrderWarning: "Pesanan minimal {n} pcs.",
       remove: "Hapus",
     },

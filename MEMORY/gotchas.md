@@ -1038,3 +1038,49 @@ Dan **`create or replace`, bukan `drop` + `create`**: drop menghapus grant
 `execute` untuk anon & authenticated, sehingga pembeli tidak bisa lagi membuat
 pesanan. Tulis ulang `grant execute` secara eksipisit sebagai pengaman.
 
+## 61. `FlavorCard` punya TIGA varian — ubah yang salah diam-diam tidak kena
+
+`FlavorCard` mengembalikan JSX lebih awal di dua titik, jadi isinya **tiga
+varian terpisah** yang nyaris tidak berbagi blok:
+
+| Varian | Dipakai di | Ciri |
+| --- | --- | --- |
+| `storefront` | halaman `/order` | foto 4:3, tombol Add/stepper full-width |
+| `dense` | beranda ("Menu", "Populer", "Menu Baru") | foto 1:1, baris like + terjual |
+| default | kartu lama / tempat lain | baris like + terjual + stok di bawah harga |
+
+Baris "jumlah like / terjual / sisa stok" ada di varian **default**, tapi
+`/order` memakai varian **`storefront`** — jadi mengubah props di
+`OrderMenuBrowser` (`showSocial`, `showSold`, `showStock`) **tidak}$
+menghasilkan apa-apa, dan tidak ada error apa pun.
+
+Gejalanya: setelah ubah, kartu tetap sama persis; `tsc` dan `eslint` hijau;
+hati pojok yangZZH kembali muncul (berarti build-nya memang baru) sehingga
+terlihat kontradiktif.
+
+Cara aman: sebelumcredited mengubah, cek **mana** dari tiga `return` yang
+memang dipakai. Kalau tidak yakin, buat screenshot sebelum & sesudah dan
+bandingkan, jangan relies pada feeling.
+
+## 62. "Maksimal {left} per rasa" — jangan pakai sisa stok sebagai pembatas per item
+
+Bug yang pernah ada (11-10-2026, sudah diperbaiki):
+
+```js
+const next = qty + 1;
+if (stockEnabled && left > 0 && next > left) { /* tolak */ }
+```
+
+`left` = sisa stok kategori **setelah seluruh keranjang dikurangi**, bukan
+sisa per item. Membandingkan `next` dengan `left` menghasilkan:
+- plafon palsu (stok 10, keranjang 5 → `6 > 5` ditolak, padahal aman);
+- dan kebalikannya, saat `left === 0` guard-nya justru dilewati karena syarat
+  `left > 0` tidak terpenuhi.
+
+Aturan yang benar untuk pemanggil mana pun: tambah satu item **hanya** berarti
+"apakah masih ada sisa?", jadi cukup `if (left <= 0) tolak`.
+
+Yang sama berlaku untuk **kalimat** error-nya. "Maksimal {n} per rasa" membuat
+pembeli (dan Steven) mengira ada plafon per rasa padahal tidak ada — pakai
+`stockLeft` ("Sisa {n} pcs untuk semua rasa") atau `outOfStock`.
+
