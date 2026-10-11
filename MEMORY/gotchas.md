@@ -897,3 +897,40 @@ Konsekuensi: tes apa pun yang menyentuh `/order` harus melewati langkah ini
 dulu. Gagal mengisinya membuat tes salah menyimpulkan "kartu tidak ada" padahal
 hanya salah langkah.
 
+## 52. Ganti signature RPC = ada jendela transisi antara DB dan deploy
+
+Mengubah jumlah argumen fungsi PostgREST (`track_by_code(text)` jadi
+`track_by_code(text, text)`) **tidak** kompatibel ke belakang. Selama kode lama
+masih hidup, panggilan lama dapat `404 PGRST202`
+("Could not find the function ... in the schema cache") — bukan NULL, bukan
+error 500.
+
+Artinya `db:apply` dan deploy harus dipandang sebagai satu langkah. Kalau deploy
+dulu, halaman track versi lama rusak sampai kode baru selesai online. Kalau
+`db:apply` dulu, halaman lama hanya jatuh ke "tidak ditemukan" (aman, karena
+`TrackForm` memperlakukan `rpcError` sama seperti `data === null`).
+
+Verifikasi signature tanpa browser: `fetch` langsung ke
+`{SUPABASE_URL}/rest/v1/rpc/nama_fungsi` pakai `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+sebagai `apikey` + `Bearer`. Untuk dapat data uji, query lewat `pg` (lihat
+`DATABASE_URL` di `.env.local`).
+
+## 53. ID yang berasal dari `pg` bisa berupa STRING, dan `pg` tidak di-resolve dari luar repo
+
+`pg` mengembalikan `bigint` sebagai string (lihat #36). Dan skrip sementara
+yang diletakkan di `%TEMP%` **tidak bisa** `import pg from "pg"` — ESM tidak
+perhatikan `NODE_PATH`. Dua jalan keluarnya: simpan skrip di dalam repo lalu
+hapus setelah selesai, atau import lewat path absolut:
+
+```js
+import pg from "file:///D:/Minimax/Japanese%20Sando/node_modules/pg/lib/index.js";
+```
+
+## 54. Badge notifikasi fiktif di top bar dihapus
+
+Lonceng di top bar sempat punya titik oranye `bg-honey-400` di pojok sebagai
+penanda "ada notifikasi". Di database **tidak ada tabel notifikasi** sama
+sekali — jadi badge itu pemalsuan (gotcha #33). Saat lonceng diarahkan
+ke `/track`, titiknya ikut dihapus. Kalau nanti notifikasi sungguhan ada,
+tampilkan angka unread dari RPC, jangan pakai titik dekoratif.
+

@@ -20,8 +20,9 @@ import { ProfileSheet, ProfileTabButton } from "@/components/customer/ProfileShe
  * - "Profil" bukan link: ia membuka sheet berisi daftar menu (Account,
  *   Contact Us, FAQ, dst) yang isinya dikelola penjual dari dashboard.
  *
- * "Pesanan" dan "Profil" sama-sama butuh login, jadi keduanya disembunyikan
- * di route yang flow-nya sudah punya tombol sendiri.
+ * "Pesanan" sekarang mengarah ke `/track`, bukan `/account` (permintaan Steven,
+ * 11-10-2026): pembeli tidak punya akun, jadi tidak ada "riwayat pesanan".
+ * Yang ada cuma lacak satu pesanan lewat kode + nomor telepon.
  *
  * Hidden juga di /order karena alur pemesanan punya sticky bar keranjang
  * sendiri (sticky, z-30) yang akan ketimpa nav ini (fixed, z-40) — itu bug
@@ -40,7 +41,7 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
 
   const items = [
     { href: "/", label: t.nav.home, icon: Home },
-    { href: "/account", label: t.nav.orders, icon: ClipboardList },
+    { href: "/track", label: t.nav.track, icon: ClipboardList },
   ];
 
   return (
@@ -54,7 +55,7 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
           spasi penggantinya harus dibuat eksplisit.
 
           Hanya di HP (`md:hidden`), dan hanya di halaman yang nav-nya tampil —
-          di /order, /account, /admin, /login, /register nav-nya disembunyikan
+          di /order, /admin, /login, /register nav-nya disembunyikan
           sehingga spacer ini ikut hilang. */}
       <div aria-hidden className="h-[68px] md:hidden" />
 

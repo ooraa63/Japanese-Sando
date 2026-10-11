@@ -119,20 +119,20 @@ export function SiteHeader({
           <span aria-hidden className="flex-1" />
         )}
 
-        {/* Belum ada fitur notifikasi, jadi lonceng ini diarahkan ke /account
-            (riwayat pesanan) — bukan tombol mati. */}
+        {/* Belum ada fitur notifikasi, jadi lonceng ini diarahkan ke /track
+            (lacak pesanan pakai kode + nomor telepon) — bukan tombol mati.
+            Titik oranye di pojok DIHAPUS: tidak ada data notifikasi sungguhan
+            di database, jadi badge itu cuma karangan. */}
         <Link
-          href="/account"
-          className="relative grid size-10 shrink-0 place-items-center rounded-xl text-cocoa-700 transition active:bg-cocoa-100"
-          aria-label={t.nav.orders}
+          href="/track"
+          className="grid size-10 shrink-0 place-items-center rounded-xl text-cocoa-700 transition active:bg-cocoa-100"
+          aria-label={t.nav.track}
         >
           <Bell className="size-5" />
-          <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-honey-400 ring-2 ring-cream-50" />
         </Link>
 
         {/* Chip avatar / "Masuk" disembunyikan sementara — fitur Account
-            dimatikan (lihat `ACCOUNT_FEATURE_ENABLED`). Halaman /account
-            tetap bisa dibuka lewat lonceng di sebelahnya dan tab "Pesanan". */}
+            dimatikan (lihat `ACCOUNT_FEATURE_ENABLED`). */}
         {ACCOUNT_FEATURE_ENABLED ? (
           loading && !profile ? (
             <span

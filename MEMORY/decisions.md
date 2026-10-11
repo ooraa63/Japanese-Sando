@@ -708,3 +708,34 @@ Jadi:
 
 Temuan asli: `flavor_likes` berisi 10 baris, `likes_count` = 6/0/2/1/1.
 
+## D29 — Halaman Pesanan = lacak pesanan (kode + telepon), bukan daftar akun
+
+**Keputusan:** Tab "Pesanan" di bottom nav mengarah ke `/track`, dan `/track`
+menuntut **dua identitas**: kode pesanan + nomor telepon. `/account`
+mengalihkan ke `/track` selama `ACCOUNT_FEATURE_ENABLED === false`.
+
+**Alasan:**
+
+- Pembeli di toko ini **tidak punya akun** (lihat D11 + flag account), jadi
+  "riwayat pesanan" tidak ada maknanya — tidak ada yang bisa di-list.
+- `track_by_code(p_code)` versi lama mengembalikan seluruh isi pesanan untuk
+  siapa saja yang tahu kodenya. Kode pendek + mudah diteruskan = data orang
+  bisa dibaca orang lain. Nomor telepon sebagai identitas kedua menutup celah itu
+  **tanpa perlu sistem akun sama sekali**.
+- Pencocokan nomor telepon dilakukan **di database** (`normalize_phone`), bukan
+  di frontend. Kalau penyaringannya cukup di browser, siapa pun yang bisa
+  memanggil RPC tetap bisa membaca data tanpa telepon.
+
+**Konsekuensi:**
+
+- Ada jendela transisi singkat antara migrasi DB dan deploy kode: halaman track
+  versi lama memanggil signature 1-argumen dan mendapat 404 PGRST202. Itu
+  **aman** — `TrackForm` memperlakukan `rpcError` sebagai "tidak ditemukan",
+  bukan crash. Tetap, urutan yang benar: `db:apply` dulu, baru deploy.
+- Kalau suatu saat Steven mau melihat **semua** pesanan satu orang dari nomor
+  telepon saja, itu fitur **beda** — butuh RPC baru yang menerima nomor saja,
+  dengan konsekuensi privasi yang lebih berat. Jangan diam-diam memakai
+  `track_by_code` untuk itu.
+- `/account` sengaja **tidak dihapus** — hanya kehilangan pintu masuk. Menyalakan
+  flag menghidupkannya kembali tanpa perubahan kode.
+

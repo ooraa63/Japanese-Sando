@@ -399,11 +399,18 @@ export const en = {
   },
   track: {
     title: "Track your order",
-    subtitle: "Just enter your order code — no phone number needed.",
+    subtitle:
+      "Enter your order code and the phone number you used when ordering.",
     code: "Order code",
     codePlaceholder: "JS-260930-001",
+    phone: "Phone number",
+    phonePlaceholder: "0812-3456-7890",
+    phoneHint: "Use the same number as when you ordered.",
+    codeRequired: "Order code is required.",
+    phoneRequired: "Phone number is required.",
     submit: "Track order",
-    notFound: "We could not find that order. Please check the code.",
+    notFound:
+      "We could not find that order. Please check the code and phone number.",
     itemsLabel: "Items",
     placedOn: "Placed on",
     lastUpdate: "Last update",

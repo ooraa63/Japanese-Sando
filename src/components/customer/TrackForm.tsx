@@ -11,12 +11,15 @@ import { ReviewModal } from "@/components/customer/ReviewModal";
 
 export function TrackForm({
   initialCode = "",
+  initialPhone = "",
 }: {
   initialCode?: string;
+  initialPhone?: string;
 }) {
   const { t, lang } = useI18n();
 
   const [code, setCode] = useState(initialCode);
+  const [phone, setPhone] = useState(initialPhone);
   const [busy, setBusy] = useState(false);
   const [order, setOrder] = useState<{
     order_code: string;
@@ -46,7 +49,7 @@ export function TrackForm({
       }>;
     }>;
   } | null>(null);
-  const [error, setError] = useState<"notFound" | "code" | null>(null);
+  const [error, setError] = useState<"notFound" | "code" | "phone" | null>(null);
   // Auto-open review modal ketika status delivered & belum ada review.
   const [reviewOpen, setReviewOpen] = useState(false);
   // Supaya pop-up tidak muncul lagi kalau user sudah menutup (ditrack this session).
@@ -57,16 +60,25 @@ export function TrackForm({
     setError(null);
     setOrder(null);
 
+    // Dua identitas wajib: kode pesanan + nomor telepon. Menyorot kolom yang
+    // kosong lebih membantu daripada langsung bilang "tidak ditemukan".
     if (!code.trim()) {
       setError("code");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("phone");
       return;
     }
 
     setBusy(true);
     try {
       const supabase = createClient();
+      // Normalisasi format di sisi server (`normalize_phone`) yang menentukan
+      // kecocokan, jadi di sini cukup kirim apa adanya yang diketik pembeli.
       const { data, error: rpcError } = await supabase.rpc("track_by_code", {
         p_code: code.trim(),
+        p_phone: phone.trim(),
       });
 
       if (rpcError || !data) {
@@ -75,7 +87,7 @@ export function TrackForm({
         setOrder(data as typeof order);
         window.localStorage.setItem(
           "js_track",
-          JSON.stringify({ code: code.trim() })
+          JSON.stringify({ code: code.trim(), phone: phone.trim() })
         );
       }
     } catch {
@@ -129,11 +141,43 @@ export function TrackForm({
             autoComplete="off"
           />
         </div>
+        <div>
+          <label htmlFor="phone" className="label">
+            {t.track.phone}
+          </label>
+          <input
+            id="phone"
+            type="tel"
+            inputMode="tel"
+            className={`input tabular ${
+              error === "phone" ? "input-error" : ""
+            }`}
+            placeholder={t.track.phonePlaceholder}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoComplete="tel"
+          />
+          <p className="mt-1.5 text-xs text-cocoa-400">{t.track.phoneHint}</p>
+        </div>
         <button type="submit" disabled={busy} className="btn-primary w-full">
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           {t.track.submit}
         </button>
       </form>
+
+      {error === "code" ? (
+        <p className="mt-5 flex items-start gap-2.5 rounded-xl bg-berry-500/10 p-3.5 text-sm font-semibold text-berry-600">
+          <XCircle className="mt-0.5 size-4 shrink-0" />
+          {t.track.codeRequired}
+        </p>
+      ) : null}
+
+      {error === "phone" ? (
+        <p className="mt-5 flex items-start gap-2.5 rounded-xl bg-berry-500/10 p-3.5 text-sm font-semibold text-berry-600">
+          <XCircle className="mt-0.5 size-4 shrink-0" />
+          {t.track.phoneRequired}
+        </p>
+      ) : null}
 
       {error === "notFound" ? (
         <p className="mt-5 flex items-start gap-2.5 rounded-xl bg-berry-500/10 p-3.5 text-sm font-semibold text-berry-600">

@@ -398,11 +398,18 @@ export const id: Dict = {
   },
   track: {
     title: "Cek Status Pesanan",
-    subtitle: "Masukkan kode pesanan saja — tidak perlu nomor telepon lagi.",
+    subtitle:
+      "Masukkan kode pesanan dan nomor telepon yang dipakai saat memesan.",
     code: "Kode pesanan",
     codePlaceholder: "JS-260930-001",
+    phone: "Nomor telepon",
+    phonePlaceholder: "0812-3456-7890",
+    phoneHint: "Pakai nomor yang sama seperti saat memesan.",
+    codeRequired: "Kode pesanan wajib diisi.",
+    phoneRequired: "Nomor telepon wajib diisi.",
     submit: "Cek pesanan",
-    notFound: "Pesanan tidak ditemukan. Periksa kembali kodenya.",
+    notFound:
+      "Pesanan tidak ditemukan. Periksa kembali kode dan nomor teleponnya.",
     itemsLabel: "Pesanan",
     placedOn: "Dibuat pada",
     lastUpdate: "Terakhir diperbarui",

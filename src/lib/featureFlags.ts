@@ -14,13 +14,14 @@
  * - bar "Account" di sheet Profil (tombol yang membuka form login),
  * - chip avatar / "Masuk" di top bar.
  *
- * Yang TETAP ada dan tidak boleh ikut tersembunyi:
- * - halaman `/account` — dipakai tab "Pesanan" di bottom nav untuk melihat
- *   riwayat & status pre-order. Itu fitur **pesanan**, bukan fitur account.
- * - lonceng notifikasi di top bar — juga mengarah ke `/account`.
+ * Yang terjadi kalau flag ini mati:
+ * - `/account` **mengalihkan** ke `/track` (lacak pesanan). Halaman account
+ *   sendiri tidak dihapus -- kodenya masih utuh, cuma tidak punya pintu masuk.
+ * - Tab "Pesanan" di bottom nav dan lonceng di top bar sudah diarahkan
+ *   langsung ke `/track`, jadi tidak ada satu pun tautan ke halaman account.
  *
- * Jadi menyalakan flag ini hanya mengembalikan entry point login; alur
- * pemesanan tidak pernah bergantung padanya.
+ * Jadi menyalakan flag ini hanya mengembalikan halaman account + entry point
+ * login; alur pemesanan dan lacak pesanan tidak pernah bergantung padanya.
  */
 export const ACCOUNT_FEATURE_ENABLED = false;
 

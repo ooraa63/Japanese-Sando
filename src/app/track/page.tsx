@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function TrackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{ code?: string; phone?: string }>;
 }) {
   const [settings, dicts, query] = await Promise.all([
     getSettings(),
@@ -22,9 +22,10 @@ export default async function TrackPage({
     searchParams,
   ]);
 
-  // Halaman sukses menautkan ke /track?code=... supaya kode pesanan
-  // sudah terisi otomatis.
+  // Halaman sukses menautkan ke /track?code=...&phone=... supaya kode dan
+  // nomor telepon sudah terisi otomatis -- pembeli tinggal menekan tombol.
   const initialCode = (query.code ?? "").slice(0, 40);
+  const initialPhone = (query.phone ?? "").slice(0, 30);
 
   return (
     <>
@@ -44,7 +45,7 @@ export default async function TrackPage({
           </p>
         </div>
 
-        <TrackForm initialCode={initialCode} />
+        <TrackForm initialCode={initialCode} initialPhone={initialPhone} />
       </main>
       <SiteFooter settings={settings} />
     </>

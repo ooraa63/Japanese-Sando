@@ -14,6 +14,7 @@ import { ContactDetails, ContactSection } from "@/components/customer/ContactSec
 import { ContactMenuRow } from "@/components/customer/ContactMenuRow";
 import { CompleteProfileCard } from "@/components/customer/CompleteProfileCard";
 import { getMyVouchersAction } from "@/app/review-actions";
+import { ACCOUNT_FEATURE_ENABLED } from "@/lib/featureFlags";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,16 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AccountPage() {
+  // Fitur Account dimatikan sementara (lihat `ACCOUNT_FEATURE_ENABLED`).
+  // Tab "Pesanan" di bottom nav sekarang mengarah ke /track, jadi halaman ini
+  // tidak lagi punya pintu masuk. Kalau ada link lama yang masih menuju
+  // /account, arahkan saja ke lacak pesanan -- lebih berguna daripada
+  // menampilkan profil yang tidak pernah dipakai.
+  // Kalau flag dinyalakan lagi, seluruh isi halaman di bawah tetap utuh.
+  if (!ACCOUNT_FEATURE_ENABLED) {
+    redirect("/track");
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

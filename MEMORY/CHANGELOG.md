@@ -4,7 +4,91 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
-## 2026-10-11 — Bundle bisa diubah, kartu /order seragam, fitur Account & search di-hide
+## 2026-10-11 — Tab "Pesanan" jadi track order (kode + nomor telepon), accountDialihkan
+
+**Scope:** feat+chore: permintaan Steven — "Di order, masih ada account, di order
+yang saya mau, kita buat jadi track order aja, jadi mereka masukin code dan nomor
+telepon untuk track orderan mereka"
+
+Steven memakai kata "order" untuk hal yang di screenshot-nya adalah tab
+**Pesanan** (tab kedua di bottom nav, yang tadinya mengarah ke `/account`). Jadi
+permintaannya dibaca sebagai: halaman Pesanan bukan daftar akun / riwayat
+pesanan, melainkan **lacak satu pesanan** pakai kode + nomor telepon.
+
+**1. RPC `track_by_code` sekarang wajib dua identitas** — `supabase/migration-42.sql`
+
+Fungsi lama `track_by_code(p_code)` mengembalikan seluruh isi pesanan (status,
+item, total, catatan) untuk siapa saja yang tahu kodenya. Kode formatnya pendek
+dan mudah diteruskan, jadi itu celah kebocoran data.
+
+- fungsi 1-argumen di-`drop`, diganti `track_by_code(p_code text, p_phone text)`;
+- kode **dan** nomor telepon harus cocok, kalau tidak `return null`;
+- perbandingan lewat `public.normalize_phone`, jadi "0812-...", "+62 812...",
+  dan "62812..." tetap cocok dengan yang tersimpan;
+- fallback ke `normalize_phone(o.phone)` untuk order lama yang
+  `phone_normalized`-nya kosong;
+- plus index `orders_phone_normalized_idx`.
+
+Diverifikasi langsung ke PostgREST dengan order nyata `JS-261008-021`:
+
+| Panggilan | Hasil |
+| --- | --- |
+| kode + telepon benar | 200, JSON pesanan lengkap |
+| kode benar, telepon salah | 200, `null` |
+| kode saja (signature lama) | 404 PGRST202 |
+| kode huruf kecil + format telepon lain | 200, JSON pesanan lengkap |
+| kode ngawur | 200, `null` |
+
+**2. `TrackForm` minta kode + nomor telepon** — `src/components/customer/TrackForm.tsx`
+
+- prop baru `initialPhone`, state `phone`, error jadi
+  `"code" | "phone" | "notFound"`;
+- kolom telepon (`type="tel"`, `inputMode="tel"`, `autoComplete="tel"`) +
+  petunjuk "Pakai nomor yang sama seperti saat memesan.";
+- kosongkan kode → pesan "Kode pesanan wajib diisi"; kosongkan telepon →
+  "Nomor telepon wajib diisi". Menyorot kolom yang kosong lebih membantu daripada
+  langsung bilang "tidak ditemukan";
+- `localStorage js_track` sekarang menyimpan `{ code, phone }`.
+
+**3. Tab "Pesanan" dan lonceng diarahkan ke `/track`** — `src/components/customer/MobileBottomNav.tsx`, `src/components/customer/SiteHeader.tsx`
+
+- bottom nav: `{ href: "/account" }` → `{ href: "/track" }`, label
+  `t.nav.orders` → `t.nav.track` ("Cek Pesanan"), icon `ClipboardList` tetap;
+- lonceng notifikasi top bar: `href` → `/track`, `aria-label` → `t.nav.track`,
+  dan **titik oranye di pojok DIHAPUS** — tidak ada tabel notifikasi di database,
+  jadi badge "unread" itu murni karangan (gotcha #33).
+
+**4. `/account` mengalihkan ke `/track`** — `src/app/account/page.tsx`
+
+`redirect("/track")` di paling atas selama `ACCOUNT_FEATURE_ENABLED === false`.
+Halaman account **tidak dihapus** — kodenya masih utuh, cuma tidak punya pintu
+masuk. Nyalakan flag dan halaman itu hidup lagi tanpa perubahan lain.
+
+**5. Halaman sukses ikut membawa nomor telepon** — `src/app/order/success/[code]/SuccessClient.tsx`
+
+Tautan "Cek status pesanan" jadi
+`/track?code=...&phone=...` supaya pembeli tidak perlu mengetik ulang. `invoice`
+boleh `null` sebelum snapshot termuat (setelah refresh), jadi dipakai
+`invoice?.phone ?? ""` — tautan terisi sendiri begitu data masuk.
+
+**6. i18n** — `src/lib/i18n/id.ts` + `en.ts`
+
+Grup `track` dapat `phone`, `phonePlaceholder`, `phoneHint`, `codeRequired`,
+`phoneRequired`. `subtitle` lama ("Masukkan kode pesanan saja — tidak perlu
+nomor telepon lagi") diganti. `en.ts` adalah sumber tipe `Dict`, jadi kedua
+bahasa wajib punya key yang sama persis.
+
+**Verifikasi lokal**
+
+- `tsc --noEmit` bersih · `npm run lint` bersih · `npm run build` sukses
+- `scripts/test-pages.mjs` **16/16 lulus**
+- headless (Edge, viewport 400×900): kolom `tel` ada; kode benar + telepon salah →
+  "Pesanan tidak ditemukan"; kode + telepon benar → status `JS-261008-021`,
+  "Menunggu konfirmasi", `1× Choco Matcha`, `Rp 18.000`; kolom kosong → pesan
+  khusus tiap kolom; `?code=&phone=` terisi otomatis; beranda tanpa `href="/account"`
+  dan lonceng `href="/track"` tanpa titik oranye; `/account` → `307 /track`
+  dengan `<h1>Cek Status Pesanan</h1>` dan tanpa field email.
+- **0 console error.**
 
 **Scope:** feat+fix: empat permintaan Steven
 

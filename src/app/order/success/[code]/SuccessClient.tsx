@@ -284,8 +284,15 @@ function SuccessScreen({
             ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2">
+              {/* Kode DAN nomor telepon ikut dibawa ke /track supaya pembeli tinggal
+                  menekan tombol -- tidak perlu mengetik ulang (dan /track kini
+                  mewajibkan keduanya, lihat migration-42). `invoice` boleh null
+                  kalau halaman di-refresh sebelum snapshot termuat; begitu data
+                  masuk, tautan ini terisi otomatis tanpa perlu refresh lagi. */}
               <Link
-                href={`/track?code=${encodeURIComponent(code)}`}
+                href={`/track?code=${encodeURIComponent(code)}&phone=${encodeURIComponent(
+                  invoice?.phone ?? ""
+                )}`}
                 className="btn-outline"
               >
                 <Search className="size-4" />
