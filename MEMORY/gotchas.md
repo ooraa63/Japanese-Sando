@@ -1452,3 +1452,26 @@ ulang `getBoundingClientRect()` sampai `y` masuk viewport.
 Always verifikasi "elemen ini tampil atau tidak" dengan dua sumber:
 getBoundingClientRect (posisi) **dan** screenshot setelah scroll
 sungguhan. Satu saja bisa berbohong.
+
+## 89 - Menghapus elemen dari satu blok render saja tidak cukup
+
+Badge bintang "Favorite" dihapus dari kartu produk, dan DIGITAL UI
+begitu: ada DUA blok render di `FlavorCard.tsx` - kartu `dense` (3 kolom)
+dan kartu besar (non-dense, dipakai di /order). Yang dense memakai
+`showBadge && flavor.is_featured`; yang besar membaca
+`flavor.is_featured` **langsung** dan sama sekali tidak pernah menyebut
+`showBadge`.
+
+Akibatnya mengubah default `showBadge = false` saja tidak menghapus
+badge dari kartu besar - dan bug itu lolos dari `tsc`, `lint`, dan
+`build` karena semuanya tetap valid.
+
+Aturan: kalau sebuah prop controlling perilaku punya beberapa blok render
+dalam satu file, grep nama prop itu DAN cari akses field langsung di JSX
+sebelum menyatakan selesai. Perubahan yang hanya menyentuh satu cabang
+selalu perlu diuji di browser, bukan hanya dikompilasi.
+
+Cara cepat verifikasi penghapusan elemen di produksi: hitung kemunculan
+teksnya di HTML hasil server (`(text.match(/Kata/g) || []).length`), bukan
+cuma `regex.test()`. Kalau elemennya masih ada di N kartu, jumlah
+kemunculannya naik dari 1 jadi 1 + N - kelihatan sekilas.

@@ -113,6 +113,11 @@ export const id: Dict = {
     // itu kata yang dipahami pembeli, dan label-nya tetap pendek supaya
     // tidak memotong di kartu 3 kolom.
     newBadge: "New",
+    // Section "Favorite" (permintaan Steven, 12-10-2026): produk yang
+    // ditandai bintang di Admin > Menu, tampil di baris sendiri tepat
+    // di bawah "Paket Hemat". Judul memakai kata "Favorite" (bukan
+    // "Populer") karena itu nama yang Steven pakai saat menandai produk.
+    favoriteSection: "Favorite",
     bestSelling: "Terlaris",
     promoFreeShip: "Gratis Ongkir",
     promoFreeShipDesc: "Untuk pesanan mulai {min}",
@@ -957,7 +962,7 @@ export const id: Dict = {
       favorite: "Favorite",
       newFlag: "New",
       featuredHint:
-        "Tandai sebagai Favorite. Label bintang muncul di foto produk di halaman Menu untuk pembeli.",
+        "Tandai sebagai Favorite. Produknya lalu muncul di baris \"Favorite\" di beranda, tepat di bawah Paket Hemat. Label bintang di foto produk sudah tidak dipakai.",
       categorySaved: "Jenis makanan tersimpan.",
       categoryDeleted: "Jenis makanan dihapus.",
       categoryDeactivated:

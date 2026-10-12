@@ -73,8 +73,8 @@ export function MenuBrowser({
   return (
     <div className="space-y-5">
       {/* Bundle tidak lagi dirender di sini. Permintaan Steven (10-10-2026):
-          paket hemat dipindah ke atas section "Populer" di beranda, supaya
-          urutannya Hero -> Bundle -> Populer -> Menu. */}
+          paket hemat dipindah ke section sendiri di beranda, supaya
+          urutannya Hero -> Bundle -> Favorite -> Menu. */}
 
       {/* ---------- Tingkat 1: jenis makanan ---------- */}
       <div>

@@ -13,7 +13,7 @@ import { FlavorCard } from "@/components/customer/FlavorCard";
  * Beranda bergaya aplikasi.
  *
  * Urutan sekarang (12-10-2026): sapaan -> hero banner (carousel) ->
- * "Menu Baru" -> "Paket Hemat" -> (langsung ke menu lengkap).
+ * "Menu Baru" -> "Paket Hemat" -> "Favorite" -> (menu lengkap).
  *
  * Semua section memakai palet coklat yang sudah ada (cocoa/cream/honey).
  * Referensinya oranye, jadi aksen diambil dari `honey-*` — tetap di
@@ -226,6 +226,61 @@ function SectionHead({
 }
 
 /* ==================================================================
+ * Section "Favorite" — produk yang PENJUAL tandai bintang di dashboard.
+ *
+ * Permintaan Steven (12-10-2026): "saya mau kembalikan fitur yang baris
+ * popular di bawah bundle" dan "yang logo favorite, itu tidak perlu
+ * lagi, jadi nanti ada baris tersendiri yang dibawah bundle yaitu
+ * Favorite/best seller".
+ *
+ * Dua keputusan yang berlaku di sini:
+ *
+ * 1. **Sumbernya satu: `flavors.is_featured`.** Ini toggle yang sama dengan
+ *    yang dipakai Steven di Admin > Menu. Tidak ada pemilih kedua di
+ *    Pengaturan, jadi baris ini dan label "New" tidak mungkin pernah
+ *    bertengkar soal produk mana yang unggulan.
+ *
+ * 2. **Badge bintang DIHAPUS dari kartu produk** (lihat `FlavorCard`,
+ *    `showBadge` default false). Sebelumnya produk unggulan ditandai dua
+ *    kali: badge di foto produk saat tampil di section "Menu", DAN baris
+ *    ini. Dua penanda untuk satu hal hanya membuat beranda terasa
+ *    berantakan, jadi Steven minta yang menempel di kartu dibuang.
+ *
+ * Yang TIDAK diubah: kolom `popular_flavor_ids` di DB. Kolom itu tidak
+ * dipakai baris ini (sumbernya `is_featured` sejak 12-10-2026), tapi
+ * biarkan saja supaya draft admin tetap membawanya apa adanya dan kolom
+ * lama tidak ikut terkosongkan.
+ *
+ * Kartu memakai `FlavorCard` mode `dense` yang SAMA dengan section "Menu"
+ * dan "Menu Baru", jadi ketiganya dijamin tidak melenceng. Hati di sini
+ * READ-ONLY supaya section "Menu" tetap menjadi satu-satunya tempat
+ * like di beranda — aturan yang sama seperti di section "Menu Baru".
+ * ================================================================ */
+export function FavoriteShowcase({ flavors }: { flavors: Flavor[] }) {
+  const { t } = useI18n();
+
+  // Belum ada yang ditandai -> disembunyikan total, bukan menampilkan
+  // judul kosong. Perlakuan yang sama seperti section "Menu Baru".
+  if (flavors.length === 0) return null;
+
+  return (
+    <section>
+      <SectionHead title={t.home.favoriteSection} />
+      {/* Grid 3 kolom dengan gap yang sama persis seperti section di
+          atasnya (`gap-2.5 / sm:gap-3`) supaya tiga baris kartu itu
+          terbaca sebagai satu kesatuan, bukan tiga blok terpisah. */}
+      <ul className="grid grid-cols-3 gap-2.5 sm:gap-3">
+        {flavors.map((f) => (
+          <li key={f.id} className="flex">
+            <FlavorCard flavor={f} dense showSocial readOnlySocial showSold={false} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ==================================================================
  * Komposisi seluruh isi beranda
  * ================================================================ */
 
@@ -258,14 +313,18 @@ export function AppHome({
     [allFlavors]
   );
 
+  // Section "Favorite" — produk yang PENJUAL tandai bintang di Admin > Menu
+  // (kolom `flavors.is_featured`). Muncul tepat DI BAWAH "Paket Hemat",
+  // sesuai permintaan Steven 12-10-2026. Badge bintang di kartu produk
+  // sengaja tidak dipakai di sini: penandaan Favorite sudah punya tempat
+  // sendiri, jadi tidak perlu diulang per kartu.
+  const favoritePicked = useMemo(
+    () => allFlavors.filter((f) => f.is_featured),
+    [allFlavors]
+  );
+
   // Urutan beranda (permintaan Steven, 12-10-2026):
-  //   sapaan -> hero -> Menu Baru -> paket hemat -> (langsung menu lengkap)
-  //
-  // Section "Populer" DIHAPUS (permintaan Steven 12-10-2026: "sepertinya saya
-  // mau cancel baris yang popular"). Produk yang dulu ditonjolkan di sana kini
-  // ditandai di halaman Menu lewat badge "Favorite"
-  // (`flavors.is_featured`, diset dari dashboard), jadi tidak ada lagi baris
-  // duplikat antara beranda dan menu.
+  //   sapaan -> hero -> Menu Baru -> paket hemat -> Favorite -> menu lengkap
   return (
     <div className="space-y-6">
       <HomeGreeting userName={userName} />
@@ -275,6 +334,8 @@ export function AppHome({
       <NewShowcase flavors={newPicked} />
 
       <BundleShowcase bundles={bundles} />
+
+      <FavoriteShowcase flavors={favoritePicked} />
     </div>
   );
 }

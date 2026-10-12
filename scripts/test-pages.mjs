@@ -129,18 +129,19 @@ await openPage("/admin/faq", {
 console.log("\n=== 4. Halaman publik tetap terbuka ===");
 // Nama merek = "Rumakomugi" (dari store_settings.store_name).
 await openPage("/", { mustContain: ["Rumakomugi", "Pesan Sekarang"] });
-// Section "Populer" dihapus dari beranda (permintaan Steven 12-10-2026) dan
-// penggantinya adalah badge "Favorite" di halaman Menu. Cek keduanya supaya
-// section yang salah tidak muncul diam-diam, dan penanda barunya tetap ada.
+// Section "Favorite" dipindah jadi baris sendiri DI BAWAH "Paket Hemat"
+// (permintaan Steven 12-10-2026), dan badge bintang "Favorite" DIHAPUS dari
+// kartu produk. Cek keduanya: baris baru harus muncul, dan kata "Favorite"
+// tidak boleh lagi muncul sebagai badge per kartu.
 {
-  const home = await openPage("/", { mustContain: ["Rumakomugi"], mustNotContain: ["Populer"] });
+  const home = await openPage("/", { mustContain: ["Rumakomugi"] });
   if (home.status === 200) {
-    check("  beranda tidak punya section Populer", !/Populer/i.test(home.text));
-  }
-  const menu = await openPage("/", { mustContain: ["Menu", "Favorite"] });
-  if (menu.status === 200) {
-    check("  badge Favorite tampil di kartu menu", /Favorite/i.test(menu.text));
-    check("  tidak ada label lama Signature", !/Signature/i.test(menu.text));
+    check("  beranda punya section Favorite", /Favorite/i.test(home.text));
+    // 1 = hanya judul section. Kalau produk yang ditandai bintang masih
+    // memakai badge, setiap kartu menambah satu kemunculan lagi.
+    const n = (home.text.match(/Favorite/g) || []).length;
+    check("  badge Favorite tidak lagi menempel di kartu", n <= 1, `(kemunculan=${n})`);
+    check("  ada section Paket Hemat di beranda", /Paket Hemat/i.test(home.text));
   }
 }
 await openPage("/order", { mustContain: ["Pre-order", "Siapa yang memesan"] });

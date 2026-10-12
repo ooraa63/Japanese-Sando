@@ -1120,3 +1120,36 @@ padat seperti badge kartu menu (lihat #80).
 - Kontras visual berubah di banyak tempat (judul jadi lebih rapat dan
   ringan). Kalau ada yang terasa "terlalu kecil", atur `text-*`
   atau `font-semibold`, bukan mengembalikan serif.
+
+---
+
+## D48. Penandaan "Favorite" punya SATU sumber: `flavors.is_featured`
+
+**Keputusan:** Toggle bintang di Admin > Menu adalah satu-satunya cara
+menandai produk sebagai unggulan. Baris "Favorite" di beranda (tepat di
+bawah "Paket Hemat") membaca kolom yang sama. Badge bintang di foto
+produk DIHAPUS supaya penandaan tidak muncul dua kali.
+
+**Alasan:** Steven meminta baris "popular" dikembalikan di bawah
+bundle, dan sekaligus meminta "yang logo favorite, itu tidak perlu
+lagi". Kalau keduanya dipertahankan, satu produk punya dua penanda di
+dua tempat yang berbeda jauh - di beranda dan di halaman menu - dan
+beranda jadi terasa seperti duplikat.
+
+Memakai toggle yang sudah ada (bukan pemilih baru di Pengaturan)
+juga menghindari dua sumber kebenaran: kalau ada pemilih terpisah,
+mungkin tidak sinkron dengan label "New" yang juga menyetel properti
+produk sendiri.
+
+**Konsekuensi:**
+- Kolom `popular_flavor_ids` masih ada di DB tapi tidak dipakai baris
+  ini. Jangan dihapus sekalian kalau tidak ada urge - `SettingsClient`
+  masih membawanya di draft, dan menghapusnya berarti satu kolom lagi
+  yang bisa terkosongkan diam-diam.
+- Kalau nanti Steven mau "Terlaris" yang benar-benar berdasarkan
+  penjualan, itu harus jadi section TERPISAH (mis. `bestSelling` yang
+  sudah ada di kamus i18n) - bukan mengganti isi baris Favorite, karena
+  keduanya punya arti berbeda: satu pilihan penjual, satu hasil data.
+- `FlavorCard` punya DUA blok render (dense dan non-dense). Kalau
+  suatu saat badge-nya dibikin bisa muncul lagi, **keduanya** harus
+  dicek, bukan cuma yang satu. Lihat gotcha #89.

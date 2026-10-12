@@ -82,17 +82,17 @@ export default async function HomePage() {
         {/* ===================== MENU LENGKAP =====================
             Permintaan Steven (10-10-2026): setelah blok atas beranda ada
             judul besar "Menu", lalu di bawahnya nama kategori ("Sando
-            Sandwich") dan kartu rasa-nya. Di kartu ini label "Favorite"
-            (kolom `flavors.is_featured`) ditampilkan kalau penjual
-            menyalakannya di dashboard.
+            Sandwich") dan kartu rasa-nya.
 
-            Section "Populer" yang tadinya ada di antara keduanya dihapus
-            (permintaan Steven 12-10-2026), jadi tidak ada lagi baris kartu
-            yang dobel antara beranda dan menu.
+            Penandaan Favorite TIDAK lagi muncul sebagai badge bintang di
+            foto kartu di sini (permintaan Steven 12-10-2026). Produk yang
+            ditandai bintang (`flavors.is_featured`) sekarang tampil di
+            baris "Favorite" sendiri, tepat di bawah "Paket Hemat", supaya
+            tidak ada satu produk yang ditandai dua kali di dua tempat.
 
             Lebarnya tetap sama dengan `AppHome` (max-w-2xl) supaya baris
-            kartu "Menu Baru" / "Paket Hemat" di atas dan baris kartu Menu
-            punya lebar yang sama.
+            kartu "Menu Baru" / "Paket Hemat" / "Favorite" di atas dan baris
+            kartu Menu punya lebar yang sama.
 
             Bundle / paket hemat sudah dirender di `AppHome`, jadi di sini
             tidak perlu dirender lagi. */}

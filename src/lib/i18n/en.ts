@@ -112,6 +112,10 @@ export const en = {
     // muncul di atas Paket Hemat dengan label "New" di foto.
     newSection: "New Arrivals",
     newBadge: "New",
+    // Section "Favorite" (permintaan Steven, 12-10-2026): produk yang
+    // ditandai bintang di Admin > Menu, tampil di baris sendiri tepat
+    // di bawah "Paket Hemat".
+    favoriteSection: "Favorite",
     bestSelling: "Best Selling",
     promoFreeShip: "Free Shipping",
     promoFreeShipDesc: "On orders over {min}",
@@ -951,7 +955,7 @@ export const en = {
       favorite: "Favorite",
       newFlag: "New",
       featuredHint:
-        "Mark as Favorite. The star label then appears on the product photo in the Menu page customers see.",
+        "Mark as Favorite. The product then appears in the \"Favorite\" row on the homepage, right below the value packs. The star label on the product photo is no longer used.",
       categorySaved: "Food category saved.",
       categoryDeleted: "Food category deleted.",
       categoryDeactivated:

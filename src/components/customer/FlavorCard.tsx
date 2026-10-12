@@ -31,7 +31,7 @@ export function FlavorCard({
   /**
    * `dense` -> kartu ringkas ala gambar referensi: foto persegi, nama 1 baris,
    * baris "♥ suka / 🛍 terjual", lalu harga. Cukup kecil untuk 3 kartu dalam
-   * satu baris di HP. Dipakai section "Menu" di beranda dan section "Populer"
+   * satu baris di HP. Dipakai section "Menu" di beranda dan section "Favorite"
    * (dengan `readOnlySocial`, jadi yang di sana tidak bisa di-like).
    *
    * Bedanya hanya ini, sisanya komponen yang sama — jadi dua baris kartu itu
@@ -39,16 +39,25 @@ export function FlavorCard({
    */
   dense = false,
   /**
-   * `showBadge` -> tampilkan badge "Favorite" di foto (produk unggulan dari
-   * admin). Default true di kartu "Menu". Dimatikan di "Populer" supaya kartu
-   * di sana bersih, mengikuti gambar referensi Steven yang tidak memakai badge.
+   * `showBadge` -> tampilkan badge bintang "Favorite" di foto produk.
+   *
+   * DEFAULT SEKARANG false (permintaan Steven, 12-10-2026 15:15): badge itu
+   * dihapus dari kartu karena penandaan Favorite sekarang punya tempat sendiri
+   * — section "Favorite" di beranda, tepat di bawah "Paket Hemat". Kalau
+   * badge tetap menempel di tiap kartu, produk yang sama jadi punya dua
+   * penanda di dua tempat dan yang di beranda terasa seperti duplikat.
+   *
+   * Propsi ini sengaja DIJAGA, bukan dihapus, supaya section yang memang
+   * butuh label sendiri (mis. "New") bisa memintanya tanpa mengubah
+   * default global lagi nanti.
    */
-  showBadge = true,
+  showBadge = false,
   /**
    * Ganti teks badge di foto, misalnya "New" untuk section "Menu Baru".
    * Kalau diisi, label ini menggantikan "Favorite" — bukan menambah badge
    * kedua, supaya dua label di pojok yang sama tidak saling tumpang tindih.
-   * `null`/`undefined` = pakai perilaku lama (tampil kalau `is_featured`).
+   * `badgeLabel` selalu menang atas `showBadge`, jadi section "Menu Baru"
+   * tidak perlu menyalakan `showBadge` hanya untuk mendapat badge.
    */
   badgeLabel = null,
   remainingStock = null,
@@ -92,7 +101,7 @@ export function FlavorCard({
   compact?: boolean;
   /** Kartu ringkas 3-kolom (foto persegi + baris suka/terjual + harga). */
   dense?: boolean;
-  /** Tampilkan badge "Favorite" di foto. Default true. */
+  /** Tampilkan badge bintang "Favorite" di foto. Default false (lihat catatan di atas). */
   showBadge?: boolean;
   /** Teks badge di foto; isi untuk menggantikan "Favorite" (mis. "New"). */
   badgeLabel?: string | null;
@@ -304,9 +313,10 @@ export function FlavorCard({
    * Kartu ringkas 3-kolom (referensi Steven, 10-10-2026).
    *
    * Dipakai di dua tempat dengan komponen yang sama supaya tidak melenceng:
-   *   - section "Menu"   -> `readOnlySocial` = false, hati di pojok kanan
+   *   - section "Menu"       -> `readOnlySocial` = false, hati di pojok kanan
    *     atas adalah TOMBOL like.
-   *   - section "Populer"-> `readOnlySocial` = true, hati hanya ikon
+   *   - section "Menu Baru" -> `readOnlySocial` = true, hati hanya ikon
+   *   - section "Favorite"  -> `readOnlySocial` = true, hati hanya ikon
    *     penanda dan kartu tidak bisa diketuk sama sekali.
    *
    * Layout mengikuti gambar referensi: foto persegi, nama, baris
@@ -384,12 +394,13 @@ export function FlavorCard({
             ) : null}
 
             {/* Hati pojok kanan atas. Di "Menu" ini tombol like; di
-                "Populer" (`readOnlySocial`) hanya ikon penanda.
+                section "Menu Baru" dan "Favorite" (`readOnlySocial`) hanya
+                ikon penanda.
 
-                `ml-auto` wajib: kalau produk ini tidak punya badge
-                "Favorite", taginya tidak ada dan tanpa `ml-auto` hati
-                ini akan menempel di KIRI — padahal di gambar referensi
-                posisinya selalu kanan atas. */}
+                `ml-auto` wajib: kalau kartu ini tidak punya badge apa pun di
+                pojok kiri (kondisi normal sejak badge "Favorite" dihapus),
+                taginya tidak ada dan tanpa `ml-auto` hati akan menempel ke
+                kiri, bukan ke kanan. */}
             {readOnlySocial ? (
               <span
                 aria-hidden
@@ -471,7 +482,7 @@ export function FlavorCard({
    * deskripsi, harga besar, lalu pil "N liked" selebar kartu.
    *
    * Ini SATU-SATUNYA tempat di beranda yang bisa di-like; section
-   * "Populer" di atasnya sengaja read-only.
+   * "Menu Baru" dan "Favorite" di atasnya sengaja read-only.
    * ------------------------------------------------------------------ */
   return (
     <article
@@ -503,7 +514,11 @@ export function FlavorCard({
         )}
 
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
-          {flavor.is_featured && !soldOut ? (
+          {/* `showBadge` ikut dicek di sini, bukan cuma di kartu dense: kalau
+              hanya dense yang hormat, badge masih muncul di kartu besar ini.
+              Default `showBadge = false` membuat penandaan Favorite cuma ada
+              di section "Favorite" di beranda. */}
+          {showBadge && flavor.is_featured && !soldOut ? (
             <span className="chip bg-honey-400/95 text-cocoa-900 shadow">
               <Star className="size-3 fill-current" />
               {t.menu.signature}

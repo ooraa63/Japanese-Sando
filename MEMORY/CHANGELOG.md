@@ -4,6 +4,59 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Baris "Favorite" dikembalikan di bawah Bundle; badge bintang dihapus dari kartu
+
+**Scope:** feat - permintaan Steven (12-10-2026 15:15)
+
+Steven: (1) "saya mau kembalikan fitur yang baris popular di bawah
+bundle", (2) "Yang logo favorite, itu tidak perlu lagi, jadi nanti ada
+baris tersendiri yang dibawah bundle yaitu Favorite/best seller".
+
+Saat ditanya, Steven mengonfirmasi sumber baris itu: **produk yang
+ditandai "Favorite"** - toggle yang sudah ada di Admin > Menu, bukan
+pemilih baru.
+
+**Yang berubah:**
+
+- `AppHome.tsx` - komponen `FavoriteShowcase` baru, dirender
+  **setelah** `BundleShowcase`. Isinya
+  `allFlavors.filter(f => f.is_featured)`. Grid 3 kolom
+  `gap-2.5 / sm:gap-3`, kartu `FlavorCard` mode `dense` dengan
+  `readOnlySocial` dan `showSold={false}` - sama persis dengan section
+  "Menu Baru" di atasnya. Kalau tidak ada produk yang ditandai, section
+  disembunyikan total (bukan menampilkan judul kosong).
+- `FlavorCard.tsx` - **default `showBadge` berubah dari `true` jadi
+  `false`**. Badge bintang "Favorite" tidak lagi muncul di foto produk.
+  Penting: kartu BESAR (non-dense) sebelumnya membaca `flavor.is_featured`
+  langsung dan **tidak pernah memakai `showBadge`** - kalau hanya yang
+  dense yang diubah, badge masih nempel di kartu besar. Keduanya sekarang
+  hormat ke `showBadge`.
+  Propsi `showBadge` sengaja **tidak dihapus**, karena section "Menu Baru"
+  memakai jalur `badgeLabel` dan masih butuh badge "New".
+- `page.tsx` plus komentar menua di `FlavorCard.tsx` dan
+  `MenuBrowser.tsx` yang menyebut section "Populer" atau badge
+  "Favorite" di kartu - semuanya ditulis ulang supaya tidak lagi
+  menyatakan hal yang sudah tidak benar.
+- i18n (ID & EN, harus sinkron) - kunci baru
+  `home.favoriteSection: "Favorite"`. `admin.menu.featuredHint` ditulis
+  ulang karena sekarang menjelaskan bahwa produk masuk ke **baris**
+  "Favorite" di beranda, bukan ke badge di foto.
+- `scripts/test-pages.mjs` - 3 cek baru menggantikan 4 cek lama:
+  beranda punya section "Favorite", kata "Favorite" muncul **maksimal
+  sekali** (hanya judul section; kalau badge masih ada, tiap kartu
+  menambah satu kemunculan), dan "Paket Hemat" tetap ada.
+
+**Yang sengaja tidak diubah:** kolom `popular_flavor_ids` di DB. Baris ini
+sumbernya `is_featured`, bukan kolom itu, tapi kolom lama dibiarkan
+supaya draft admin tetap membawanya apa adanya.
+
+**Verifikasi lokal:** `tsc` 0 error, `lint` 0 error, `build` sukses,
+`test-pages` **25/25**, headless 0 exception. Urutan section terukur:
+Hero -> "Pilihan Paket Hemat" -> "Favorite" -> "Menu", 0 chip
+"Favorite", kata "Favorite" muncul 1x.
+
+---
+
 ## 2026-10-12 - Mapbox dihapus total, alamat jadi ketik manual; font serif -> sans-serif
 
 **Scope:** feat/refactor - permintaan Steven (12-10-2026 15:15)
