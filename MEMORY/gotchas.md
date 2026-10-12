@@ -1493,3 +1493,29 @@ Dan untuk teks yang juga muncul di section lain (mis. "terjual" yang
 hanya ada di kartu), jangan pakai `regex.test()` di seluruh halaman -
 checkout jadi false positive. Isolasi substring section-nya dulu:
 ambil dari heading sampai `</section>` terdekat.
+
+## 91 - `FlavorCard` punya 3 jalur render; fitur harus ada di semuanya
+
+Satu file, tiga tampilan berbeda, masing-masing dengan markup sendiri:
+
+- varian `storefront` (sekitar baris 170) - dipakai halaman **/order**,
+  aksi di `StorefrontAction`
+- varian `dense` (sekitar baris 350) - grid 3 kolom di beranda
+- varian non-dense (sekitar baris 490) - kartu besar, aksi di
+  `FlavorCardStepper`
+
+Awalnya field "catatan per item" hanya ada di `FlavorCardStepper`.
+Karena /order memakai varian `storefront`, fitur itu praktis tidak ada
+di layar tempat pembeli memilih rasa - dan tidak ada error, tidak ada
+warning, build tetap hijau.
+
+Aturan: sebelum bilang "fitur X sudah ada", cek ke VARIAN MANA layar
+itu dirender. Cara cepat: cari `aria-label` yang sama di beberapa blok
+(mis. `+1 ${name}` muncul di dua komponen berbeda). Kalau muncul di
+lebih dari satu tempat, isi fiturnya belum tentu sama.
+
+Catatan tambahan soal pengujian: field yang baru muncul setelah
+interaksi (qty > 0, dialog terbuka) TIDAK bisa diuji lewat
+`test-pages.mjs` karena skrip itu cuma GET HTTP tanpa state browser.
+Untuk kasus seperti ini andalkan headless CDP, dan pastikan tetap
+tidak mengirim order.

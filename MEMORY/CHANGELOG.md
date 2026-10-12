@@ -4,6 +4,62 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Field catatan per rasa muncul lagi di halaman pre-order
+
+**Scope:** fix - laporan Steven 12-10-2026 15:46 dengan screenshot kartu
+rasa di /order: "saat pre-order tidak ada notenya saat di pilih rasa"
+
+**Penyebabnya bukan fitur yang hilang, tapi fitur yang ada di tempat yang
+salah.**
+
+`FlavorCard.tsx` punya TIGA jalur render yang berbeda, masing-masing
+dengan komponen aksi sendiri:
+
+| Varian | Dipakai di | Komponen aksi | Punya field catatan? |
+| --- | --- | --- | --- |
+| `storefront` | halaman **/order** | `StorefrontAction` | **tidak** |
+| `dense` | beranda (Menu / Menu Baru / Favorite) | tombol statis | tidak perlu |
+| non-dense | kartu besar | `FlavorCardStepper` | ya |
+
+Halaman /order memakai varian `storefront`, dan varian itu - satu-satunya
+yang dipakai pembeli saat memilih rasa - justru yang paling sederhana:
+hanya tombol `+`, angka, dan `-`. Field catatannya hanya ada di
+`FlavorCardStepper`, yang dipakai kartu besar di halaman lain.
+
+Jadi Steven memang tidak pernah bisa mengetik "jangan pakai cabe" saat
+memilih rasa. Satu-satunya jalan adalah membuka drawer keranjang dulu.
+
+**Perbaikan:** field catatan dipindahkan (bukan disalin) ke
+`StorefrontAction`, di dalam cabang `qty > 0`:
+
+- `const note = cart.notes[String(flavor.id)] ?? ""` ditambahkan, dan
+  input memakai `cart.setNote(flavor.id, ...)` - key yang sama
+  dengan `FlavorCardStepper` dan `CartDrawer`, jadi ketiganya membaca
+  satu nilai yang sama.
+-(stepper + input) dibungkus `<div className="space-y-2">`; indentasi
+  seluruh blok dirapikan ulang.
+- Field sengaja TIDAK muncul sebelum produk dipilih. Satu baris input
+  kosong di setiap kartu akan membuat halaman pilihan terasa berat
+  tanpa ada yang mengisinya.
+- `aria-label` ditambahkan (`"${t.menu.notePlaceholder} — ${name}"`),
+  karena di grid 2 kolom placeholder-nya bisa terpotong dan pembaca
+  layar butuh tahu kolom ini milik produk yang mana.
+- Sekalian dibetulkan typo menua di komentar blok yang sama:
+  "supayaqty" dan "satu-satuanya".
+
+**Tidak ada perubahan di sisi server:** kolom `order_items.note` sudah
+ada dan `OrderFlow` sudah mengirim `notes[flavorId]`. Yang hilang murni
+masalah UI.
+
+**Verifikasi end-to-end (lokal, tanpa mengirim order):** tambah Choco
+Matcha -> field catatan muncul -> ketik "tolong sedikit less sweet" ->
+`localStorage['js_cart_v1'].notes = { "3": "tolong sedikit less sweet" }`
+-> buka drawer keranjang -> catatan yang sama tampil. 0 request
+`create_order`, 0 request `/api/flavor-like`, 0 exception.
+`tsc` 0 error, `lint` 0 error, `build` sukses, `test-pages` 27/27.
+
+---
+
 ## 2026-10-12 - Section "Favorite" jadi bisa di-like dan ikut menampilkan jumlah terjual
 
 **Scope:** feat - permintaan Steven (12-10-2026 15:33), langsung setelah

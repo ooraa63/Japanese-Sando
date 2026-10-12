@@ -690,8 +690,15 @@ export function FlavorCard({
  * Tombol aksi ringkas untuk kartu etalase (UIUX 3).
  *
  * Kalau produk belum ada di keranjang: tombol "+ Tambah" selebar baris.
- * Kalau sudah ada: angka pcs + tombol tambah kecil, supayaqty bisa naik
- * tanpa membuka drawer.
+ * Kalau sudah ada: angka pcs + tombol tambah kecil, supaya qty bisa naik
+ * tanpa membuka drawer, PLUS field catatan per item.
+ *
+ * Catatan ini sebelumnya HANYA ada di `FlavorCardStepper` (kartu besar),
+ * sedangkan kartu etalase - yang justru dipakai halaman /order - tidak
+ * punya apa pun. Akibatnya Steven tidak bisa menulis "jangan pakai cabe"
+ * saat memilih rasa (12-10-2026: "saat pre-order tidak ada notenya saat
+ * di pilih rasa"). Catatan di keranjang tetap bisa diedit lewat
+ * `CartDrawer`, tapi memaksa pembeli keluar dari layar pilihan rasa.
  *
  * `useCart()` dipanggil di sini (bukan di FlavorCard) supaya kartu yang
  * hanya dilihat-saja tidak ikut memuat state keranjang.
@@ -719,6 +726,7 @@ function StorefrontAction({
   // `inCart` dikirim induk sebagai nilai awal supaya kartu tetap benar
   // walau provider keranjang belum selesai memuat.
   const qty = cart.quantities[String(flavor.id)] ?? inCart ?? 0;
+  const note = cart.notes[String(flavor.id)] ?? "";
 
   if (soldOut) {
     return (
@@ -736,59 +744,78 @@ function StorefrontAction({
 
   if (qty > 0) {
     return (
-      <div
-        className={`flex items-center gap-1 ${fullWidth ? "w-full justify-between" : "shrink-0"}`}
-      >
-        <button
-          type="button"
-          onClick={() => cart.setQuantity(flavor.id, qty - 1)}
-          aria-label={`-1 ${name}`}
-          className="grid size-9 shrink-0 place-items-center rounded-xl border-2 border-matcha-500 bg-white text-matcha-600 transition hover:bg-matcha-50 active:scale-95"
+      <div className="space-y-2">
+        <div
+          className={`flex items-center gap-1 ${fullWidth ? "w-full justify-between" : "shrink-0"}`}
         >
-          <Minus className="size-4" />
-        </button>
-        <span className="min-w-6 flex-1 text-center font-display text-sm font-extrabold text-cocoa-900 tabular">
-          {qty}
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            // Hormati sisa stok supaya langkah berikutnya tidak menambah
-            // lebih dari yang dijual.
-            //
-            // PENTING: `left` itu SISA STOK kategori setelah SELURUH isi keranjang
-            // dikurangi, bukan sisa per rasa. Jadi satu-satuanya pertanyaan
-            // sebelum boleh nambah adalah "masih ada sisa?", bukan
-            // "berapa sisa?".
-            //
-            // Versi lama menulis `next > left` (jumlah rasa ini vs sisa
-            // stok) dan itu salah dua arah:
-            //   - stok 10, keranjang 5 rasa sama -> left 5, tambah jadi 6
-            //     Dicek 6 > 5 lalu DITOLAK, padahal 6 dari 10 masih aman.
-            //     Steven sempat beberapa kali melihat ini sebagai "Maksimal 5 per rasa"
-            //     padahal tidak ada plafon per rasa sama sekali;
-            //   - saat left = 0, syarat `left > 0` gagal sehingga guard
-            //     dilewati sepenuhnya dan pembeli bisa menambahkan melebihi
-            //     stok.
-            //
-            // Backend tetap memvalidasi `insufficient_stock`; ini hanya
-            // supaya UI tidak menjanjikan sesuatu yang tak Bisa dibayar.
-            if (stockEnabled && left <= 0) {
-              toast.warning(
-                name,
-                left === 0
-                  ? t.order.menu.outOfStock
-                  : t.order.menu.stockLeft.replace("{n}", String(left))
-              );
-              return;
-            }
-            cart.add(flavor);
-          }}
-          aria-label={`+1 ${name}`}
-          className="grid size-9 shrink-0 place-items-center rounded-xl bg-matcha-500 text-white transition hover:bg-matcha-600 active:scale-95"
-        >
-          <Plus className="size-4" />
-        </button>
+            <button
+              type="button"
+              onClick={() => cart.setQuantity(flavor.id, qty - 1)}
+              aria-label={`-1 ${name}`}
+              className="grid size-9 shrink-0 place-items-center rounded-xl border-2 border-matcha-500 bg-white text-matcha-600 transition hover:bg-matcha-50 active:scale-95"
+            >
+              <Minus className="size-4" />
+            </button>
+          <span className="min-w-6 flex-1 text-center font-display text-sm font-extrabold text-cocoa-900 tabular">
+            {qty}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              // Hormati sisa stok supaya langkah berikutnya tidak menambah
+              // lebih dari yang dijual.
+              //
+              // PENTING: `left` itu SISA STOK kategori setelah SELURUH isi keranjang
+              // dikurangi, bukan sisa per rasa. Jadi satu-satunya pertanyaan
+              // sebelum boleh nambah adalah "masih ada sisa?", bukan
+              // "berapa sisa?".
+              //
+              // Versi lama menulis `next > left` (jumlah rasa ini vs sisa
+              // stok) dan itu salah dua arah:
+              //   - stok 10, keranjang 5 rasa sama -> left 5, tambah jadi 6
+              //     dicek 6 > 5 lalu DITOLAK, padahal 6 dari 10 masih aman.
+              //     Steven sempat beberapa kali melihat ini sebagai "Maksimal 5 per rasa"
+              //     padahal tidak ada plafon per rasa sama sekali;
+              //   - saat left = 0, syarat `left > 0` gagal sehingga guard
+              //     dilewati sepenuhnya dan pembeli bisa menambahkan melebihi
+              //     stok.
+              //
+              // Backend tetap memvalidasi `insufficient_stock`; ini hanya
+              // supaya UI tidak menjanjikan sesuatu yang tak Bisa dibayar.
+              if (stockEnabled && left <= 0) {
+                toast.warning(
+                  name,
+                  left === 0
+                    ? t.order.menu.outOfStock
+                    : t.order.menu.stockLeft.replace("{n}", String(left))
+                );
+                return;
+              }
+              cart.add(flavor);
+            }}
+            aria-label={`+1 ${name}`}
+            className="grid size-9 shrink-0 place-items-center rounded-xl bg-matcha-500 text-white transition hover:bg-matcha-600 active:scale-95"
+          >
+            <Plus className="size-4" />
+          </button>
+        </div>
+
+        {/* Field catatan per item — mis. "jangan pakai cabe". Sengaja
+            hanya muncul setelah qty > 0: saat produk belum dipilih, satu
+            baris input kosong per kartu cuma bikin halaman pilihan terasa
+            berat dan tidak ada yang akan mengisinya. */}
+        <div className="relative">
+          <MessageSquare className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-cocoa-400" />
+          <input
+            type="text"
+            aria-label={`${t.menu.notePlaceholder} — ${name}`}
+            placeholder={t.menu.notePlaceholder}
+            value={note}
+            onChange={(e) => cart.setNote(flavor.id, e.target.value)}
+            maxLength={120}
+            className="input !py-2 !pl-8 !pr-2 !text-[12px]"
+          />
+        </div>
       </div>
     );
   }
