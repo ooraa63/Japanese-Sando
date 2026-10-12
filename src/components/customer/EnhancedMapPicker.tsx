@@ -176,6 +176,58 @@ function featureToResult(f: GeocodeFeature): SearchResult {
  *  - onChange(lat, lng, label?): callback saat titik berubah.
  *  - placeholder: search input placeholder.
  */
+/**
+ * Deteksi "peta sudah termuat tapi tidak bisa digambar".
+ *
+ * Kasus yang dilaporkan Steven 12-10-2026: peta stubbornly kosong padahal
+ * tile/style/font semua 200 dan `m.loaded()` = true. penyebabnya ada di luar
+ * aplikasi (browser/perangkat tidak meng-composite layer WebGL), dan karena
+ * tidak ada error, tidak ada apa pun yang bisa dilihat user.
+ *
+ * Cara deteksi: salin canvas ke canvas 2D kecil lalu hitung jumlah warna unik.
+ * Peta sungguhan selalu berisi puluhan warna (jalan, air, tanah, bangunan).
+ * Kalau cuma 1-3 warna, isinya rata -> tidak ada yang tergambar.
+ *
+ * Hanya jalan kalau `preserveDrawingBuffer: true` (sudah diset di options Map),
+ * karena tanpa itu buffer WebGL dibuang tiap frame dan tidak bisa dibaca.
+ */
+function scheduleBlankCheck(m: mapboxgl.Map) {
+  setTimeout(() => {
+    const canvas = m.getCanvas();
+    if (!canvas || canvas.width === 0) return;
+    try {
+      const sample = document.createElement("canvas");
+      sample.width = 64;
+      sample.height = 64;
+      const ctx = sample.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+      const data = ctx.getImageData(0, 0, sample.width, sample.height).data;
+      const warna = new Set<string>();
+      for (let i = 0; i < data.length; i += 4) {
+        warna.add(`${data[i]},${data[i + 1]},${data[i + 2]}`);
+        if (warna.size > 12) break;
+      }
+      if (warna.size <= 3) {
+        setMapErrorFor(
+          m,
+          "Peta tidak bisa digambar di browser ini. Coba buka pakai Chrome atau Safari terbaru, atau ketik alamatnya langsung di kolom di bawah."
+        );
+      }
+    } catch {
+      // Canvas tidak terbaca (mis. ditolak karena cross-origin) - biarkan saja,
+      // jangan tampilkan pesan yang mungkin tidak benar.
+    }
+  }, 6000);
+}
+
+/** Overlay error disimpan per-instance Map lewat property agar tidak perlu
+ *  state bersama; komponen ini hanya punya satu map anyway. */
+const errorSetters = new WeakMap<mapboxgl.Map, (msg: string) => void>();
+function setMapErrorFor(m: mapboxgl.Map, msg: string) {
+  errorSetters.get(m)?.(msg);
+}
+
 export function EnhancedMapPicker({
   lat,
   lng,
@@ -243,6 +295,7 @@ export function EnhancedMapPicker({
     m.on("load", () => {
       // First reverse-geocode untuk initial label
       void doReverse(initialCenter[0], initialCenter[1]);
+      scheduleBlankCheck(m);
     });
 
     // Saat user selesai nge-geser peta → koordinat = map.getCenter().
@@ -270,6 +323,7 @@ export function EnhancedMapPicker({
     });
 
     mapRef.current = m;
+    errorSetters.set(m, setMapError);
 
     // Peta yang tidak pernah selesai load = kotak kosong tanpa penjelasan.
     // Kalau style belum siap dalam 12 detik, anggap gagal supaya pembeli

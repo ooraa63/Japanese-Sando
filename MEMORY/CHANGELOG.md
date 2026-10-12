@@ -44,6 +44,26 @@ Verifikasi lokal: `koordinatTampil: []` (tidak ada angka di layar),
 `adaOverlayGagal: false`, canvas 122 warna unik, 0 error. `tsc` bersih,
 lint 0 error, `test-pages.mjs` 26/26 lulus.
 
+**Tambahan (Steven: "masih belum tampil" setelah hard refresh):** ditambahkan
+deteksi "peta sudah termuat tapi tidak bisa digambar". Ini kondisi ketiga yang
+belum tertangkap: `m.loaded()` = true, semua request 200, tapi canvas tetap
+tidak menampilkan apa pun karena browser/perangkat tidak meng-composite layer
+WebGL. Sebelum ini tidak ada error, jadi tidak ada apa pun yang kelihatan.
+
+`scheduleBlankCheck()` menyalin canvas ke canvas 2D berukuran 64x64 lalu
+menghitung jumlah warna unik. Peta sungguhan selalu berisi puluhan warna;
+kalau cuma 1-3 warna berarti isinya rata. Baru kemudian overlay
+"Peta belum tampil" muncul dengan saran konkret. Setter error disimpan di
+`WeakMap<mapboxgl.Map, setter>` supaya fungsi modul bisa menjangkau instance
+map tanpa jadi props/state tambahan.
+
+Syaratnya `preserveDrawingBuffer: true` - tanpa itu buffer WebGL dibuang tiap
+frame dan tidak bisa dibaca.
+
+Verifikasi: di lingkungan yang normal, sample 64x64 menghasilkan **841 warna
+unik** dan overlay **tidak** muncul (tidak salah-positive). `koordinatTampil:
+[]`, `adaNamaJalan: true`, 0 exception.
+
 ---
 
 ## 2026-10-12 - Midtrans: cek akun production, 结果 belum aktif (tetap sandbox)
