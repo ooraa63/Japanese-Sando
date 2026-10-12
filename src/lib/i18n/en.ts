@@ -63,6 +63,8 @@ export const en = {
     orders: "Orders",
     track: "Track order",
     history: "History",
+    orderHub: "Orders",
+    orderHubOpen: "Open order menu",
     contact: "Contact",
     admin: "Seller dashboard",
     account: "Account",

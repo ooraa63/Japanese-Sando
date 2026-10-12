@@ -61,6 +61,8 @@ export const id: Dict = {
     orders: "Pesanan",
     track: "Cek Pesanan",
     history: "Riwayat",
+    orderHub: "Orderan",
+    orderHubOpen: "Buka menu pesanan",
     contact: "Kontak",
     admin: "Dashboard Penjual",
     account: "Akun",

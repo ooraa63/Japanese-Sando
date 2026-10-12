@@ -4,6 +4,32 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Bar Cek Pesanan + Riwayat jadi muncul SETELAH tab "Orderan" ditekan
+
+**Scope:** fix - koreksi kedua atas bar pesanan
+
+Steven koreksi lagi: bar `Cek Pesanan` + `Riwayat` jangan selalu terlihat.
+Bottom nav jadi `Beranda | Orderan | Profil`, dan bar kedua **muncul hanya
+setelah tab "Orderan" ditekan**.
+
+- Tab tengah berubah dari link ke `/track` jadi `<button>` bernama "Orderan"
+  (`t.nav.orderHub`, key baru; `t.nav.orders` yang sudah ada tidak diubah karena
+  dipakai tempat lain). Punya `aria-expanded` + `aria-controls`.
+- State `hubAt: string | null` menyimpan **pathname** saat tombol ditekan,
+  bukan boolean. Bar menutup sendiri begitu halaman berpindah - tanpa
+  `useEffect` + `setState` yang kena aturan `react-hooks/set-state-in-effect`,
+  dan tanpa bar yang menggantung di halaman lain seperti /faq.
+- Spacer bawah ikut berubah: 68px saat tertutup, 114px saat terbuka.
+- `items` (array link lama) dan `quickActions` dihapus - sekarang hanya satu
+  array `orderPages`.
+
+Verifikasi headless alur nyata: beranda (bar tutup, nav 56px) -> tap Orderan
+(bar muncul, nav 107px) -> pilih Riwayat (bar tutup, nav 56px) -> tap Orderan
+-> pilih Cek Pesanan (bar tutup). Buka `/track` langsung dari luar juga bar
+tutup. 0 console error, tsc bersih, lint 0 error, test-pages 21/21.
+
+---
+
 ## 2026-10-12 - Bar Cek Pesanan + Riwayat dipindah ke BAWAH bar tab
 
 **Scope:** fix - koreksi posisi dari permintaan sebelumnya

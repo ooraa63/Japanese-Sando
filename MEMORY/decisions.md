@@ -960,23 +960,30 @@ browser, dan tidak terlihat di HP lain. Perlakukan ini sebagai fitur (privasi +
 tanpa akun), dan halaman /riwayat harus menjelaskan bahwa datanya lokal. Jangan
 diam-diam mengubahnya ke database tanpa diminta.
 
-## D41 - Bar quick-action menyatu dengan bottom nav, bukan elemen fixed terpisah
+## D41 - Tab "Orderan" membuka bar kedua, bukan link
 
-**Keputusan:** "Cek Pesanan" + "Riwayat" dirender DI DALAM elemen `<nav>` yang
-sama dengan bar tab, sebagai bar kedua DI BAWAH bar tab.
+**Keputusan:** Tab tengah bottom nav bernama **Orderan** adalah `<button>`, bukan
+`<a>`. Menekannya membuka bar kedua DI BAWAH bar tab berisi dua tombol:
+"Cek Pesanan" (-> /track) dan "Riwayat" (-> /riwayat). Menekannya lagi
+menutup.
 
-**Alasan:** Dua alasan terpisah.
+**Alasan:** Steven koreksi dua kali. Versi pertama bar-nya melayang selalu di
+atas bottom nav; versi kedua ditukar ke bawah tapi selalu terlihat; yang dia
+minta sebenarnya adalah bar itu **muncul hanya setelah tab "Orderan"
+ditekan** — screenshotnya: baris `Beranda | Orderan | Profil`, lalu setelah
+tekan "Orderan" muncul bar `Track order | History`.
 
-1. *Struktur:* tinggi bar quick-action tidak konstan, dan
-   `pb-[env(safe-area-inset-bottom)]` pada nav membuat posisinya bergeser di HP
-   bergerigi. Dua elemen `fixed` berarti satu harus mengarang offset yang cepat
-   salah - gejalanya bar menutupi tab Profil.
-2. *Posisi:* Steven koreksi setelah versi pertama ditaruh DI ATAS bar tab
-   ("Track order dan history bukan sana, tapi setelah di bagian Track order
-   (kanan Home)"). Jadi urutan dari atas: Home / Cek Pesanan / Profil, lalu bar
-   Cek Pesanan + Riwayat paling bawah, menempel ke tepi bawah layar.
+State-nya `hubAt: string | null` yang berisi PATHNAME saat tombol ditekan,
+bukan boolean. Dengan begitu bar menutup SENDIRI begitu halaman berpindah,
+tanpa `useEffect` + `setState` (React menandainya sebagai render berlapis) dan
+tanpa bar yang menggantung di halaman lain seperti /faq.
 
-**Konsekuensi:** Spacer bawah halaman harus ikut naik (68px -> 114px). Kalau
-tidak, kartu terakhir di beranda tertutup bar Riwayat. Saat memindahkan bar,
-cek lagi tinggi `<nav>` dengan `getBoundingClientRect` di headless - jangan
-sekadar benar secara visual.
+**Konsekuensi:**
+- Spacer bawah harus ikut berubah: 68px saat bar tertutup, 114px saat terbuka.
+  Kalau fix, saat tertutup ada rongga kosong mencolok, dan saat terbuka kartu
+  terakhir ketutup.
+- Bar kedua tetap di dalam elemen `<nav>` yang sama (bukan `div fixed`
+  terpisah) supaya offsetnya tidak pernah salah di HP dengan safe-area.
+- Membuka /track atau /riwayat dari tautan lain di luar app **tetap** dengan
+  bar tertutup. Itu konsekuensi yang diterima: untuk pindah ke opsi yang lain,
+  tekan "Orderan" sekali lagi.
