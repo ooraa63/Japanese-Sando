@@ -4,6 +4,90 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Angka koordinat dihapus dari peta; kegagalan peta jadi terlihat
+
+**Scope:** fix - dua laporan Steven dari screenshot (12-10-2026 13:52)
+
+Steven: (1) "Mapnya gada", (2) untuk angka `1.13777, 104.03088` "itu dihapus,
+saya gamau pakai angka, saya mau nama jalannya aja".
+
+**Koordinat dihapus dari dua tempat:**
+- `EnhancedMapPicker.tsx`: baris "koordinat + label" diganti jadi satu baris
+  **nama jalan saja** (ikon pin + `reverseLabel` dari reverse geocoding). Kalau
+  masih memuat, muncul teks "Geser peta atau ketik nama jalan di atas."
+- `AddressPicker.tsx`: baris `<p>` berisi `lat.toFixed(5), lng.toFixed(5)` di
+  bawah chip alamat dihapus; chip jadi satu blok tanpa sub-baris.
+- Koordinat **tetap** diambil dan dikirim ke `create_order` - yang hilang hanya
+  tampilannya.
+
+**Peta kosong: diverifikasi ulang dan ternyata TIDAK rusak di sisi server.**
+Canvas WebGL terbentuk (348x300 CSS), `isContextLost()` false, style + font +
+**tile vektor 200**, 0 console error, 0 request gagal. Isi canvas di-sample dan
+mengandung **122 warna unik** - peta benar-benar ter-render.
+
+Penyebab "kotak kosong" yang terlihat di screenshot adalah headless/lingkungan
+yang tidak meng-composite layer WebGL (`Page.captureScreenshot` headless tidak
+menangkap WebGL sama sekali, meski `preserveDrawingBuffer` sudah on).
+
+Tapi kegagalannya tadinya **tidak terlihat sama sekali** - tidak ada umpan balik
+jika peta gagal, dan pembeli akan mengira fiturnya rusak. Karena itu:
+
+- `m.on("error", ...)` sekarang menangkap error Mapbox (error kecil soal
+  sprite/glyph/abort didiamkan saja karena tidak merusak peta).
+- Watchdog 12 detik: kalau `!map.loaded()`, tampilkan overlay
+  **"Peta belum tampil"** + alasannya. Kolom alamat tetap bisa diketik manual,
+  jadi overlay ini informasi, bukan blokir.
+- `preserveDrawingBuffer: true` ditambahkan ke konfigurasi Map.
+
+Verifikasi lokal: `koordinatTampil: []` (tidak ada angka di layar),
+`adaNamaJalan: true` ("Merdeka, 40113, Sumur Bandung, Bandung, Jawa Barat..."),
+`adaOverlayGagal: false`, canvas 122 warna unik, 0 error. `tsc` bersih,
+lint 0 error, `test-pages.mjs` 26/26 lulus.
+
+---
+
+## 2026-10-12 - Midtrans: cek akun production, 结果 belum aktif (tetap sandbox)
+
+**Scope:** docs/investigasi — Steven minta lanjut ke production karena
+business registration (Step 2) sudah selesai. Diperiksa langsung, production
+**belum bisa dipakai**.
+
+**Temuan utama:**
+- Klien sudah menyelesaikan Step 2 (business registration) di dashboard Midtrans.
+  Tapi Step 3 (business review) / Step 4 (Result) belum selesai.
+- Probe langsung ke API Midtrans (GET status, order_id dummy, tanpa charge):
+  - `api.sandbox.midtrans.com` -> **HTTP 200** `404 Transaction doesn't exist`
+    (auth LOLOS — key valid, order memang tidak ada)
+  - `api.midtrans.com` -> **HTTP 401** `Unknown Merchant server_key/id`
+  - Artinya merchant **belum terdaftar/aktif di environment production**.
+- Penting: prefix key `Mid-server-P-...` (format production) TIDAK menjamin
+  akun production aktif. Yang menentukan adalah host mana yang menerima key itu.
+
+**Keputusan:** `.env.local` **tetap** `MIDTRANS_IS_PRODUCTION=false`. Flipping ke
+`true` sekarang akan bikin `/order` menampilkan opsi QRIS tapi charge selalu 401.
+
+**Verifikasi (semua read-only, tidak ada transaksi/charge dibuat):**
+- Kolom `orders.qris_*` (5 kolom) + RPC `set_order_qris_charge`,
+  `set_order_qris_status`, `public_order_qris_status` -> sudah ada di DB
+  produksi. Migration-18 sudah applied.
+- Webhook live `GET https://japanese-sando.vercel.app/api/midtrans/webhook`
+  -> **200** `{"ok":true,"endpoint":"midtrans-webhook","accept":"POST"}`.
+- Signature webhook `verifyWebhookSignatureAsync` memakai
+  `MIDTRANS_SERVER_KEY` — jadi saat nanti ganti ke production key, env di
+  **Vercel Production** harus di-update bersamaan dengan `.env.local`,
+  kalau tidak webhook akan 403 `invalid_signature` dan status tidak pernah
+  sinkron.
+
+**Belum dilakukan (perlu keputusan Steven):** set 3 env var di Vercel
+Production + update Payment Notification URL. Tidak dikerjakan karena
+production key belum valid — men-set sekarang hanya menambah env yang mati.
+
+**File yang berubah:**
+- `.env.local` — hanya komentar blok Midtrans (pentingnya kunci production
+  dinota). Nilai env tidak berubah, `MIDTRANS_IS_PRODUCTION` tetap `false`.
+
+---
+
 ## 2026-10-12 - Mapbox diaktifkan (token dipasang, peta jadi jalan)
 
 **Scope:** feature - menghidupkan fitur peta yang kodenya sudah ada sejak lama

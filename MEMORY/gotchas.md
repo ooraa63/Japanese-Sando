@@ -229,6 +229,41 @@ Untuk aktivasi: lihat `docs/MIDTRANS.md` atau entry CHANGELOG
 "2026-10-05 — Midtrans QRIS Dinamis (DORMANT, menunggu credentials)".
 
 
+## 16b. Prefix key Midtrans MENIPU — jangan pakai prefix untuk menentukan mode
+
+Key di `.env.local` ber-prefix `Mid-server-P-...` (format **production**),
+padahal host yang benar-benar menerima key itu adalah **sandbox**. Diuji
+2026-10-12:
+
+| Host | Hasil |
+|---|---|
+| `api.sandbox.midtrans.com` | 200 `404 Transaction doesn't exist` (auth LOLOS) |
+| `api.midtrans.com` | 401 `Unknown Merchant server_key/id` |
+
+Jadi merchant **belum aktif di production** walau prefix key-nya production.
+Alasannya: prefix hanya format string; yang menentukan akun terdaftar adalah
+apakah verifikasi bisnis selesai di dashboard Midtrans.
+
+**Jangan set `MIDTRANS_IS_PRODUCTION=true` hanya karena prefix key terlihat
+production.** Kalau di-set, `getBaseUrl()` (`src/lib/midtrans/server.ts:87`)
+membidik `api.midtrans.com`, charge selalu 401, opsi QRIS tetap nongol di UI
+karena `isMidtransConfigured()` cuma cek key tidak kosong (baris 83).
+
+**Cara cek jujur sebelum flip** (read-only, tanpa charge):
+
+```bash
+node -e "const k=process.env.MIDTRANS_SERVER_KEY;const a='Basic '+Buffer.from(k+':').toString('base64');fetch('https://api.midtrans.com/v2/PROBE/status',{headers:{Accept:'application/json',Authorization:a}}).then(r=>console.log(r.status))"
+```
+
+`404` di host production = merchant aktif, aman. `401 Unknown Merchant` =
+belum, jangan flip.
+
+**Saat flip nanti, update `.env.local` DAN Vercel Production bersamaan.**
+`verifyWebhookSignatureAsync` pakai `MIDTRANS_SERVER_KEY` yang sama; kalau
+Vercel masih pakai key lama, webhook balas 403 `invalid_signature` dan status
+order tidak pernah sinkron (polling 5s jadi satu-satunya cadangan).
+
+
 ## 18. JANGAN jalankan `npm test` — dia menghapus data produksi
 
 `package.json` script `test` (= `npm test`) me-chain beberapa skrip yang

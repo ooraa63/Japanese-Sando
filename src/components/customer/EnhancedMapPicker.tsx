@@ -9,6 +9,7 @@ import {
   Loader2,
   Search,
   ShoppingBag,
+  MapPin,
   Trees,
   X,
 } from "lucide-react";
@@ -195,6 +196,7 @@ export function EnhancedMapPicker({
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string>("");
+  const [mapError, setMapError] = useState<string>("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const picked = useMemo(() => {
@@ -222,8 +224,21 @@ export function EnhancedMapPicker({
       center: initialCenter,
       zoom: DEFAULT_ZOOM,
       attributionControl: true,
+      // Tanpa ini, WebGL buffer dibuang setelah tiap frame, jadi canvas jadi
+      // tidak bisa dibaca (screenshot / ekspor /UNGKAHAN).
+      preserveDrawingBuffer: true,
     });
     m.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+
+    // Kegagalan diam-diam = kotak krem kosong yang tidak bisa dibedakan dari
+    // "peta sedang loading". Tangkap error Mapbox supaya bisa ditampilkan.
+    m.on("error", (e) => {
+      const msg = e?.error?.message || "Gagal memuat peta";
+      // Error kecil soal glyph/sprite individual tidak membuat peta ini rusak
+      // seluruhnya, jadi diamkan saja.
+      if (/sprite|glyph|font|abort/i.test(msg)) return;
+      setMapError(msg);
+    });
 
     m.on("load", () => {
       // First reverse-geocode untuk initial label
@@ -256,7 +271,19 @@ export function EnhancedMapPicker({
 
     mapRef.current = m;
 
+    // Peta yang tidak pernah selesai load = kotak kosong tanpa penjelasan.
+    // Kalau style belum siap dalam 12 detik, anggap gagal supaya pembeli
+    // bisa isi alamat manual (kolom teks di bawah tetap bisa dipakai).
+    const watchdog = setTimeout(() => {
+      if (!m.loaded()) {
+        setMapError(
+          "Peta tidak selesai dimuat. Periksa koneksi internet, atau ketik alamatnya langsung."
+        );
+      }
+    }, 12000);
+
     return () => {
+      clearTimeout(watchdog);
       m.remove();
       mapRef.current = null;
       resultMarkersRef.current = [];
@@ -535,21 +562,28 @@ export function EnhancedMapPicker({
         </p>
       ) : null}
 
-      {/* Koordinat + reverse geocoding label */}
-      <div className="flex items-center justify-between gap-2 px-1 text-[11px] tabular">
-        <span className="font-mono text-cocoa-500">
-          {picked.lat.toFixed(5)}, {picked.lng.toFixed(5)}
-        </span>
+      {/* Nama jalan hasil reverse geocoding.
+          Angka koordinat (lat/lng) TIDAK ditampilkan lagi — permintaan Steven
+          12-10-2026: "saya mau nama jalannya aja". Koordinatnya tetap dipakai
+          di belakang layar (dikirim ke create_order), cuma tidak ditampilkan. */}
+      <div className="flex items-center gap-1.5 px-1 text-[11px]">
         {reverseLoading ? (
           <span className="flex items-center gap-1 text-cocoa-400">
             <Loader2 className="size-3 animate-spin" />
             cek alamat…
           </span>
         ) : reverseLabel ? (
-          <span className="line-clamp-1 flex-1 text-right text-cocoa-500">
-            {reverseLabel}
+          <>
+            <MapPin className="size-3 shrink-0 text-matcha-600" />
+            <span className="line-clamp-1 text-cocoa-600">
+              {reverseLabel}
+            </span>
+          </>
+        ) : (
+          <span className="text-cocoa-400">
+            Geser peta atau ketik nama jalan di atas.
           </span>
-        ) : null}
+        )}
       </div>
 
       {/* Peta Mapbox — center pin adalah child absolute, ngikut map center */}
@@ -567,6 +601,22 @@ export function EnhancedMapPicker({
             />
           </svg>
         </div>
+
+        {/* Overlay kalau peta gagal. Tanpa ini, kegagalannya tampil sebagai
+            kotak krem kosong yang identik dengan "sedang memuat" — pembeli
+            lalu bingung dan mengira fiturnya rusak. Kolom alamat di bawah
+            tetap bisa diketik manual, jadi ini informasi, bukan blokir. */}
+        {mapError ? (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-cream-50 px-6 text-center">
+            <MapPin className="size-6 text-cocoa-300" />
+            <p className="text-xs font-semibold text-cocoa-600">
+              Peta belum tampil
+            </p>
+            <p className="text-[11px] leading-relaxed text-cocoa-400">
+              {mapError}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <p className="px-1 text-[11px] text-cocoa-500">

@@ -66,24 +66,22 @@ export function AddressPicker({
       />
 
       {hasLocation ? (
-        <div className="overflow-hidden rounded-2xl border border-cocoa-200 bg-cream-50">
-          <div className="flex items-center gap-2 border-b border-cocoa-100 bg-cream-50 px-3 py-2 text-xs">
-            <MapPin className="size-3.5 shrink-0 text-matcha-600" />
-            <span className="line-clamp-1 flex-1 text-cocoa-700">
-              {draft.address}
-            </span>
-            <button
-              type="button"
-              onClick={() => updateDraft({ lat: null, lng: null })}
-              className="rounded-md p-1 text-cocoa-400 transition hover:bg-cocoa-100 hover:text-berry-500"
-              aria-label="Hapus lokasi"
-            >
-              ×
-            </button>
-          </div>
-          <p className="px-3 py-1.5 text-[11px] tabular text-cocoa-400">
-            {(draft.lat as number).toFixed(5)}, {(draft.lng as number).toFixed(5)}
-          </p>
+        // Angka koordinat (lat/lng) TIDAK ditampilkan lagi — permintaan
+        // Steven 12-10-2026: "saya mau nama jalannya aja". Yang tampil cukup
+        // nama alamat; koordinatnya tetap ikut tersimpan ke order.
+        <div className="flex items-center gap-2 rounded-2xl border border-cocoa-200 bg-cream-50 px-3 py-2 text-xs">
+          <MapPin className="size-3.5 shrink-0 text-matcha-600" />
+          <span className="line-clamp-1 flex-1 text-cocoa-700">
+            {draft.address}
+          </span>
+          <button
+            type="button"
+            onClick={() => updateDraft({ lat: null, lng: null })}
+            className="rounded-md p-1 text-cocoa-400 transition hover:bg-cocoa-100 hover:text-berry-500"
+            aria-label="Hapus lokasi"
+          >
+            ×
+          </button>
         </div>
       ) : null}
 
