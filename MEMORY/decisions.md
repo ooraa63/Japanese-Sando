@@ -1042,3 +1042,30 @@ pembeli, sedangkan "Signature" terasa seperti istilah teknis.
   Lebar badge = teks + ikon + gap + padding. Dengan `text-[10px]`, ikon
   `size-3`, `gap-0.5`, `px-1.5` totalnya ~66px dan "Favorite" muat utuh.
   Jangan menaikkan padding dulu sebelum mengukur ulang.
+
+## D45 - Mapbox pakai akun trial tanpa kartu kredit
+
+**Keputusan:** Paket peta memakai akun Mapbox **trial tanpa kartu kredit**,
+dengan satu public token yang dipakai bersama untuk pembeli maupun admin
+(`NEXT_PUBLIC_MAPBOX_TOKEN`).
+
+**Alasan:** Steven butuh peta jalan tanpa biaya dan tanpa risiko tagihan.
+Trial memberi kuota 5.000 map loads + 10.000 Temporary Geocoding per bulan,
+dan pemakaian Japanese Sando jauh di bawah itu (peta cuma dimuat saat pembeli
+membuka pemilih alamat, bukan otomatis). Menaruh kartu kredit sekarang
+justru membuka risiko penagihan yang belum perlu.
+
+**Konsekuensi:**
+- Kalau kuota trial someday tembus, pilihannya: tambah kartu kredit (free tier
+  jauh lebih besar, kelebihan ditagih) ATAU ganti ke MapLibre + OpenStreetMap.
+  Jangan ganti sebelum dihitung dulu.
+- Akun trial **hanya boleh punya satu token** dan tidak bisa membuat/mengrotasi
+  token baru tanpa kartu kredit. Jadi jangan pernah refresh/hapus default public
+  token - setelah dihapus tidak bisa dibuat ulang.
+- Token `pk.` bersifat publik dan memang dikirim ke browser. Kalau nanti
+  diganti ke mode berbayar, buat token baru dengan **URL restriction** hanya ke
+  domain produksi (tidak bisa dilakukan di akun trial).
+- Setiap request geocoding menambah kuota. Pencarian alamat memicunya dengan
+  debounce 350 ms dan **tanpa syarat panjang minimal**, jadi satu huruf pun
+  menambah kuota. Menambah syarat minimal 3 karakter adalah perbaikan hemat
+  kuota yang masih belum dikerjakan.

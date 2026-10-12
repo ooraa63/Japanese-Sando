@@ -4,6 +4,51 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Mapbox diaktifkan (token dipasang, peta jadi jalan)
+
+**Scope:** feature - menghidupkan fitur peta yang kodenya sudah ada sejak lama
+
+Peta sudah terpasang lengkap sejak awal (dependency `mapbox-gl`, CSS brand di
+`globals.css`, `EnhancedMapPicker` untuk pembeli, `InlineMapPicker` untuk admin,
+`MapModal` + `AddressPicker` untuk flow pemesanan). Yang belum ada cuma
+`NEXT_PUBLIC_MAPBOX_TOKEN`, sehingga kedua picker menampilkan panel merah
+"Mapbox token belum disetel" dan peta tidak pernah tampil.
+
+- Token publik (`pk.…`, akun trial tanpa kartu kredit) dipasang ke `.env.local`
+  dan ke Vercel **Production** sebagai `type: config`.
+- `.env.example` diberi blok Mapbox: apa akibatnya kalau token kosong, bahwa
+  token ini publik, dan bahwa `NEXT_PUBLIC_*` harus **build ulang** (restart
+  saja tidak cukup karena di-inline saat build).
+- Tidak ada perubahan kode aplikasi pada iterasi ini.
+
+Verifikasi:
+- Token diuji langsung ke API Mapbox: geocoding 200, style 200, sprite 200,
+  **tile vektor 200 (199 KB protobuf)**, raster tile 200 → cakupan public scope
+  lengkap, termasuk `tiles:read`.
+- Peta admin (`/admin/pickup-delivery`, inline di form zona): canvas 470×300,
+  request Mapbox semua 200, tanpa panel token kosong, ditutup dengan "Batal".
+- Peta pembeli (`/order` → Pembayaran → Diantar → zona "Antar ke alamatmu" →
+  "Cari alamat di peta"): canvas 348×300, reverse-geocode berhasil
+  ("Merdeka, 40113, Sumur Bandung"), 0 exception.
+- `tsc` bersih, `test-pages.mjs` 26/26 lulus.
+
+**Bug yang ketemu saat verifikasi produksi (pertama):** cara pertama memasang
+token ke Vercel (`"pk...." | npx vercel env add ...`) menghasilkan **401** dari
+Mapbox di domain produksi, padahal tokennya benar di `.env.local` dan lokal
+jalan. Sebabnya PowerShell menambah newline ke stdin, dan Vercel menyimpannya
+apa adanya — jadi nilai yang ter-inline `"pk...\n"`. Diperbaiki dengan
+`vercel env rm` lalu `vercel env add ... --value "<nilai>"`, lalu deploy ulang.
+Setelah itu: request tile vektor asli
+(`/v4/mapbox.mapbox-streets-v8,...`) **200**, style 200, font 200, tanpa 401.
+
+**Catatan:** area peta tetap kosong di screenshot headless karena Mapbox GL JS
+memang butuh compositor untuk menjalankan render loop. Di produksi headless
+tile-nya sudah terunduh 200 (jadi permintaannya benar), hanya catnya yang tidak
+ter-composite. Yang terbukti: canvas + WebGL 2.0 terbentuk, style/font terunduh,
+geocoding jalan, tile vektor 200.
+
+---
+
 ## 2026-10-12 - Label badge "Signature" balik jadi "Favorite", badge diperbesar sedikit
 
 **Scope:** fix - koreksi label + ukuran, dengan screenshot

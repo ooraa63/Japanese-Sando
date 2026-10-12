@@ -1281,3 +1281,65 @@ Selector jebakan: teks kategori mengandung kata "jenis" ("Sando Sandwich /
 5 rasa"), dan tombol "Tambah jenis makanan" juga mengandung kata itu - klik
 yang salah akan membuka modal tambah kategori. Match /^Sando Sandwich/ atau
 nama kategori spesifik, bukan /jenis/.
+
+## 81 - Peta tidak bisa diverifikasi dari screenshot headless
+
+Mapbox GL JS **tidak** melakukan render loop tanpa compositor, jadi di Edge
+headless: canvas WebGL terbentuk, WebGL 2.0 ada, style + font + icon terunduh
+200, tapi **tidak ada satu pun permintaan tile vektor** dan area peta tampil
+kosong. Tuple `(canvas ada, request Mapbox 200, area peta kosong)` = artefak
+headless, BUKAN token rusak. Tried `--headless=new --use-angle=swiftshader
+--enable-unsafe-swiftshader` maupun `--headless=old`; hasilnya sama.
+
+Cara memverifikasi token dengan benar: panggil endpoint-nya langsung di luar
+browser. Untuk token `pk.` public scope, semua ini harus 200:
+
+- `api.mapbox.com/geocoding/v5/mapbox.places/<q>.json`
+- `api.mapbox.com/styles/v1/mapbox/streets-v12` (style JSON)
+- `api.mapbox.com/styles/v1/mapbox/streets-v12/sprite@2x.png`
+- `api.mapbox.com/v4/mapbox.mapbox-streets-v8/{z}/{x}/{y}.vector.pbf` ← ini
+  yang membuktikan ada scope `tiles:read`
+
+Hindari menebak URL tile: bentuk `@2x` pada endpoint `v4` memang 404 dan itu
+bukan tanda akses ditolak.
+
+## 82 - `vercel env add` menolak nama `NEXT_PUBLIC_*` tanpa `--type`
+
+CLI memblokir command itu dengan pesan:choose `--type secret` (ganti nama)
+atau `--type config` (biarkan publik). Untuk `NEXT_PUBLIC_MAPBOX_TOKEN`
+jawabannya `--type config` - nilai memang meant untuk diekspos ke browser.
+
+Nilai dikirim lewat stdin (PowerShell):
+`"pk...." | npx vercel env add NEXT_PUBLIC_MAPBOX_TOKEN production --type config --scope ooraa64`
+
+## 83 - Di flow pemesanan, peta HANYA muncul di zona `requires_address`
+
+`OrderFlow.tsx` merender `AddressPicker` hanya kalau
+`draft.deliveryMethod === "delivery" && currentZone?.requires_address`. Zona
+fixed seperti "Vihara Tian En" / "UVERS" sengaja **tidak** menampilkan peta
+(menampilkan kartu lokasi statis). Jadi saat menguji, urutan yang benar:
+
+identitas -> (tambah 1 rasa ke keranjang) -> tombol "Lanjut" **di dalam sheet
+keranjang yang dibuka dari sticky bar bawah** (bukan tombol di step utama)
+-> "Diantar" -> zona yang `requires_address` -> "Cari alamat di peta".
+
+## 84 - `| npx vercel env add` di PowerShell menyimpan NEWLINE di nilai
+
+PowerShell menambahkan newline saat menulis ke stdin, dan Vercel menyimpannya
+apa adanya. Efeknya nyata danozon: variabel `NEXT_PUBLIC_*` berisi
+`"pk...\n"`, ter-inline ke bundle, dan Mapbox membalas **401** di produksi
+sementara lokal tetap jalan (lokal baca `.env.local`, bukan stdin).
+
+Gejalanya khas: request ke `api.mapbox.com` returning 401 padahal token-nya
+sudah benar di file lokal.
+
+Perbaikan: pakai flag `--value` yang tidak menambah newline.
+
+```
+npx vercel env add <NAME> production --type config --value "<nilai>" --yes --scope ooraa64
+```
+
+Cara memastikan: setelah deploy, jalankan headless ke domain produksi dan
+periksa status response ke `api.mapbox.com`. Kalau 401, cek cara penambahannya
+sebelum menebak tokennya salah. Catatan: `--type config` wajib untuk nama
+`NEXT_PUBLIC_*`, kalau tidak CLI menolaknya (lihat #82).
