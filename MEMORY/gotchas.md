@@ -1216,3 +1216,25 @@ pola `<partikel Indonesia><huruf>` untuk menangkap ini.
 Karantanya: pakai `\b(yang|dan|...)[a-z]{2,}\b` (kata yang HARUS diikuti
 spasi), bukan `[a-z](yang|dan|...)\b` (kata yang jadi akhiran) - versi kedua
 salah semua karena "selalu"/"boleh"/"terlalu" jadi false positive.
+
+## 77 - `admin_save_flavor` HAPUS kolom yang tidak ada di payload
+
+RPC `admin_save_flavor` memakai
+`coalesce((payload->>'is_new')::boolean, false)` - jadi kalau kunci `is_new`
+tidak ada di JSON payload, nilainya jadi `false`, bukan "jangan diubah".
+
+Akibatnya toggle admin yang kirim payload sebagian (`toggleFlavorActive`,
+`toggleFlavorFeatured`) diam-diam menghapus label "New" dari produk itu.
+Setiap kali menambah toggle baru di form rasa, **kirim SEMUA kolom flag**
+(`is_active`, `is_featured`, `is_new`, `stock_enabled`) - jangan hanya yang
+berubah. Pola `coalesce(x, false)` aman untuk kolom yang baru, tapi produk
+yang sudah punya nilai lama akan ditimpa jadi `false`.
+
+## 78 - Warning `core.autocrlf` itu wajar, bukan diff noise
+
+`core.autocrlf=true` tanpa `.gitattributes` bikin `git diff` mencetak
+"LF will be replaced by CRLF the next time Git touches it" untuk file yang
+sekarang LF. Itu cuma warning, **bukan** diff noise: index menyimpan LF, jadi
+blob yang ter-commit sama saja. Jangan buru-buru mengonversi file ke CRLF
+sendiri - working tree repo ini memang campuran (mis. `id.ts` CRLF,
+`page.tsx` LF) dan sudah begitu sejak awal.

@@ -4,6 +4,52 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Section "Populer" beranda dihapus, badge "Signature" di halaman Menu
+
+**Scope:** feature - dua permintaan Steven sekaligus (dengan screenshot)
+
+Steven minta dua hal: (1) cancel baris "Popular" di beranda, (2) pindahkan
+penandaan produk ke halaman Menu dengan gaya **badge bintang "Signature"** di
+foto produk, dan bisa diset admin penjualan.
+
+- `src/components/customer/AppHome.tsx`: komponen `PopularGrid`, `PopularCard`,
+  helper `pickByIds`, prop `popularIds`, dan import `useSoldCounts` **dihapus**.
+  Komposisi beranda sekarang `HomeGreeting -> HeroBanner -> NewShowcase ->
+  BundleShowcase`. Section "Menu" di beranda tetap read-only dan jadi satu-
+  satunya tempat likes, seperti sebelumnya.
+- `src/app/page.tsx`: prop `popularIds` dihapus, import `normalizeFlavorIds`
+  ikut dibuang.
+- `src/components/admin/SettingsClient.tsx`: pemilih produk "Populer" (dan
+  komponen `HomePickField` yang hanya untuk itu) dihapus dari tab "Beranda".
+  Kolom DB `store_settings.popular_flavor_ids` **tidak di-drop**, dan draft
+  pengaturan tetap membawanya apa adanya supaya tidak ikut terkosongkan kalau
+  admin menyimpan. Prop `flavors` juga dibuang dari `SettingsClient`.
+- `src/app/admin/(dashboard)/settings/page.tsx`: `getActiveFlavors` tidak lagi
+  dipanggil.
+- Label admin untuk `flavors.is_featured` diubah **"Favorite" -> "Signature"**
+  (ID & EN) supaya kata yang dilihat penjual sama persis dengan yang dilihat
+  pembeli. Hint `featuredHint` diperjelas: badge bintang muncul di foto produk
+  di halaman Menu.
+- Badge-nya sudah ada sebelumnya di kartu menu; yang diset lewat toggle
+  "Signature" di form rasa (`MenuClient`).
+
+**Bug fix (penting):** `toggleFlavorActive` dan `toggleFlavorFeatured` di
+`MenuClient.tsx` sekarang mengirim `is_new: f.is_new`. Sebelumnya payload tidak
+menyertakan kunci itu, sedangkan `admin_save_flavor` memakai
+`coalesce((payload->>'is_new')::boolean, false)` - jadi menyalakan/mematikan
+"Tampilkan di website" atau "Signature" **diam-diam menghapus label "New"** dari
+produk itu. Bug ini sudah aktif sejak sebelum permintaan ini.
+
+Verifikasi: `tsc` bersih, lint 0 error, build sukses, `test-pages.mjs` 25/25
+lulus (4 cek baru: beranda tidak boleh punya teks "Populer", badge "Signature"
+harus tampil di kartu menu). Headless lokal 0 console error — beranda tanpa
+"Populer", halaman Menu punya 3 badge Signature (Choco Matcha, Creme Brulee,
+Strawberry Cheese dari data `is_featured` yang sudah ada), form admin punya
+toggle "Signature" dan "New", tab Beranda admin tidak punya pemilih Populer.
+Produksi tidak diubah: verifikasi admin selalu ditutup dengan "Batal".
+
+---
+
 ## 2026-10-12 - "Orderan" buka halaman lacak pesanan; "Riwayat" jadi tab di atas halaman
 
 **Scope:** fix - koreksi ketiga, dengan screenshot halaman "Aktivitas" GoFood

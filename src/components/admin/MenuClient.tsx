@@ -433,6 +433,11 @@ export function MenuClient({
       image_url: f.image_url ?? "",
       is_active: !f.is_active,
       is_featured: f.is_featured,
+      // WAJIB ikut mengirim: `admin_save_flavor` memakai
+      // `coalesce((payload->>'is_new')::boolean, false)`, jadi kalau kunci ini
+      // tidak dikirim, toggling "Tampilkan" akan DELETE label "New" yang
+      // sengaja diset penjual di form flavor.
+      is_new: f.is_new,
       stock_enabled: true,
       stock: 0,
       sort_order: f.sort_order,
@@ -462,6 +467,10 @@ export function MenuClient({
       image_url: f.image_url ?? "",
       is_active: f.is_active,
       is_featured: !f.is_featured,
+      // Sama seperti di toggleFlavorActive: kalau `is_new` tidak ikut dikirim,
+      // nyalakan/mematikan label "Signature" akan diam-diam menghapus label
+      // "New" dari produk itu.
+      is_new: f.is_new,
       stock_enabled: true,
       stock: 0,
       sort_order: f.sort_order,

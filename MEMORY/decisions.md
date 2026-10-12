@@ -983,3 +983,40 @@ meletakkan bar itu sebagai anak dari `<nav>` bottom, yang tidak sesuai.
   ke tab lain tanpa lewat bottom nav.
 - `HistoryBack` dihapus dari `/riwayat`: bottom nav sudah punya tombol Beranda,
   jadi link "Kembali ke beranda" itu mubazir.
+
+## D42 - Section "Populer" di beranda dihapus; penandaan pindah ke badge di halaman Menu
+
+**Keputusan:** Baris "Popular" di beranda dihapus total (komponen, prop, dan
+pemilih admin). Penandaan produk yang tadinya dilakukan di sana sekarang
+dilakukan lewat badge bintang **"Signature"** di foto produk pada halaman
+Menu, pakai kolom yang sudah ada: `flavors.is_featured`.
+
+**Alasan:** Permintaan Steven 12-10-2026 dengan dua screenshot - dia cancel
+baris Popular, lalu bilang "buat di menu, ada kayak di gambarnya... signature,
+yang bisa di set oleh admin penjualan". Badge di foto produk lebih jelas
+menunjuk satu produk tertentu daripada baris kartu tambahan di beranda yang
+hanya berisi produk yang juga sudah ada di menu.
+
+**Konsekuensi:**
+- Kolom DB `store_settings.popular_flavor_ids` **tidak di-drop** (butuh
+  migration, tidak perlu sekarang) dan tetap dibawa apa adanya di draft
+  pengaturan supaya tidak ikut terkosongkan saat admin menyimpan.
+- Kalau suatu saat section Popular perlu dipakai lagi, sumbernya bukan
+  Beranda tapi query beranda (mis. terlaris), bukan daftar id manual.
+- Badge Signature dan label "New" hidup di dua tempat berbeda: "New" =
+  `is_new` (section "Menu Baru" di beranda), "Signature" = `is_featured`
+  (badge di foto kartu menu). Jangan gabungkan keduanya.
+
+## D43 - Label admin `is_featured` disebut "Signature", bukan "Favorite"
+
+**Keputusan:** `t.admin.menu.favorite` (ID & EN) = "Signature".
+
+**Alasan:** Kata yang dilihat penjual harus sama persis dengan yang dilihat
+pembeli. Kalau admin mencentang "Favorite" tapi pembeli melihat badge
+"Signature", ada orang yang akan bingung karena tidak tahu maksudnya.
+
+**Konsekuensi:**
+- Serialisasi i18n menuntut key `favorite` tetap ada (kunci dict harus cocok
+  persis antara `id.ts` dan `en.ts`) - yang berubah hanya **nilainya**.
+- Kalau label dengan `t.admin.menu.favorite` dipakai ulang untuk konsep lain,
+  jangan memakai ulang teks ini.

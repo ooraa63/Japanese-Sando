@@ -5,15 +5,15 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { MAX_HOME_PICKS, MAX_NEW_PICKS } from "@/lib/utils";
-import { useSoldCounts } from "@/lib/useSoldCounts";
+import { MAX_NEW_PICKS } from "@/lib/utils";
 import { BundleShowcase } from "@/components/customer/BundleShowcase";
 import { FlavorCard } from "@/components/customer/FlavorCard";
 
 /**
- * Beranda bergaya aplikasi — mengikuti layout UIUX 4 (screen "Home"):
- * sapaan -> hero banner (carousel) -> kategori -> produk populer ->
- * banner promo -> daftar terlaris.
+ * Beranda bergaya aplikasi.
+ *
+ * Urutan sekarang (12-10-2026): sapaan -> hero banner (carousel) ->
+ * "Menu Baru" -> "Paket Hemat" -> (langsung ke menu lengkap).
  *
  * Semua section memakai palet coklat yang sudah ada (cocoa/cream/honey).
  * Referensinya oranye, jadi aksen diambil dari `honey-*` — tetap di
@@ -153,18 +153,18 @@ export function HeroBanner({
  *    berisi hal yang paling ingin dilihat pembeli baru, jadi ia tidak boleh
  *    menunggu sampai shopper menggulir melewati paket.
  *
- * 2. **Baris mendatar (scroll horizontal), bukan grid 3 kolom.** Batasnya 6
- *    item; kalau grid, enam kartu jadi dua baris dan mendorong "Paket Hemat"
- *    serta "Populer" terlalu jauh ke bawah. Baris mendatar selalu satu baris,
- *    dan masih bisa menampilkan lebih banyak item sekaligus.
+ * 2. **Grid 3 kolom.** Dulu ini baris mendatar (scroll horizontal) supaya
+ *    enam kartu muat satu baris, tapi Steven 12-10-2026 minta ukurannya
+ *    disamakan dengan section di bawahnya. Sekarang enam kartu jadi dua baris
+ *    penuh, dan itu disengaja.
  *
- * 3. **Hati di sini READ-ONLY**, sama seperti section "Populer". Section
- *    "Menu" di bawah tetap jadi satu-satunya tempat likes di beranda — kalau
- *    "Menu Baru" juga bisa di-like, aturan itu jadi kabur.
+ * 3. **Hati di sini READ-ONLY.** Section "Menu" di bawah tetap jadi satu-satunya
+ *    tempat likes di beranda — kalau "Menu Baru" juga bisa di-like, aturan itu
+ *    jadi kabur.
  *
- * Kartu memakai `FlavorCard` mode `dense` yang SAMA dengan section "Menu"
- * dan "Populer", jadi ketiganya dijamin tidak melenceng. Yang membedakan cuma
- * prop `badgeLabel` (label "New") dan lebar kartunya.
+ * Kartu memakai `FlavorCard` mode `dense` yang SAMA dengan section "Menu",
+ * jadi keduanya dijamin tidak melenceng. Yang membedakan cuma prop
+ * `badgeLabel` (label "New" menggantikan "Signature").
  * ================================================================ */
 export function NewShowcase({ flavors }: { flavors: Flavor[] }) {
   const { t } = useI18n();
@@ -177,12 +177,11 @@ export function NewShowcase({ flavors }: { flavors: Flavor[] }) {
   return (
     <section>
       <SectionHead title={t.home.newSection} />
-      {/* Grid 3 kolom yang SAMA persis dengan section "Populer" di bawah
-          (permintaan Steven, 12-10-2026: "New, Bundle dan Popular beda
-          ukuran, samakan seperti yang popular aja, 1 baris bisa 3").
-          Sebelumnya section ini baris mendatar yang bisa di-scroll dengan
-          lebar tetap (w-36 / sm:w-40), jadi ukurannya tidak sama dengan
-          "Populer" dan "Paket Hemat". Sekarang ketiganya satu grid. */}
+      {/* Grid 3 kolom. Padding kartu juga sama dengan kartu di halaman
+          "Menu" (`gap-2.5 / sm:gap-3`) supaya baris ini dan yang di bawahnya
+          terlihat satu kesatuan.
+
+         /* REQUEST: Steven 12-10-2026 minta section "Menu Baru" disamakan ukurannya dengan section yang tadinya "Populer". Section "Populer" sendiri sudah dihapus pada permintaan yang sama, jadi acuan ukurannya sekarang kartu di halaman Menu. */}
       <ul className="grid grid-cols-3 gap-2.5 sm:gap-3">
         {flavors.map((f) => (
           <li key={f.id} className="flex">
@@ -198,79 +197,6 @@ export function NewShowcase({ flavors }: { flavors: Flavor[] }) {
         ))}
       </ul>
     </section>
-  );
-}
-
-/* ==================================================================
- * Produk populer — deretan kartu yang HANYA untuk dilihat.
- *
- * Permintaan Steven (10-10-2026): kartu di section ini tidak bisa
- * diketuk sama sekali. Bukan link ke /order, dan hatinya bukan tombol.
- * Menyonya di sini berarti heart-nya berubah jadi ikon biasa.
- * Tombolnya ada di section "Menu" di bawahnya.
- * ================================================================ */
-export function PopularGrid({
-  flavors,
-  soldCounts = {},
-}: {
-  flavors: Flavor[];
-  soldCounts?: Record<number, number>;
-}) {
-  const { t } = useI18n();
-
-  if (flavors.length === 0) {
-    return <p className="text-sm text-cocoa-400">{t.home.emptyPopular}</p>;
-  }
-
-  return (
-    <section>
-      {/* Tanpa link "Lihat Semua" (permintaan Steven, 10-10-2026): semua
-          produk sudah tampil lengkap di section "Menu" tepat di bawahnya,
-          jadi link itu cuma menambah ruang kosong. */}
-      <SectionHead title={t.home.popular} />
-      {/* Jarak antar kartu disamakan dengan section "Menu" (gap-2.5 / sm:gap-3)
-          supaya dua baris kartu itu terlihat satu kesatuan — beda 1px di HP
-          tapi 4px di PC, dan efeknya terlihat di layar lebar. */}
-      <ul className="grid grid-cols-3 gap-2.5 sm:gap-3">
-        {flavors.map((f) => (
-          <li key={f.id} className="flex">
-            <PopularCard flavor={f} soldCount={soldCounts[f.id] ?? 0} />
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/**
- * Kartu read-only di section "Populer".
- *
- * Sengaja memakai komponen yang SAMA dengan kartu di section "Menu"
- * (`FlavorCard` gaya `dense`) supaya dua baris itu terlihat_IDENTIK —
- * bedanya hanya satu hal: di sini `readOnlySocial`, jadi hatinya cuma ikon
- * penanda dan tidak bisa ditekan. Section "Menu" di bawahnya yang menjadi
- * tempat Likes Like.
- */
-function PopularCard({
-  flavor,
-  soldCount,
-}: {
-  flavor: Flavor;
-  soldCount: number;
-}) {
-  return (
-    <FlavorCard
-      flavor={flavor}
-      dense
-      showSocial
-      readOnlySocial
-      showBadge={false}
-      soldCount={soldCount}
-      /* Angka terjual SELALU tampil, termasuk "0 terjual" (permintaan
-         Steven, 10-10-2026). Sebelumnya disembunyikan saat 0 — itu membuat
-         kartu tampak tidak lengkap dan tinggi barisnya tidak rata. */
-      showSold
-    />
   );
 }
 
@@ -303,44 +229,20 @@ function SectionHead({
  * Komposisi seluruh isi beranda
  * ================================================================ */
 
-/**
- * Urutkan produk mengikuti pilihan penjual.
- *
- * Id yang tidak ditemukan (produknya sudah dihapus atau dinonaktifkan)
- * diam-diam dilewati supaya section tidak pernah menampilkan rongsokan.
- * Order admin dipakai apa adanya — itu yang dia susun lewat dashboard.
- */
-function pickByIds(flavors: Flavor[], ids: number[] | null | undefined, max = MAX_HOME_PICKS): Flavor[] {
-  if (!Array.isArray(ids) || ids.length === 0) return [];
-  const byId = new Map(flavors.map((f) => [f.id, f]));
-  const out: Flavor[] = [];
-  for (const raw of ids) {
-    const f = byId.get(Number(raw));
-    if (f) out.push(f);
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
 export function AppHome({
   categories,
   bundles = [],
   heroImages,
   userName,
-  popularIds,
   ctaSlot,
 }: {
   categories: Category[];
-  /** Bundle / paket hemat — ditampilkan di atas "Populer". */
+  /** Bundle / paket hemat — ditampilkan sebelum section "Menu Baru" selesai. */
   bundles?: Bundle[];
   heroImages: string[];
   userName?: string | null;
-  /** Pilihan penjual untuk "Populer" (maks 3). Kosong = pakai otomatis. */
-  popularIds?: number[];
   ctaSlot: React.ReactNode;
 }) {
-  const soldCounts = useSoldCounts();
-
   const allFlavors = useMemo(
     () => categories.flatMap((c) => c.flavors ?? []),
     [categories]
@@ -356,28 +258,14 @@ export function AppHome({
     [allFlavors]
   );
 
-  // Pilihan penjual menang kalau ada. Kalau tidak ada pilihan, pakai
-  // urutan otomatis (like + terjual) — jadi website tetap utuh untuk
-  // penjual yang belum pernah ke tab Beranda.
-  const popularPicked = useMemo(
-    () => pickByIds(allFlavors, popularIds),
-    [allFlavors, popularIds]
-  );
-  const autoPopular = useMemo(() => {
-    const sorted = [...allFlavors].sort((a, b) => {
-      const sa = soldCounts[a.id] ?? 0;
-      const sb = soldCounts[b.id] ?? 0;
-      if (sa !== sb) return sb - sa;
-      return (b.likes_count ?? 0) - (a.likes_count ?? 0);
-    });
-    return sorted.slice(0, MAX_HOME_PICKS);
-  }, [allFlavors, soldCounts]);
-  const popular = popularPicked.length > 0 ? popularPicked : autoPopular;
-
-  // Urutan beranda (permintaan Steven, 10-10-2026 + 11-10-2026):
-  //   sapaan -> hero -> Menu Baru -> paket hemat -> Populer -> (menu)
-  // Section "Kategori" dan banner promo dihapus; menu langsung menyusul
-  // section "Populer".
+  // Urutan beranda (permintaan Steven, 12-10-2026):
+  //   sapaan -> hero -> Menu Baru -> paket hemat -> (langsung menu lengkap)
+  //
+  // Section "Populer" DIHAPUS (permintaan Steven 12-10-2026: "sepertinya saya
+  // mau cancel baris yang popular"). Produk yang dulu ditonjolkan di sana kini
+  // ditandai di halaman Menu lewat badge "Signature"
+  // (`flavors.is_featured`, diset dari dashboard), jadi tidak ada lagi baris
+  // duplikat antara beranda dan menu.
   return (
     <div className="space-y-6">
       <HomeGreeting userName={userName} />
@@ -387,8 +275,6 @@ export function AppHome({
       <NewShowcase flavors={newPicked} />
 
       <BundleShowcase bundles={bundles} />
-
-      <PopularGrid flavors={popular} soldCounts={soldCounts} />
     </div>
   );
 }

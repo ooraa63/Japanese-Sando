@@ -129,6 +129,19 @@ await openPage("/admin/faq", {
 console.log("\n=== 4. Halaman publik tetap terbuka ===");
 // Nama merek = "Rumakomugi" (dari store_settings.store_name).
 await openPage("/", { mustContain: ["Rumakomugi", "Pesan Sekarang"] });
+// Section "Populer" dihapus dari beranda (permintaan Steven 12-10-2026) dan
+// penggantinya adalah badge "Signature" di halaman Menu. Cek keduanya supaya
+// section yang salah tidak muncul diam-diam, dan penanda barunya tetap ada.
+{
+  const home = await openPage("/", { mustContain: ["Rumakomugi"], mustNotContain: ["Populer"] });
+  if (home.status === 200) {
+    check("  beranda tidak punya section Populer", !/Populer/i.test(home.text));
+  }
+  const menu = await openPage("/", { mustContain: ["Menu", "Signature"] });
+  if (menu.status === 200) {
+    check("  badge Signature tampil di kartu menu", /Signature/i.test(menu.text));
+  }
+}
 await openPage("/order", { mustContain: ["Pre-order", "Siapa yang memesan"] });
 await openPage("/track", { mustContain: ["Cek Status Pesanan"] });
 // Halaman FAQ (item 5, 12-10-2026) + halaman riwayat lokal (item 3).

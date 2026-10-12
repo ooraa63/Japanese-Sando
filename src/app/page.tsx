@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { ShopInfo } from "@/components/customer/ShopInfo";
 import { AppHome } from "@/components/customer/AppHome";
-import { normalizeFlavorIds, waLink } from "@/lib/utils";
+import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
 
@@ -62,7 +62,6 @@ export default async function HomePage() {
             bundles={bundles}
             heroImages={heroImages}
             userName={profile?.full_name ?? null}
-            popularIds={normalizeFlavorIds(settings?.popular_flavor_ids)}
             ctaSlot={
               <OrderNowLink
                 open={open}
@@ -81,17 +80,22 @@ export default async function HomePage() {
         </div>
 
         {/* ===================== MENU LENGKAP =====================
-            Permintaan Steven (10-10-2026): setelah "Populer" ada judul
-            besar "Menu", lalu di bawahnya nama kategori ("Sando Sandwich")
-            dan kartu rasa-nya.
+            Permintaan Steven (10-10-2026): setelah blok atas beranda ada
+            judul besar "Menu", lalu di bawahnya nama kategori ("Sando
+            Sandwich") dan kartu rasa-nya. Di kartu ini label "Signature"
+            (kolom `flavors.is_featured`) ditampilkan kalau penjual
+            menyalakannya di dashboard.
 
-            Lebarnya disamakan dengan `AppHome` (max-w-2xl) supaya baris
-            kartu Menu dan baris kartu Populer punya lebar yang sama —
-            kalau menu memakai max-w-6xl, di desktop kartu-kartunya jadi
-            jauh lebih lebar dari Populer tepat di atasnya.
+            Section "Populer" yang tadinya ada di antara keduanya dihapus
+            (permintaan Steven 12-10-2026), jadi tidak ada lagi baris kartu
+            yang dobel antara beranda dan menu.
 
-            Bundle / paket hemat sudah pindah ke atas "Populer" (lihat
-            AppHome), jadi di sini tidak perlu dirender lagi. */}
+            Lebarnya tetap sama dengan `AppHome` (max-w-2xl) supaya baris
+            kartu "Menu Baru" / "Paket Hemat" di atas dan baris kartu Menu
+            punya lebar yang sama.
+
+            Bundle / paket hemat sudah dirender di `AppHome`, jadi di sini
+            tidak perlu dirender lagi. */}
         <section id="menu" className="mx-auto max-w-2xl scroll-mt-20 px-4 pb-10 sm:px-6 lg:pb-14">
           <h2 className="mb-4 text-2xl font-extrabold text-cocoa-900">
             {dicts.menu.title}

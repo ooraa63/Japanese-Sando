@@ -962,9 +962,10 @@ export const id: Dict = {
       deleteBundleConfirm: "Hapus bundle ini? Bundle yang sudah dipakai pesanan tidak akan dihapus, hanya disembunyikan.",
       searchBundle: "Cari bundle...",
       noBundle: "Belum ada bundle. Buat satu untuk menjual paket hemat.",
-      favorite: "Favorite",
+      favorite: "Signature",
       newFlag: "New",
-      featuredHint: "Tandai sebagai favorite untuk menyorotkan di website.",
+      featuredHint:
+        "Tandai sebagai Signature. Label bintang muncul di foto produk di halaman Menu untuk pembeli.",
       categorySaved: "Jenis makanan tersimpan.",
       categoryDeleted: "Jenis makanan dihapus.",
       categoryDeactivated:

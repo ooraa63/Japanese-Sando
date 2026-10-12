@@ -31,7 +31,7 @@ import {
   getAdminAccountsAction,
   revokeAdminAction,
 } from "@/app/admin/actions";
-import { formatDateTime, formatIDR, MAX_HOME_PICKS, MAX_NEW_PICKS, normalizeFlavorIds, waLink } from "@/lib/utils";
+import { formatDateTime, formatIDR, MAX_NEW_PICKS, normalizeFlavorIds, waLink } from "@/lib/utils";
 
 type Draft = Omit<StoreSettings, "id" | "updated_at" | "bank_accounts"> & {
   bank_accounts: BankAccount[];
@@ -101,11 +101,8 @@ function toDraft(s: StoreSettings | null): Draft {
 
 export function SettingsClient({
   initialSettings,
-  flavors,
 }: {
   initialSettings: StoreSettings | null;
-  /** Produk yang boleh dipilih untuk sorotan beranda (yang aktif saja). */
-  flavors: Flavor[];
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
@@ -610,20 +607,11 @@ export function SettingsClient({
       {tab === "home" ? (
       <Section icon={<Sparkles className="size-4.5" />} title={t.admin.settings.homeSection}>
         <div className="space-y-4">
-          <p className="text-xs text-cocoa-400">
-            {t.admin.settings.homeSectionHint.replace("{max}", String(MAX_HOME_PICKS))}
-          </p>
-          <HomePickField
-            title={t.admin.settings.popularPicker}
-            hint={t.admin.settings.popularPickerHint}
-            selected={form.popular_flavor_ids}
-            options={flavors}
-            onChange={(ids) => patch({ popular_flavor_ids: ids })}
-          />
-          {/* Section "Menu Baru" TIDAK lagi dipilih di sini. Sekarang cukup
-              menyalakan toggle "New" di form flavor (Menu & Stok) — satu
-              sumber kebenaran, bukan dua tempat yang bisa berbeda.
-              Kolom `store_settings.new_flavor_ids` sengaja dibiarkan di DB. */}
+          {/* Section "Populer" DIHAPUS dari beranda (permintaan Steven
+              12-10-2026), jadi pemilihnya ikut dibuang — tidak ada lagi
+              tempat produk itu tampil. Nilai `popular_flavor_ids` tetap
+              dibawa apa adanya di draft supaya kolom di database tidak ikut
+              dikosongkan kalau admin menyimpan pengaturan ini. */}
           <p className="rounded-xl bg-cocoa-50 px-3 py-2 text-[11px] text-cocoa-500">
             {t.admin.settings.newPickerHint}
           </p>
@@ -644,147 +632,6 @@ export function SettingsClient({
           {saving ? t.common.saving : t.common.save}
         </button>
       </div>
-    </div>
-  );
-}
-
-/**
- * Pemilih produk untuk satu section beranda ("Populer" / "Menu Baru").
- * Urutan klik = urutan tampil di website.
- *
- * `max` berbeda per section: "Populer" dibatasi 3 (satu baris kartu 3 kolom),
- * "Menu Baru" dibatasi 6 (baris mendatar, jadi muat lebih banyak). Kalau
- * kosong, `emptyLabel`/`emptyHint` menjelaskan apa yang terjadi — untuk
- * "Populer" itu "dipilih otomatis", untuk "Menu Baru" justru "section
- * disembunyikan". Batas dan isi kotak kosong ikut lewat prop supaya satu
- * komponen tidak mengarang aturan yang tidak berlaku untuk section-nya.
- */
-function HomePickField({
-  title,
-  hint,
-  selected,
-  options,
-  onChange,
-  max = MAX_HOME_PICKS,
-  emptyLabel,
-  emptyHint,
-}: {
-  title: string;
-  hint: string;
-  selected: number[];
-  options: Flavor[];
-  onChange: (ids: number[]) => void;
-  /** Batas item yang boleh dipilih. Harus sama dengan CHECK constraint di DB. */
-  max?: number;
-  /** Kalimat tebal di kotak kosong. Default: "Dipilih otomatis". */
-  emptyLabel?: string;
-  /** Penjelasan setelahnya. Default: penjelasan "dipilih otomatis". */
-  emptyHint?: string;
-}) {
-  const { t, lang } = useI18n();
-  const nameOf = (f: Flavor) => (lang === "en" ? f.name_en || f.name_id : f.name_id);
-  const isFull = selected.length >= max;
-  const remaining = options.filter((f) => !selected.includes(f.id));
-
-  function toggle(id: number) {
-    if (selected.includes(id)) onChange(selected.filter((x) => x !== id));
-    else if (selected.length < max) onChange([...selected, id]);
-  }
-
-  return (
-    <div className="rounded-2xl border border-cocoa-200 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-cocoa-800">{title}</p>
-          <p className="mt-0.5 text-xs text-cocoa-400">{hint}</p>
-        </div>
-        <span className="shrink-0 rounded-full bg-cocoa-100 px-2.5 py-1 text-[11px] font-bold tabular text-cocoa-600">
-          {t.admin.settings.pickerCounter
-            .replace("{n}", String(selected.length))
-            .replace("{max}", String(max))}
-        </span>
-      </div>
-
-      {/* Yang sudah dipilih, urutannya penting — itu urutan tampil di website. */}
-      {selected.length === 0 ? (
-        <p className="mt-3 rounded-xl bg-cocoa-50 px-3.5 py-2.5 text-xs text-cocoa-500">
-          <span className="font-bold text-cocoa-700">
-            {emptyLabel ?? t.admin.settings.pickerAuto}.
-          </span>{" "}
-          {emptyHint ?? t.admin.settings.pickerAutoHint}
-        </p>
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {selected.map((id, i) => {
-            const f = options.find((o) => o.id === id);
-            return (
-              <li
-                key={id}
-                className="flex items-center gap-3 rounded-xl border border-cocoa-200 bg-white p-2"
-              >
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-cocoa-900 text-[11px] font-bold tabular text-cream-50">
-                  {i + 1}
-                </span>
-                <span className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-cream-100">
-                  {f?.image_url ? (
-                    <Image src={f.image_url} alt="" fill sizes="40px" className="object-cover" />
-                  ) : null}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-bold text-cocoa-800">
-                  {f ? nameOf(f) : `#${id}`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => toggle(id)}
-                  className="shrink-0 rounded-lg p-2 text-berry-500 transition hover:bg-berry-500/10"
-                  aria-label={`${t.common.delete} ${f ? nameOf(f) : id}`}
-                >
-                  <X className="size-4" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {options.length === 0 ? (
-        <p className="mt-3 text-xs text-cocoa-400">{t.admin.settings.pickerNoProducts}</p>
-      ) : remaining.length > 0 ? (
-        <div className="mt-3">
-          <p className="mb-2 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
-            {t.admin.settings.pickerAdd}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {remaining.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => toggle(f.id)}
-                disabled={isFull}
-                title={
-                  isFull
-                    ? t.admin.settings.pickerLimitReached.replace("{max}", String(max))
-                    : undefined
-                }
-                className="inline-flex items-center gap-1.5 rounded-full border border-cocoa-200 px-3 py-1.5 text-xs font-bold text-cocoa-700 transition hover:border-honey-400 hover:bg-honey-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Plus className="size-3.5" />
-                {nameOf(f)}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {selected.length > 0 ? (
-        <button
-          type="button"
-          onClick={() => onChange([])}
-          className="mt-3 text-[12px] font-bold text-cocoa-500 underline underline-offset-2 transition hover:text-cocoa-700"
-        >
-          {t.admin.settings.pickerReset}
-        </button>
-      ) : null}
     </div>
   );
 }

@@ -955,9 +955,10 @@ export const en = {
       deleteBundleConfirm: "Delete this bundle? Bundles already used by orders won't be removed, just hidden.",
       searchBundle: "Search bundle...",
       noBundle: "No bundles yet. Create one to sell value packs.",
-      favorite: "Favorite",
+      favorite: "Signature",
       newFlag: "New",
-      featuredHint: "Mark as favorite to highlight it on the website.",
+      featuredHint:
+        "Mark as Signature. The star label then appears on the product photo in the Menu page customers see.",
       categorySaved: "Food category saved.",
       categoryDeleted: "Food category deleted.",
       categoryDeactivated:
