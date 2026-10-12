@@ -5,6 +5,7 @@ import { getI18nDict } from "@/lib/i18n-server";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { TrackForm } from "@/components/customer/TrackForm";
+import { OrderHubTabs } from "@/components/customer/OrderHubTabs";
 
 export async function generateMetadata(): Promise<Metadata> {
   const dicts = await getI18nDict();
@@ -34,8 +35,13 @@ export default async function TrackPage({
         logoUrl={settings?.logo_url ?? null}
         brandLine={settings?.brand_line ?? ""}
       />
-      <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
-        <div className="mb-8 text-center">
+      <main className="mx-auto max-w-2xl px-4 pt-4 pb-12 sm:px-6 sm:pt-6 sm:pb-16">
+        {/* Bar tab "Cek Pesanan | Riwayat". Ini tujuan tab "Orderan" di
+            bottom nav: pembeli menekan "Orderan" dan langsung mendarat di
+            sini, lalu bisa pindah ke Riwayat lewat bar ini. */}
+        <OrderHubTabs />
+
+        <div className="mb-8 mt-8 text-center">
           <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-cocoa-800 text-cream-50">
             <PackageSearch className="size-6" />
           </span>

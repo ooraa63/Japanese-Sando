@@ -4,6 +4,36 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - "Orderan" buka halaman lacak pesanan; "Riwayat" jadi tab di atas halaman
+
+**Scope:** fix - koreksi ketiga, dengan screenshot halaman "Aktivitas" GoFood
+
+Maksud Steven sekarang jelas: satu tab "Orderan" di bottom nav yang ketika
+ditekan langsung membuka halaman lacak pesanan, dan **di halaman itu** ada bar
+tab untuk pilih Cek Pesanan atau Riwayat - seperti bar "Riwayat / Dalam Proses
+/ Terjadwal / Draf" di GoFood.
+
+- Komponen baru `src/components/customer/OrderHubTabs.tsx`: deretan label
+  di atas konten, tab aktif tebal + garis bawah honey, `aria-current="page"`,
+  `sticky top-0`.
+- Bar dirender oleh `/track` dan `/riwayat`, jadi dari mana pun pembeli masuk
+  (termasuk tautan "Lihat pesanan" di halaman sukses) dia bisa pindah tab
+  tanpa lewat bottom nav.
+- `MobileBottomNav` disederhanakan total: "Orderan" kembali jadi `<a href="/track">`,
+  nav hanya satu bar lagi (spacer 68px), dan **tidak ada state sama sekali**.
+  State `hubAt` dan `<button aria-expanded>` dihapus.
+- Tab "Orderan" aktif di `/track` **dan** `/riwayat`.
+- `HistoryBack` (link "Kembali ke beranda") dihapus dari `/riwayat`; bottom nav
+  sudah punya tombol Beranda.
+
+Verifikasi headless: beranda -> tap Orderan mendarat di `/track` dengan tab bar
+di y=81 dan "Cek Pesanan" aktif; tap "Riwayat" -> `/riwayat` dengan tab itu
+aktif; tap balik -> `/track`. `<nav>` bottom sekarang punya 1 anak saja
+(`ul`). 0 console error, tsc bersih, lint 0 error, build sukses, test-pages
+21/21.
+
+---
+
 ## 2026-10-12 - Bar Cek Pesanan + Riwayat jadi muncul SETELAH tab "Orderan" ditekan
 
 **Scope:** fix - koreksi kedua atas bar pesanan

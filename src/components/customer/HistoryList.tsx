@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, History, Search } from "lucide-react";
+import { ArrowUpRight, History, Search } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import {
   formatDateTime,
@@ -102,19 +102,5 @@ export function HistoryList() {
         </li>
       ))}
     </ul>
-  );
-}
-
-/** Link "kembali" yang dipakai halaman /riwayat. */
-export function HistoryBack() {
-  const { t } = useI18n();
-  return (
-    <Link
-      href="/"
-      className="inline-flex items-center gap-1.5 text-sm font-bold text-cocoa-500 transition hover:text-cocoa-900"
-    >
-      <ArrowLeft className="size-4" />
-      {t.historyPage.back}
-    </Link>
   );
 }

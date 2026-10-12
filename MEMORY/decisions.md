@@ -960,30 +960,26 @@ browser, dan tidak terlihat di HP lain. Perlakukan ini sebagai fitur (privasi +
 tanpa akun), dan halaman /riwayat harus menjelaskan bahwa datanya lokal. Jangan
 diam-diam mengubahnya ke database tanpa diminta.
 
-## D41 - Tab "Orderan" membuka bar kedua, bukan link
+## D41 - "Orderan" = link ke /track; "Riwayat" jadi tab di ATAS halaman pesanan
 
-**Keputusan:** Tab tengah bottom nav bernama **Orderan** adalah `<button>`, bukan
-`<a>`. Menekannya membuka bar kedua DI BAWAH bar tab berisi dua tombol:
-"Cek Pesanan" (-> /track) dan "Riwayat" (-> /riwayat). Menekannya lagi
-menutup.
+**Keputusan:** Tab tengah bottom nav bernama **Orderan** adalah link biasa ke
+`/track`. Isinya berubah jadi bar tab di ATAS halaman pesanan
+(`OrderHubTabs`): **Cek Pesanan** (-> /track) dan **Riwayat** (-> /riwayat),
+dengan gaya deretan label + garis bawah pada tab aktif.
 
-**Alasan:** Steven koreksi dua kali. Versi pertama bar-nya melayang selalu di
-atas bottom nav; versi kedua ditukar ke bawah tapi selalu terlihat; yang dia
-minta sebenarnya adalah bar itu **muncul hanya setelah tab "Orderan"
-ditekan** — screenshotnya: baris `Beranda | Orderan | Profil`, lalu setelah
-tekan "Orderan" muncul bar `Track order | History`.
-
-State-nya `hubAt: string | null` yang berisi PATHNAME saat tombol ditekan,
-bukan boolean. Dengan begitu bar menutup SENDIRI begitu halaman berpindah,
-tanpa `useEffect` + `setState` (React menandainya sebagai render berlapis) dan
-tanpa bar yang menggantung di halaman lain seperti /faq.
+**Alasan:** Steven koreksi tiga kali dan meyakinkan dengan screenshot halaman
+"Aktivitas" GoFood. Maksudnya: satu tab "Orderan" di bottom nav yang langsung
+membuka halaman pesanan, dan di halaman itu ada bar tab seperti
+"Riwayat / Dalam Proses / Terjadwal / Draf" milik GoFood. Versi sebelumnya
+meletakkan bar itu sebagai anak dari `<nav>` bottom, yang tidak sesuai.
 
 **Konsekuensi:**
-- Spacer bawah harus ikut berubah: 68px saat bar tertutup, 114px saat terbuka.
-  Kalau fix, saat tertutup ada rongga kosong mencolok, dan saat terbuka kartu
-  terakhir ketutup.
-- Bar kedua tetap di dalam elemen `<nav>` yang sama (bukan `div fixed`
-  terpisah) supaya offsetnya tidak pernah salah di HP dengan safe-area.
-- Membuka /track atau /riwayat dari tautan lain di luar app **tetap** dengan
-  bar tertutup. Itu konsekuensi yang diterima: untuk pindah ke opsi yang lain,
-  tekan "Orderan" sekali lagi.
+- `MobileBottomNav` kembali ke **tanpa state sama sekali** — satu bar, spacer
+  68px. Tidak ada lagi `hubAt`/boolean/effect yang menggantung.
+- Tab "Orderan" aktif di `/track` **dan** `/riwayat`, karena keduanya halaman
+  pesanan yang dipilih lewat tab di atasnya.
+- `OrderHubTabs` dirender oleh kedua halaman, jadi dari mana pun pembeli masuk
+  (termasuk tautan "Lihat pesanan" dari halaman sukses) dia selalu bisa pindah
+  ke tab lain tanpa lewat bottom nav.
+- `HistoryBack` dihapus dari `/riwayat`: bottom nav sudah punya tombol Beranda,
+  jadi link "Kembali ke beranda" itu mubazir.
