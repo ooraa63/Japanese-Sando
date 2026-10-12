@@ -68,6 +68,30 @@ problem, `npm run build` sukses. Tidak ada data produksi yang diubah
 Catatan: `adaSerif: true` di skrip scan itu **false positive** -
 regex-nya mencocokkan kata "serif" di dalam "sans-serif".
 
+**Verifikasi produksi** (`japanese-sando-6q6bwmufm-ooraa64`, alias
+`japanese-sando.vercel.app`):
+- Font `body` / `h1` / elemen ber-`font-display` / `textarea` semuanya
+  resolve ke `"Plus Jakarta Sans"`. Tidak ada Playfair/Georgia/Times.
+- HTML hasil server untuk `/`, `/order`, `/admin/pickup-delivery` **tidak
+  mengandung** string `mapbox`, `api.mapbox`, maupun `pk.eyJ` - token
+  tidak bocor ke bundle.
+- Flow address: 2 textarea dengan placeholder benar, **0 request** ke
+  `api.mapbox.com`, tidak ada `.mapboxgl-canvas`/`.mapboxgl-ctrl`,
+  tidak ada angka koordinat, 0 exception.
+- Admin `/admin/pickup-delivery`: heading "Catatan Pengambilan &
+  Pengiriman" sans-serif, 0 peta, 0 exception.
+- `admin_list_zones` =&gt; koordinat zona di DB **utuh** (nilai
+  `-6.917 / 107.6-107.7` masih ada, tidak jadi NULL).
+- `scripts/test-pages.mjs` terhadap domain produksi: **26/26 lulus**.
+- Tidak ada data produksi diubah - verifikasi hanya membuka form dan
+  menutupnya, tidak ada order yang dikirim.
+
+Cara cek form yang ada di bawah fold: `scrollIntoView` **tidak**
+menggeser halaman kalau container-nya punya `overflow` sendiri -
+pakai `Input.dispatchMouseEvent` `mouseWheel`. Screenshot yang diambil
+sebelum scroll hanya memperlihatkan step atas, padahal elemennya
+sudah ada di DOM.
+
 ---
 
 ## 2026-10-12 - Angka koordinat dihapus dari peta; kegagalan peta jadi terlihat

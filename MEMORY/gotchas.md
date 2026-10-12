@@ -1432,3 +1432,23 @@ menghapus field-nya dari payload.
 Perilaku yang sama berlaku untuk form mana pun yang kolomnya dihapus
 dari UI tapi kolomnya masih ada di DB: hapus dari UI != hapus dari
 payload upsert.
+
+## 88 - `scrollIntoView` tidak selalu menggeser halaman; pakai roda mouse
+
+Halaman admin dan `/order` memakai container sendiri dengan `overflow`
+tersendiri. Calling `element.scrollIntoView()` lalu membaca
+`window.scrollY` menghasilkan `0` - padahal elemennya sudah bergeser
+di dalam container. `document.scrollingElement.scrollTop` juga tidak
+berdampak.
+
+Akibatnya `Page.captureScreenshot` selalu menghasilkan frame yang sama
+(bagian atas halaman), dan terlihat seolah-olah elemen target tidak ada
+padahal `getBoundingClientRect()` menunjukkannya ada.
+
+Cara yang bekerja: `Input.dispatchMouseEvent` dengan
+`type: "mouseWheel"` dan `deltaY` positif beberapa kali, lalu cek
+ulang `getBoundingClientRect()` sampai `y` masuk viewport.
+
+Always verifikasi "elemen ini tampil atau tidak" dengan dua sumber:
+getBoundingClientRect (posisi) **dan** screenshot setelah scroll
+sungguhan. Satu saja bisa berbohong.
