@@ -4,6 +4,72 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Mapbox dihapus total, alamat jadi ketik manual; font serif -> sans-serif
+
+**Scope:** feat/refactor - permintaan Steven (12-10-2026 15:15)
+
+Steven: "Untuk Map saya mau hapus dulu deh kita jangan pakai map dulu
+hapus semuanya, untuk deliver to your location nanti mereka harus isi
+dengan detail aja pakai ketik" dan "Tulisan jangan pakai Serif,
+pakainya san serif".
+
+Artinya peta dibatalkan total (bukan cuma disembunyikan), dan seluruh
+tulisan aplikasi pindah dari serif ke sans-serif.
+
+**Mapbox dihapus total:**
+- File dihapus: `EnhancedMapPicker.tsx` (pembeli),
+  `MapModal.tsx` (pembeli), `InlineMapPicker.tsx` (admin zona).
+- `AddressPicker.tsx` ditulis ulang jadi form teks murni: satu `textarea`
+  alamat (placeholder "Jalan, nomor, kelurahan, kota") + satu `textarea`
+  detail/location note (placeholder "mis. pagar putih, rumah cat biru,
+  depan masjid, Gg. Melati No. 12") + kartu konfirmasi alamat dengan
+  tombol hapus. Tidak ada modal, tidak ada peta, tidak ada reverse
+  geocoding.
+- `OrderFlow.tsx`: kartu zona fix (Vihara / UVERS) tidak lagi
+  menampilkan lat/lng, dan tombol "pilih di peta" hilang.
+- `DeliveryZonesClient.tsx` (admin): blok peta + input `radius_km`
+  dihapus. **Penting:** `onSave` tetap mengirim `lat`/`lng`/`radius_km`
+  dari draft (baris ~138-140 mengisi dari zone yang ada) supaya RPC
+  `admin_upsert_zone` yang memakai `lat = excluded.lat` tidak
+  mengosongkan koordinat zona yang sudah tersimpan di DB.
+- `globals.css`: `@import "mapbox-gl/dist/mapbox-gl.css"` dan seluruh
+  blok CSS Mapbox dihapus.
+- `package.json`: `npm uninstall mapbox-gl`.
+- `.env.local`: blok Mapbox diganti catatan "DIDAPUS 12-10-2026";
+  `NEXT_PUBLIC_MAPBOX_TOKEN` **sudah dihapus** dari Vercel production.
+- `.env.example`: blok Mapbox diganti catatan bahwa tidak ada lagi.
+
+**Font serif -> sans-serif tanpa menyentuh 26 file:**
+- `globals.css`: `--font-display` diarah ke
+  `var(--font-jakarta), ui-sans-serif, ...`. Karena ada 54 pemakaian
+  utility class `font-display` di 26 file, semua ikut berubah tanpa
+  edit per-file. Nama class `font-display` sengaja **dipertahankan**
+  (dipakai theme/density, bukan penanda serif).
+- `layout.tsx`: import + `const playfair` dihapus, `<html>` sekarang
+  hanya `className={jakarta.variable}`. Playfair tidak lagi diunduh
+  sama sekali (hemat request font).
+- Komentar di `FlavorCard.tsx` yang menyebut Playfair diperbarui.
+
+**Yang sengaja TIDAK diubah:**
+- Kolom `lat`/`lng` di tabel `orders` tetap ada, dan `CartDraft`
+  masih punya field tersebut - hanya tidak diisi dari UI. Tidak perlu
+  migration.
+- `requires_address` tetap dipakai: itu yang menentukan pembeli harus
+  mengetik alamat manual atau cukup datang ke zona fix.
+
+**Verifikasi lokal** (`npm run start` port 3000 + headless Edge):
+font body/heading/`font-display` semuanya resolve ke
+`"Plus Jakarta Sans", ..., sans-serif`; `adaCanvasMapbox: false`,
+`adaTombolPeta: false`, 0 request ke `api.mapbox.com`; 2 textarea
+dengan placeholder yang benar; `tsc` exit 0, `npm run lint` 0
+problem, `npm run build` sukses. Tidak ada data produksi yang diubah
+(verifikasi hanya membuka form lalu menutup dengan "Batal").
+
+Catatan: `adaSerif: true` di skrip scan itu **false positive** -
+regex-nya mencocokkan kata "serif" di dalam "sans-serif".
+
+---
+
 ## 2026-10-12 - Angka koordinat dihapus dari peta; kegagalan peta jadi terlihat
 
 **Scope:** fix - dua laporan Steven dari screenshot (12-10-2026 13:52)

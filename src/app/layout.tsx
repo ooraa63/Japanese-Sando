@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n";
@@ -11,13 +11,8 @@ import { AuthModal } from "@/components/customer/AuthModal";
 import { MobileBottomNav } from "@/components/customer/MobileBottomNav";
 import { getCustomerProfile, getProfileMenuItems } from "@/lib/data";
 
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair",
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
-});
-
+// Playfair (serif) DIHAPUS 12-10-2026 — semua judul sekarang sans-serif.
+// Font Playfair sengaja tidak di-load supaya tidak ada request font sia-sia.
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
@@ -94,7 +89,7 @@ export default async function RootLayout({
     <html
       lang={lang}
       data-scroll-behavior="smooth"
-      className={`${playfair.variable} ${jakarta.variable}`}
+      className={jakarta.variable}
     >
       <body className="min-h-dvh antialiased">
         <I18nProvider initialLang={lang}>

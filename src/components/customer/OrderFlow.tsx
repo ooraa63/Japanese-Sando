@@ -1196,7 +1196,9 @@ export function OrderFlow({
                 </div>
               ) : null}
 
-              {/* Alamat + map picker — hanya untuk zona yang requires_address. */}
+              {/* Alamat ketik manual — hanya untuk zona yang requires_address.
+                  Peta dihapus 12-10-2026; pembeli cukup menulis alamat +
+                  detail secara manual. */}
               {draft.deliveryMethod === "delivery" && currentZone?.requires_address ? (
                 <AddressPicker
                   draft={draft}
@@ -1204,7 +1206,9 @@ export function OrderFlow({
                   dict={t.order.payment}
                 />
               ) : draft.deliveryMethod === "delivery" && currentZone ? (
-                /* Zona fix (Vihara/UVERS) — customer tidak perlu pilih map. */
+                /* Zona fix (Vihara/UVERS) — pembeli datang sendiri, jadi tidak
+                   perlu menulis alamat. Koordinat ikut disembunyikan karena
+                   Steven minta angka tidak ditampilkan. */
                 <div className="mt-4 flex items-start gap-3 rounded-2xl border border-matcha-300 bg-matcha-50 p-4">
                   <MapPin className="mt-0.5 size-5 shrink-0 text-matcha-700" />
                   <div>
@@ -1214,11 +1218,6 @@ export function OrderFlow({
                     <p className="mt-0.5 text-sm font-semibold text-cocoa-800">
                       {lang === "en" ? currentZone.name_en : currentZone.name_id}
                     </p>
-                    {currentZone.lat && currentZone.lng ? (
-                      <p className="mt-0.5 text-[11px] text-cocoa-500 tabular">
-                        {currentZone.lat.toFixed(4)}, {currentZone.lng.toFixed(4)}
-                      </p>
-                    ) : null}
                   </div>
                 </div>
               ) : settings.address ? (

@@ -22,7 +22,7 @@ import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatIDR } from "@/lib/utils";
-import { InlineMapPicker } from "./InlineMapPicker";
+
 
 /**
  * Rapikan nilai `shipping_discounts` yang datang dari database.
@@ -676,32 +676,11 @@ function EditZoneModal({
             />
           </label>
 
-          {draft.lat || draft.lng || !draft.requires_address ? (
-            <div className="space-y-3">
-              <InlineMapPicker
-                lat={draft.lat ? Number(draft.lat) : null}
-                lng={draft.lng ? Number(draft.lng) : null}
-                onChange={(lat, lng) =>
-                  patch({
-                    lat: lat.toFixed(6),
-                    lng: lng.toFixed(6),
-                  })
-                }
-                placeholder="Cari tempat (mis. Universitas UVERS)"
-              />
-              <label className="block">
-                <span className="label">
-                  {t.admin.deliveryZones.radiusLabel}
-                </span>
-                <input
-                  className="input font-mono"
-                  value={draft.radius_km}
-                  onChange={(e) => patch({ radius_km: e.target.value })}
-                  placeholder="0.5"
-                />
-              </label>
-            </div>
-          ) : null}
+          {/* Peta dihapus 12-10-2026 (permintaan Steven). Koordinat & radius
+              milik zona TIDAK dihapus dari database maupun dari draft, cuma
+              tidak bisa diedit lewat UI lagi. `onSave` tetap mengirim nilai
+              lama itu apa adanya, jadi `admin_upsert_zone` tidak mengosongkan
+              kolomnya (RPC memakai `lat = excluded.lat`). */}
 
           <label className="block">
             <span className="label">

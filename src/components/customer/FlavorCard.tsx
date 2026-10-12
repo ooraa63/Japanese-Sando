@@ -467,7 +467,7 @@ export function FlavorCard({
 
   /* ------------------------------------------------------------------
    * Kartu menu di beranda (gambar referensi Steven, 10-10-2026):
-   * foto tinggi, badge "Favorite" di kiri atas, nama Playfair besar,
+   * foto tinggi, badge "Favorite" di kiri atas, nama besar sans-serif,
    * deskripsi, harga besar, lalu pil "N liked" selebar kartu.
    *
    * Ini SATU-SATUNYA tempat di beranda yang bisa di-like; section

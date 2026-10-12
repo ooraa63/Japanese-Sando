@@ -296,17 +296,10 @@ export const id: Dict = {
       addressNote: "Patokan alamat",
       addressNoteHint: "opsional",
       addressError: "Mohon isi alamat lengkap.",
-      pickOnMap: "Cari alamat di peta",
-      pickOnMapHint:
-        "Ketik nama jalan atau alamat lengkap (mis. 'Jalan Asia Afrika 100, Bandung'). Kami cari lokasinya.",
-      searchButton: "Cari",
-      searchPlaceholder: "Nama jalan, kelurahan, kota...",
-      previewLabel: "Alamat yang akan disimpan",
-      noResult: "Alamat tidak ditemukan. Coba lebih detail.",
+      // Kunci2 peta (pickOnMap, pickOnMapHint, searchButton, searchPlaceholder
+      // versi peta, previewLabel, noResult, confirmLocation, lat, lng) dihapus
+      // 12-10-2026 waktu Mapbox dicabut. Pembeli sekarang mengetik alamat.
       cancel: "Batal",
-      confirmLocation: "Pakai lokasi ini",
-      lat: "Latitude",
-      lng: "Longitude",
       transferAccount: "Transfer ke",
       copyAccount: "Salin nomor",
       qrisUnavailable: "Metode pembayaran belum diatur oleh penjual.",
@@ -874,9 +867,8 @@ export const id: Dict = {
       fixedLabel: "Titik tetap (Vihara / UVERS)",
       fixedHint: "Centang untuk zona fix (customer tidak perlu pilih map). Isi koordinat pusat di bawah.",
       addressRequiredLabel: "Customer wajib pilih lokasi",
-      latLabel: "Latitude",
-      lngLabel: "Lng",
-      radiusLabel: "Radius (km, opsional)",
+      // latLabel / lngLabel / radiusLabel dihapus 12-10-2026 (UI peta zona dihapus;
+      // nilai lat/lng di database tetap dipertahankan, cuma tidak diedit lagi).
       sortOrderLabel: "Urutan tampil",
       saved: "Zona tersimpan.",
       deleted: "Zona disembunyikan.",

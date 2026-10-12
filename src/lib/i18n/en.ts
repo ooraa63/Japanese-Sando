@@ -292,17 +292,11 @@ export const en = {
       addressNote: "Landmark",
       addressNoteHint: "optional",
       addressError: "Please enter a complete address.",
-      pickOnMap: "Find address on map",
-      pickOnMapHint:
-        "Type a street name or full address (e.g. '123 Main Street, Bandung'). We will look it up.",
-      searchButton: "Search",
-      searchPlaceholder: "Street, district, city...",
-      previewLabel: "Address to save",
-      noResult: "Address not found. Try more details.",
+      // Map-only keys (pickOnMap, pickOnMapHint, searchButton, the map
+      // searchPlaceholder, previewLabel, noResult, confirmLocation, lat, lng)
+      // were removed 12-10-2026 when Mapbox was dropped. Customers now type
+      // their address instead of picking a point on a map.
       cancel: "Cancel",
-      confirmLocation: "Use this location",
-      lat: "Latitude",
-      lng: "Longitude",
       transferAccount: "Transfer to",
       copyAccount: "Copy number",
       qrisUnavailable: "No payment method has been set up yet.",
@@ -869,9 +863,8 @@ export const en = {
       fixedLabel: "Fixed point (Vihara / UVERS)",
       fixedHint: "Check for fixed zones (customer doesn't need to pick a location). Set center coordinates below.",
       addressRequiredLabel: "Customer must pick a location",
-      latLabel: "Latitude",
-      lngLabel: "Longitude",
-      radiusLabel: "Radius (km, optional)",
+      // latLabel / lngLabel / radiusLabel removed 12-10-2026 (the zone map UI is gone;
+      // the lat/lng values stay in the database, they are just not editable).
       sortOrderLabel: "Display order",
       saved: "Zone saved.",
       deleted: "Zone hidden.",

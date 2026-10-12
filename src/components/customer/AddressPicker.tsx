@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { MapPin } from "lucide-react";
-import dynamic from "next/dynamic";
+import { CheckCircle2, MapPin, X } from "lucide-react";
 import type { Dict } from "@/lib/types";
 import type { CartDraft } from "@/components/customer/CartProvider";
 
@@ -10,22 +8,21 @@ import type { CartDraft } from "@/components/customer/CartProvider";
 type PickerDict = Dict["order"]["payment"];
 
 /**
- * Picker alamat dengan Mapbox GL JS + Geocoding API (free, gak perlu kartu
- * kredit). mapbox-gl butuh `window` — di-load dinamis dengan next/dynamic +
- * ssr:false.
+ * Alamat pengiriman TANPA peta.
+ *
+ * Steven 12-10-2026: "Untuk Map saya mau hapus dulu deh kita jangan pakai map
+ * dulu hapus semuanya, untuk deliver to your location nanti mereka harus isi
+ * dengan detail aja pakai ketik."
+ *
+ * Jadi pembeli tidak lagi memilih titik di peta. Dia cukup menuliskan alamatnya
+ * lengkap beserta detail yang membantu kurir menemukan lokasi (patokan,
+ * warna pagar, nama jalan, nomor rumah).
+ *
+ * Kolom `lat`/`lng` di draft TIDAK lagi diisi dari sini. Field-nya sengaja
+ * tidak dihapus dari `CartDraft` karena `create_order` masih punya kolomnya di
+ * database - kalau suatu saat dibutuhkan untuk geo-analytics, nilainya masih
+ * bisa diisi dari sumber lain tanpa perlu migration.
  */
-const AddressPickerModal = dynamic(
-  () => import("./MapModal").then((m) => m.MapModal),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-full items-center justify-center bg-cocoa-50">
-        <MapPin className="size-6 animate-pulse text-cocoa-400" />
-      </div>
-    ),
-  }
-);
-
 export function AddressPicker({
   draft,
   updateDraft,
@@ -35,27 +32,14 @@ export function AddressPicker({
   updateDraft: (patch: Partial<CartDraft>) => void;
   dict: PickerDict;
 }) {
-  const [open, setOpen] = useState(false);
-
-  const hasLocation =
-    typeof draft.lat === "number" && typeof draft.lng === "number";
+  // Alamat dianggap sudah terisi kalau ada isi besides whitespace.
+  const adaAlamat = draft.address.trim().length > 0;
 
   return (
     <div className="mt-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <label htmlFor="address" className="label flex-1">
-          {dict.address}
-        </label>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-cocoa-200 px-2.5 py-1.5 text-xs font-bold text-cocoa-600 transition hover:bg-cocoa-50"
-        >
-          <MapPin className="size-3.5" />
-          {dict.pickOnMap}
-        </button>
-      </div>
-
+      <label htmlFor="address" className="label">
+        {dict.address}
+      </label>
       <textarea
         id="address"
         rows={2}
@@ -64,26 +48,6 @@ export function AddressPicker({
         value={draft.address}
         onChange={(e) => updateDraft({ address: e.target.value })}
       />
-
-      {hasLocation ? (
-        // Angka koordinat (lat/lng) TIDAK ditampilkan lagi — permintaan
-        // Steven 12-10-2026: "saya mau nama jalannya aja". Yang tampil cukup
-        // nama alamat; koordinatnya tetap ikut tersimpan ke order.
-        <div className="flex items-center gap-2 rounded-2xl border border-cocoa-200 bg-cream-50 px-3 py-2 text-xs">
-          <MapPin className="size-3.5 shrink-0 text-matcha-600" />
-          <span className="line-clamp-1 flex-1 text-cocoa-700">
-            {draft.address}
-          </span>
-          <button
-            type="button"
-            onClick={() => updateDraft({ lat: null, lng: null })}
-            className="rounded-md p-1 text-cocoa-400 transition hover:bg-cocoa-100 hover:text-berry-500"
-            aria-label="Hapus lokasi"
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
 
       <div>
         <label htmlFor="address-note" className="label">
@@ -94,28 +58,44 @@ export function AddressPicker({
         </label>
         <textarea
           id="address-note"
-          rows={2}
+          rows={3}
           className="input resize-none"
-          placeholder="mis. pagar putih, rumah cat biru, depan masjid"
+          placeholder="mis. pagar putih, rumah cat biru, depan masjid, Gg. Melati No. 12"
           value={draft.addressNote}
           onChange={(e) => updateDraft({ addressNote: e.target.value })}
         />
       </div>
 
-      {open ? (
-        <AddressPickerModal
-          open={open}
-          center={{
-            lat: typeof draft.lat === "number" ? draft.lat : -6.917,
-            lng: typeof draft.lng === "number" ? draft.lng : 107.619,
-          }}
-          onClose={() => setOpen(false)}
-          onPick={(lat, lng, label) => {
-            updateDraft({ lat, lng, address: label || draft.address });
-            setOpen(false);
-          }}
-          dict={dict}
-        />
+      {/* Konfirmasi singkat supaya pembeli tahu alamatnya sudah tercatat. */}
+      {adaAlamat ? (
+        <div className="flex items-start gap-2 rounded-2xl border border-matcha-300 bg-matcha-50 px-3 py-2.5 text-xs">
+          {draft.addressNote.trim() ? (
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-matcha-600" />
+          ) : (
+            <MapPin className="mt-0.5 size-4 shrink-0 text-matcha-600" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-cocoa-800">{dict.address}</p>
+            <p className="mt-0.5 break-words text-cocoa-600">
+              {draft.address}
+            </p>
+            {draft.addressNote.trim() ? (
+              <p className="mt-1 break-words text-cocoa-500">
+                {dict.addressNote}: {draft.addressNote}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              updateDraft({ address: "", addressNote: "", lat: null, lng: null })
+            }
+            className="rounded-md p-1 text-cocoa-400 transition hover:bg-cocoa-100 hover:text-berry-500"
+            aria-label="Hapus alamat"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
       ) : null}
     </div>
   );

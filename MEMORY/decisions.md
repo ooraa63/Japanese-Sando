@@ -1069,3 +1069,54 @@ justru membuka risiko penagihan yang belum perlu.
   debounce 350 ms dan **tanpa syarat panjang minimal**, jadi satu huruf pun
   menambah kuota. Menambah syarat minimal 3 karakter adalah perbaikan hemat
   kuota yang masih belum dikerjakan.
+
+---
+
+## D46. Mapbox dibatalkan total; alamat diisi manual oleh pembeli
+
+**Keputusan:** Semua dependensi Mapbox dan peta dihapus dari project
+(3 komponen, CSS, package, env var lokal dan Vercel).
+Pembeli yang memilih zona `requires_address` mengetik alamat di
+`textarea` dan mengisi detail/location note di `textarea` kedua.
+
+**Alasan:** Steven memutuskan peta belum dibutuhkan untuk tahap ini dan
+meminta delivery address diisi "dengan detail aja pakai ketik". Tak
+memakai peta juga menghapus token publik, kuota, dan satu titik kebocoran
+ketika token tidak sengaja masuk commit.
+
+**Konsekuensi:**
+- `lat`/`lng` kolom di `orders` dan field `CartDraft` **dibiarkan**
+  (tidak ada migration) - kalau nanti peta dipakai lagi, tinggal diisi
+  lagi dari UI.
+- Koordinat zona di `delivery_zones` juga dibiarkan. `DeliveryZonesClient`
+  tetap mengirim `lat`/`lng`/`radius_km` ke `onSave` (lihat #87).
+- `requires_address` tetap menjadi penentu apakah pembeli perlu
+  menulis alamat.
+- Kalau peta diaktifkan lagi, jangan_andalkan token trial Mapbox
+  (lihat D45): token itu sudah dihapus dari Vercel dan tidak pernah
+  dibuat ulang tanpa kartu kredit.
+- Alamat kini tidak divalidasi secara geografis. owners yang salah ketik
+  jadi tanggung jawab pembeli/kurir - pertimbangkan konfirmasi manual di
+  chat bila Complaint naik.
+
+## D47. Ganti family font lewat token `--font-display`, bukan rename class
+
+**Keputusan:** Semua tulisan pindah ke Plus Jakarta Sans dengan
+mengubah satu CSS variable (`--font-display` di `globals.css`) lalu
+menghapus import `Playfair_Display` dari `layout.tsx`.
+
+**Alasan:** Steven meminta sans-serif untuk semua tulisan. Ada 54
+pemakaian class `font-display` di 26 file; mengubah variable-nya
+menghindari diff raksasa dan menghindari regresi layout di komponen
+padat seperti badge kartu menu (lihat #80).
+
+**Konsekuensi:**
+- Nama class `font-display` dipertahankan. Kalau suatu saat di-rename ke
+  `font-sans`, lakukan penggantian menyeluruh dan cek padding badge
+  kartu menu sebelum merge.
+- Font sans yang dipakai: **Plus Jakarta Sans** (bukan Inter/Geist) -
+  sudah terpasang di `layout.tsx` sebagai `jakarta`, jadi tidak menambah
+  request font.
+- Kontras visual berubah di banyak tempat (judul jadi lebih rapat dan
+  ringan). Kalau ada yang terasa "terlalu kecil", atur `text-*`
+  atau `font-semibold`, bukan mengembalikan serif.

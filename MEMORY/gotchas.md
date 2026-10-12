@@ -1378,3 +1378,57 @@ Cara memastikan: setelah deploy, jalankan headless ke domain produksi dan
 periksa status response ke `api.mapbox.com`. Kalau 401, cek cara penambahannya
 sebelum menebak tokennya salah. Catatan: `--type config` wajib untuk nama
 `NEXT_PUBLIC_*`, kalau tidak CLI menolaknya (lihat #82).
+
+## 85 - Ganti font cukup arahkan `--font-display`, jangan edit 26 file
+
+Utility class `font-display` dipakai 54 kali di 26 file, tapi semuanya
+menunjuk ke CSS variable yang sama di `globals.css`. Mengubah satu
+baris `--font-display` sudah mengubah seluruh aplikasi:
+
+```
+--font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+```
+
+Jangan mengganti nama class-nya jadi `font-sans` - itu memancing edit
+massif dan memicu regresi padding di komponen padat (pernah merusak
+badge kartu menu, lihat #80). Nama `font-display` sendiri bukan
+penanda serif, dia nama token tema.
+
+Langkah wajibnya: hapus juga import font lama di `layout.tsx`
+(`next/font/google`), kalau tidak Next tetap mengunduh font yang
+tidak dipakai.
+
+Verifikasi bukan dengan membaca CSS, tapi dengan mengambil
+`getComputedStyle` dari body, heading, dan satu elemen ber-
+`font-display` lalu cocokkan `fontFamily`-nya.
+
+## 86 - Regex deteksi kata menempel harus tanpa `\s*`
+
+Scanner kata menempel (menggabungkan partikel ke kata berikutnya) yang
+menggunakan `\s*` gagal terus karena kata Indonesia sah berprefiks
+`di-` ikut kena: `diperbesar`, `ditandai`, `dihapus`, `dipertahankan`.
+Pakai `\s*` juga resurrect kata yang sebenarnya menempel.
+
+Gunakan pola tanpa `\s*` untuk partikel (`di`, `ke`, `dan`, `atau`,
+`yang`, `untuk`, `dengan`) dan andalkan daftar putih untuk pengecualian.
+
+Efek samping yang sama berlaku untuk deteksi font: regex
+`/serif/i` akan cocok dengan kata **"sans-serif"**, jadi
+`adaSerif: true` pada hasil scan berarti false positive skrip, bukan
+font serif yang bocor. Selalu cocokkan `fontFamily` hasil
+`getComputedStyle`, bukan nama font di CSS.
+
+## 87 - `admin_upsert_zone` menimpa koordinat jadi NULL kalau payload kosong
+
+RPC `admin_upsert_zone` (lihat `supabase/migration-25.sql` baris
+170-196) memakai `lat = excluded.lat`. Kalau form admin tidak mengirim
+lat/lng, `excluded.lat` NULL dan koordinat zona yang sudah ada **hilang**
+dari DB - tidak ada error, tidak ada backup.
+
+Jadi saat membuat form admin tanpa peta, `onSave` **wajib tetap mengirim**
+`lat`/`lng`/`radius_km` yang dibaca dari zone yang sedang diedit, bukan
+menghapus field-nya dari payload.
+
+Perilaku yang sama berlaku untuk form mana pun yang kolomnya dihapus
+dari UI tapi kolomnya masih ada di DB: hapus dari UI != hapus dari
+payload upsert.
