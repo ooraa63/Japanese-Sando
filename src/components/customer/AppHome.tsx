@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { MAX_NEW_PICKS } from "@/lib/utils";
+import { useSoldCounts } from "@/lib/useSoldCounts";
 import { BundleShowcase } from "@/components/customer/BundleShowcase";
 import { FlavorCard } from "@/components/customer/FlavorCard";
 
@@ -252,12 +253,22 @@ function SectionHead({
  * lama tidak ikut terkosongkan.
  *
  * Kartu memakai `FlavorCard` mode `dense` yang SAMA dengan section "Menu"
- * dan "Menu Baru", jadi ketiganya dijamin tidak melenceng. Hati di sini
- * READ-ONLY supaya section "Menu" tetap menjadi satu-satunya tempat
- * like di beranda — aturan yang sama seperti di section "Menu Baru".
+ * dan "Menu Baru", jadi ketiganya dijamin tidak melenceng.
+ *
+ * Berbeda dari "Menu Baru", section ini TIDAK `readOnlySocial`: Steven
+ * minta hatinya bisa diklik dan angka terjualnya ikut tampil (12-10-2026,
+ * "di favorite buat ada jumlah terjualnya berapa juga sama kyk menu, dan
+ * kalau bisa, bisa like juga di sana"). Karena semua kartu memakai
+ * store `useFlavorLikes` yang SAMA dengan section "Menu", menekan hati
+ * di sini langsung mengubah hati kartu yang sama di "Menu" — dan
+ * sebaliknya. Itu memang yang diinginkan: satu produk, satu status suka.
  * ================================================================ */
 export function FavoriteShowcase({ flavors }: { flavors: Flavor[] }) {
   const { t } = useI18n();
+  // Angka terjual yang sama persis dengan section "Menu" — hook yang sama
+  // juga dipakai `MenuBrowser`, jadi satu rasa tidak akan punya dua angka
+  // terjual yang berbeda di dua tempat.
+  const soldCounts = useSoldCounts();
 
   // Belum ada yang ditandai -> disembunyikan total, bukan menampilkan
   // judul kosong. Perlakuan yang sama seperti section "Menu Baru".
@@ -272,7 +283,13 @@ export function FavoriteShowcase({ flavors }: { flavors: Flavor[] }) {
       <ul className="grid grid-cols-3 gap-2.5 sm:gap-3">
         {flavors.map((f) => (
           <li key={f.id} className="flex">
-            <FlavorCard flavor={f} dense showSocial readOnlySocial showSold={false} />
+            <FlavorCard
+              flavor={f}
+              dense
+              showSocial
+              showSold
+              soldCount={soldCounts[f.id] ?? 0}
+            />
           </li>
         ))}
       </ul>

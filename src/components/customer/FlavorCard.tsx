@@ -31,7 +31,8 @@ export function FlavorCard({
   /**
    * `dense` -> kartu ringkas ala gambar referensi: foto persegi, nama 1 baris,
    * baris "♥ suka / 🛍 terjual", lalu harga. Cukup kecil untuk 3 kartu dalam
-   * satu baris di HP. Dipakai section "Menu" di beranda dan section "Favorite"
+   * satu baris di HP. Dipakai section "Menu" dan section "Favorite" di
+   * beranda (keduanya punya tombol like), plus section "Menu Baru"
    * (dengan `readOnlySocial`, jadi yang di sana tidak bisa di-like).
    *
    * Bedanya hanya ini, sisanya komponen yang sama — jadi dua baris kartu itu
@@ -313,10 +314,12 @@ export function FlavorCard({
    * Kartu ringkas 3-kolom (referensi Steven, 10-10-2026).
    *
    * Dipakai di dua tempat dengan komponen yang sama supaya tidak melenceng:
-   *   - section "Menu"       -> `readOnlySocial` = false, hati di pojok kanan
+   *   - section "Menu"      -> `readOnlySocial` = false, hati di pojok kanan
    *     atas adalah TOMBOL like.
+   *   - section "Favorite"  -> `readOnlySocial` = false, juga TOMBOL like.
+   *     Store-nya sama dengan section "Menu", jadi satu produk punya satu
+   *     status suka yang konsisten di kedua tempat.
    *   - section "Menu Baru" -> `readOnlySocial` = true, hati hanya ikon
-   *   - section "Favorite"  -> `readOnlySocial` = true, hati hanya ikon
    *     penanda dan kartu tidak bisa diketuk sama sekali.
    *
    * Layout mengikuti gambar referensi: foto persegi, nama, baris
@@ -393,9 +396,9 @@ export function FlavorCard({
               </span>
             ) : null}
 
-            {/* Hati pojok kanan atas. Di "Menu" ini tombol like; di
-                section "Menu Baru" dan "Favorite" (`readOnlySocial`) hanya
-                ikon penanda.
+            {/* Hati pojok kanan atas. Di section "Menu" dan "Favorite" ini tombol
+                like; di section "Menu Baru" (`readOnlySocial`) hanya ikon
+                penanda.
 
                 `ml-auto` wajib: kalau kartu ini tidak punya badge apa pun di
                 pojok kiri (kondisi normal sejak badge "Favorite" dihapus),
@@ -478,11 +481,12 @@ export function FlavorCard({
 
   /* ------------------------------------------------------------------
    * Kartu menu di beranda (gambar referensi Steven, 10-10-2026):
-   * foto tinggi, badge "Favorite" di kiri atas, nama besar sans-serif,
-   * deskripsi, harga besar, lalu pil "N liked" selebar kartu.
+   * foto tinggi, nama besar sans-serif, deskripsi, harga besar, lalu pil
+   * "N liked" selebar kartu.
    *
-   * Ini SATU-SATUNYA tempat di beranda yang bisa di-like; section
-   * "Menu Baru" dan "Favorite" di atasnya sengaja read-only.
+   * Section "Menu" dan "Favorite" di beranda sama-sama punya tombol like,
+   * dan keduanya membaca store `useFlavorLikes` yang sama, jadi satu
+   * produk punya satu status suka yang konsisten di kedua tempat.
    * ------------------------------------------------------------------ */
   return (
     <article

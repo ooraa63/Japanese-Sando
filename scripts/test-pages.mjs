@@ -142,6 +142,17 @@ await openPage("/", { mustContain: ["Rumakomugi", "Pesan Sekarang"] });
     const n = (home.text.match(/Favorite/g) || []).length;
     check("  badge Favorite tidak lagi menempel di kartu", n <= 1, `(kemunculan=${n})`);
     check("  ada section Paket Hemat di beranda", /Paket Hemat/i.test(home.text));
+
+    // Isolasi isi section "Favorite" supaya cek tidak tertaut dengan
+    // section "Menu" yang juga memuat kata "terjual" dan tombol like.
+    const mulai = home.text.indexOf(">Favorite<");
+    const akhir = mulai >= 0 ? home.text.indexOf("</section>", mulai) : -1;
+    const isi = mulai >= 0 && akhir > mulai ? home.text.slice(mulai, akhir) : "";
+    check("  kartu Favorite menampilkan jumlah terjual", /terjual/i.test(isi));
+    // Tombol like = <button ... aria-pressed="...">. Kalau section ini
+    // kembali read-only, hati berubah jadi <span aria-hidden> dan cek ini
+    // gagal — persis regresi yang mau dicegah.
+    check("  hati di kartu Favorite bisa diklik", /aria-pressed/i.test(isi));
   }
 }
 await openPage("/order", { mustContain: ["Pre-order", "Siapa yang memesan"] });

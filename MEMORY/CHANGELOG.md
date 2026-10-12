@@ -4,6 +4,54 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Section "Favorite" jadi bisa di-like dan ikut menampilkan jumlah terjual
+
+**Scope:** feat - permintaan Steven (12-10-2026 15:33), langsung setelah
+baris "Favorite" pertama kali dikirim
+
+Steven: "di favorite buat ada jumlah terjualnya berapa juga sama kyk
+menu, dan kalau bisa, bisa like juga disana".
+
+Dua perubahan, keduanya di `AppHome.tsx` pada `FavoriteShowcase`:
+
+- `readOnlySocial` DIHAPUS. Hati di pojok kartu sekarang `<button>`
+  dengan `aria-pressed`, sama seperti di section "Menu". Section
+  "Menu Baru" tetap `readOnlySocial`.
+- `showSold={false}` -> `showSold` + `soldCount={soldCounts[f.id] ?? 0}`,
+  dengan angka dari hook `useSoldCounts()` yang sama persis dipakai
+  `MenuBrowser`. Jadi satu rasa tidak punya dua angka terjual berbeda
+  di dua tempat, dan angkanya tetap berasal dari RPC publik
+  (`public_flavor_sold_counts`) - tidak pernah dikarang.
+
+Kenapa satu produk yang sama bisa di-like dari dua tempat tanpa bentrok:
+semua kartu membaca store modul-level `useFlavorLikes`. Snapshot-nya
+di-cache pada tingkat modul dan `useSyncExternalStore` menyinkronkan
+semuanya sekaligus. Menekan hati di "Favorite" langsung mengubah
+hati kartu yang sama di "Menu". Persis yang diminta Steven - satu
+produk, satu status suka.
+
+Catatan penting untuk pengujian: `/api/flavor-like` menulis ke tabel
+`flavor_likes` di database produksi. Verifikasi headless TIDAK boleh
+mengklik hati. Yang diperiksa hanya strukturnya: elemennya `<button>`
+dengan `aria-pressed`. Diperkuat juga dengan pesan di
+`useFlavorLikes.ts` supaya sesi berikutnya tidak salah klik.
+
+Komentar lama yang menyatakan "section Menu = satu-satunya tempat like
+di beranda" di `FlavorCard.tsx` (3 tempat) dan `useFlavorLikes.ts`
+sudah ditulis ulang karena aturannya memang berubah.
+
+`test-pages`: 2 cek baru (total 27). Keduanya mengisolasi HTML section
+"Favorite" dulu - ambil substring dari `>Favorite<` sampai
+`</section>` terdekat - supaya tidak ikut tertaut dengan section
+"Menu" yang juga memuat kata "terjual" dan tombol like.
+
+Verifikasi lokal: `tsc` 0 error, `lint` 0 error, `build` sukses,
+`test-pages` 27/27, headless 3 kartu dengan `hatiTombol: true` dan
+baris sosial `"1 | 0 terjual"`, 0 request `/api/flavor-like`,
+0 exception.
+
+---
+
 ## 2026-10-12 - Baris "Favorite" dikembalikan di bawah Bundle; badge bintang dihapus dari kartu
 
 **Scope:** feat - permintaan Steven (12-10-2026 15:15)

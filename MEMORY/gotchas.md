@@ -1475,3 +1475,21 @@ Cara cepat verifikasi penghapusan elemen di produksi: hitung kemunculan
 teksnya di HTML hasil server (`(text.match(/Kata/g) || []).length`), bukan
 cuma `regex.test()`. Kalau elemennya masih ada di N kartu, jumlah
 kemunculannya naik dari 1 jadi 1 + N - kelihatan sekilas.
+
+## 90 - Menguji elemen interaktif: periksa strukturnya, jangan diklik
+
+`POST /api/flavor-like` menulis ke tabel `flavor_likes` di database
+PRODUKSI. Mengklik hati saat verifikasi headless bukan hal yang aman
+seperti mengetik ke keranjang (yang cuma localStorage) - ini mengubah
+counter global yang dilihat semua pembeli.
+
+Cara aman memverifikasi elemen interaktif: periksa signature DOM-nya
+sebagai ganti menekan. Untuk tombol like, cukup cek
+`section.querySelectorAll('button[aria-pressed]')` - kalau jumlahnya
+lebih dari 0, tombolnya ada dan punya state terikat. Kalau elemennya
+kembali jadi `<span aria-hidden>`, cek ini otomatis gagal.
+
+Dan untuk teks yang juga muncul di section lain (mis. "terjual" yang
+hanya ada di kartu), jangan pakai `regex.test()` di seluruh halaman -
+checkout jadi false positive. Isolasi substring section-nya dulu:
+ambil dari heading sampai `</section>` terdekat.

@@ -3,18 +3,23 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 /**
- * Store "produk yang aku suka", dipakai bersama oleh kartu Populer di beranda
+ * Store "produk yang aku suka", dipakai bersama oleh kartu Favorite di beranda
  * dan kartu di halaman menu.
  *
  * Kenapa store modul-level, bukan `useState` per kartu:
- * kartu yang sama bisa muncul di beberapa tempat sekaligus (mis. grid Populer
- * dan daftar menu lengkap di halaman yang sama). Kalau tiap kartu punya
- * state sendiri, pencetan hati di satu tempat tidak langsung terlihat di
- * tempat lain.
+ * kartu yang sama bisa muncul di beberapa tempat sekaligus (mis. baris
+ * Favorite dan daftar menu lengkap di halaman yang sama). Kalau tiap kartu
+ * punya state sendiri, pencetan hati di satu tempat tidak langsung terlihat
+ * di tempat lain.
  *
  * Like dicatat di dua tempat, sama seperti FlavorCard:
  *  - `localStorage` (key `like:flavor:<id>`) supaya instan & bertahan reload,
  *  - tabel `flavor_likes` lewat POST /api/flavor-like, untuk counter global.
+ *
+ * PENTIK untuk pengujian: endpoint `/api/flavor-like` menulis ke tabel
+ * `flavor_likes` di database produksi. Jangan mengklik hati saat verifikasi
+ * headless - cukup periksa elemennya `<button>` yang punya `aria-pressed`,
+ * bukan benar-benar menekan.
  *
  * Kalau offline / server gagal, pilihan lokal tetap disimpan: lebih baik
  * counter server yang telat sinkron daripada pilihan yang hilang.
