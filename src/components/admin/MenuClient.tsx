@@ -468,7 +468,7 @@ export function MenuClient({
       is_active: f.is_active,
       is_featured: !f.is_featured,
       // Sama seperti di toggleFlavorActive: kalau `is_new` tidak ikut dikirim,
-      // nyalakan/mematikan label "Signature" akan diam-diam menghapus label
+      // nyalakan/mematikan label "Favorite" akan diam-diam menghapus label
       // "New" dari produk itu.
       is_new: f.is_new,
       stock_enabled: true,

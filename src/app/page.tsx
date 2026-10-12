@@ -82,7 +82,7 @@ export default async function HomePage() {
         {/* ===================== MENU LENGKAP =====================
             Permintaan Steven (10-10-2026): setelah blok atas beranda ada
             judul besar "Menu", lalu di bawahnya nama kategori ("Sando
-            Sandwich") dan kartu rasa-nya. Di kartu ini label "Signature"
+            Sandwich") dan kartu rasa-nya. Di kartu ini label "Favorite"
             (kolom `flavors.is_featured`) ditampilkan kalau penjual
             menyalakannya di dashboard.
 

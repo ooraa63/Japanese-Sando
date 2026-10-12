@@ -4,6 +4,44 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-12 - Label badge "Signature" balik jadi "Favorite", badge diperbesar sedikit
+
+**Scope:** fix - koreksi label + ukuran, dengan screenshot
+
+Steven melihat hasilDeploy sebelumnya dan minta dua hal: labelnya balik
+**"Favorite"** (bukan "Signature"), dan badge-nya **diperbesar dikit aja**.
+
+- i18n (ID & EN): `t.menu.signature` dan `t.admin.menu.favorite` nilainya
+  dikembalikan ke `"Favorite"`. `t.menu.featured` (EN) juga disamakan dari
+  `"Signature"` ke `"Favorite"` supaya tidak ada sisa kata itu di kamus.
+  `featuredHint` ditulis ulang menyesuaikan ("Tandai sebagai Favorite...").
+  Semua kunci `signature`/`favorite` tetap ada - hanya **nilai** yang berubah,
+  karena serialisasi i18n menuntut kunci `id.ts` dan `en.ts` cocok persis.
+- Badge di foto kartu dense (`FlavorCard.tsx`): `text-[9px]` -> `text-[10px]`,
+  ikon `size-2.5` -> `size-3`, `py-0.5` -> `py-[3px]`, `px-1.5` (dipertahankan),
+  `gap-0.5` (dipertahankan).
+- Komentar di `FlavorCard`, `AppHome`, `page.tsx`, `MenuClient` disesuaikan.
+- `scripts/test-pages.mjs`: cek "badge Favorite tampil" + cek baru "tidak ada
+  label lama Signature" (total 26 cek).
+- Warning lint `Flavor` tidak terpakai di `SettingsClient.tsx` (sisa dari
+  penghapusan prop `flavors` di iterasi sebelumnya) ikut dibersihkan -
+  sekarang `npm run lint` 0 problem, bukan 0 error + 1 warning.
+
+**Penting soal ukuran:** versi pertama (`px-2 gap-1`) justru membuat badge
+terpotong jadi "Favo...". Baris foto kartu 3 kolom hanya ~111px; hati
+(`size-7`) memakan 28px + `gap-1` 4px, jadi sisa untuk badge cuma ~79px.
+Butuh lebar badge = teks + ikon + gap + padding horizontal: 39.9 + 12 + 2 + 12
+= ~66px. Karena itu padding harus tetap `px-1.5` dan gap `gap-0.5` - teks
+10px harus tetap muat utuh.
+
+Verifikasi: `tsc` bersih, lint 0 problem, build sukses, `test-pages.mjs`
+26/26 lulus. Headless lokal: badge 66×18px, `teksScroll == teksClient` (tidak
+terpotong), 6 badge di DOM, 0 teks "Signature", 0 exception. Admin form "Ubah
+rasa" terbaca `["Tampil di website", "Favorite", "New"]` dan ditutup dengan
+"Batal" - tidak ada data produksi yang diubah.
+
+---
+
 ## 2026-10-12 - Section "Populer" beranda dihapus, badge "Signature" di halaman Menu
 
 **Scope:** feature - dua permintaan Steven sekaligus (dengan screenshot)

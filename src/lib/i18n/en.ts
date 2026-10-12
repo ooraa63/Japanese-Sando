@@ -152,8 +152,8 @@ export const en = {
     changeCategory: "Change category",
     flavors: "flavors",
     orderNow: "Order these",
-    featured: "Signature",
-    signature: "Signature",
+    featured: "Favorite",
+    signature: "Favorite",
     soldOut: "Sold out",
     lowStock: "Only {n} left",
     inStock: "{n} available",
@@ -955,10 +955,10 @@ export const en = {
       deleteBundleConfirm: "Delete this bundle? Bundles already used by orders won't be removed, just hidden.",
       searchBundle: "Search bundle...",
       noBundle: "No bundles yet. Create one to sell value packs.",
-      favorite: "Signature",
+      favorite: "Favorite",
       newFlag: "New",
       featuredHint:
-        "Mark as Signature. The star label then appears on the product photo in the Menu page customers see.",
+        "Mark as Favorite. The star label then appears on the product photo in the Menu page customers see.",
       categorySaved: "Food category saved.",
       categoryDeleted: "Food category deleted.",
       categoryDeactivated:

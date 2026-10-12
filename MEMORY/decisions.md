@@ -1007,16 +1007,38 @@ hanya berisi produk yang juga sudah ada di menu.
   `is_new` (section "Menu Baru" di beranda), "Signature" = `is_featured`
   (badge di foto kartu menu). Jangan gabungkan keduanya.
 
-## D43 - Label admin `is_featured` disebut "Signature", bukan "Favorite"
+## D43 - ~~Label admin `is_featured` disebut "Signature"~~ (DIBATALKAN oleh D44)
 
-**Keputusan:** `t.admin.menu.favorite` (ID & EN) = "Signature".
+**Status:** dibatalkan. Keputusan ini hanya bertahan satu deploy; Steven
+melihat hasilnya lalu meminta labelnya balik jadi "Favorite". Jangan dipakai
+lagi sebagai rujukan - lihat D44.
 
-**Alasan:** Kata yang dilihat penjual harus sama persis dengan yang dilihat
-pembeli. Kalau admin mencentang "Favorite" tapi pembeli melihat badge
-"Signature", ada orang yang akan bingung karena tidak tahu maksudnya.
+Awalnya `t.admin.menu.favorite` (ID & EN) diubah dari "Favorite" menjadi
+"Signature" dengan alasan "kata yang dilihat penjual harus sama dengan yang
+dilihat pembeli". Alasan itu ternyata tidak tepat: Steven justru ingin kata
+"Favorite" yang biasa dipakai.
+
+**Yang masih berlaku dari keputusan ini:**
+- Serialisasi i18n menuntut kunci `id.ts` dan `en.ts` cocok persis, jadi kunci
+  `favorite`/`signature` harus tetap ada walau nilainya berubah.
+
+---
+
+## D44 - Label badge `is_featured` tetap "Favorite" (ID & EN)
+
+**Keputusan:** Label yang dipakai PENJUAL dan PEMBELI sama-sama
+**"Favorite"**. Kunci i18n tetap `t.menu.signature` dan `t.admin.menu.favorite`
+(nilai string-nya "Favorite"), jadi struktur dict tidak perlu diubah.
+
+**Alasan:** Steven mencoba kata "Signature" dan setelah melihat deploy-nya
+meminta balik: "Signature diganti jadi favorite aja". Kata itu sudah dikenal
+pembeli, sedangkan "Signature" terasa seperti istilah teknis.
 
 **Konsekuensi:**
-- Serialisasi i18n menuntut key `favorite` tetap ada (kunci dict harus cocok
-  persis antara `id.ts` dan `en.ts`) - yang berubah hanya **nilainya**.
-- Kalau label dengan `t.admin.menu.favorite` dipakai ulang untuk konsep lain,
-  jangan memakai ulang teks ini.
+- Kalau nanti ada kata "signature" lain di UI (mis. label marketing terpisah),
+  jangan memakainya lagi untuk `is_featured` - kata itu sudah dipakai Steven.
+- Badge di foto kartu dense punya batas ruang ketat: baris foto kartu 3 kolom
+  ~111px, hati `size-7` memakan 28px + gap 4px, jadi sisa untuk badge ~79px.
+  Lebar badge = teks + ikon + gap + padding. Dengan `text-[10px]`, ikon
+  `size-3`, `gap-0.5`, `px-1.5` totalnya ~66px dan "Favorite" muat utuh.
+  Jangan menaikkan padding dulu sebelum mengukur ulang.

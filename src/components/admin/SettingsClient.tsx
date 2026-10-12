@@ -21,7 +21,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { AdminUser, BankAccount, Flavor, StoreSettings } from "@/lib/types";
+import type { AdminUser, BankAccount, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";

@@ -164,7 +164,7 @@ export function HeroBanner({
  *
  * Kartu memakai `FlavorCard` mode `dense` yang SAMA dengan section "Menu",
  * jadi keduanya dijamin tidak melenceng. Yang membedakan cuma prop
- * `badgeLabel` (label "New" menggantikan "Signature").
+ * `badgeLabel` (label "New" menggantikan "Favorite").
  * ================================================================ */
 export function NewShowcase({ flavors }: { flavors: Flavor[] }) {
   const { t } = useI18n();
@@ -263,7 +263,7 @@ export function AppHome({
   //
   // Section "Populer" DIHAPUS (permintaan Steven 12-10-2026: "sepertinya saya
   // mau cancel baris yang popular"). Produk yang dulu ditonjolkan di sana kini
-  // ditandai di halaman Menu lewat badge "Signature"
+  // ditandai di halaman Menu lewat badge "Favorite"
   // (`flavors.is_featured`, diset dari dashboard), jadi tidak ada lagi baris
   // duplikat antara beranda dan menu.
   return (

@@ -1238,3 +1238,46 @@ sekarang LF. Itu cuma warning, **bukan** diff noise: index menyimpan LF, jadi
 blob yang ter-commit sama saja. Jangan buru-buru mengonversi file ke CRLF
 sendiri - working tree repo ini memang campuran (mis. `id.ts` CRLF,
 `page.tsx` LF) dan sudah begitu sejak awal.
+
+## 79 - Badge kartu 3 kolom:flex `shrink` menutupi truncation
+
+`truncate` di span TERCILAM hanya diam-diam: span luar punya `min-w-0 shrink`,
+jadi flex MENEKAN lebarnya sampai muat. Cek `badge.scrollWidth >
+badge.clientWidth` pada span LUAR akan selalu false - yang benar yang harus
+diperiksa adalah **span dalam** (`span.truncate`).
+
+Ruang badge di baris foto kartu 3 kolom (viewport 390px) sangat ketat:
+
+| bagian | lebar |
+|---|---|
+| baris foto | 111px |
+| hati `size-7` + `gap-1` | 32px |
+| sisa untuk badge | ~79px |
+
+Lebar badge = teks + ikon + gap + padding horizontal. "Favorite" di
+Plus Jakarta Sans bold: 35.9px @9px, 39.9px @10px. Jadi `text-[10px]` +
+ikon `size-3` + `gap-0.5` + `px-1.5` = ~66px (muat), tapi `px-2` + `gap-1`
+= ~72px plus Heart jadi **terpotong jadi "Favo..."**.
+
+Ukur lewat CDP (`getBoundingClientRect` + bikin span sementara untuk mengukur
+teks), jangan menebak dari screenshot saja. Catatan tambahan: `clip` pada
+`Page.captureScreenshot` memakai koordinat **dokumen**, jadi `y` harus
+ditambah `window.scrollY`; `getBoundingClientRect()` mengembalikan koordinat
+viewport.
+
+## 80 - Label admin di halaman `/admin/*` tidak ada di HTML SSR
+
+`MenuClient` dsb. ambil data lewat Supabase di client, jadi HTML dari `fetch`
+(`/admin/menu`) tidak memuat teks label apa pun - termasuk label toggle.
+`grep` HTML tidak bisa membuktikan label sudah benar.
+
+Cara cek yang benar: Edge headless + CDP, set cookie
+`sb-<projectRef>-auth-token` (`Network.setCookie`, `domain: "localhost"`,
+`value: encodeURIComponent(JSON.stringify(session))`), lalu klik baris
+kategori (baris flavor tidak ada sebelum kategori dipilih), klik "Ubah" sampai
+modal berisi "Ubah rasa", baca `innerText`-nya, lalu tutup dengan "Batal".
+
+Selector jebakan: teks kategori mengandung kata "jenis" ("Sando Sandwich /
+5 rasa"), dan tombol "Tambah jenis makanan" juga mengandung kata itu - klik
+yang salah akan membuka modal tambah kategori. Match /^Sando Sandwich/ atau
+nama kategori spesifik, bukan /jenis/.

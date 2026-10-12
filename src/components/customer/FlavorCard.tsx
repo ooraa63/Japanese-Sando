@@ -39,14 +39,14 @@ export function FlavorCard({
    */
   dense = false,
   /**
-   * `showBadge` -> tampilkan badge "Signature" di foto (produk unggulan dari
+   * `showBadge` -> tampilkan badge "Favorite" di foto (produk unggulan dari
    * admin). Default true di kartu "Menu". Dimatikan di "Populer" supaya kartu
    * di sana bersih, mengikuti gambar referensi Steven yang tidak memakai badge.
    */
   showBadge = true,
   /**
    * Ganti teks badge di foto, misalnya "New" untuk section "Menu Baru".
-   * Kalau diisi, label ini menggantikan "Signature" — bukan menambah badge
+   * Kalau diisi, label ini menggantikan "Favorite" — bukan menambah badge
    * kedua, supaya dua label di pojok yang sama tidak saling tumpang tindih.
    * `null`/`undefined` = pakai perilaku lama (tampil kalau `is_featured`).
    */
@@ -92,9 +92,9 @@ export function FlavorCard({
   compact?: boolean;
   /** Kartu ringkas 3-kolom (foto persegi + baris suka/terjual + harga). */
   dense?: boolean;
-  /** Tampilkan badge "Signature" di foto. Default true. */
+  /** Tampilkan badge "Favorite" di foto. Default true. */
   showBadge?: boolean;
-  /** Teks badge di foto; isi untuk menggantikan "Signature" (mis. "New"). */
+  /** Teks badge di foto; isi untuk menggantikan "Favorite" (mis. "New"). */
   badgeLabel?: string | null;
   /** Stok keseluruhan toko (bukan per rasa). null = tak terbatas. */
   remainingStock?: number | null;
@@ -352,7 +352,7 @@ export function FlavorCard({
           )}
 
           <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-1 p-1.5">
-            {/* Badge di pojok kiri atas. Teksnya "Signature" untuk produk
+            {/* Badge di pojok kiri atas. Teksnya "Favorite" untuk produk
                 unggulan, atau `badgeLabel` (mis. "New") kalau pemanggil
                 mengirimnya. Kalau label replacement ikut ada, produk ini
                 tetap tidak butuh `is_featured` — jadi section "Menu Baru"
@@ -360,15 +360,24 @@ export function FlavorCard({
 
                 Class `chip` bawaan TIDAK dipakai: default-nya `px-3 py-1
                 text-xs` terlalu lebar untuk kartu 3 kolom (~113px di HP)
-                dan akibatnya kata "Signature" jadi "Signat...". Teks 9px +
+                dan akibatnya kata label jadi terpotong. Teks 10px +
                 padding ramping membuatnya utuh; `truncate` tetap dipakai
-                sebagai jaring pengaman kalau labelnya nanti lebih panjang. */}
+                sebagai jaring pengaman kalau labelnya nanti lebih panjang.
+
+                Steven 12-10-2026 minta badge diperbesar "dikit aja" dari
+                versi 9px, jadi naik ke 10px + ikon 12px. Jangan lebih besar
+                dari itu: di kartu 3 kolom baris foto hanya ~111px, dan
+                hati (size-7) memakan 28px + gap 4px, jadi sisa untuk badge
+                cuma ~79px. Butuh lebar badge = teks + ikon + gap + padding
+                horizontal; dengan `px-1.5` + `gap-0.5` totalnya ~66px, jadi
+                "Favorite" muat utuh. Kalau padding dilonggarkan lagi, teks
+                akan terpakai jadi "Favo...". */}
             {!soldOut && (badgeLabel || (showBadge && flavor.is_featured)) ? (
-              <span className="inline-flex min-w-0 shrink items-center gap-0.5 rounded-full bg-honey-400/95 px-1.5 py-0.5 text-[9px] leading-none font-bold text-cocoa-900 shadow">
+              <span className="inline-flex min-w-0 shrink items-center gap-0.5 rounded-full bg-honey-400/95 px-1.5 py-[3px] text-[10px] leading-none font-bold text-cocoa-900 shadow">
                 {badgeLabel ? (
-                  <Sparkles className="size-2.5 shrink-0" />
+                  <Sparkles className="size-3 shrink-0" />
                 ) : (
-                  <Star className="size-2.5 shrink-0 fill-current" />
+                  <Star className="size-3 shrink-0 fill-current" />
                 )}
                 <span className="truncate">{badgeLabel ?? t.menu.signature}</span>
               </span>
@@ -378,7 +387,7 @@ export function FlavorCard({
                 "Populer" (`readOnlySocial`) hanya ikon penanda.
 
                 `ml-auto` wajib: kalau produk ini tidak punya badge
-                "Signature", taginya tidak ada dan tanpa `ml-auto` hati
+                "Favorite", taginya tidak ada dan tanpa `ml-auto` hati
                 ini akan menempel di KIRI — padahal di gambar referensi
                 posisinya selalu kanan atas. */}
             {readOnlySocial ? (
@@ -458,7 +467,7 @@ export function FlavorCard({
 
   /* ------------------------------------------------------------------
    * Kartu menu di beranda (gambar referensi Steven, 10-10-2026):
-   * foto tinggi, badge "Signature" di kiri atas, nama Playfair besar,
+   * foto tinggi, badge "Favorite" di kiri atas, nama Playfair besar,
    * deskripsi, harga besar, lalu pil "N liked" selebar kartu.
    *
    * Ini SATU-SATUNYA tempat di beranda yang bisa di-like; section

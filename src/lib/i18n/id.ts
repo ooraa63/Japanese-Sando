@@ -155,7 +155,7 @@ export const id: Dict = {
     flavors: "rasa",
     orderNow: "Pesan rasa ini",
     featured: "Favorit",
-    signature: "Signature",
+    signature: "Favorite",
     soldOut: "Habis",
     lowStock: "Tersisa {n}",
     inStock: "Tersedia {n}",
@@ -962,10 +962,10 @@ export const id: Dict = {
       deleteBundleConfirm: "Hapus bundle ini? Bundle yang sudah dipakai pesanan tidak akan dihapus, hanya disembunyikan.",
       searchBundle: "Cari bundle...",
       noBundle: "Belum ada bundle. Buat satu untuk menjual paket hemat.",
-      favorite: "Signature",
+      favorite: "Favorite",
       newFlag: "New",
       featuredHint:
-        "Tandai sebagai Signature. Label bintang muncul di foto produk di halaman Menu untuk pembeli.",
+        "Tandai sebagai Favorite. Label bintang muncul di foto produk di halaman Menu untuk pembeli.",
       categorySaved: "Jenis makanan tersimpan.",
       categoryDeleted: "Jenis makanan dihapus.",
       categoryDeactivated:
