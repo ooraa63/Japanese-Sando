@@ -4,6 +4,58 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-13 - Footer ikut tersembunyi sampai di-scroll
+
+**Scope:** 1 permintaan Steven (13-10-2026 13:15, dikonfirmasi lewat kuesioner):
+"sembunyikan footer juga sampai di-scroll". Footer yang dimaksud adalah blok
+coklat info toko (`SiteFooter`, tampil di desktop), bukan MobileBottomNav.
+
+### Yang berubah
+
+- **`src/lib/useRevealOnScroll.ts` (baru)** - hook bersama untuk
+  "muncul setelah digulir", dipakai `MobileBottomNav` dan `SiteFooter`.
+  Ambang `REVEAL_AFTER_PX = 16`. Argumen `tampilkanJikaTidakBisaGulir` yang
+  sempat ada untuk footer DIHAPUS: begitu ada pengecualian halaman pendek,
+  elemen muncul diam-diam tepat setelah pindah halaman, persis perilaku yang
+  Steven tolak.
+- **`src/components/customer/SiteFooter.tsx`** - pakai hook itu. Efeknya
+  `invisible` + `opacity` dengan `transition-opacity`.
+- **`src/components/customer/MobileBottomNav.tsx`** - hook lokal
+  `useShowNavOnScroll` dihapus, diganti hook bersama.
+- **`src/app/layout.tsx`** - `<body>` jadi `min-h-[calc(100dvh+4rem)]`,
+  sebelumnya `min-h-dvh`.
+
+### Dua jebakan yang bikin lama
+
+**1. `translate-y-full` di footer memicu scroll anchoring.** Footer itu
+`position: static`, jadi saat transform-nya berubah seiring scroll, anchoring
+browser mengoreksi scroll, scroll turun lagi, footer hilang, anchoring dorong
+naik, dan seterusnya. Akibatnya `scrollY` terkunci di 12px dan `opacity`
+footer berkedip di 0.031 tiap frame. Nav bawah aman karena `position: fixed`.
+
+**2. Padding di footer TIDAK menambah tinggi halaman.** Tiap halaman punya
+anak `flex-1` di dalam wrapper `min-h-dvh`; anak itu menyerap seluruh ruang
+kosong yang tersisa. `pb-16` di footer maupun `<div class="h-16">` sebagai
+saudara setelah footer sama-sama dikompensasi: `/riwayat` 1912x807 tetap
+`scrollHeight` 807 = persis tinggi viewport. Satu-satunya tempat yang tidak
+menyerap adalah `<body>`, jadi ruang scroll minimal 64px dipasang di sana.
+
+Perhatikan juga: aturan `min-height` untuk `body` di `@layer base` globals.css
+sama sekali tidak berlaku, karena class utility `min-h-*` di JSX menang atas
+cascade layer `base`. Itu sempat membuat satu percobaan gagal tanpa error.
+
+### Verifikasi
+
+Headless (Edge + CDP, scroll via `Input.dispatchMouseEvent`): 8/8 lulus.
+Footer `visibility: hidden` di layar pertama dan `visible` setelah di-scroll
+di `/riwayat`, `/faq`, `/track`, `/jam-buka`, `/syarat-ketentuan`, `/contact`
+(1912x807) dan `/riwayat` (1920x1400). Bottom nav mobile `/riwayat` 390x844
+tetap muncul setelah digulir. `tsc` 0 error, `eslint` 0 error, build sukses,
+`test:pages` 30/30.
+
+Catatan: `store_settings.hours_*` dan `deadline_*` masih kosong di produksi,
+jadi blok jam buka di footer belum menampilkan apa pun. Tidak diisi dengan
+data karangan.
 ## 2026-10-13 - Prefix kode pesanan RK-, nav bawah muncul setelah di-scroll
 
 **Scope:** 2 permintaan Steven (13-10-2026 12:15) + 1 screenshot `/track` yang

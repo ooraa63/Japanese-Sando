@@ -2,68 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { ClipboardList, Home } from "lucide-react";
 import type { ProfileMenuItem } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
+import { useRevealOnScroll } from "@/lib/useRevealOnScroll";
 import { ProfileSheet, ProfileTabButton } from "@/components/customer/ProfileSheet";
-
-/**
- * Berapa px pengguna harus menggulir sebelum nav bawah muncul.
- *
- * Sengaja kecil. Alasannya: halaman pendek seperti /riwayat (hanya ~68px
- * ruang scroll, semuanya cuma spacer buat nav itu sendiri) TIDAK punya ruang
- * buat ambang besar — dengan ambang 80px nav tidak akan pernah muncul di sana,
- * persis halaman yang jadi keluhan Steven. 16px cukup untuk menyaring
- * getaran sub-piksel tanpa membuat halaman pendek jadi buntu.
- */
-const NAV_REVEAL_PX = 16;
-
-/**
- * True kalau nav bawah layak ditampilkan: pengguna sudah menggulir ke bawah.
- *
- * SENGAJA TIDAK ada pengecualian "kalau halaman tidak bisa digulir, tetap
- * tampilkan". Percobaan pertama punya pengecualian itu dengan alasan supaya
- * pembeli tidak kehilangan navigasi di halaman pendek. Setelah diuji ternyata
- * tidak perlu: setiap halaman pembeli sudah merender spacer 68px
- * (`h-[68px] md:hidden`), jadi selalu ada yang bisa digulir dan nav selalu
- * bisa dijangkau. Pengecualian itu cuma membuat nav muncul diam-diam tepat
- * setelah pindah halaman, persis yang Steven minta dihilangkan ("jangan
- * ketika klik Riwayat langsung muncul").
- *
- * `resetKey` (pathname) jadi dependensi supaya efeknya jalan ulang setiap
- * pindah halaman. Next.js mengembalikan scroll ke 0, tapi event "scroll"
- * tidak selalu sempat dilepas pada momen itu; dengan memanggil ulang
- * evaluate(), nav ikut menghitung ulang posisinya.
- */
-function useShowNavOnScroll(active: boolean, resetKey: string) {
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    if (!active) return;
-
-    const evaluate = () => {
-      setShow(window.scrollY > NAV_REVEAL_PX);
-    };
-
-    // Dipanggil sekali di sini supaya tampilan benar sejak frame pertama
-    // (termasuk saat browser memulihkan posisi scroll). Sisa pemanggilan datang
-    // dari event scroll/resize.
-    evaluate();
-    window.addEventListener("scroll", evaluate, { passive: true });
-    window.addEventListener("resize", evaluate);
-    return () => {
-      window.removeEventListener("scroll", evaluate);
-      window.removeEventListener("resize", evaluate);
-    };
-  }, [active, resetKey]);
-
-  // Tidak ada `setShow(false)` di dalam effect: saat `active` jadi false,
-  // komponennya sudah `return null` jadi nav tidak dirender sama sekali.
-  // Mengembalikan `active && show` membuat state sisa dari halaman sebelumnya
-  // tidak pernah bocor ke render berikutnya.
-  return active && show;
-}
 
 /**
  * Bottom navigation bar untuk mobile (HP). Fixed di bawah viewport, di atas
@@ -111,7 +54,7 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
   // WAJIB dipanggil sebelum `if (hidden) return null` di bawah. Hook yang
   // bersyarat akan mengubah urutan hook antar navigasi, dan React akan
   // melemparkan error "Rendered more hooks than during the previous render".
-  const navVisible = useShowNavOnScroll(!hidden, pathname);
+  const navVisible = useRevealOnScroll(!hidden, pathname);
 
   if (hidden) return null;
 

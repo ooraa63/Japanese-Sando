@@ -1221,3 +1221,23 @@ produk sendiri.
   menjamin setiap halaman pembeli selalu bisa digulir, jadi tidak ada risiko
   navigasi terkunci. Lihat gotcha #98 untuk dua percobaan gagal yang
   seharusnya tidak diulang.
+
+
+- **D61** - **Footer (`SiteFooter`) ikut disembunyikan sampai di-scroll**, sama
+  seperti bottom nav (Steven 13-10-2026: "sembunyikan footer juga sampai
+  di-scroll"). Steven sudah diberi tahu bahwa halaman yang tidak bisa
+  digulir akan jadi tanpa footer sama sekali, dan dia tetap memilihnya.
+  Efeknya memakai `visibility` + `opacity`, BUKAN `translate-y-full`: footer
+  itu `position: static`, dan menggeser elemen static saat scroll memicu
+  scroll anchoring yang mengunci `scrollY` dan membuat footer berkedip.
+  Bottom nav aman dari itu hanya karena `position: fixed`.
+- **D62** - **Ruang scroll minimal dijamin di `<body>`**
+  (`src/app/layout.tsx`: `min-h-[calc(100dvh+4rem)]`), bukan dengan padding
+  footer atau elemen spacer. Alasannya di gotcha #99 dan #100. Halaman yang
+  sudah lebih panjang dari viewport tidak terpengaruh.
+- **D63** - Logika scroll-reveal diekstrak ke hook bersama
+  **`src/lib/useRevealOnScroll.ts`**, dipakai `MobileBottomNav` dan
+  `SiteFooter`. Argumen `tampilkanJikaTidakBisaGulir` DIHAPUS: begitu ada
+  pengecualian halaman pendek, elemen muncul diam-diam tepat setelah pindah
+  halaman, dan itu justru yang Steven minta dihapus. Hook dipanggil sebelum
+  `if (hidden) return null` supaya urutan hook tidak berubah antar navigasi.

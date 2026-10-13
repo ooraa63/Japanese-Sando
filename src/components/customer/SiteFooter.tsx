@@ -3,9 +3,11 @@ import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Clock, HelpCircle, MessageCircle, Timer } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { waLink } from "@/lib/utils";
+import { useRevealOnScroll } from "@/lib/useRevealOnScroll";
 import type { StoreSettings } from "@/lib/types";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 
@@ -15,6 +17,21 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
   const storeName = settings?.store_name || DEFAULT_STORE_NAME;
   const hours = lang === "en" ? settings?.hours_en : settings?.hours_id;
   const deadline = lang === "en" ? settings?.deadline_en : settings?.deadline_id;
+
+  // Steven 13-10-2026: footer ikut disembunyikan sampai pengguna menggulir,
+  // sama seperti bottom nav. "Di /riwayat blok coklatnya langsung nempel di
+  // layar pertama, padahal di /track baru muncul setelah di-scroll" — dia mau
+  // konsisten, keduanya baru muncul begitu digulir.
+  //
+  // `pathname` jadi resetKey supaya pindah halaman mengulang penghitungan dari
+  // nol. Tanpa pengecualian "kalau tidak bisa digulir, tetap tampilkan":
+  // begitu ada pengecualian, elemen muncul diam-diam tepat setelah pindah
+  // halaman — perilaku yang justru Steven tolak.
+  //
+  // Konsekuensinya halaman WAJIB selalu punya ruang scroll. Itulah gunanya
+  // `pb-16` di bawah.
+  const pathname = usePathname() ?? "";
+  const reveal = useRevealOnScroll(true, pathname);
 
   return (
     // Steven (dokumen "Perbaikan Ruma Komugi 2" item 1 & 2): footer ini adalah
@@ -26,7 +43,52 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
     // (lihat ContactMenuRow + ContactSection).
     //
     // `hidden md:block` = tidak sama sekali di HP, tampil penuh di laptop.
-    <footer className="mt-14 hidden bg-cocoa-900 text-cream-200 md:block">
+    //
+    // `invisible` dipakai bareng `opacity-0` supaya footer yang tersembunyi
+    // benar-benar keluar dari tab-order. Kalau hanya digeser keluar layar,
+    // link di dalamnya masih bisa difokus pakai keyboard.
+    //
+    // PENTING — kenapa TIDAK pakai `translate-y-full` di sini (bottom nav
+    // memang memakainya dan itu aman):
+    //
+    // Footer ini `position: static`, jadi berada di dalam flow. Menggesernya
+    // dengan transform membuat posisinya berubah, dan itu memicu SCROLL
+    // ANCHORING browser untuk mengoreksi scroll agar konten tidak meloncat.
+    // Di halaman yang ruang scroll-nya cuma ~300px (/riwayat) hasilnya
+    // feedback loop: scroll naik -> footer muncul -> anchoring menarik scroll
+    // turun lagi -> footer hilang -> anchoring dorong naik -> ... Halaman jadi
+    // tidak bisa di-scroll sama sekali (scrollY terkunci di 12px) dan footer
+    // berkedip.
+    //
+    // Nav bawah aman dari ini karena `position: fixed` — fixed tidak ikut
+    // memengaruhi posisi elemen lain, jadi scroll anchoring tidak bereaksi.
+    //
+    // Efeknya tetap sesuai permintaan Steven: footer tidak ada di layar
+    // pertama, baru muncul setelah digulir. Ruangnya juga tidak berubah
+    // karena `visibility: hidden` tetap menempati tempat di layout, jadi
+    // halaman tidak melompat saat digulir.
+    //
+    // Ruang gulir 64px yang membuat semua ini bisa bekerja TIDAK ditaruh
+    // di sini. Padding di dalam <footer> (pb-16) maupun div spacer sebagai
+    // saudara di wrapper halaman sama-sama tidak menambah tinggi halaman:
+    // tiap halaman membungkus header+main di dalam anak `flex-1` milik
+    // wrapper `min-h-dvh`, dan anak itu menyerap seluruh ruang kosong yang
+    // tersisa. Terbukti di /riwayat 1912x807: dengan pb-16 maupun dengan
+    // spacer, `scrollHeight` tetap 807 = persis tinggi viewport; yang
+    // bergeser cuma posisi footer (504 -> 440).
+    //
+    // Jadi batas minimal tinggi halaman dipasang di `<body>` pada
+    // src/app/layout.tsx (`min-h-[calc(100dvh+4rem)]`) — satu tempat untuk
+    // semua halaman. Di sana tidak ada yang menyerap ruang kosong, jadi
+    // 64px itu benar-benar jadi ruang scroll.
+    // Tanpa itu, footer di halaman yang isinya muat pas di layar pertama
+    // tidak akan pernah bisa muncul: tidak ada yang bisa digulir untuk
+    // memunculkannya.
+    <footer
+      className={`mt-14 hidden bg-cocoa-900 text-cream-200 transition-opacity duration-200 ease-out md:block ${
+        reveal ? "visible opacity-100" : "invisible opacity-0"
+      }`}
+    >
       <div className="bg-seigaha">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-4">
           <div className="md:col-span-2">

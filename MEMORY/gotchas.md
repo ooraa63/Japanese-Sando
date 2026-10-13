@@ -1642,3 +1642,51 @@ Cabang itu membatalkan seluruh permintaan — fiturnya akan muncul diam-diam
 tepat setelah pindah halaman, dan itu justru yang sedang dicoba dihilangkan.
 Periksa dulu apakah halaman benar-benar tidak bisa digulir (dihitung dari
 `scrollHeight` vs `innerHeight`), bukan berasus-asumsi.
+
+
+
+## Gotcha #99 — `flex-1` di dalam wrapper `min-h-dvh` MENYERAP semua tinggi tambahan
+
+Struktur wrapper tiap halaman:
+
+```
+<div className="flex min-h-dvh w-full flex-col">      <- min-h dvh
+  <div className="... flex-1 flex-col">...</div>       <- header + main, SERAP sisa ruang
+  <SiteFooter />
+</div>
+```
+
+Kalau elemen apa pun ditambah atau diperbesar di dalam atau di sisi wrapper
+itu, anak `flex-1` yang menyusut supaya total tinggi tetap pas di `dvh`.
+`scrollHeight` tidak bertambah sama sekali.
+
+Dua percobaan yang sudah terbukti GAGAL dan jangan diulang:
+
+- `pb-16` di dalam `<footer>`: `/riwayat` 1912x807 tetap `scrollHeight` 807.
+  Yang bergeser cuma posisi footer (`getBoundingClientRect().top` 504 ke 440).
+- `<div className="h-16 shrink-0 bg-cocoa-900" />` sebagai saudara SETELAH
+  `<footer>` di wrapper yang sama: tetap 807. Ukuran terukur: anak 384 +
+  `mt-14` 56 + footer 303 + spacer 64 = 807 persis.
+
+Perbaikannya: batas minimum tinggi halaman dipasang di `<body>`
+(`src/app/layout.tsx`), karena di body tidak ada anak `flex-1` yang menyerap.
+Lihat gotcha #100 untuk kenapa tidak bisa ditaruh di `globals.css`.
+
+## Gotcha #100 — utility Tailwind di JSX menang atas `@layer base` globals.css
+
+Aturan `min-height` untuk `body` yang ditulis di `@layer base` `globals.css`
+tidak berlaku kalau elemen itu punya class utility `min-h-*` di JSX.
+Cascade layer `utilities` menang atas `base` meski specificity-nya
+rendah. Gejalanya: aturan ada di file, build bersih, tapi `scrollHeight`
+tetap tidak berubah saat diukur di browser.
+
+Jadi perubahan yang menyentuh class utility harus ditulis di JSX-nya
+(`src/app/layout.tsx`), bukan di globals.css.
+
+## Gotcha #101 — file sumber repo ini CRLF; hati-hati saat menulis skrip Node
+
+File `.ts`, `.tsx`, dan `.css` di repo ini memakai akhir baris CRLF.
+`content.split("\n")` menyisakan `\r` di akhir tiap baris, jadi perbandingan
+persis string (`line === "..."`) diam-diam tidak pernah cocok dan skrip
+menganggap tidak ada yang berubah. Pakai `line.trim()`, atau lebih aman:
+kerja berdasarkan indeks baris, bukan isi baris.
