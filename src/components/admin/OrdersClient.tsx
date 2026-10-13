@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import {
   Check,
   CheckCheck,
-  ChevronDown,
   ClipboardList,
   Download,
   ImageOff,
@@ -34,7 +33,6 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { getOrdersAction, updateOrderStatusAction } from "@/app/admin/actions";
 import { ProofViewer } from "@/components/admin/ProofViewer";
-import { OrderRow } from "@/components/admin/OrderRow";
 
 const FILTERS: Array<{ key: OrderStatus | "all"; labelId: string; labelEn: string }> = [
   { key: "all", labelId: "Semua", labelEn: "All" },
@@ -65,7 +63,7 @@ export function OrdersClient({
     () => initialOrders.find((o) => o.id === focusId) ?? null
   );
   const [note, setNote] = useState(() => initialOrders.find((o) => o.id === focusId)?.admin_note ?? "");
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  // `expanded` dihapus 13-10-2026 bersama tombol "Lihat pesanan".
   const [busyId, setBusyId] = useState<number | null>(null);
   const [refreshing, startRefresh] = useTransition();
   const [pending, startPending] = useTransition();
@@ -307,7 +305,6 @@ export function OrdersClient({
       ) : (
         <ul className="space-y-3">
           {orders.map((o) => {
-            const open = expanded.has(o.id);
             const actions = ADMIN_TRANSITIONS[o.status];
             const busy = busyId === o.id;
 
@@ -319,7 +316,20 @@ export function OrdersClient({
                 }`}
               >
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4">
-                  {/* Info utama */}
+                  {/* Info utama.
+
+                      Steven 13-10-2026: SELURUH teks di sini diperbesar.
+                      Sebelumnya baris tanggal/pembayaran/delivery hanya
+                      `text-[11px]` dan nama pelanggan `text-sm` — di layar
+                      admin itu nyaris tidak terbaca tanpa condenser.
+                      Sekarang minimal `text-[13px]`, nama `text-base`.
+
+                      Tombol "Lihat pesanan" yang expandable dihapus: rincian
+                      yang dihidupkannya (Telepon, Pembayaran, Pengiriman,
+                      alamat, tanggal) SEMUA-nya sudah tertulis di header ini,
+                      dan versi lengkapnya sudah ada di modal detail yang
+                      terbuka saat kode pesanan ditekan. Berkas
+                      `OrderRow.tsx` dihapus bersama fiturnya. */}
                   <button
                     type="button"
                     onClick={() => {
@@ -344,18 +354,18 @@ export function OrdersClient({
                       ) : null}
                     </div>
 
-                    <p className="mt-1 text-sm font-bold text-cocoa-700">
+                    <p className="mt-1.5 text-base font-bold text-cocoa-700">
                       {o.customer_name}{" "}
-                      <span className="font-normal text-cocoa-400" dir="ltr">
+                      <span className="font-normal text-cocoa-500" dir="ltr">
                         · {formatPhone(o.phone)}
                       </span>
                     </p>
 
-                    <p className="mt-1 line-clamp-2 text-[13px] text-cocoa-500">
+                    <p className="mt-1 line-clamp-2 text-sm text-cocoa-600">
                       {o.items.map((i) => `${i.quantity}× ${i.flavor_name}`).join(", ")}
                     </p>
 
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-cocoa-400">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-cocoa-500">
                       {/* Hari, tanggal, dan jam lengkap */}
                       <span className="font-semibold text-cocoa-500" title={t.admin.orders.createdFull}>
                         {formatFullDateTime(o.created_at, lang)}
@@ -434,31 +444,8 @@ export function OrdersClient({
                         );
                       })}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpanded((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(o.id)) next.delete(o.id);
-                          else next.add(o.id);
-                          return next;
-                        })
-                      }
-                      className="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-cocoa-400 transition hover:text-cocoa-700"
-                    >
-                      {open ? t.admin.orders.hideItems : t.admin.orders.showItems}
-                      <ChevronDown className={`size-3 transition ${open ? "rotate-180" : ""}`} />
-                    </button>
                   </div>
                 </div>
-
-                {/* Rincian */}
-                {open ? (
-                  <div className="border-t border-cocoa-100 bg-cocoa-50/60 px-4 py-3.5">
-                    <OrderRow order={o} />
-                  </div>
-                ) : null}
               </li>
             );
           })}

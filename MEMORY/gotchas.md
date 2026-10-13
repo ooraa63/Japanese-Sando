@@ -1708,3 +1708,23 @@ Di lokal bundle CSS sudah cache sehingga tidak pernah muncul.
 Jeda aman untuk produksi: 6 detik. Kalau bandingkan lokal vs produksi,
 samakan dulu jeda-nya supaya yang diukur memang perilakunya, bukan
 kecepatan jaringan.
+
+
+## Gotcha #103 - `Add-Content -Encoding UTF8` dari PowerShell merusak isi file
+
+Menulis ke file sumber dari PowerShell dengan `Add-Content -Encoding UTF8`
+BISA merusak isi file yang sudah ada, bukan cuma menambahkan. Di globals.css
+tanda em-dash turned jadi `a-circumflex-euro` (`â€”`) dan file jadi campur
+CRLF dan LF.
+
+Akibatnya skrip Node berikutnya yang memecah file dengan `split("\n")` ikut
+salah hit, dan saat_dictionary yang salah itu 'dibersihkan' skrip tersebut
+justru MENGHAPUS blok `@media print` yang sah — 29 baris hilang tanpa terlihat
+sampai dicek `git diff`.
+
+Aturan: penyuntingan file SELALU lewat tool edit/write atau skrip Node yang
+menulis UTF-8. Kalau salah satu sudah merusak file, `git checkout -- <file>`
+lalu ulang — jangantry menambal dengan edit.
+
+Dan selalu cek `git diff --numstat`: untuk file yang murni nambah isi, kolom
+penghapusan HARUS 0. Kalau tidak nol, ada baris lama yang hilang.

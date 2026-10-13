@@ -292,7 +292,11 @@ export const id: Dict = {
       cashDesc: "Tidak perlu transfer. Bayar saat mengambil pesanan.",
       pickup: "Ambil di toko",
       pickupDesc: "Datang ke toko sesuai waktu yang disepakati. Pesanan tidak diantar.",
-      deliveryTitle: "Bagaimana cara menerimanya?",
+      // Steven 13-10-2026: judulnyarijadi "Pengambilan" saja. Frasa
+      // "Bagaimana cara menerimanya?" terlalu panjang dan membingungkan
+      // karena yang dipilih sebenarnya cara MEMILIH tempat, bukan cara
+      // menerima barang.
+      deliveryTitle: "Pengambilan",
       delivery: "Diantar",
       deliveryDesc: "Kami antarkan ke alamatmu.",
       deliveryZoneTitle: "Antar ke zona mana?",
@@ -308,9 +312,11 @@ export const id: Dict = {
       transferAccount: "Transfer ke",
       copyAccount: "Salin nomor",
       qrisUnavailable: "Metode pembayaran belum diatur oleh penjual.",
-      qrisMidtrans: "QRIS via Midtrans (dinamis)",
-      qrisMidtransDesc:
-        "QR unik di-generate sesuai total kamu. Auto-terkonfirmasi via Midtrans.",
+      // Steven 13-10-2026: label dipersingkat jadi "QRIS" dan deskripsinya
+      // dihapus. Kata "via Midtrans (dinamis)" adalah istilah internal
+      // integration — pembeli cuma perlu tahu cara bayarnya QRIS.
+      qrisMidtrans: "QRIS",
+      qrisMidtransDesc: "",
       qrisMidtransNotConfigured:
         "Midtrans belum dikonfigurasi. Hubungi penjual atau pilih metode lain.",
       qrisMidtransCta: "Bayar dengan QRIS",

@@ -37,7 +37,9 @@ export default async function AdminLoginPage({
   const [dicts, lang] = await Promise.all([getI18nDict(), getLang()]);
 
   return (
-    <main className="grid min-h-dvh lg:grid-cols-2">
+    // `admin-shell` agar ikut aturan pembesar font yang sama dengan dashboard
+    // (lihat globals.css). Tanpa ini, halaman login tetap ukuran kecil.
+    <main className="admin-shell grid min-h-dvh lg:grid-cols-2">
       {/* Panel kiri: identitas */}
       <div className="relative hidden overflow-hidden bg-cocoa-950 p-12 text-cream-50 lg:flex lg:flex-col lg:justify-between">
         <div className="absolute inset-0 bg-seigaha opacity-70" />

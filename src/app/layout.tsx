@@ -91,29 +91,17 @@ export default async function RootLayout({
       data-scroll-behavior="smooth"
       className={jakarta.variable}
     >
-      {/* `min-h-[calc(100dvh+4rem)]`, bukan `min-h-dvh` polos (Steven 13-10-2026).
+      {/* Steve 13-10-2026 23:00: `min-h-dvh` polos, bukan plus 4rem.
 
-          Footer dan bottom nav sama-sama disembunyikan sampai pengguna
-          menggulir. Kalau sebuah halaman isinya pas di layar pertama, tidak
-          ada yang bisa digulir untuk memunculkannya: di /riwayat ukuran
-          1912x807 tinggi halamannya persis sama dengan viewport, sehingga
-          footer tidak akan pernah muncul.
+          Scroll-reveal footer sudah dibatalkan — Steven meluruskan bahwa
+          footer tidak perlu efek apa pun, cukup "ada di paling bawah".
+          Ruang scroll 64px yang dulu dipaksakan supaya footer bisa
+          dimunculkan juga sudah dicabut: tanpa efek itu, tidak ada alasan
+          halaman pendek harus bisa digulir.
 
-          Kenapa 4rem-nya di <body>, bukan padding di footer atau di wrapper
-          halaman? Karena tiap halaman punya anak `flex-1` di dalam wrapper
-          `min-h-dvh`, dan anak itu menyerap seluruh ruang kosong yang
-          tersisa. Tambahan tinggi di dalam atau di sisi footer selalu
-          dikompensasi, jadi tinggi halaman tidak pernah bertambah — terbukti
-          saat `pb-16` dicoba dan `scrollHeight` tetap 807. Di body tidak ada
-          yang menyerap, jadi 4rem ini benar-benar jadi ruang scroll.
-
-          Halaman yang sudah lebih panjang dari viewport tidak terpengaruh
-          sama sekali, karena min-height hanya memberi batas bawah.
-
-          Catatan: aturan ini TIDAK bisa ditaruh di globals.css. Utility
-          Tailwind `min-h-dvh` yang ada di elemen ini menang atas `@layer base`,
-          jadi harus diubah langsung di sini. */}
-      <body className="min-h-[calc(100dvh+4rem)] antialiased">
+          Detail kenapa padding di footer / spacer tidak pernah berhasil ada
+          di MEMORY/gotchas.md (#99) dan di komentar SiteFooter. */}
+      <body className="min-h-dvh antialiased">
         <I18nProvider initialLang={lang}>
           <ToastProvider>
             <CartProvider>

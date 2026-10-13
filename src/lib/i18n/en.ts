@@ -287,7 +287,8 @@ export const en = {
       cashDesc: "No transfer needed. Pay when you collect your order.",
       pickup: "Collect in store",
       pickupDesc: "Come to the store at the agreed time. Orders are not delivered.",
-      deliveryTitle: "How will you get it?",
+      // Steven 13-10-2026: heading is just "Pickup", not a long question.
+      deliveryTitle: "Pickup",
       delivery: "Delivery",
       deliveryDesc: "We deliver to your address.",
       deliveryZoneTitle: "Deliver to which zone?",
@@ -304,9 +305,9 @@ export const en = {
       transferAccount: "Transfer to",
       copyAccount: "Copy number",
       qrisUnavailable: "No payment method has been set up yet.",
-      qrisMidtrans: "QRIS via Midtrans (dynamic)",
-      qrisMidtransDesc:
-        "A unique QR is generated for your exact total. Auto-confirmed by Midtrans.",
+      // Steven 13-10-2026: label shortened to "QRIS", description removed.
+      qrisMidtrans: "QRIS",
+      qrisMidtransDesc: "",
       qrisMidtransNotConfigured:
         "Midtrans is not set up. Please contact the seller or choose another payment method.",
       qrisMidtransCta: "Pay with QRIS",

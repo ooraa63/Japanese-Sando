@@ -377,3 +377,41 @@
     display: block !important;
   }
 }
+
+/* =============================================================================
+   Steven 13-10-2026 - UKURAN FONT DASHBOARD ADMIN
+
+   Keluhan: "font untuk web admin, banyak yang susah dibaca karena terlalu
+   kecil". Dashboard dipakai sambil memeriksa detail pesanan, jadi teks
+   10-13px praktis tidak terbaca.
+
+   Kenapa pakai CSS dan bukan mengubah tiap file? Ada ratusan kemunculan
+   `text-[10px]` sampai `text-[13px]` di `src/app/admin/**` dan
+   `src/components/admin/**`. Mengedit semuanya satu per satu rawan ada
+   yang tertinggal, sementara aturan di bawah cukup satu tempat.
+
+   Sifat aturan ini: TIDAK memakai `@layer`, dan itu disengaja. CSS tanpa
+   layer selalu menang atas CSS ber-layer, termasuk utility Tailwind. Kalau
+   aturan ini ditaruh ke `@layer utilities`, ia akan kalah dari utility
+   yang dikompilasi belakangan.
+
+   Hanya berlaku di dalam `.admin-shell` (shell dashboard + halaman login
+   admin). Tampilan pembeli tidak tersentuh sama sekali.
+   ============================================================================= */
+.admin-shell [class*="text-[9px]"],
+.admin-shell [class*="text-[10px]"],
+.admin-shell [class*="text-[11px]"] {
+  font-size: 0.8125rem; /* 13px - naik dari 9/10/11px */
+}
+
+.admin-shell [class*="text-[12px]"] {
+  font-size: 0.875rem; /* 14px */
+}
+
+.admin-shell [class*="text-[13px]"] {
+  font-size: 0.9375rem; /* 15px */
+}
+
+.admin-shell .text-xs {
+  font-size: 0.875rem; /* 14px - utility text-xs itu 12px */
+}

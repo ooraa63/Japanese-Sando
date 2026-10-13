@@ -750,10 +750,15 @@ export function OrderFlow({
   // mundur ini harus ada di SETIAP langkah, bukan cuma di payment & review.
   const prevStep: Step | null = stepIndex > 0 ? steps[stepIndex - 1] : null;
 
-  // Di langkah identitas BELUM ada yang bisa dimasukkan ke keranjang, jadi
-  // panel keranjang disembunyikan supaya tidak menampilkan pilihan kosong yang
-  // membingungkan. Grid pun jadi satu kolom penuh.
-  const showCartPanel = step !== "identity";
+  // Steven 13-10-2026: panel keranjang HANYA di langkah "Pilih Rasa".
+  //
+  // Di langkah identitas isinya pasti kosong, jadi tidak useful. Di langkah
+  // Pembayaran dan Konfirmasi juga dihapus — di situ pembeli sudah memilih
+  // metode pembayaran, lokasi, lalu mengonfirmasi; isi keranjang yang
+  // ditunjukkan di sisi kanan hanya mengulang apa yang sudah tertulis di
+  // kartu "Periksa pesananmu" (nama, telepon, pembayaran, pengiriman).
+  // Menghemat ruang vertikal, yang di layar HP dipakai untuk form.
+  const showCartPanel = step === "menu";
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -1220,22 +1225,17 @@ export function OrderFlow({
                     </p>
                   </div>
                 </div>
-              ) : settings.address ? (
-                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-cocoa-200 bg-cocoa-50 p-4">
-                  <Store className="mt-0.5 size-5 shrink-0 text-cocoa-400" />
-                  <div>
-                    <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
-                      {t.order.payment.address}
-                    </p>
-                    <p className="mt-0.5 text-[13px] text-cocoa-600">{settings.address}</p>
-                    {settings.hours_id ? (
-                      <p className="mt-1 text-xs text-cocoa-400">
-                        {t.contact.hours}: {settings.hours_id}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
               ) : null}
+              {/* Steven 13-10-2026: kartu yang dulu ada di sini DIHAPUS.
+
+                  Kartu itu berlabel "ALAMAT PENGIRIMAN" padahal isinya
+                  `settings.address`, yaitu ALAMAT TOKO, bukan alamat
+                  pembeli. Salah label itu bikin membingungkan, dan di
+                  langkah "Ambil di toko" pembeli jelas tidak perlu alamat
+                  pengiriman sama sekali.
+
+                  Alamat toko sendiri tetap hidup di halaman /contact dan di
+                  kartu pilihan lokasi pengambilan. */}
 
               {/* Detail transfer */}
               {draft.paymentMethod === "transfer" ? (
@@ -1699,7 +1699,7 @@ function ChoiceCard({
   onClick: () => void;
   icon: React.ReactNode;
   title: string;
-  desc: string;
+  desc?: string;
   note?: string;
 }) {
   return (
@@ -1726,9 +1726,15 @@ function ChoiceCard({
             {title}
             {selected ? <Check className="size-4 shrink-0 text-matcha-600" /> : null}
           </span>
-          <span className="mt-0.5 block text-xs leading-relaxed text-cocoa-500">
-            {desc}
-          </span>
+          {/* `desc` boleh kosong. Steven 13-10-2026 meminta deskripsi QRIS
+              dihapus, dan beberapa kartu lain memang lebih baik tanpa teks
+              tambahan. Kalau kosong, blok deskripsi tidak dirender sama sekali
+              supaya tidak menyisakan jarak kosong di dalam kartu. */}
+          {desc ? (
+            <span className="mt-0.5 block text-xs leading-relaxed text-cocoa-500">
+              {desc}
+            </span>
+          ) : null}
         </span>
       </span>
 

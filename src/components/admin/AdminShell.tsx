@@ -135,7 +135,10 @@ export function AdminShell({
   );
 
   return (
-    <div className="min-h-dvh bg-cream-50">
+    // Steven 13-10-2026: kelas `admin-shell` jadi penanda untuk menaikkan
+    // ukuran font seluruh dashboard — lihat blok `.admin-shell` di
+    // globals.css. Tanpa kelas ini, override font-size itu tidak berlaku.
+    <div className="admin-shell min-h-dvh bg-cream-50">
       {/* ---------- Sidebar desktop ---------- */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col gap-6 border-r border-cocoa-200 bg-cream-100/70 p-5 lg:flex">
         <Link href="/admin">{brand}</Link>

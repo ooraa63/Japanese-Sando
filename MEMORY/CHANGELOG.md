@@ -4,6 +4,83 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-13 - Tahap A dari 15 permintaan: alur order + admin
+
+**Scope:** 15 permintaan Steven (13-10-2026, gambar 1-11 di `D:\Gambar error`),
+dijawab lewat kuesioner. Bagian ini Tahap A; feature batch PO (poin 4, 5, 6, 12,
+13, 14) menyusul karena butuh tabel dan fungsi SQL baru.
+
+### 1. Scroll-reveal dibatalkan total (poin 8 + 15)
+
+Steven mengoreksi: "maksud saya BUKAN muncul ketika scroll, tapi KARENA DIA
+ADA DI BAWAH". Jadi tidak ada efek apa pun lagi.
+
+- `src/lib/useRevealOnScroll.ts` DIHAPUS.
+- `MobileBottomNav` selalu tampil; `visible translate-y-full opacity-0` dan
+  hook-nya dibuang.
+- `SiteFooter` selalu tampil; `invisible opacity-0` dan hook-nya dibuang.
+- `<body>` di layout.tsx kembali ke `min-h-dvh` polos. Ruang scroll 64px yang
+  dipaksakan (`min-h-[calc(100dvh+4rem)]`) dicabut juga — tanpa efek reveal,
+  tidak ada alasan halaman pendek harus bisa digulir.
+
+Netralkan efek reveal berarti feedback loop scroll anchoring (gotcha #99) dan
+reservasi ruang scroll (#101) ikut hilang, bukan sekadar disembunyikan.
+
+### 2. Panel keranjang hanya di langkah "Pilih Rasa" (poin 1)
+
+`showCartPanel` di `OrderFlow.tsx` berubah dari `step !== "identity"` jadi
+`step === "menu"`. Di Pembayaran dan Konfirmasi isinya cuma mengulang apa yang
+sudah tertulis di kartu "Periksa pesananmu".
+
+### 3. QRIS (poin 2)
+
+`qrisMidtrans` jadi `"QRIS"`, `qrisMidtransDesc` jadi kosong di id.ts dan
+en.ts. `ChoiceCard` sekarang hanya merender blok deskripsi kalau `desc`
+berisi, supaya tidak menyisakan jarak kosong.
+
+### 4. Judul bagian pengambilan (poin 3)
+
+`deliveryTitle`: "Bagaimana cara menerimanya?" -> "Pengambilan". Dipakai
+lagi di baris review pesanan.
+
+### 5. Kartu alamat toko yang salah label dihapus (poin 7)
+
+Kartu itu berlabel "ALAMAT PENGIRIMAN" tapi isinya `settings.address` —
+alamat TOKO, bukan alamat pembeli. Salah label itu yang bikin membingungkan,
+dan di langkah "Ambil di toko" pembeli memang tidak butuh alamat pengiriman.
+
+### 6. Admin: "Lihat pesanan" dihapus + teks diperbesar (poin 9)
+
+Tombol expandable di daftar pesanan dihapus beserta `OrderRow.tsx`. Rincian
+yang dihidupkannya (Telepon, Pembayaran, Pengiriman, alamat, tanggal) semuanya
+sudah tertulis di header kartu, dan versi lengkapnya sudah ada di modal detail
+yang terbuka saat kode pesanan ditekan.
+
+Teks di header kartu diperbesar: nama pelanggan `text-sm` -> `text-base`,
+daftar item `text-[13px]` -> `text-sm`, baris tanggal/pembayaran/delivery
+`text-[11px]` -> `text-[13px]`.
+
+### 7. Font dashboard admin diperbesar (poin 10)
+
+Ada ratusan kemunculan `text-[10px]` s.d. `text-[13px]` di `src/app/admin/**`
+dan `src/components/admin/**`. Semuanya ditangani dari satu tempat: blok CSS
+`.admin-shell` di `globals.css` yang menaikkan ukuran font terkecil, lalu
+kelas penanda `admin-shell` ditambahkan ke `AdminShell` dan halaman login
+admin. Aturan ini SENGAJA tanpa `@layer` — CSS tanpa layer menang atas utility
+Tailwind (layer `utilities`). Tampilan pembeli tidak tersentuh.
+
+### Verifikasi
+
+`tsc` 0 error, `eslint` 0 error, build sukses, `test:pages` 30/30.
+
+Headless lokal 4/4: footer `/riwayat` 1912x807 langsung `visible` dengan sisa
+scroll 0px (tidak ada ruang scroll paksa lagi), nav bawah 390x844 `visible`
+dengan `transform: none` tanpa perlu scroll, `/order` tidak lagi memuat panel
+keranjang maupun teks "QRIS via Midtrans", dan aturan `.admin-shell` terbukti
+terpasang di CSS terpasang.
+
+Pemeriksaan visual admin BELUM dilakukan otomatis karena `ADMIN_EMAIL` dan
+`ADMIN_PASSWORD` tidak tersimpan di `.env.local` — perlu dicek manual Steven.
 ## 2026-10-13 - Footer ikut tersembunyi sampai di-scroll
 
 **Scope:** 1 permintaan Steven (13-10-2026 13:15, dikonfirmasi lewat kuesioner):

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { ClipboardList, Home } from "lucide-react";
 import type { ProfileMenuItem } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { useRevealOnScroll } from "@/lib/useRevealOnScroll";
 import { ProfileSheet, ProfileTabButton } from "@/components/customer/ProfileSheet";
 
 /**
@@ -36,11 +35,11 @@ import { ProfileSheet, ProfileTabButton } from "@/components/customer/ProfileShe
  * sendiri (sticky, z-30) yang akan ketimpa nav ini (fixed, z-40) — itu bug
  * "keranjang pas slide masih error" yang Steven laporkan.
  *
- * BARU 13-10-2026: nav ini disembunyikan sampai pengguna menggulir ke bawah
- * (permintaan Steven: "nav bawahnya hanya muncul ketika dislide kebawah,
- * jangan ketika klik Riwayat langsung muncul"). Efeknya jauh lebih bersih di
- * halaman pendek seperti /riwayat yang isinya cuma satu kartu — nav tidak lagi
- * langsung menutupi isi yang baru terbuka.
+ * CARA Steven 13-10-2026 23:00: nav ini SELALU tampil, tidak lagi disembunyikan
+ * sampai pengguna menggulir. Percobaan sebelumnya (scroll-reveal) dibatalkan:
+ * nav yang ikut hilang bikin pengguna mengira tombolnya hilang, dan di
+ * halaman pendek seperti /riwayat nav akan muncul tepat setelah pindah halaman.
+ * Sekarang posisinya tetap fixed di bawah layar, apa pun yang sedang di-scroll.
  */
 export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMenuItem[] }) {
   const pathname = usePathname() ?? "";
@@ -51,11 +50,9 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
     || pathname.startsWith("/register")
     || pathname.startsWith("/order");
 
-  // WAJIB dipanggil sebelum `if (hidden) return null` di bawah. Hook yang
-  // bersyarat akan mengubah urutan hook antar navigasi, dan React akan
-  // melemparkan error "Rendered more hooks than during the previous render".
-  const navVisible = useRevealOnScroll(!hidden, pathname);
-
+  // WAJIB dipanggil sebelum `if (hidden) return null` di bawah sudah tidak
+  // relevan: nav ini tidak lagi memakai hook apa pun. Syarat `if` tetap
+  // dipertahankan karena perilakunya tidak berubah.
   if (hidden) return null;
 
   const orderActive = pathname.startsWith("/track") || pathname.startsWith("/riwayat");
@@ -81,14 +78,7 @@ export function MobileBottomNav({ profileMenu = [] }: { profileMenu?: ProfileMen
 
       <nav
         aria-label="Mobile navigation"
-        // `invisible` dipakai bersama translate supaya nav yang tersembunyi
-        // benar-benar keluar dari tab-order — kalau hanya digeser keluar layar,
-        // link di dalamnya masih bisa difokus pakai keyboard.
-        className={`fixed inset-x-0 bottom-0 z-40 border-t border-cocoa-200 bg-cream-50 pb-[env(safe-area-inset-bottom)] transition-all duration-200 ease-out md:hidden ${
-          navVisible
-            ? "visible translate-y-0 opacity-100"
-            : "invisible translate-y-full opacity-0"
-        }`}
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-cocoa-200 bg-cream-50 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <ul className="grid grid-cols-3">
           <li>

@@ -1241,3 +1241,27 @@ produk sendiri.
   pengecualian halaman pendek, elemen muncul diam-diam tepat setelah pindah
   halaman, dan itu justru yang Steven minta dihapus. Hook dipanggil sebelum
   `if (hidden) return null` supaya urutan hook tidak berubah antar navigasi.
+
+
+- **D64** - **Tidak ada lagi efek scroll-reveal di situs mana pun.** Steven
+  mengoreksi permintaannya sendiri (poin 15): footer "bukan muncul ketika
+  scroll, tapi karena dia ada di bawah". Jadi `SiteFooter` dan
+  `MobileBottomNav` keduanya selalu tampil, `useRevealOnScroll` dihapus, dan
+  reservasi ruang scroll 64px di `<body>` ikut dicabut. Konsekuensi: halaman
+  pendek TIDAK dipaksa bisa digulir.
+- **D65** - **Panel keranjang hanya di langkah "Pilih Rasa".** Di Pembayaran
+  dan Konfirmasi isinya mengulang apa yang sudah ada di kartu ringkasan, jadi
+  ruang vertikal dipakai untuk form (poin 1).
+- **D66** - **Label "Alamat pengiriman" TIDAK boleh dipakai untuk alamat
+  toko.** Kartu yang selama ini berlabel itu sebenarnya menampilkan
+  `settings.address`. Sudah dihapus (poin 7).
+- **D67** - **Perbesar font admin lewat CSS terpusat, bukan edit tiap file.**
+  Aturan `.admin-shell` di `globals.css` SENGAJA tanpa `@layer` supaya menang
+  atas utility Tailwind. Kalau nanti ditambah utility kecil baru, cek dulu
+  apakah sudah tertangkap aturan ini.
+- **D68** - **Rincian pesanan admin tidak expandable lagi.** Detail lengkap
+  hanya di modal yang terbuka dari kode pesanan (poin 9).
+- **D69** - **Stok ke depan adalah milik batch PO, bukan `categories.stock`**
+  (jawaban Steven poin 2 & 9). Angka 30 dan 40 di contohnya dibaca sebagai
+  stok PER JENIS MENU per batch. Pemetaan batch ke pesanan: kalau beberapa
+  batch punya tanggal pengambilan sama, pakai yang stoknya paling dulu habis.
