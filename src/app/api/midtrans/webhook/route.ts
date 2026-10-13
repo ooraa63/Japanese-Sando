@@ -14,7 +14,7 @@ import {
  * Body Midtrans (contoh):
  * {
  *   "transaction_id": "...",
- *   "order_id": "JS-...",
+ *   "order_id": "RK-...",
  *   "gross_amount": "35000.00",
  *   "payment_type": "qris",
  *   "transaction_status": "settlement",

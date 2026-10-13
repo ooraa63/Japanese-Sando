@@ -4,6 +4,102 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-13 - Prefix kode pesanan RK-, nav bawah muncul setelah di-scroll
+
+**Scope:** 2 permintaan Steven (13-10-2026 12:15) + 1 screenshot `/track` yang
+masih menampilkan placeholder "JS-260930-001".
+
+### 1. Prefix kode pesanan JS- menjadi RK-
+
+Steven: "itu di kode pesanan JS diubah jdi RK dulu".
+
+Kode pesanan dibuat di fungsi SQL `create_order`, satu baris:
+
+```sql
+v_code := 'JS-' || to_char(now(), 'YYMMDD') || '-' || lpad(nextval('order_code_seq')::text, 3, '0');
+```
+
+Cara_AMAN mengubahnya: `supabase/migration-48.sql` **tidak** menyalin body dari
+migration-46. Body diambil VERBATIM dari versi LIVE lewat
+`pg_get_functiondef(pg_proc.oid)`, lalu hanya baris itu yang diganti. Panjang
+body sebelum dan sesudah sama persis (14436 karakter) — bukti tidak ada satu
+baris lain yang ikut berubah.
+
+Dua hal yang harusVIA `pg_get_functiondef` TIDAK ikut dan ditulis ulang manual:
+
+- **`grant execute ... to anon, authenticated, service_role`**. Sebenarnya
+  `create or replace` sudah mempertahankan grant, tapi ditulis eksplisit
+  supaya file migrasi utuh.
+- **`comment on function`.** Function-nya punya komentar
+  ("RPC buyer: buat pesanan. Nama + phone wajib..."). Kalau tidak ditulis ulang,
+  komentar itu hilang permanen.
+
+Yang TIDAK diubah, dan sengaja:
+
+- **`supabase/schema.sql`** ikut di-update (`RK-YYMMDD-001`) karena dipakai
+  `npm run db:push` untuk instalasi database kosong. Migrasi historis
+  (2-46) TIDAK disentuh — itu catatan sejarah, bukan kode yang dijalankan lagi.
+- **`i18n` placeholder** `codePlaceholder` di id.ts + en.ts, dan contoh
+  `"order_id"` di komentar webhook Midtrans.
+- **Pesanan yang sudah ada.** 6 pesanan lama tetap `JS-` dan itu benar:
+  kodenya sudah tercetak, sudah dipakai pembeli cek status, dan sudah jadi
+  `order_id` di Midtrans. Mengubahnya akan membatalkan riwayat. Hanya pesanan
+  BARU yang dapat `RK-`.
+
+Kenapa aman: tidak ada kode frontend atau RPC lain yang mem-parse "JS-".
+Kolom `orders.order_code` cuma `text not null unique`, dan semua pencarian
+lewat `upper(order_code) = upper(kode yang diketik)`. Jadi `RK-` langsung bisa
+dicari di /track tanpa perubahan lain.
+
+### 2. Nav bawah hanya muncul setelah di-scroll
+
+Steven: "itu nav bawahnya hanya muncul ketika dislide kebawah, jangan ketika
+klik Riwayat langsung muncul".
+
+`MobileBottomNav` sekarang pakai hook `useShowNavOnScroll(active, pathname)`:
+
+- Nav di-render dengan `invisible translate-y-full opacity-0` saat
+  `scrollY <= NAV_REVEAL_PX`, dan `visible translate-y-0 opacity-100` di atas
+  ambang itu. `invisible` dipakai bareng `translate` supaya nav yang
+  tersembunyi benar-benar KELUAR dari tab-order — kalau hanya digeser keluar
+  layar, link di dalamnya masih bisa difokus pakai keyboard.
+- Hooknya dipanggil SEBELUM `if (hidden) return null`. Hook yang bersyarat akan
+  mengubah urutan hook antar navigasi dan React melempar "Rendered more hooks
+  than during the previous render".
+- `pathname` jadi dependensi efek supaya hook berjalan ulang tiap pindah
+  halaman. Next.js mengembalikan scroll ke 0, tapi event "scroll" tidak selalu
+  sempat dilepas pada momen itu.
+- Tidak ada `setShow(false)` di dalam efek (men-trigger eslint
+  `react-hooks/set-state-in-effect`). Hook mengembalikan `active && show`:
+  saat `active` false, komponen sudah `return null` jadi nav memang tidak
+  dirender.
+
+Dua percobaan yang GAGAL dan alasannya — jangan diulang:
+
+- **Ambang 80px terlalu besar.** `/riwayat` hanya punya 68px ruang scroll,
+  dan itu seluruhnya cuma spacer `h-[68px] md:hidden` milik nav itu sendiri.
+  Dengan ambang 80px nav TIDAK PERNAH muncul di halaman yang justru jadi
+  keluhan Steven. Threshold sekarang **16px**.
+- **Pengecualian "kalau halaman tidak bisa digulir, tetap tampilkan"** —
+  pakai ini karena triglyceride agar pembeli tidak kehilangan navigasi di
+  halaman pendek. JustruSRU yang menDibuat: di `/track` (pendek) nav muncul
+  diam-diam tepat setelah pindah halaman, persis yang Steven minta dihapus.
+  Pengecualian itu juga tidak perlu, karena setiap halaman pembeli sudah
+  merender spacer 68px, jadi selalu ada yang bisa digulir. Dihapus total.
+
+### Verifikasi
+
+tsc 0, eslint 0, build sukses, test-pages **30/30**, headless **8/8**:
+
+- `/riwayat` nav `visibility=hidden` saat dibuka (`scrollY=0`)
+- setelah wheel scroll: `visibility=visible opacity=1 scrollY=68`
+- balik ke atas: `visibility=hidden` lagi
+- klik tab Orderan -> `/track` -> nav `visibility=hidden` (tidak langsung muncul)
+- beranda: hidden saat dibuka, visible setelah scroll (`scrollY=1430`)
+
+Migrasi 48 diverifikasi langsung ke database: prefix `RK-` aktif, `'JS-' ||`
+hilang, ketiga grant utuh, komentar fungsi ada, 6 pesanan lama tetap `JS-`
+dan 0 pesanan `RK-`. Tidak ada order yang dibuat saat verifikasi.
 ## 2026-10-13 - Footer /riwayat (dan 3 halaman lain) jadi full width
 
 **Scope:** lanjutan permintaan Steven (13-10-2026 11:24) — "masih ngebug

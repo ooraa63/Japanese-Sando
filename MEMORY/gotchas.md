@@ -1596,3 +1596,49 @@ Akibatnya posisi piksel di screenshot TIDAK bisa dipakai untuk menilai
 layout. Untuk menilai layout, selalu render ulang halaman LIVE dengan
 `Emulation.setDeviceMetricsOverride` pada ukuran yang dikehendai, lalu
 ukur `getBoundingClientRect()` langsung di DOM — bukan dari gambar.
+
+## Gotcha #97 - `pg_get_functiondef` TIDAK membawa grant dan COMMENT ON
+
+Untuk mengubah satu baris di dalam fungsi SQL yang sudah deployed, cara
+teramanpa menyalin body dari migrasi lama:
+
+```sql
+select p.oid::regprocedure::text, pg_get_functiondef(p.oid)
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'create_order';
+```
+
+Lalu ganti satu barisnya dan tulis ulang hasilnya sebagai file migrasi. Jauh
+lebih aman daripada menyalin body dari migration-46, karena yang Anda ubah
+adalah versi yang BENAR-BENAR hidup.
+
+TAPI dua hal ini tidak ikut dan harus ditulis ulang manual:
+
+1. **`grant execute ...`** — `create or replace` sebenarnya sudah
+   memertahankan grant yang ada, jadi ini opsional; tetap ditulis supaya file
+   migrasi utuh.
+2. **`comment on function`** — INI HILANG PERMANEN kalau tidak ditulis ulang.
+   Untuk `create_order` komentarnya berisi aturan bisnis ("Nama + phone
+   wajib. Email & Instagram OPTIONAL") yang berguna sekali buat dibaca siapa
+   pun yang-debug order.
+
+Juga: `'public.create_order'::regprocedure` akan gagal dengan "expected a
+left parenthesis" kalau fungsinya punya banyak argumen ber-default. Cari lewat
+`pg_proc` + `proname`, bukan regprocedure.
+
+## Gotcha #98 - Halaman pendek punya ruang scroll yang sangat sedikit
+
+`/riwayat` punya `scrollHeight=912` dengan `innerHeight=844` — cuma 68px,
+dan 68px itu seluruhnya spacer `h-[68px] md:hidden` milik bottom nav itu
+sendiri.
+
+Konsekuensi: ambang scroll untuk fitur "muncul setelah digulir" TIDAK BOLEH
+besar. Ambang 80px membuat fitur itu tidak pernah aktif di halaman yang justru
+dipakai buat melaporkannya. Pakai 16px.
+
+Juga beware: jangan menambahkan cabang "kalau halaman tidak bisa digulir,
+tampilkan saja" untuk fitur CTA yang maksudnya disembunyikan sampai di-scroll.
+Cabang itu membatalkan seluruh permintaan — fiturnya akan muncul diam-diam
+tepat setelah pindah halaman, dan itu justru yang sedang dicoba dihilangkan.
+Periksa dulu apakah halaman benar-benar tidak bisa digulir (dihitung dari
+`scrollHeight` vs `innerHeight`), bukan berasus-asumsi.

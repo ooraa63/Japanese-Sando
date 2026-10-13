@@ -1207,3 +1207,17 @@ produk sendiri.
   nilai RGB — dan salah, karena piksel transparan terbaca hitam. Verifikasi
   dengan render ulang halaman LIVE pada ukuran yang sama sebelum menyentuh
   kode.
+
+- **D58** - Mengubah satu baris di dalam fungsi SQL yang sudah deployed
+  dilakukan dengan **`pg_get_functiondef` dari database LIVE**, bukan dengan
+  menyalin body dari migrasi historis. Lihat gotcha #97. Migration-48
+  (prefix kode pesanan JS- -> RK-) adalah contoh penerapannya.
+- **D59** - **Pesanan lama tidak pernah ditulis ulang** saat format kode
+  berubah. 6 pesanan berawalan `JS-` tetap `JS-`; hanya pesanan baru yang
+  dapat `RK-`. Alasannya kode itu sudah tercetak, sudah dipakai pembeli, dan
+  sudah jadi `order_id` di Midtrans.
+- **D60** - Bottom nav **tidak tampil sampai pengguna menggulir ke bawah**
+  (ambang 16px), dan **tidak ada pengecualian halaman pendek**. Spacer 68px
+  menjamin setiap halaman pembeli selalu bisa digulir, jadi tidak ada risiko
+  navigasi terkunci. Lihat gotcha #98 untuk dua percobaan gagal yang
+  seharusnya tidak diulang.

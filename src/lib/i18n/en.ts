@@ -415,7 +415,7 @@ export const en = {
     subtitle:
       "Enter your order code and the phone number you used when ordering.",
     code: "Order code",
-    codePlaceholder: "JS-260930-001",
+    codePlaceholder: "RK-260930-001",
     phone: "Phone number",
     phonePlaceholder: "0812-3456-7890",
     phoneHint: "Use the same number as when you ordered.",

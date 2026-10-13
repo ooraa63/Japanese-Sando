@@ -230,7 +230,7 @@ begin
 end;
 $$;
 
--- Nomor urut untuk kode pesanan (JS-YYMMDD-001) ------------------------------
+-- Nomor urut untuk kode pesanan (RK-YYMMDD-001) ------------------------------
 create sequence if not exists public.order_code_seq start 1;
 
 -- =============================================================================
@@ -348,7 +348,7 @@ begin
   end if;
 
   -- ---------- generate kode pesanan (sequence, selalu unik) ----------
-  v_code := 'JS-' || to_char(now(), 'YYMMDD') || '-' || lpad(nextval('public.order_code_seq')::text, 3, '0');
+  v_code := 'RK-' || to_char(now(), 'YYMMDD') || '-' || lpad(nextval('public.order_code_seq')::text, 3, '0');
 
   -- ---------- simpan pesanan ----------
   insert into public.orders (

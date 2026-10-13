@@ -419,7 +419,7 @@ export const id: Dict = {
     subtitle:
       "Masukkan kode pesanan dan nomor telepon yang dipakai saat memesan.",
     code: "Kode pesanan",
-    codePlaceholder: "JS-260930-001",
+    codePlaceholder: "RK-260930-001",
     phone: "Nomor telepon",
     phonePlaceholder: "0812-3456-7890",
     phoneHint: "Pakai nomor yang sama seperti saat memesan.",
