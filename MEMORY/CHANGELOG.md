@@ -4,6 +4,68 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 - Detail batch: klik batch -> sidebar Stok/Pesanan/Pelanggan/Mutasi
+
+**Permintaan Steven:** "yang saya inginkan adalah contoh setelah kita buat batch
+kita bisa click itu lalu nanti di dalamnya ada beberapa sidebar yang sama seperti
+mutasi, stock, pesanan, pelanggan namun khusus utk batch itu aja".
+
+### Database — migration-51 (SUDAH LIVE, idempoten)
+
+- Index partial `orders (po_batch_id, created_at desc) where po_batch_id is not null`.
+- `admin_list_orders`, `admin_list_mutasi`, `admin_list_customers` masing-masing
+  dapat parameter baru `p_po_batch_id` di AKHIR daftar, default NULL.
+- RPC baru `admin_list_po_batch_detail(bigint)`: header batch, rincian stok per
+  jenis menu (sisa / terjual / stok awal), dan ringkasan pesanan.
+  Raise `batch_not_found` kalau id tidak ada.
+
+**JAWAHAH NYATA YANG HAMPIR MELALUI:** `create or replace function` dengan
+JUMLAH ARGUMEN BERBEDA tidak mengganti fungsi lama — Postgres membuat OVERLOAD
+baru. Karena semua parameter baru punya DEFAULT, panggilan lama 4 argumen jadi
+ambigu: `function admin_list_orders(unknown, unknown, integer, integer) is not
+unique`. Kalau tidak di(drop) dulu, `/admin/orders`, `/admin/sales`, dan
+`/admin/customers` production akan langsung rusak. Ketahuan karena migration-51
+sudah di-apply sebelum dicek — sekarang migration-51 sudah punya `drop function
+if exists` untuk ketiganya.
+
+### Halaman `/admin/po/[id]`
+
+- `src/app/admin/(dashboard)/po/[id]/page.tsx` — server component, otomatis dapat
+  `AdminShell` + guard admin karena ada di dalam group `(dashboard)`.
+  Batch hilang atau id bukan angka -> `notFound()` (404).
+- `src/components/admin/PoBatchDetailClient.tsx` — sidebar kiri berisi 4 tab:
+  Stok / Pesanan / Pelanggan / Mutasi. Di mobile sidebar jadi strip horizontal
+  yang bisa digeser; di desktop jadi kolom vertikal yang `sticky`.
+- Empat tab dimuat SEKALI di server lalu dipindah lewat state. Tidak ada fetch
+  ulang saat tab berganti, jadi pindah tab instan dan tidak ada request
+  bolak-balik.
+- Kartu batch di `/admin/po` sekarang tautan ke `/admin/po/<id>` dengan label
+  "Lihat detail". Tombol Ubah/Hapus SENGAJA di luar `<Link>` supaya klik
+  Hapus tidak pernah membuka detail.
+
+### Keputusan data
+
+- **`stok_awal` tidak ada di database**, jadi diturunkan dari
+  `sisa + terjual`. Akurat karena stok awal hanya turun karena penjualan dan
+  naik lagi saat pesanan dibatalkan. Ditampilkan dengan catatan eksplisit di
+  bawah judul kolom.
+- **"Terjual" memakai semantik kartu batch** (semua status kecuali
+  rejected/cancelled), bukan semantik Mutasi (accepted/ready/delivered).
+  Menghitung pesanan yang dibatalkan sebagai terjual akan membuat kolom
+  "Terjual" tidak cocok dengan kolom "Sisa" di tabel yang sama.
+- Kategori yang tidak punya baris stok DAN tidak pernah terjual di batch itu
+  disembunyikan dari tabel — supaya tidak ada baris 0 yang membingungkan.
+- Tab Mutasi menampilkan revenue/pesanan/PCS dari batch itu. Field
+  `revenue_today` sengaja TIDAK ikut difilter batch (dan tidak dirender di
+  sini) karena "hari ini" itu selalu hari ini.
+
+### Verifikasi
+
+`tsc` 0, `eslint` 0, build sukses (route `/admin/po/[id]` muncul),
+`test:pages` 41/41, headless dengan sesi admin asli 10/10 termasuk screenshot
+tab Stok dan keempat tab. RPC diuji langsung ke produksi: `p_po_batch_id` NULL
+tetap memberi hasil yang sama dengan panggilan lama, dan batch uji dihapus.
+
 ## 2026-10-13 - Tahap B: batch PO lengkap (sisi pembeli + admin)
 
 **Scope:** sisa dari 15 permintaan Steven (poin 4, 5, 6, 12, 13, 14). Tahap A

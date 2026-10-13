@@ -1773,3 +1773,31 @@ padahal CSS-nya benar. Selalu set device metrics override eksplisit
 
 Juga: `location.reload()` di dalam `Runtime.evaluate` butuh 4-5 detik di
 mode dev (Turbopack recompile), bukan 2 detik.
+
+### #107 - Tambah parameter ke RPC Postgres itu OVERLOAD, bukan replace
+
+`create or replace function f(a, b)` lalu `create or replace function f(a, b, c
+default null)` TIDAK mengganti fungsi pertama. Postgres menyimpan keduanya, dan
+karena `c` punya DEFAULT, panggilan lama `f(a, b)` jadi ambigu:
+
+    error: function public.admin_list_orders(unknown, unknown, integer, integer)
+    is not unique
+
+Tiga halaman produksi (/admin/orders, /admin/sales, /admin/customers) ikut
+rusak hanya karena migrasi menambah satu parameter.
+
+Aturan: SEBELUM `create or replace` dengan signature berbeda, tulis `drop function
+if exists <nama>(<tipe argumen lama>);`. Kalau migrasi sudah terlanjur
+di-apply, tambahin drop-nya lalu apply ulang — seluruh isi migrasi ini
+idempoten, jadi aman dijalankan berulang.
+
+### #108 - `ADMIN_EMAIL` / `ADMIN_PASSWORD` ternyata ADA (dari `.env`, bukan `.env.local`)
+
+Dulu dianggap "tidak ada, verifikasi admin harus manual". Padahal
+`scripts/test-pages.mjs` membaca `.env.local` DULU `.env`, dan di situ
+kredensialnya ada — makanya login di test-pages selalu berhasil.
+
+Artinya verifikasi visual halaman admin BISA otomatis: login dengan
+`@supabase/ssr` di Node, ambil cookie `sb-*-auth-token`, lalu `Network.setCookies`
+di CDP sebelum `Page.navigate`. Dipakai untuk memverifikasi `/admin/po/[id]`
+(10/10 termasuk screenshot).

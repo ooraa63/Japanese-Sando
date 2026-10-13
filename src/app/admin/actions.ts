@@ -216,7 +216,9 @@ export async function getOrdersAction(
   status: OrderStatus | null,
   search: string,
   limit = 60,
-  offset = 0
+  offset = 0,
+  /** Migration-51: batasi pesanan ke satu batch pre-order. Null = semua batch. */
+  poBatchId?: number | null
 ): Promise<ActionResult<{ orders: Order[]; total: number }>> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_list_orders", {
@@ -224,6 +226,7 @@ export async function getOrdersAction(
     p_search: search.trim() || null,
     p_limit: limit,
     p_offset: offset,
+    p_po_batch_id: poBatchId ?? null,
   });
 
   if (error) return { ok: false, error: humanize(error.message) };
@@ -265,6 +268,8 @@ export async function getMutasiAction(params: {
   search?: string;
   limit?: number;
   offset?: number;
+  /** Migration-51: batasi mutasi ke satu batch pre-order. Null = semua batch. */
+  poBatchId?: number | null;
 }): Promise<
   ActionResult<{
     summary: SalesSummary;
@@ -280,6 +285,7 @@ export async function getMutasiAction(params: {
     p_search: params.search?.trim() || null,
     p_limit: params.limit ?? 50,
     p_offset: params.offset ?? 0,
+    p_po_batch_id: params.poBatchId ?? null,
   });
   if (error) return { ok: false, error: humanize(error.message) };
 
@@ -388,11 +394,13 @@ export interface AdminCustomerRow {
  * `admin_list_customers` sudah disiapkan di migration-12 (dan di-group ulang
  * per identitas di migration-31).
  */
-export async function getCustomersAction(): Promise<
+export async function getCustomersAction(poBatchId?: number | null): Promise<
   ActionResult<AdminCustomerRow[]>
 > {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_list_customers");
+  const { data, error } = await supabase.rpc("admin_list_customers", {
+    p_po_batch_id: poBatchId ?? null,
+  });
   if (error) return { ok: false, error: humanize(error.message) };
   return { ok: true, data: (data as AdminCustomerRow[]) ?? [] };
 }
@@ -952,4 +960,89 @@ export async function deletePoBatchAction(id: number): Promise<ActionResult> {
   revalidatePath("/admin");
   revalidatePath("/admin/po");
   return { ok: true };
+}
+
+/* ============================================================================
+ *  DETAIL SATU BATCH — dipakai halaman /admin/po/[id]
+ * ========================================================================== */
+
+/** Baris stok per jenis menu di satu batch. */
+export interface PoBatchStockRow {
+  category_id: number;
+  nama: string;
+  /** Sisa stok yang masih bisa dipesan. */
+  sisa: number;
+  /** PCS yang sudah terjual di batch ini (rejected/cancelled tidak dihitung). */
+  terjual: number;
+  /** Diturunkan: sisa + terjual. Stok awal tidak disimpan di database. */
+  stok_awal: number;
+}
+
+export interface PoBatchDetailSummary {
+  terjual: number;
+  pcs_terjual: number;
+  pendapatan: number;
+  pending: number;
+  selesai: number;
+  ditolak: number;
+}
+
+export interface PoBatchDetail {
+  batch: {
+    id: number;
+    label: string;
+    open_at: string;
+    close_at: string;
+    pickup_date: string;
+    is_active: boolean;
+    status: PoBatchStatus;
+  };
+  stok: PoBatchStockRow[];
+  ringkasan: PoBatchDetailSummary;
+}
+
+const EMPTY_DETAIL_SUMMARY: PoBatchDetailSummary = {
+  terjual: 0,
+  pcs_terjual: 0,
+  pendapatan: 0,
+  pending: 0,
+  selesai: 0,
+  ditolak: 0,
+};
+
+/**
+ * Detail satu batch: header, rincian stok per jenis menu, dan ringkasan
+ * pesanan. RPC `admin_list_po_batch_detail` (migration-51).
+ *
+ * Kalau batch tidak ada, kembalikan `ok: false` dengan `not_found` supaya
+ * halaman bisa menampilkan "batch tidak ada" alih-alih crash.
+ */
+export async function getPoBatchDetailAction(
+  batchId: number
+): Promise<ActionResult<PoBatchDetail>> {
+  if (!Number.isInteger(batchId) || batchId <= 0) {
+    return { ok: false, error: "not_found" };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_list_po_batch_detail", {
+    p_batch_id: batchId,
+  });
+  if (error) {
+    if (error.message.includes("batch_not_found")) {
+      return { ok: false, error: "not_found" };
+    }
+    return { ok: false, error: humanize(error.message) };
+  }
+
+  const payload = (data ?? {}) as Partial<PoBatchDetail>;
+  if (!payload.batch) return { ok: false, error: "not_found" };
+
+  return {
+    ok: true,
+    data: {
+      batch: payload.batch,
+      stok: payload.stok ?? [],
+      ringkasan: payload.ringkasan ?? EMPTY_DETAIL_SUMMARY,
+    },
+  };
 }

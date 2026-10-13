@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
+  ChevronRight,
   Loader2,
   Pencil,
   Plus,
@@ -230,7 +232,14 @@ export function PoBatchesClient({
           {batches.map((b) => (
             <li key={b.id} className="card p-0">
               <div className="flex flex-wrap items-start gap-3 p-4">
-                <div className="min-w-0 flex-1">
+                {/* Area kiri adalah TAUTAN ke /admin/po/[id] (Steven
+                    14-10-2026). Tombol Ubah/Hapus sengaja TIDAK ikut jadi
+                    tautan supaya klik "Hapus" tidak pernah Bella-belok
+                    membuka halaman detail. */}
+                <Link
+                  href={`/admin/po/${b.id}`}
+                  className="min-w-0 flex-1 rounded-lg transition hover:opacity-80"
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-display text-base font-bold text-cocoa-900">
                       {b.label}
@@ -262,7 +271,12 @@ export function PoBatchesClient({
                     {t.admin.po.pcsSoldLabel.replace("{n}", String(b.pcs_terjual))} ·{" "}
                     {t.admin.po.revenue}: Rp {b.pendapatan.toLocaleString("id-ID")}
                   </p>
-                </div>
+
+                  <p className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-bold text-cocoa-600">
+                    {t.admin.po.detail.viewDetail}
+                    <ChevronRight className="size-3.5" />
+                  </p>
+                </Link>
 
                 <div className="flex shrink-0 items-center gap-1">
                   <button

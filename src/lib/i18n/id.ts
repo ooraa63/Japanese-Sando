@@ -803,6 +803,52 @@ export const id: Dict = {
       buyerPreview: "Pembeli akan melihat",
       stockBelowReserved:
         "Stok tidak bisa dikecilkan di bawah jumlah yang sudah dipesan.",
+
+      // Halaman /admin/po/[id] (Steven 14-10-2026): klik batch -> detail
+      // dengan sidebar Stok / Pesanan / Pelanggan / Mutasi, semuanya hanya
+      // untuk batch itu.
+      detail: {
+        back: "Semua batch",
+        subtitle:
+          "Semua angka di halaman ini hanya untuk batch ini. Pembeli tetap tidak pernah melihat nama batch.",
+        tabs: {
+          stock: "Stok",
+          orders: "Pesanan",
+          customers: "Pelanggan",
+          mutasi: "Mutasi",
+        },
+        stock: {
+          title: "Stok per jenis menu",
+          colName: "Jenis menu",
+          colInitial: "Stok awal",
+          colSold: "Terjual",
+          colLeft: "Sisa",
+          empty: "Belum ada stok yang diisi untuk batch ini.",
+          initialHint:
+            "Stok awal dihitung dari sisa + terjual, karena stok awal tidak disimpan terpisah.",
+        },
+        orders: {
+          empty: "Belum ada pesanan di batch ini.",
+          failed: "Pesanan gagal dimuat.",
+        },
+        customers: {
+          empty: "Belum ada pelanggan di batch ini.",
+          failed: "Pelanggan gagal dimuat.",
+        },
+        mutasi: {
+          empty: "Belum ada mutasi di batch ini.",
+          failed: "Mutasi gagal dimuat.",
+        },
+        summary: {
+          terjual: "Pesanan",
+          pcs: "PCS terjual",
+          revenue: "Pendapatan",
+          pending: "Menunggu",
+          done: "Diproses",
+          rejected: "Dibatalkan",
+        },
+        viewDetail: "Lihat detail",
+      },
     },
 
     nav: {

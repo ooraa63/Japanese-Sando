@@ -1283,3 +1283,18 @@ produk sendiri.
 - **D74** - **Popup lokasi hanya berisi data yang sudah ada** (nama zona, catatan
   admin, alamat toko dari Pengaturan). Kalau detailnya kosong, popup mengatakannya
   terus terang alih-alih menampilkan peta atau jam yang dikarang.
+
+- **D75** - **Sidebar di halaman detail batch adalah navigasi tab, bukan filter.**
+  Isinya hanya batch itu dan tidak ada jalan "lihat semua". Semua query
+  disaring di server lewat `p_po_batch_id`, jadi URL pun tidak bisa
+  menampilkan data batch lain.
+- **D76** - **Empat tab dimuat sekali di server, bukan lazy-load per tab.**
+  Data per batch kecil (ratusan order paling banyak per batch), dan pemuatan
+  sekali membuat pindah tab terasa instan tanpa ada loading skeleton.
+- **D77** - **`stok_awal` diturunkan (`sisa + terjual`) dan diberi catatan di UI.**
+  Menambah kolom `stock_initial` ke `po_batches` akan menghilangkan data yang
+  sudah ada dan tidak memperbaiki apa pun, karena angkanya sudah bisa
+  direkonstruksi persis.
+- **D78** - **Angka "terjual" di halaman batch mengikuti semantik kartu batch, bukan
+  semantik Mutasi.** Kalau yang dipakai semantik Mutasi, kolom Terjual dan Sisa
+  di tabel stok yang sama akan terlihat bertentangan tanpa penjelasan.

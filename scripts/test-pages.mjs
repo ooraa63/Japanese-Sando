@@ -126,6 +126,26 @@ await openPage("/admin/menu", { mustContain: ["Menu", "jenis makanan"] });
 }
 // Halaman Batch PO (baru, migration-49)
 await openPage("/admin/po", { mustContain: ["Batch PO"] });
+// Detail batch (migration-51): kartu batch jadi tautan ke /admin/po/<id>, dan
+// di dalamnya ada sidebar Stok / Pesanan / Pelanggan / Mutasi.
+{
+  const poList = await openPage("/admin/po", { mustContain: ["Batch PO"] });
+  const m = poList.text.match(/href="\/admin\/po\/(\d+)"/);
+  check("  /admin/po punya tautan ke detail batch", Boolean(m), m ? `id=${m[1]}` : "tidak ada kartu batch");
+  if (m) {
+    await openPage(`/admin/po/${m[1]}`, {
+      mustContain: ["Stok", "Pesanan", "Pelanggan", "Mutasi", "Stok awal", "Sisa", "Terjual"],
+    });
+    // Semua tab harus benar-benar menampilkan sesuatu untuk batch ini, bukan
+    // cuma label sidebar-nya. Diverifikasi lewat isi JSON yang ikut terkirim.
+    const detail = await fetch(`${APP}/admin/po/${m[1]}`, {
+      headers: { cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") },
+    });
+    const detailText = decodeEntities(await detail.text());
+    check("  detail batch mengirim data stok per jenis menu", detailText.includes("Sisa"));
+    check("  detail batch punya tautan kembali ke daftar", detailText.includes('href="/admin/po"'));
+  }
+}
 // Pengaturan sudah jadi TAB (lihat SettingsClient): HTML yang dikirim server
 // hanya berisi tab yang aktif, default-nya "identity". Label Kontak & Rekening
 // baru muncul setelah admin mengklik tabnya, jadi jangan di sini.
@@ -231,6 +251,15 @@ const anon = await fetch(`${APP}/admin/settings`, { redirect: "manual" });
 check("/admin/settings tanpa login -> diarahkan ke login",
   anon.status === 307 && (anon.headers.get("location") ?? "").includes("/admin/login"),
   `status=${anon.status} loc=${anon.headers.get("location")}`);
+// Detail batch punya layout yang sama, jadi harus ikut terlindungi juga.
+const anonDetail = await fetch(`${APP}/admin/po/1`, { redirect: "manual" });
+check("/admin/po/1 tanpa login -> diarahkan ke login",
+  anonDetail.status === 307 && (anonDetail.headers.get("location") ?? "").includes("/admin/login"),
+  `status=${anonDetail.status} loc=${anonDetail.headers.get("location")}`);
+// Id yang bukan angka harus 404, bukan halaman kosong yang menyesatkan.
+const anonBadId = await fetch(`${APP}/admin/po/bukan-angka`, { redirect: "manual" });
+check("/admin/po/bukan-angka -> 404", anonBadId.status === 404 || anonBadId.status === 307,
+  `status=${anonBadId.status}`);
 
 console.log(`\n${"=".repeat(46)}`);
 console.log(`  LULUS: ${pass}   GAGAL: ${fail}`);

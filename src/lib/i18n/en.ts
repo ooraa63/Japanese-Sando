@@ -792,6 +792,51 @@ export const en = {
       buyerPreview: "Buyers will see",
       stockBelowReserved:
         "Stock cannot go below the number that has already been ordered.",
+
+      // /admin/po/[id] page (Steven 14-10-2026): click a batch to see its
+      // stock, orders, customers, and mutations — that batch only.
+      detail: {
+        back: "All batches",
+        subtitle:
+          "Every number on this page belongs to this batch only. Buyers still never see the batch name.",
+        tabs: {
+          stock: "Stock",
+          orders: "Orders",
+          customers: "Customers",
+          mutasi: "Transactions",
+        },
+        stock: {
+          title: "Stock per menu type",
+          colName: "Menu type",
+          colInitial: "Initial",
+          colSold: "Sold",
+          colLeft: "Left",
+          empty: "No stock has been set for this batch yet.",
+          initialHint:
+            "Initial stock is derived from left + sold, because the original number is not stored separately.",
+        },
+        orders: {
+          empty: "No orders in this batch yet.",
+          failed: "Could not load orders.",
+        },
+        customers: {
+          empty: "No customers in this batch yet.",
+          failed: "Could not load customers.",
+        },
+        mutasi: {
+          empty: "No transactions in this batch yet.",
+          failed: "Could not load transactions.",
+        },
+        summary: {
+          terjual: "Orders",
+          pcs: "PCS sold",
+          revenue: "Revenue",
+          pending: "Pending",
+          done: "Processed",
+          rejected: "Cancelled",
+        },
+        viewDetail: "View detail",
+      },
     },
     nav: {
       dashboard: "Dashboard",
