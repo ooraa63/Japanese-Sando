@@ -1690,3 +1690,21 @@ File `.ts`, `.tsx`, dan `.css` di repo ini memakai akhir baris CRLF.
 persis string (`line === "..."`) diam-diam tidak pernah cocok dan skrip
 menganggap tidak ada yang berubah. Pakai `line.trim()`, atau lebih aman:
 kerja berdasarkan indeks baris, bukan isi baris.
+
+
+## Gotcha #102 — ukur headless ke produksi jangan terlalu cepat
+
+Menunggu 2,5 detik setelah `Page.navigate` ke `japanese-sando.vercel.app`
+terlalu cepat untuk diandalkan. Bundle CSS belum sempat terpasang, jadi
+`getComputedStyle(footer).visibility` masih nilai default `visible` padahal
+kelas React-nya sudah benar (`invisible opacity-0`). Hasilnya: tes lokal
+lulus, tes produksi dilaporkan gagal satu halaman.
+
+Jejak 120ms (`Page.addScriptToEvaluateOnNewDocument` + `setInterval` polling
+`scrollY`, `scrollHeight`, `visibility`, dan isi `className`) membuktikan
+kelas React sudah benar sejak frame pertama; yang belum ada hanya CSS-nya.
+Di lokal bundle CSS sudah cache sehingga tidak pernah muncul.
+
+Jeda aman untuk produksi: 6 detik. Kalau bandingkan lokal vs produksi,
+samakan dulu jeda-nya supaya yang diukur memang perilakunya, bukan
+kecepatan jaringan.

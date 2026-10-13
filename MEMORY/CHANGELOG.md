@@ -53,6 +53,16 @@ di `/riwayat`, `/faq`, `/track`, `/jam-buka`, `/syarat-ketentuan`, `/contact`
 tetap muncul setelah digulir. `tsc` 0 error, `eslint` 0 error, build sukses,
 `test:pages` 30/30.
 
+Verifikasi produksi (`japanese-sando-87l6xhawy-ooraa64`, deploy ke
+https://japanese-sando.vercel.app): 8/8 lulus dengan angka yang sama persis.
+
+Satu jebakan pengukuran yang sempat bikin salah baca: menunggu 2,5 detik setelah
+`Page.navigate` ke produksi terlalu cepat. Bundle CSS belum sempat terpasang,
+jadi `getComputedStyle(footer).visibility` masih nilai default `visible` padahal
+kelas React-nya sudah benar (`invisible opacity-0`). Jejak 120ms membuktikan
+classes React sudah benar sejak frame pertama; yang belum ada hanya CSS-nya.
+Jeda aman: 6 detik. Gotcha #102.
+
 Catatan: `store_settings.hours_*` dan `deadline_*` masih kosong di produksi,
 jadi blok jam buka di footer belum menampilkan apa pun. Tidak diisi dengan
 data karangan.
