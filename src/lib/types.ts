@@ -27,7 +27,12 @@ export type QrisStatus =
   | "refunded"
   | "cancelled";
 
-export type DeliveryMethod = "pickup" | "delivery";
+/** Cara pengambilan pesanan.
+ *  'pickup'   = pembeli datang sendiri ke titik ambil yang dipilih.
+ *  'delivery' = kami antarkan ke zona + alamat yang dipilih pembeli.
+ *  'courier'  = pembeli sendiri yang memesan armada (ongkir ditanggung
+ *               pembeli, tidak perlu alamat dari kami). */
+export type DeliveryMethod = "pickup" | "delivery" | "courier";
 
 export interface Category {
   id: number;
@@ -291,6 +296,10 @@ export interface Order {
   item_count: number;
   status: OrderStatus;
   language: Language;
+  /** Batch PO asal pesanan (migration-49). Null untuk pesanan lama / mode lama. */
+  po_batch_id?: number | null;
+  /** Tanggal ambil dari batch PO, format `YYYY-MM-DD`. */
+  pickup_date?: string | null;
   created_at: string;
   updated_at: string;
   items: OrderItem[];
@@ -396,6 +405,8 @@ export interface InvoiceSnapshot {
   payment_method: PaymentMethod;
   transfer_method: string | null;
   delivery_method: DeliveryMethod;
+  /** Tanggal ambil dari batch PO (migration-49), format `YYYY-MM-DD`. */
+  pickup_date?: string | null;
   created_at: string;
   language: Language;
   /** Status Midtrans (untuk QRIS Midtrans). Null untuk metode lain. */

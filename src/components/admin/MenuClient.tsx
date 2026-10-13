@@ -11,7 +11,6 @@ import {
   ImagePlus,
   LayoutGrid,
   Loader2,
-  Minus,
   Package,
   Pencil,
   Plus,
@@ -35,7 +34,6 @@ import {
   saveCategoryAction,
   saveFlavorAction,
   saveBundleAction,
-  setCategoryStockAction,
 } from "@/app/admin/actions";
 
 /**
@@ -676,37 +674,6 @@ export function MenuClient({
     }
   }
 
-  /* ---------------- Stok per kategori ---------------- */
-
-  async function changeCategoryStock(c: Category, delta: number) {
-    await saveCategoryStock(c, Math.max(0, (c.stock ?? 0) + delta));
-  }
-
-  /**
-   * Simpan stok kategori ke nilai ABSOLUT (bukan tambah/kurang).
-   *
-   * Dipakai oleh input stok yang bisa diketik (permintaan Steven 12-10-2026,
-   * "stock disitu buat bisa pakai ketik"). Nilai dikunci ke >= 0 supaya tidak
-   * ada stok negatif yang lolos ke database.
-   */
-  async function saveCategoryStock(c: Category, rawTarget: number) {
-    const target = Math.max(0, Math.floor(Number(rawTarget) || 0));
-    setBusyId(c.id);
-    const res = await setCategoryStockAction(c.id, target);
-    setBusyId(null);
-
-    if (res.ok) {
-      setCategories((prev) =>
-        prev.map((x) =>
-          x.id === c.id ? { ...x, stock: res.data!.stock } : x
-        )
-      );
-      router.refresh();
-    } else {
-      toast.error(t.errors.generic);
-    }
-  }
-
   /* ---------------- Tampilan ---------------- */
 
   return (
@@ -778,8 +745,6 @@ export function MenuClient({
             toggleFlavorActive,
             toggleFlavorFeatured,
             busyId,
-            changeCategoryStock,
-            setCategoryStockTo: saveCategoryStock,
           }}
         />
       ) : (
@@ -981,9 +946,6 @@ function CategoriesView(props: {
   toggleFlavorActive: (f: Flavor) => Promise<void>;
   toggleFlavorFeatured: (f: Flavor) => Promise<void>;
   busyId: number | null;
-  changeCategoryStock: (c: Category, delta: number) => Promise<void>;
-  /** Simpan stok ke nilai absolut — dipakai input stok yang bisa diketik. */
-  setCategoryStockTo: (c: Category, next: number) => Promise<void>;
 }) {
   const {
     t,
@@ -1003,8 +965,6 @@ function CategoriesView(props: {
     toggleFlavorActive,
     toggleFlavorFeatured,
     busyId,
-    changeCategoryStock,
-    setCategoryStockTo,
   } = props;
 
   return (
@@ -1177,8 +1137,6 @@ function CategoriesView(props: {
             toggleFlavorActive,
             toggleFlavorFeatured,
             busyId,
-            changeCategoryStock,
-            setCategoryStockTo,
           }}
         />
       )}
@@ -1197,9 +1155,6 @@ function FlavorList(props: {
   toggleFlavorActive: (f: Flavor) => Promise<void>;
   toggleFlavorFeatured: (f: Flavor) => Promise<void>;
   busyId: number | null;
-  changeCategoryStock: (c: Category, delta: number) => Promise<void>;
-  /** Simpan stok ke nilai absolut — dipakai input stok yang bisa diketik. */
-  setCategoryStockTo: (c: Category, next: number) => Promise<void>;
 }) {
   const {
     t,
@@ -1212,8 +1167,6 @@ function FlavorList(props: {
     toggleFlavorActive,
     toggleFlavorFeatured,
     busyId,
-    changeCategoryStock,
-    setCategoryStockTo,
   } = props;
 
   return (
@@ -1232,47 +1185,6 @@ function FlavorList(props: {
             </p>
           </div>
         </div>
-
-        {/* Tombol stok di header kategori — muncul saat halaman detail */}
-        {activeCategory.stock_enabled ? (
-          <div className="flex items-center gap-2 rounded-xl bg-cream-50 px-2 py-1.5">
-            <span className="text-[10px] font-bold tracking-wide text-cocoa-500 uppercase">
-              {t.admin.menu.stockQuick}
-            </span>
-            <button
-              type="button"
-              onClick={() => void changeCategoryStock(activeCategory, -1)}
-              disabled={busyId === activeCategory.id || activeCategory.stock <= 0}
-              className="grid size-8 place-items-center rounded-md border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
-              aria-label="-1"
-            >
-              <Minus className="size-4" />
-            </button>
-            <QuickStockInput
-              value={activeCategory.stock ?? 0}
-              disabled={busyId === activeCategory.id}
-              ariaLabel={t.admin.menu.stockQuick}
-              onCommit={(next) => void setCategoryStockTo(activeCategory, next)}
-            />
-            <button
-              type="button"
-              onClick={() => void changeCategoryStock(activeCategory, 1)}
-              disabled={busyId === activeCategory.id}
-              className="grid size-8 place-items-center rounded-md border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
-              aria-label="+1"
-            >
-              <Plus className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void changeCategoryStock(activeCategory, 10)}
-              disabled={busyId === activeCategory.id}
-              className="rounded-md border border-cocoa-200 px-2 py-1.5 text-xs font-bold text-cocoa-600 transition hover:bg-cocoa-100 disabled:opacity-40"
-            >
-              +10
-            </button>
-          </div>
-        ) : null}
       </div>
 
       {flavorsInCategory.length === 0 ? (
@@ -1669,73 +1581,6 @@ function CategoryForm({
             hint: t.admin.menu.imageHint,
           }}
         />
-      </div>
-
-      {/* Stok per-kategori */}
-      <div className="rounded-2xl border border-cocoa-200 bg-cream-50 p-4">
-        <p className="text-sm font-bold text-cocoa-800">
-          {t.admin.menu.stockTitle}
-        </p>
-        <p className="mt-0.5 text-xs text-cocoa-500">
-          {t.admin.menu.stockHint}
-        </p>
-        <div className="mt-3 space-y-3">
-          <Toggle
-            checked={category.stock_enabled}
-            onChange={(v) => setCategory({ ...category, stock_enabled: v })}
-            label={t.admin.menu.stockEnabled}
-          />
-          {category.stock_enabled ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setCategory({
-                    ...category,
-                    stock: Math.max(0, category.stock - 1),
-                  })
-                }
-                className="grid size-9 place-items-center rounded-lg border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50"
-                aria-label="-1"
-              >
-                <Minus className="size-4" />
-              </button>
-              <input
-                type="number"
-                min={0}
-                value={category.stock}
-                onChange={(e) =>
-                  setCategory({
-                    ...category,
-                    stock: Math.max(0, Number(e.target.value.replace(/\D/g, "")) || 0),
-                  })
-                }
-                className="input tabular !w-24 text-center"
-                aria-label={t.admin.menu.stockAdjust}
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setCategory({ ...category, stock: category.stock + 1 })
-                }
-                className="grid size-9 place-items-center rounded-lg border border-cocoa-200 text-cocoa-600 transition hover:bg-cocoa-50"
-                aria-label="+1"
-              >
-                <Plus className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setCategory({ ...category, stock: category.stock + 10 })}
-                className="rounded-lg border border-cocoa-200 px-3 py-2 text-xs font-bold text-cocoa-600 transition hover:bg-cocoa-50"
-              >
-                +10
-              </button>
-              <span className="text-xs text-cocoa-400 tabular">
-                {t.admin.menu.stockUnit}
-              </span>
-            </div>
-          ) : null}
-        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -2221,67 +2066,6 @@ function Toggle({
         <span className="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
       </span>
     </label>
-  );
-}
-
-/**
- * Angka stok yang juga bisa DIKETIK (permintaan Steven 12-10-2026).
- *
- * Sebelumnya di header kategori hanya ada tombol -1 / +1 / +10, jadi untuk
- *misal set stok jadi 250 harus menekan tombol hundreds kali atau buka form
- * kategori terpisah.
- *
- * Sifatnya:
- *  - mengetik = mengubah teks di layar saja, TIDAK menyentuh database
- *    (kalau tiap ketikan langsung disimpan, mengetik "250" akan menulis
- *    2 -> 25 -> 250 dan membanjiri history);
- *  - `Enter` atau blur = commit sekali;
- *  - `Escape` = batal, kembali ke nilai terakhir;
- *  - nilai dikunci jadi digit saja dan >= 0.
- */
-function QuickStockInput({
-  value,
-  disabled,
-  ariaLabel,
-  onCommit,
-}: {
-  value: number;
-  disabled?: boolean;
-  ariaLabel: string;
-  onCommit: (next: number) => void;
-}) {
-  // `null` = belum diketik, jadi tampilkan nilai dari server apa adanya.
-  const [draft, setDraft] = useState<string | null>(null);
-
-  const shown = draft ?? String(value);
-
-  function commit() {
-    if (draft === null) return;
-    const parsed = Math.max(0, Math.floor(Number(draft.replace(/\D/g, "")) || 0));
-    setDraft(null);
-    if (parsed !== value) onCommit(parsed);
-  }
-
-  return (
-    <input
-      type="text"
-      inputMode="numeric"
-      value={shown}
-      disabled={disabled}
-      onChange={(e) => setDraft(e.target.value.replace(/\D/g, ""))}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          (e.currentTarget as HTMLInputElement).blur();
-        } else if (e.key === "Escape") {
-          setDraft(null);
-          (e.currentTarget as HTMLInputElement).blur();
-        }
-      }}
-      aria-label={ariaLabel}
-      className="h-9 w-16 rounded-md border border-cocoa-200 bg-white text-center font-display text-lg font-extrabold text-cocoa-900 tabular transition focus:border-cocoa-400 focus:outline-none disabled:opacity-40"
-    />
   );
 }
 

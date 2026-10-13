@@ -871,3 +871,85 @@ export async function deleteTermsAction(id: number): Promise<ActionResult> {
   revalidatePath("/admin/terms");
   return { ok: true };
 }
+
+/* ==========================================================================
+ *  BATCH PRE-ORDER (PO)
+ *  Gantikan tombol buka/tutup pre-order. Setiap batch punya jendela pemesanan
+ *  sendiri, satu tanggal pengambilan, dan stok sendiri per jenis menu.
+ *  Tabel + RPC: supabase/migration-49.sql
+ * ========================================================================== */
+
+/** Status tampilan batch, dihitung di SQL supaya satu sumber kebenaran. */
+export type PoBatchStatus = "buka" | "akan_dibuka" | "selesai" | "nonaktif";
+
+export interface PoBatchStockCell {
+  category_id: number;
+  nama: string;
+  stock: number;
+}
+
+export interface PoBatch {
+  id: number;
+  label: string;
+  /** Tanggal ISO (YYYY-MM-DD). */
+  open_at: string;
+  close_at: string;
+  pickup_date: string;
+  is_active: boolean;
+  status: PoBatchStatus;
+  terjual: number;
+  pcs_terjual: number;
+  pendapatan: number;
+  /** Di-index dengan String(category_id). */
+  stok: Record<string, PoBatchStockCell>;
+}
+
+export interface PoCategoryLite {
+  id: number;
+  nama: string;
+  aktif: boolean;
+}
+
+export interface PoData {
+  batches: PoBatch[];
+  kategori: PoCategoryLite[];
+}
+
+export async function listPoBatchesAction(): Promise<ActionResult<PoData>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error || !data) return { ok: false, error: "not_authorized" };
+
+  const { data: rows, error: sErr } = await supabase.rpc("admin_list_po_batches");
+  if (sErr) return { ok: false, error: humanize(sErr.message) };
+
+  const payload = (rows ?? {}) as Partial<PoData>;
+  return { ok: true, data: { batches: payload.batches ?? [], kategori: payload.kategori ?? [] } };
+}
+
+export async function savePoBatchAction(
+  payload: Record<string, unknown>
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_save_po_batch", { p_payload: payload });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  // Halaman beranda, /order, dan dashboard semua membaca batch.
+  revalidatePath("/");
+  revalidatePath("/order");
+  revalidatePath("/admin");
+  revalidatePath("/admin/po");
+  return { ok: true };
+}
+
+export async function deletePoBatchAction(id: number): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_delete_po_batch", { p_id: id });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/");
+  revalidatePath("/order");
+  revalidatePath("/admin");
+  revalidatePath("/admin/po");
+  return { ok: true };
+}

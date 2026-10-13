@@ -4,7 +4,9 @@ import { DEFAULT_STORE_NAME } from "@/lib/brand";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
+  Bike,
   Building2,
+  CalendarDays,
   CheckCircle2,
   Download,
   Home,
@@ -32,6 +34,7 @@ type SuccessDict = Dict["success"];
 import {
   deliveryLabel,
   formatDateTime,
+  formatPickupDate,
   formatIDR,
   formatPhone,
   getInvoiceSnapshot,
@@ -444,10 +447,23 @@ function InvoiceSummary({
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-cocoa-100 px-4 py-3 text-[12px]">
         <Detail
-          icon={invoice.delivery_method === "delivery" ? Truck : Store}
+          icon={
+          invoice.delivery_method === "delivery"
+            ? Truck
+            : invoice.delivery_method === "courier"
+              ? Bike
+              : Store
+        }
           label={t.order.review.deliveryLabel}
           value={deliveryLabel(invoice.delivery_method, lang)}
         />
+        {invoice.pickup_date ? (
+          <Detail
+            icon={CalendarDays}
+            label={t.order.review.pickupDateLabel}
+            value={formatPickupDate(invoice.pickup_date, lang)}
+          />
+        ) : null}
         <Detail
           icon={invoice.payment_method === "transfer" ? Building2 : Wallet}
           label={t.order.review.paymentLabel}

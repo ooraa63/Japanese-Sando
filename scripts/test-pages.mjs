@@ -103,14 +103,29 @@ const dash = await openPage("/admin", {
   mustContain: ["Pendapatan", "Menunggu", "Pesanan terbaru", EMAIL],
 });
 if (dash.status === 200) {
+  // Steven 13-10-2026: menu "Menu & Stok" diganti jadi "Menu" karena stok
+  // sekarang diatur di halaman Batch PO (/admin/po), bukan di halaman Menu.
   check("  menu sidebar tampil",
-    dash.text.includes("Menu &amp; Stok") || dash.text.includes("Menu & Stok"));
+    dash.text.includes("Menu &amp; Stok") || dash.text.includes("Menu & Stok") || dash.text.includes("Menu"));
   check("  tombol keluar tampil", dash.text.includes("Keluar"));
+  check("  menu sidebar punya Batch PO", dash.text.includes("Batch PO"));
 }
 
 console.log("\n=== 3. Halaman lain di dashboard ===");
 await openPage("/admin/orders", { mustContain: ["Pesanan", "Semua"] });
-await openPage("/admin/menu", { mustContain: ["Menu", "Stok", "jenis makanan"] });
+// Steven 13-10-2026: stepper stok DIHAPUS dari halaman Menu (stok diatur di
+// /admin/po). Ujinya dibalik: kata "Stok" tidak boleh muncul lagi sebagai
+// kontrol stok, hanya boleh ada di teks lain. Yang dijaga: halaman tetap
+// memuat daftar jenis makanan.
+await openPage("/admin/menu", { mustContain: ["Menu", "jenis makanan"] });
+{
+  const menu = await openPage("/admin/menu", { mustContain: ["Menu"] });
+  check("  /admin/menu tidak punya stepper stok kategori",
+    !menu.text.includes("Stok per jenis") && !menu.text.includes("stokQuick"),
+    menu.text.includes("Stok per jenis") ? "masih ada blok stok" : "");
+}
+// Halaman Batch PO (baru, migration-49)
+await openPage("/admin/po", { mustContain: ["Batch PO"] });
 // Pengaturan sudah jadi TAB (lihat SettingsClient): HTML yang dikirim server
 // hanya berisi tab yang aktif, default-nya "identity". Label Kontak & Rekening
 // baru muncul setelah admin mengklik tabnya, jadi jangan di sini.

@@ -254,7 +254,9 @@ function OrderRow({
       method:
         order.delivery_method === "delivery"
           ? dict.orders.delivery
-          : dict.orders.pickup,
+          : order.delivery_method === "courier"
+            ? dict.orders.courier
+            : dict.orders.pickup,
       statusLabel:
         dict.statuses[order.status as keyof typeof dict.statuses] ?? order.status,
     }),

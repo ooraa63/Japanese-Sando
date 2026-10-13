@@ -26,6 +26,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       logoUrl={settings?.logo_url ?? null}
       labels={{
         dashboard: dicts.admin.nav.dashboard,
+        // Steven 13-10-2026: bar "Batch" di sidebar menunjuk ke /admin/po.
+        batch: dicts.admin.po.title,
         orders: dicts.admin.nav.orders,
         menu: dicts.admin.nav.menu,
         customers: dicts.admin.nav.customers,

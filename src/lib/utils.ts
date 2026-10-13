@@ -114,7 +114,7 @@ export function waOrderLink(phone: string, order: Order, lang: Language): string
     }
     lines.push(`*Total: ${formatIDR(order.total_price, lang)}*`);
     lines.push(
-      order.delivery_method === "delivery" ? "Method: Delivery" : "Method: Pickup"
+      `Method: ${deliveryLabel(order.delivery_method, "en")}`
     );
   } else {
     lines.push(`Halo ${order.customer_name}!`, "");
@@ -129,7 +129,7 @@ export function waOrderLink(phone: string, order: Order, lang: Language): string
     }
     lines.push(`*Total: ${formatIDR(order.total_price, lang)}*`);
     lines.push(
-      order.delivery_method === "delivery" ? "Metode: Diantar" : "Metode: Ambil di tempat"
+      `Metode: ${deliveryLabel(order.delivery_method, "id")}`
     );
   }
   return waLink(phone, lines.join("\n"));
@@ -205,7 +205,33 @@ export function paymentLabel(_method: PaymentMethod, lang: Language): string {
 
 export function deliveryLabel(method: DeliveryMethod, lang: Language): string {
   if (method === "delivery") return lang === "en" ? "Delivery" : "Diantar";
+  if (method === "courier") return lang === "en" ? "Booked courier" : "Pesan Kurir";
   return lang === "en" ? "Collect in store" : "Ambil di toko";
+}
+
+/**
+ * `YYYY-MM-DD` -> objek Date di zona waktu LOKAL.
+ *
+ * `new Date("2026-10-17")` di-parse sebagai UTC tengah malam, lalu
+ * diformat dengan `toLocaleDateString` di zona waktu offset negatif seperti
+ * WIB (UTC+7) — hasilnya bergeser ke HARI SEBELUMNYA. Karena tanggal ambil
+ * adalah tanggal kalender biasa (bukan momen absolut), komponennya harus
+ * dibaca manual.
+ */
+export function parseIsoDate(iso: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return new Date(iso);
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** Tanggal ambil dalam bahasa pembeli, mis. "Jumat, 17 Oktober 2026". */
+export function formatPickupDate(iso: string, lang: Language): string {
+  return parseIsoDate(iso).toLocaleDateString(lang === "en" ? "en-GB" : "id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 /** Nomor pesanan acak untuk afflict draft keranjang di sisi pembeli. */

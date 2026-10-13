@@ -1728,3 +1728,48 @@ lalu ulang — jangantry menambal dengan edit.
 
 Dan selalu cek `git diff --numstat`: untuk file yang murni nambah isi, kolom
 penghapusan HARUS 0. Kalau tidak nol, ada baris lama yang hilang.
+
+### #104 - `useState(() => sessionStorage...)` = hydration error di Next App Router
+
+Membaca sessionStorage di initializer `useState` membuat render server
+(`null`) berbeda dari render klien (nilai sebenarnya). React membuang seluruh
+tree dan `/order` berkedip.
+
+Akibat beruntun: efek yang bergantung pada nilai itu `setPickupDate` ulang
+setelah hydration, tapi `react-hooks/set-state-in-effect` (**React Compiler,
+wajib-nol error di repo ini**) makin menolak pola `useEffect` ->
+`setState` sinkron.
+
+Solusi yang jalan dua-duanya: `useSyncExternalStore` (snapshot server
+`null`, `getSnapshot` baca storage — pola yang sudah dipakai `readOrderStep`)
+dipasangkan dengan state lokal yang lebih baru:
+
+```ts
+const restored = useSyncExternalStore(subscribeNoop, getSnapshot, serverNull);
+const [chosen, setChosen] = useState<string | null>(null);
+const value = chosen ?? restored;
+```
+
+Ini juga menghindari satu `useEffect` untuk menyalin state.
+
+### #105 - `max(sum(...))` illegal di SQL, dan `create_order` versi LIVE harus di-patch, bukan ditulis ulang
+
+Dua jebakan SQL yang muncul bareng di migration-49:
+1. Sisa stok per batch harus dihitung dua tingkat (CTE `per_batch` ->
+   `per_tanggal`), karena `max(sum(x))` langsung offending
+   ("aggregate function calls cannot be nested").
+2. `create_order` yang hidup di produksi SUDAH berisi patch dari migration
+   sebelumnya. Menulis ulang dari nol akan Removesemua perbaikan itu. Ambil
+   definisi LIVE lewat `pg_get_functiondef`, patch sebagai penggantian string
+   yang harus cocok PERSIS, dan skrip berhenti kalau pola tak ditemukan.
+
+### #106 - Headless: `--window-size` TIDAK mengganti viewport, dan footer "di atas" bisa artefak ukur
+
+Tanpa `Emulation.setDeviceMetricsOverride`, headless Edge memakai viewport
+kecil (~754x487). Di ukuran itu footer `hidden md:block` jadi `display:none`,
+`getBoundingClientRect().top` = 0, dan tes "footer di bawah lipatan" gagal
+padahal CSS-nya benar. Selalu set device metrics override eksplisit
+(1400x900) sebelum mengukur posisi footer.
+
+Juga: `location.reload()` di dalam `Runtime.evaluate` butuh 4-5 detik di
+mode dev (Turbopack recompile), bukan 2 detik.

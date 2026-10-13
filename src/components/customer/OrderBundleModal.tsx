@@ -54,6 +54,7 @@ export function OrderBundleModal({
   onClose,
   soldCounts: soldCountsProp = {},
   editingEntry = null,
+  stockOverride = null,
 }: {
   bundle: Bundle | null;
   categories: Category[];
@@ -68,6 +69,8 @@ export function OrderBundleModal({
    * bundle kedua. Tanpa prop ini, perilaku lama (tambah baru) berlaku.
    */
   editingEntry?: CartBundleEntry | null;
+  /** Sisa stok per kategori dari batch PO yang dipilih (lihat `po.ts`). */
+  stockOverride?: Map<number, number> | null;
 }) {
   const { t, lang } = useI18n();
   const cart = useCart();
@@ -144,9 +147,10 @@ export function OrderBundleModal({
       categories,
       cart.quantities,
       otherBundles,
-      slots
+      slots,
+      stockOverride
     );
-  }, [categories, cart.quantities, cart.bundles, slots, editingEntry]);
+  }, [categories, cart.quantities, cart.bundles, slots, editingEntry, stockOverride]);
 
   if (!bundle) return null;
 

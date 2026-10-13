@@ -364,6 +364,7 @@
     print-color-adjust: exact;
   }
   main {
+    min-height: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;
@@ -414,4 +415,26 @@
 
 .admin-shell .text-xs {
   font-size: 0.875rem; /* 14px - utility text-xs itu 12px */
+}
+
+/* =============================================================================
+   Steven 13-10-2026 - FOOTER SELALU DI BAWAH LIPATAN LAYAR
+
+   "Saya mau seperti yang /order ada di bawah lipatan layar." Di /order itu
+   kebetulan terjadi karena halamannya panjang. Di halaman pendek seperti
+   /riwayat, footer justru nempel di baris paling bawah layar pertama dan
+   langsung terlihat tanpa harus menggulir.
+
+   Perbaikannya satu aturan untuk semua halaman: area konten minimal setinggi
+   satu layar. Dengan begitu footer selalu mulai DI BAWAH lipatan layar dan
+   baru terlihat setelah digulir — persis seperti di /order.
+
+   Kenapa `main` dan bukan elemen lain? `main` adalah pembungkus konten di
+   setiap halaman yang memakai SiteFooter, dan posisinya selalu tepat sebelum
+   footer. Menulis aturan per halaman justru rawan ada yang tertinggal.
+
+   Sengaja tanpa `@layer`: CSS tanpa layer menang atas utility Tailwind.
+   ============================================================================= */
+main {
+  min-height: 100dvh;
 }

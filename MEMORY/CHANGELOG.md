@@ -4,6 +4,76 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-13 - Tahap B: batch PO lengkap (sisi pembeli + admin)
+
+**Scope:** sisa dari 15 permintaan Steven (poin 4, 5, 6, 12, 13, 14). Tahap A
+sudah live di commit `cee672d`. Semua 15 permintaan sekarang beres.
+
+### 1. Migration-49 (SUDAH LIVE di produksi, idempoten)
+
+Tabel `po_batches` + `po_batch_stock`, kolom `orders.po_batch_id` dan
+`orders.pickup_date`, fungsi `restore_order_stock` / `consume_order_stock`
+service-role only, RPC publik `public_po_pickup_dates()` dan
+`public_po_batch_for_date(date)`, RPC admin `admin_list_po_batches` /
+`admin_save_po_batch` / `admin_delete_po_batch`.
+
+Bonus: `admin_update_order_status` DITAMBAHKAN — tadinya menulis ke
+`store_settings.total_stock` yang sudah tidak ada sejak migration-11, jadi
+setiap reject/cancel error. Sekarang panggil `restore_order_stock` /
+`consume_order_stock` dan mengembalikan JSON tanpa `total_stock`.
+
+### 2. Migration-50 (SUDAH LIVE di produksi)
+
+`admin_list_orders` sekarang ikut membawa `delivery_zone`, `po_batch_id`, dan
+`pickup_date` ke JSON. Tanpa ini penjual tidak bisa melihat tanggal ambil.
+
+### 3. Sisi pembeli
+
+- **Langkah baru "Tanggal Ambil"** (`OrderFlow.tsx`), muncul SEBELUM identitas
+  hanya kalau ada batch yang sedang dibuka. Tanpa batch, langkahnya dihilangkan
+  dan pembeli jalan mode lama — daftar langkah jadi 4, bukan 5, jadi tidak ada
+  layar kosong yang membingungkan.
+- **Stok per batch** mengalir lewat `stockOverride` → `remainingStockByCategory`.
+  Kategori yang ada di batch memakai angka batch dan SELALU dianggap
+  `stock_enabled`, karena mengaktifkan stok itu memang makna kolomnya.
+- **3 metode pengambilan**: Ambil di toko / Diantar / Pesan Kurir. Kurir tidak
+  minta alamat dan tidak ada ongkir yang kita tagih.
+- **Popup lokasi** untuk Ambil & Diantar (komponen `LocationPopup`), berisi
+  nama titik + catatan admin + alamat toko. Tidak ada data yang dikarang.
+- Tanggal pilihan disimpan di sessionStorage (`js_po_pickup_date`) supaya
+  refresh tidak menghapus pilihan dan stok tidak balik ke `categories.stock`.
+- `p_po_batch_id` + `p_pickup_date` dikirim di kedua jalur pemesanan
+  (transfer dan QRIS). Schema zod QRIS ikut menerima `poBatchId` /
+  `pickupDate`, dan `deliveryMethod` sekarang izinkan `courier`.
+
+### 4. Sisi admin
+
+- **`/admin/po`** (baru): daftar batch, badge status, tanggal buka/tutup/ambil,
+  terjual/pcs/pendapatan, stok per jenis menu, tambah/ubah/hapus.
+- **`/admin/menu`**: stepper stok DIHAPUS dari header kategori DAN form
+  kategori, plus komponen `QuickStockInput`. Stok sekarang hanya di batch PO.
+- **Dashboard**: tombol buka/tutup pre-order + banner status dihapus
+  (prop `isPreorderOpen` ikut dibuang dari `DashboardClient` dan page).
+- **`/admin/orders`**: tanggal ambil tampil di baris meta tiap pesanan.
+- **Menu Profil**: tiap bar (FAQ, Syarat, Jam buka, Kontak, Akun) dapat tombol
+  "Kelola isi halaman" yang menuju editor yang sesuai — Profil jadi pintu
+  masuk, bukan editor kedua.
+
+### 5. Footer
+
+`main { min-height: 100dvh }` di `globals.css` (tanpa `@layer`) + `min-height:
+0 !important` di blok `@media print`. Terverifikasi di enam halaman pendek
+(/riwayat, /contact, /faq, /jam-buka, /syarat-ketentuan, /track): footer selalu
+mulai di bawah lipatan layar 900px.
+
+### Verifikasi
+
+`tsc` 0, `eslint` 0, build sukses, `test:pages` 34/34 (2 tes lama ditulis
+ulang karena "Menu & Stok" dan "Stok" memang sengaja hilang), headless lokal
+14/14 (mode lama) + 13/13 (batch aktif, termasuk bukti kartu menunjukkan
+"Tersisa 5" dari batch dan bukan 20 dari `categories.stock`). Batch uji di
+produksi sudah dihapus; 6 pesanan lama `JS-` utuh.
+
 ## 2026-10-13 - Tahap A dari 15 permintaan: alur order + admin
 
 **Scope:** 15 permintaan Steven (13-10-2026, gambar 1-11 di `D:\Gambar error`),

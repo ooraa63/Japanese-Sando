@@ -237,12 +237,22 @@ export const en = {
     // Account feature is temporarily off (11-10-2026), so don't promise an
     // account here. Honest copy instead: no sign-up, just your details.
     subtitle: "No sign-up needed. Just your details, then pick your flavors.",
+    stepDate: "Pickup date",
     stepIdentity: "Your details",
     stepMenu: "Choose flavors",
     stepPayment: "Payment",
     stepReview: "Review & confirm",
     stepOf: "Step {n} of {total}",
     goBackTo: "Back to {step}",
+    // "Pickup date" step (PO batches, migration-49).
+    date: {
+      title: "When will you collect?",
+      subtitle: "Pick an available date. Stock in the next step follows this date.",
+      empty: "No pickup schedule is open yet. For now you can go straight to choosing flavors.",
+      chooseFirst: "Please pick a pickup date first.",
+      loading: "One moment, we are preparing the stock for that date.",
+      unavailable: "The schedule for that date changed. Please pick another date.",
+    },
     guestPrompt: {
       title: "Order with an account or as a guest?",
       subtitle: "An account is optional. Takes about a minute.",
@@ -290,7 +300,14 @@ export const en = {
       // Steven 13-10-2026: heading is just "Pickup", not a long question.
       deliveryTitle: "Pickup",
       delivery: "Delivery",
-      deliveryDesc: "We deliver to your address.",
+      deliveryDesc: "We deliver to the zone you pick.",
+      // Third method (13-10-2026): the buyer books their own courier, so
+      // the shipping cost is on them and we never ask for an address.
+      courier: "Book a courier",
+      courierDesc: "You book your own courier. Shipping cost is on you.",
+      viewLocation: "View location",
+      locationPopup: "Location details",
+      locationEmpty: "The seller has not filled in details for this point yet.",
       deliveryZoneTitle: "Deliver to which zone?",
       address: "Delivery address",
       addressPlaceholder: "Street, number, district, city",
@@ -359,6 +376,7 @@ export const en = {
       itemsLabel: "Items",
       paymentLabel: "Payment",
       deliveryLabel: "Delivery",
+      pickupDateLabel: "Pickup date",
       deliveryFee: "Delivery fee",
       freeShipping: "Free delivery",
       shippingDiscount: "Shipping discount",
@@ -641,6 +659,7 @@ export const en = {
       total: "Total",
       pickup: "Pickup in store",
       delivery: "Delivery",
+      courier: "Booked courier",
       total_label: "{n} orders",
       activeTitle: "In progress",
       activeHint: "Pre-orders you have not picked up yet",
@@ -727,11 +746,60 @@ export const en = {
       rateLimited:
         "Too many attempts just now. Please wait about an hour, or turn off email confirmation in the Supabase dashboard.",
     },
+    /**
+     * /admin/po — pre-order batches (Steven 13-10-2026).
+     * Replaces the open/close pre-order button on the dashboard.
+     */
+    po: {
+      title: "PO batches",
+      subtitle:
+        "Each batch has its own open date, close date, pickup date, and stock per menu. Buyers only ever see the pickup date.",
+      addBatch: "Add batch",
+      empty: "No PO batches yet.",
+      emptyHint:
+        "Until a batch is open, buyers can still order as before and stock comes from the menu settings.",
+      newBatch: "New batch",
+      editBatch: "Edit batch",
+      label: "Batch name",
+      labelPlaceholder: "e.g. PO October A",
+      labelHint: "For your eyes only. Buyers never see this name.",
+      openAt: "Open date",
+      closeAt: "Close date",
+      pickupDate: "Pickup date",
+      dateHint: "Buyers pick the pickup date, not the batch name.",
+      stockTitle: "Stock for this batch",
+      stockHint:
+        "Leave it empty or set 0 when a menu type is not made in this batch.",
+      stockUnit: "pcs",
+      save: "Save batch",
+      delete: "Delete batch",
+      deleteConfirm: "Delete this batch?",
+      deleteBlocked:
+        "This batch is already used by orders, so it cannot be deleted. Just deactivate it.",
+      active: "Active",
+      inactive: "Inactive",
+      statusBuka: "Open now",
+      statusAkan: "Opens later",
+      statusSelesai: "Finished",
+      statusNonaktif: "Inactive",
+      sold: "Sold",
+      revenue: "Revenue",
+      pcsLeft: "left",
+      soldLabel: "{n} orders",
+      pcsSoldLabel: "{n} pcs sold",
+      saved: "PO batch saved.",
+      deleted: "PO batch deleted.",
+      buyerPreview: "Buyers will see",
+      stockBelowReserved:
+        "Stock cannot go below the number that has already been ordered.",
+    },
     nav: {
       dashboard: "Dashboard",
       orders: "Orders",
       batch: "Batch",
-      menu: "Menu & stock",
+      // Steven 13-10-2026: "Menu & stock" -> "Menu". Stock now lives on the
+      // PO batch page, so the menu page no longer promises stock controls.
+      menu: "Menu",
       customers: "Customers",
       settings: "Settings",
       viewSite: "View website",
@@ -756,7 +824,8 @@ export const en = {
       viewBatch: "View batch & production list",
       noBatch: "No open batch yet.",
       stockTitle: "Stock",
-      stockPerCategory: "Stock is now set per menu. Open Menu & Stock to manage it.",
+      stockPerCategory:
+        "Stock is now set per PO batch. Open the PO page to manage it.",
       pcsLeft: "pcs left",
       stockUsed: "{n} pcs already ordered in the current batch",
       stockAllFlavors: "Stock applies to all flavors combined, not per flavor.",
@@ -781,6 +850,7 @@ export const en = {
       newBadge: "new",
       createdFull: "When the order was placed",
       viewProof: "View receipt",
+      pickupDate: "Collect",
       noProof: "No receipt",
       downloadProof: "Download",
       openProof: "Open full size",
@@ -960,7 +1030,7 @@ export const en = {
       errorTitleRequired: "The title is required.",
     },
     menu: {
-      title: "Menu & stock",
+      title: "Menu",
       subtitle:
         "Start with a food category, then fill in its flavors. E.g. Sando Sandwich, Croissant, Birthday Cake.",
       addCategory: "Add food category",
@@ -1138,10 +1208,10 @@ export const en = {
       orderRules: "Order rules",
       deliveryFee: "Delivery fee (Rp)",
       stockHint:
-        "Stock is now set per menu. Open Menu & Stock to manage per-category stock.",
+        "Stock is now set per PO batch. Open the PO page to manage stock per batch.",
       bundleTitle: "Bundle (explicit pack)",
       bundleHint:
-        "A bundle is a combination pack sold as its own item. Open the Bundles tab in Menu & Stock to manage them.",
+        "A bundle is a combination pack sold as its own item. Open the Bundles tab on the Menu page to manage them.",
       bundleSize: "Slot count",
       bundlePrice: "Bundle price",
       bundleEmpty: "No bundles yet.",
@@ -1165,10 +1235,10 @@ export const en = {
       popularPicker: "Popular",
       popularPickerHint: "Shown as cards near the top of the homepage.",
       // The "New arrivals" section is now filled from the "New" toggle in the
-      // flavor form (Menu & Stock), not from a picker here — one source of
+      // flavor form (the Menu page), not from a picker here — one source of
       // truth, so the "New" label can never drift from the list.
       newPickerHint:
-        "The 'New arrivals' section on the homepage comes from Menu & Stock: switch on the 'New' toggle for each new product.",
+        "The 'New arrivals' section on the homepage comes from the Menu page: switch on the 'New' toggle for each new product.",
       bestPicker: "Best sellers",
       bestPickerHint: "Shown as a row list on the homepage.",
       pickerAuto: "Automatic",
@@ -1215,6 +1285,9 @@ export const en = {
         saved: "Menu row saved.",
         deleted: "Menu row deleted.",
         deleteConfirm: "Remove this menu row from the app?",
+        // Steven 13-10-2026: opens the editor that actually stores the page
+        // content, not the popup form below.
+        managePage: "Manage page content",
         contactCopiedFromSettings:
           "This row was filled from Settings > Contact & Location when it was first created. It is a copy now: changing the address or opening hours there does not update this popup text — copy it across manually.",
       },

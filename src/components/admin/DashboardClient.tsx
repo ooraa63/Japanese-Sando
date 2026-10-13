@@ -3,13 +3,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle,
   ArrowRight,
-  CheckCircle2,
   ChefHat,
   Clock,
   PackageCheck,
-  Power,
   RefreshCw,
   ShoppingBag,
   TrendingUp,
@@ -19,29 +16,22 @@ import type { DashboardStats, Order } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { formatFullDateTime, formatIDR, formatRelative, statusLabel } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useToast } from "@/components/ui/Toast";
 import {
   getDashboardStatsAction,
   getOrdersAction,
-  togglePreorderAction,
 } from "@/app/admin/actions";
 
 export function DashboardClient({
   initialStats,
   initialOrders,
-  isPreorderOpen,
 }: {
   initialStats: DashboardStats;
   initialOrders: Order[];
-  isPreorderOpen: boolean;
 }) {
   const { t, lang } = useI18n();
-  const toast = useToast();
   const [stats, setStats] = useState(initialStats);
   const [orders, setOrders] = useState(initialOrders);
-  const [open, setOpen] = useState(isPreorderOpen);
   const [refreshing, startRefresh] = useTransition();
-  const [toggling, startToggle] = useTransition();
 
   function refresh() {
     startRefresh(async () => {
@@ -54,20 +44,6 @@ export function DashboardClient({
     });
   }
 
-  function toggleOpen() {
-    const next = !open;
-    setOpen(next);
-    startToggle(async () => {
-      // Fungsi khusus: hanya menyentuh is_preorder_open, tidak mengubah field lain
-      const res = await togglePreorderAction(next);
-      if (res.ok) {
-        toast.success(next ? t.admin.dash.openStore : t.admin.dash.closeStore);
-      } else {
-        setOpen(!next);
-        toast.error(t.errors.generic);
-      }
-    });
-  }
 
   const cards = [
     {
@@ -124,39 +100,13 @@ export function DashboardClient({
             <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
 
-          <button
-            type="button"
-            onClick={toggleOpen}
-            disabled={toggling}
-            className={`btn !px-4 !py-2.5 ${
-              open
-                ? "border border-berry-500/30 bg-berry-500/10 text-berry-600 hover:bg-berry-500/15"
-                : "border border-matcha-300 bg-matcha-100 text-matcha-700 hover:bg-matcha-200/70"
-            }`}
-          >
-            <Power className="size-4" />
-            {open ? t.admin.dash.closeStore : t.admin.dash.openStore}
-          </button>
         </div>
       </div>
 
-      {/* ---------- Status pre-order ---------- */}
-      <div
-        className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${
-          open
-            ? "border-matcha-300 bg-matcha-50 text-matcha-700"
-            : "border-berry-500/30 bg-berry-500/5 text-berry-600"
-        }`}
-      >
-        {open ? (
-          <CheckCircle2 className="size-5 shrink-0" />
-        ) : (
-          <AlertTriangle className="size-5 shrink-0" />
-        )}
-        <p className="text-sm font-bold">
-          {open ? t.admin.dash.storeOpen : t.admin.dash.storeClosed}
-        </p>
-      </div>
+      {/* Steven 13-10-2026: banner dan tombol buka/tutup pre-order DIHAPUS.
+          Yang menentukan PO buka/tutup sekarang adalah tanggal buka dan
+          tanggal tutup tiap batch di halaman /admin/po. Banner lama akan
+          menampilkan status yang tidak lagi dipakai siapa pun. */}
 
       {/* ---------- Kartu statistik ---------- */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

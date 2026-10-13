@@ -1265,3 +1265,21 @@ produk sendiri.
   (jawaban Steven poin 2 & 9). Angka 30 dan 40 di contohnya dibaca sebagai
   stok PER JENIS MENU per batch. Pemetaan batch ke pesanan: kalau beberapa
   batch punya tanggal pengambilan sama, pakai yang stoknya paling dulu habis.
+
+- **D70** - **Daftar langkah /order berubah bentuk, bukan cuma isinya.**
+  `stepsFor(profileComplete, hasPo)` mengembalikan 5 langkah kalau ada batch
+  terbuka, 4 kalau tidak. Membaca `poDates` di SERVER (`/order/page.tsx`)
+  supaya jumlah langkah tidak berubah setelah hydration.
+- **D71** - **Kategori yang ada di batch PO selalu dianggap `stock_enabled`.**
+  Mengaktifkan stok itu makna kolomnya; kalau batch punya 0 untuk kategori itu,
+  kategori itu memang habis — bukan "tidak dibatasi".
+- **D72** - **Tanggal ambil dipersistensi di sessionStorage, dan divalidasi
+  ulang terhadap daftar tanggal aktif.** Refresh tidak boleh menghapus pilihan
+  (stok akan balik ke `categories.stock`), tapi tanggal yang sudah ditutup
+  admin juga tidak boleh Offered.
+- **D73** - **"Pesan Kurir" = pembeli yang memesan armada sendiri.** Tidak ada
+  zona, tidak ada alamat, ongkir ditanggung pembeli. Sisa tiga metode tetap
+  punya popup lokasi karena titik dan jamnya ditentukan admin.
+- **D74** - **Popup lokasi hanya berisi data yang sudah ada** (nama zona, catatan
+  admin, alamat toko dari Pengaturan). Kalau detailnya kosong, popup mengatakannya
+  terus terang alih-alih menampilkan peta atau jam yang dikarang.

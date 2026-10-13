@@ -6,7 +6,9 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  Bike,
   Building2,
+  CalendarDays,
   Check,
   Copy,
   Loader2,
@@ -37,16 +39,36 @@ import { AddressPicker } from "@/components/customer/AddressPicker";
 import { CartDrawer } from "@/components/customer/CartDrawer";
 import { QrisPaymentModal } from "@/components/customer/QrisPaymentModal";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
-import { formatIDR, formatPhone, resolveShipping, saveInvoice } from "@/lib/utils";
+import {
+  formatIDR,
+  formatPhone,
+  formatPickupDate,
+  resolveShipping,
+  saveInvoice,
+} from "@/lib/utils";
 import type { ShippingQuote } from "@/lib/utils";
+import { fetchBatchForDate, type PoBatchStock, type PoPickupDate } from "@/lib/po";
 
-const FULL_STEPS = ["identity", "menu", "payment", "review"] as const;
-const LOGGED_IN_STEPS = ["menu", "payment", "review"] as const;
+/**
+ * Batch PO menentukan tanggal ambil, jadi langkah "pilih tanggal" harus
+ * ada SEBELUM pembeli isi identitas — begitu begitu tanggal dipilih, stok
+ * yang tampil di langkah "Pilih Rasa" langsung mengikuti batch tanggal itu.
+ *
+ * Kalau admin belum membuat batch yang sedang dibuka, langkah tanggal
+ * DIHILANGKAN dan pembeli tetap bisa memesan dengan mode lama (stok dari
+ * `categories.stock`). Ini yang membuat migrasi tidak membrikkan toko.
+ */
+const FULL_STEPS = ["date", "identity", "menu", "payment", "review"] as const;
+const LOGGED_IN_STEPS = ["date", "menu", "payment", "review"] as const;
+const NO_PO_FULL_STEPS = ["identity", "menu", "payment", "review"] as const;
+const NO_PO_LOGGED_IN_STEPS = ["menu", "payment", "review"] as const;
 type Step = (typeof FULL_STEPS)[number];
 /** Step list untuk user yang sudah login + profile lengkap — skip identity.
- *  Guest (= tanpa profile) tetap melewati identity dulu. */
-function stepsFor(profileComplete: boolean): readonly Step[] {
-  return profileComplete ? LOGGED_IN_STEPS : FULL_STEPS;
+ *  Guest (= tanpa profile) tetap melewati identity dulu.
+ *  `hasPo` = ada batch yang sedang dibuka, jadi langkah tanggal ditampilkan. */
+function stepsFor(profileComplete: boolean, hasPo: boolean): readonly Step[] {
+  if (hasPo) return profileComplete ? LOGGED_IN_STEPS : FULL_STEPS;
+  return profileComplete ? NO_PO_LOGGED_IN_STEPS : NO_PO_FULL_STEPS;
 }
 
 /**
@@ -75,12 +97,79 @@ function readOrderStep(steps: readonly Step[]): Step {
 function subscribeOrderStep(): () => void {
   return () => {};
 }
+
+/**
+ * Tanggal ambil yang dipilih, disimpan di sessionStorage.
+ *
+ * Tanpa ini, refresh di tengah alur menghapus pilihan tanggal — pembeli
+ * yang sudah jauh di langkah "Pilih Rasa" tiba-tiba diminta memilih ulang,
+ * dan `poBatch` ikut jadi null sehingga angka stok yang tampil balik ke
+ * `categories.stock`. Kuncinya dihapus saat /order ditinggalkan, sama
+ * seperti `js_order_step`.
+ */
+const PO_DATE_KEY = "js_po_pickup_date";
+
+function readPoDate(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const saved = sessionStorage.getItem(PO_DATE_KEY);
+    return saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePoDate(value: string | null) {
+  try {
+    if (value) sessionStorage.setItem(PO_DATE_KEY, value);
+    else sessionStorage.removeItem(PO_DATE_KEY);
+  } catch {
+    // Mode privat / storage diblokir — pilihan tetap jalan di state.
+  }
+}
+
+/**
+ * Subscribe no-op: sessionStorage hanya dibaca, tidak ada sumber daya
+ * eksternal yang perlu dipantau. Yang penting dari argumen ini adalah
+ * mengembalikan fungsi unsubscribe.
+ */
+function subscribePoDate(): () => void {
+  return () => {};
+}
+
+/**
+ * Tanggal ambil tersimpan, atau `null`.
+ *
+ * Snapshot server sengaja `null`: kalau server membaca sessionStorage,
+ * render pertama di server dan di browser berbeda dan React membuang
+ * seluruh tree (hydration error). Pola `useSyncExternalStore` yang sama
+ * dipakai `readOrderStep` aman karena React memakai `getServerSnapshot`
+ * saat render server maupun hydration, dan baru membandingkan dengan
+ * snapshot klien SETELAH selesai.
+ *
+ * Tanggal yang tersimpan tapi sudah tidak ada di `poDates` (admin menutup
+ * batch-nya) dianggap tidak ada — jangan Offer pilihan yang tak bisa
+ * dipesan.
+ */
+function readPoDateSnapshot(active: readonly PoPickupDate[]): () => string | null {
+  return () => {
+    const saved = readPoDate();
+    if (!saved) return null;
+    return active.some((d) => d.pickupDate === saved) ? saved : null;
+  };
+}
+function serverPoDateSnapshot(): string | null {
+  return null;
+}
+
 /** True kalau customer sudah punya profile lengkap (boleh skip identity).
  *  profile lengkap = user_id + full_name + phone. Saat signup via /register
  *  ketiga field ini wajib diisi, jadi user yang berhasil register = profile
  *  lengkap = bisa skip identity di OrderFlow. */
 const isProfileComplete = (p: CustomerProfile | null | undefined) =>
   !!(p?.user_id && p.full_name && p.phone);
+
+
 
 /**
  * Baris Potongan ongkir + petunjuk tier berikutnya.
@@ -139,6 +228,7 @@ export function OrderFlow({
   settings,
   deliveryZones,
   midtransReady = false,
+  poDates,
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri / per-kategori yang dijual. */
@@ -149,6 +239,9 @@ export function OrderFlow({
   /** True kalau MIDTRANS_SERVER_KEY sudah di-set. Dikirim dari server
    *  component (page.tsx) supaya kita tidak perlu expose env ke client. */
   midtransReady?: boolean;
+  /** Tanggal pengambilan yang sedang dibuka (server-fetched). Kosong =
+   *  belum ada batch, pembeli pesan dengan mode lama. */
+  poDates: PoPickupDate[];
 }) {
   const { t, lang } = useI18n();
   const router = useRouter();
@@ -193,7 +286,11 @@ export function OrderFlow({
   // ke menu. Kalau belum lengkap (guest / OAuth tanpa phone), tetap
   // melalui identity dulu.
   const profileComplete = isProfileComplete(profile);
-  const steps = useMemo(() => stepsFor(profileComplete), [profileComplete]);
+  const hasPo = poDates.length > 0;
+  const steps = useMemo(
+    () => stepsFor(profileComplete, hasPo),
+    [profileComplete, hasPo]
+  );
 
   // Catatan: useState initial hanya jalan sekali, jadi user yang logout
   // setelah halaman dimuat akan tetap di step dia sekarang sampai dia
@@ -220,7 +317,11 @@ export function OrderFlow({
   // Navigasi manual menimpa nilai yang dibaca dari storage. Sekali user
   // menekan tombol, storage bukan lagi sumber kebenaran untuk sesi ini.
   const [stepOverride, setStepOverride] = useState<Step | null>(null);
-  const step = stepOverride ?? stepFromStorage;
+  // `steps` bisa berubah saat komponen hidup (mis. batch PO ditutup admin),
+  // jadi langkah yang tersimpan harus divalidasi lagi. Tanpa ini
+  // `steps.indexOf(step)` = -1 dan seluruh progress bar salah.
+  const stepCandidate = (stepOverride ?? stepFromStorage) as Step;
+  const step = steps.includes(stepCandidate) ? stepCandidate : steps[0];
   const setStep = useCallback((target: Step) => {
     setStepOverride(target);
   }, []);
@@ -232,6 +333,66 @@ export function OrderFlow({
    *  paymentMethod=qris_midtrans. Modal akan generate QR via Midtrans. */
   const [qrisPayload, setQrisPayload] = useState<Record<string, unknown> | null>(null);
   const [qrisModalOpen, setQrisModalOpen] = useState(false);
+
+  /* ---------------- Batch pre-order (PO) ---------------- */
+  // Tanggal yang dipilih pembeli (`YYYY-MM-DD`) + batch yang dipakai untuk
+  // tanggal itu. Batch diambil ulang setiap kali tanggal berubah, jadi
+  // `stokPerBatch` selalu sesuai tanggal aktif — bukan batch lama yang
+  // sudah ditutup admin.
+  // Hanya baca yang sudah pernah dipilih DAN masih ada di daftar tanggal
+  // aktif. Kalau admin menutup batch-nya, tanggal lama diabaikan.
+  //
+  // `restoredPoDate` = hasil baca sessionStorage (null saat render server,
+  // nilai sebenarnya setelah hydration). `chosenDate` = pilihan yang
+  // dibuat pembeli di sesi ini, yang lebih baru kalau ada.
+  const restoredPoDate = useSyncExternalStore(
+    subscribePoDate,
+    readPoDateSnapshot(poDates),
+    serverPoDateSnapshot
+  );
+  const [chosenDate, setChosenDate] = useState<string | null>(null);
+  const pickupDate = chosenDate ?? restoredPoDate;
+  const [poBatch, setPoBatch] = useState<PoBatchStock | null>(null);
+  const [poLoading, setPoLoading] = useState(false);
+  /* Popup detail lokasi. Steven 13-10-2026: baik "Ambil di Toko" maupun
+     "Diantar" harus membuka popup lokasi, karena titik dan jam ambil
+     ditentukan admin dan pembeli perlu tahu sebelum konfirmasi. */
+  const [locationPopup, setLocationPopup] = useState<DeliveryZone | null>(null);
+
+  // Mengganti tanggal membuang batch lama seketika, supaya selama RPC
+  // berjalan tidak ada satu frame pun yang memakai stok batch yang salah.
+  const selectPickupDate = useCallback((date: string | null) => {
+    setPoBatch(null);
+    setPoLoading(date !== null);
+    setChosenDate(date);
+    writePoDate(date);
+  }, []);
+
+  useEffect(() => {
+    if (!pickupDate) return;
+    let cancelled = false;
+    void (async () => {
+      const batch = await fetchBatchForDate(pickupDate);
+      if (cancelled) return;
+      setPoLoading(false);
+      if (!batch) {
+        // Batch-nya sudah tidak berlaku (ditutup admin di tengah pembeli
+        // memilih). Paksa pilih ulang daripada lanjut dengan stok yang
+        // sudah tidak bisa dipesan.
+        selectPickupDate(null);
+        toast.error(t.order.date.unavailable);
+        goTo("date");
+        return;
+      }
+      setPoBatch(batch);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `toast` & `goTo` sengaja tidak masuk dependencies: keduanya dibuat
+    // ulang tiap render, dan `goTo` menulis sessionStorage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupDate, selectPickupDate]);
 
   // Tarik counter 'terjual' per-flavor saat halaman dibuka.
   useEffect(() => {
@@ -278,16 +439,22 @@ export function OrderFlow({
   // melebihi sisa stok kategori. Bundle dihitung dari slot yang dipilih
   // (tiap slot = 1 pcs fisik, dari kategori bundle atau bebas kalau
   // bundle berdiri sendiri).
+  //
+  // Kalau pembeli sudah memilih tanggal ambil, sumber stoknya adalah batch
+  // PO tanggal itu — bukan `categories.stock`. Fallback ke `categories.stock`
+  // kalau batch belum selesai dimuat atau kategori tidak ada di batch.
   const stockByCategory = useMemo(() => {
     const m = new Map<number, { enabled: boolean; left: number }>();
+    const override = poBatch?.stockByCategory ?? null;
     for (const c of categories) {
+      const fromBatch = override?.has(c.id) ? override.get(c.id)! : null;
       m.set(c.id, {
-        enabled: c.stock_enabled,
-        left: Math.max(0, c.stock ?? 0),
+        enabled: fromBatch != null ? true : c.stock_enabled,
+        left: Math.max(0, fromBatch ?? c.stock ?? 0),
       });
     }
     return m;
-  }, [categories]);
+  }, [categories, poBatch]);
 
   // Semua rasa dikumpulkan dari kategori yang tampil.
   const flavors = useMemo(
@@ -389,7 +556,10 @@ export function OrderFlow({
     return m;
   }, [cartLines, cartBundles, categories]);
 
-  // Ongkir dari zona delivery (kalau pickup = 0).
+  // Ongkir dari zona delivery (kalau pickup / kurir = 0).
+  //
+  // "Pesan Kurir" = pembeli sendiri yang memesan armada (GoSend/Grab),
+  // jadi ongkir ditanggung pembeli dan tidak ada ongkir yang kita tagih.
   const currentZone = deliveryZones.find((z) => z.id === draft.deliveryZone);
   const rawDeliveryFee =
     draft.deliveryMethod === "delivery" && currentZone ? currentZone.fee : 0;
@@ -409,6 +579,13 @@ export function OrderFlow({
   );
   const deliveryFee = shipping.finalFee;
   const total = subtotal + deliveryFee;
+  // Label metode untuk sticky bar + kartu konfirmasi.
+  const deliveryLabel =
+    draft.deliveryMethod === "delivery"
+      ? t.order.payment.delivery
+      : draft.deliveryMethod === "courier"
+        ? t.order.payment.courier
+        : t.order.payment.pickup;
 
   const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
 
@@ -461,6 +638,7 @@ export function OrderFlow({
 
       // Unmount sungguhan = pindah halaman. Bersihin.
       sessionStorage.removeItem("js_order_step");
+      sessionStorage.removeItem(PO_DATE_KEY);
       resetRef.current();
     };
   }, []);
@@ -478,6 +656,20 @@ export function OrderFlow({
       // Mode privat / storage penuh — langkah tetap jalan di state.
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function validateDate(): boolean {
+    // Kalau belum ada batch, tidak ada tanggal yang wajib dipilih.
+    if (!hasPo) return true;
+    if (!pickupDate) {
+      toast.warning(t.order.date.chooseFirst);
+      return false;
+    }
+    if (!poBatch) {
+      toast.warning(t.order.date.loading);
+      return false;
+    }
+    return true;
   }
 
   function validateIdentity(): boolean {
@@ -531,6 +723,7 @@ export function OrderFlow({
   }
 
   function handleNext() {
+    if (step === "date" && !validateDate()) return;
     if (step === "identity" && !validateIdentity()) return;
     if (step === "menu" && !validateMenu()) return;
     if (step === "payment" && !validatePayment()) return;
@@ -539,7 +732,7 @@ export function OrderFlow({
   }
 
   async function handleSubmit() {
-    if (!validateIdentity() || !validateMenu() || !validatePayment()) {
+    if (!validateIdentity() || !validateMenu() || !validatePayment() || !validateDate()) {
       toast.error(t.errors.generic);
       return;
     }
@@ -575,6 +768,11 @@ export function OrderFlow({
         note: entry.note ?? null,
       })),
       pUserId: profile?.user_id ?? null,
+      // Batch PO. Kalau pembeli tidak memilih tanggal (belum ada batch
+      // yang dibuka), keduanya null dan `create_order` memotong stok dari
+      // `categories.stock` seperti mode lama.
+      pPoBatchId: poBatch?.batchId ?? null,
+      pPickupDate: poBatch ? poBatch.pickupDate : null,
     };
 
     // ===== Cabang QRIS Midtrans =====
@@ -598,7 +796,9 @@ export function OrderFlow({
         items: payload.pItems,
         bundles: payload.pBundles,
         language: payload.pLanguage,
-        userId: payload.pUserId,
+        pUserId: payload.pUserId,
+        poBatchId: payload.pPoBatchId,
+        pickupDate: payload.pPickupDate,
       });
       setQrisModalOpen(true);
       return;
@@ -627,6 +827,8 @@ export function OrderFlow({
         p_items: payload.pItems,
         p_bundles: payload.pBundles,
         p_user_id: payload.pUserId,
+        p_po_batch_id: payload.pPoBatchId,
+        p_pickup_date: payload.pPickupDate,
       });
 
       if (error) {
@@ -656,6 +858,7 @@ export function OrderFlow({
         qris_status: null,
         qris_paid_at: null,
         delivery_method: draft.deliveryMethod,
+        pickup_date: poBatch ? poBatch.pickupDate : null,
         created_at: new Date().toISOString(),
         language: lang,
         items: groups.map((g) => ({
@@ -739,6 +942,7 @@ export function OrderFlow({
   }
 
   const stepTitles: Record<Step, string> = {
+    date: t.order.stepDate,
     identity: t.order.stepIdentity,
     menu: t.order.stepMenu,
     payment: t.order.stepPayment,
@@ -864,7 +1068,70 @@ export function OrderFlow({
         }
       >
         <div className="min-w-0">
-          {/* ============ LANGKAH 1: IDENTITAS ============ */}
+          {/* ============ LANGKAH 1: TANGGAL AMBIL ============ */}
+          {step === "date" ? (
+            <section className="card p-6 sm:p-8">
+              <StepHeading
+                icon={<CalendarDays className="size-5" />}
+                title={t.order.date.title}
+                subtitle={t.order.date.subtitle}
+              />
+
+              {poDates.length === 0 ? (
+                <p className="mt-6 rounded-2xl bg-honey-300/20 p-4 text-sm font-semibold text-honey-500">
+                  {t.order.date.empty}
+                </p>
+              ) : (
+                <ul className="mt-6 grid gap-2.5 sm:grid-cols-2">
+                  {poDates.map((d) => {
+                    const selected = pickupDate === d.pickupDate;
+                    return (
+                      <li key={d.pickupDate}>
+                        <button
+                          type="button"
+                          onClick={() => selectPickupDate(d.pickupDate)}
+                          aria-pressed={selected}
+                          className={`flex w-full flex-col items-start gap-1 rounded-2xl border-2 p-4 text-left transition ${
+                            selected
+                              ? "border-matcha-500 bg-matcha-50"
+                              : "border-cocoa-200 bg-white hover:border-cocoa-300 hover:bg-cocoa-50/50"
+                          }`}
+                        >
+                          <span className="flex w-full items-center gap-1.5 text-sm font-bold text-cocoa-900">
+                            {formatPickupDate(d.pickupDate, lang)}
+                            {selected ? (
+                              <Check className="size-4 shrink-0 text-matcha-600" />
+                            ) : null}
+                          </span>
+                          <span className="text-xs font-semibold text-cocoa-500 tabular">
+                            {lang === "en"
+                              ? `${d.sisa} pcs left`
+                              : `tersisa ${d.sisa} pcs`}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {poLoading ? (
+                <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-cocoa-500">
+                  <Loader2 className="size-4 animate-spin" />
+                  {t.order.date.loading}
+                </p>
+              ) : null}
+
+              <StepNav
+                onBack={null}
+                onNext={handleNext}
+                nextLabel={t.common.next}
+                nextIcon={<ArrowRight className="size-4" />}
+              />
+            </section>
+          ) : null}
+
+          {/* ============ LANGKAH 2: IDENTITAS ============ */}
           {step === "identity" ? (
             <section className="card p-6 sm:p-8">
               <StepHeading
@@ -1024,6 +1291,7 @@ export function OrderFlow({
                   categories={categories}
                   bundles={bundles}
                   soldCounts={soldCounts}
+                  stockOverride={poBatch?.stockByCategory ?? null}
                 />
               )}
 
@@ -1035,11 +1303,7 @@ export function OrderFlow({
                 totalItems={totalItems}
                 subtotal={subtotal}
                 storeName={settings?.store_name ?? ""}
-                deliveryLabel={
-                  draft.deliveryMethod === "delivery"
-                    ? t.order.payment.delivery
-                    : t.order.payment.pickup
-                }
+                deliveryLabel={deliveryLabel}
                 onOpenCart={() => setCartOpen(true)}
               />
 
@@ -1079,18 +1343,21 @@ export function OrderFlow({
                 ) : null}
               </div>
 
-              {/* Cara penerimaan — 2 tingkat: Ambil di toko / Diantar -> pilih zona spesifik */}
+              {/* Cara pengambilan — 3 pilihan (permintaan Steven
+                  13-10-2026): Ambil di toko, Diantar, dan Pesan Kurir.
+                  Lokasi Ambil & Diantar ditentukan admin di menu "Ambil &
+                  Kirim"; setelah metode dipilih, tombol "Lihat lokasi"
+                  membuka popup berisi detail titik tersebut. */}
               <h3 className="mt-8 text-base font-bold text-cocoa-800">
                 {t.order.payment.deliveryTitle}
               </h3>
 
-              {/* Tingkat 1: Ambil di toko vs Diantar */}
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <ChoiceCard
                   selected={draft.deliveryMethod === "pickup"}
                   onClick={() => {
-                    // Pilih pickup location default: zona pickup pertama yang aktif,
-                    // fallback ke "pickup" kalau admin belum set lokasi pickup.
+                    // Pilih lokasi pickup default: zona pickup pertama yang
+                    // aktif, fallback ke "pickup" kalau admin belum set.
                     const firstPickup = deliveryZones.find(
                       (z) => z.kind === "pickup"
                     );
@@ -1102,6 +1369,7 @@ export function OrderFlow({
                       lat: null,
                       lng: null,
                     });
+                    if (firstPickup) setLocationPopup(firstPickup);
                   }}
                   icon={<Store className="size-5" />}
                   title={t.order.payment.pickup}
@@ -1110,24 +1378,43 @@ export function OrderFlow({
                 />
                 <ChoiceCard
                   selected={draft.deliveryMethod === "delivery"}
-                  onClick={() =>
+                  onClick={() => {
                     // Saat pertama kali pilih 'Diantar', default ke zona
                     // pertama yang bukan pickup.
+                    const firstZone = deliveryZones.find(
+                      (z) => (z.kind ?? "delivery") === "delivery"
+                    );
                     updateDraft({
                       deliveryMethod: "delivery",
-                      deliveryZone:
-                        deliveryZones.find((z) => z.id !== "pickup")?.id ??
-                        "vihara",
-                    })
-                  }
+                      deliveryZone: firstZone?.id ?? "vihara",
+                    });
+                    if (firstZone) setLocationPopup(firstZone);
+                  }}
                   icon={<Truck className="size-5" />}
                   title={t.order.payment.delivery}
                   desc={t.order.payment.deliveryDesc}
                 />
+                <ChoiceCard
+                  selected={draft.deliveryMethod === "courier"}
+                  onClick={() =>
+                    // Pesan Kurir = pembeli yang memesan armada sendiri,
+                    // jadi tidak ada zona dan tidak ada alamat dari kami.
+                    updateDraft({
+                      deliveryMethod: "courier",
+                      deliveryZone: "courier",
+                      address: "",
+                      addressNote: "",
+                      lat: null,
+                      lng: null,
+                    })
+                  }
+                  icon={<Bike className="size-5" />}
+                  title={t.order.payment.courier}
+                  desc={t.order.payment.courierDesc}
+                />
               </div>
 
-              {/* Tingkat 2a: zona delivery (hanya muncul setelah pilih 'Diantar').
-                  Filter hanya kind='delivery' (kind='pickup' muncul di Tingkat 2b). */}
+              {/* Zona pengantaran (hanya muncul setelah pilih 'Diantar'). */}
               {draft.deliveryMethod === "delivery" ? (
                 <div className="mt-4">
                   <p className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
@@ -1145,9 +1432,10 @@ export function OrderFlow({
                           <ChoiceCard
                             key={z.id}
                             selected={draft.deliveryZone === z.id}
-                            onClick={() =>
-                              updateDraft({ deliveryZone: z.id })
-                            }
+                            onClick={() => {
+                              updateDraft({ deliveryZone: z.id });
+                              setLocationPopup(z);
+                            }}
                             icon={<MapPin className="size-5" />}
                             title={zName}
                             desc={
@@ -1165,7 +1453,7 @@ export function OrderFlow({
                 </div>
               ) : null}
 
-              {/* Tingkat 2b: titik pengambilan (hanya muncul setelah pilih 'Ambil di
+              {/* Titik pengambilan (hanya muncul setelah pilih 'Ambil di
                   toko'). Dikelola admin di menu "Ambil & Kirim"
                   (/admin/pickup-delivery). Catatan di bawah dipakai untuk
                   jam ambil — "ada catatan juga jadi tau ambil jam berapa". */}
@@ -1187,9 +1475,10 @@ export function OrderFlow({
                           <ChoiceCard
                             key={z.id}
                             selected={draft.deliveryZone === z.id}
-                            onClick={() =>
-                              updateDraft({ deliveryZone: z.id })
-                            }
+                            onClick={() => {
+                              updateDraft({ deliveryZone: z.id });
+                              setLocationPopup(z);
+                            }}
                             icon={<Store className="size-5" />}
                             title={zName}
                             desc={lang === "en" ? "Free" : "Gratis"}
@@ -1226,6 +1515,20 @@ export function OrderFlow({
                   </div>
                 </div>
               ) : null}
+              {/* Tombol "Lihat lokasi" — muncul kalau metode Ambil/Diantar
+                  dan titik yang dipilih punya detail (catatan admin atau
+                  alamat toko dari pengaturan). */}
+              {draft.deliveryMethod !== "courier" && currentZone ? (
+                <button
+                  type="button"
+                  onClick={() => setLocationPopup(currentZone)}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl border border-cocoa-200 bg-white px-3.5 py-2.5 text-sm font-bold text-cocoa-700 transition hover:bg-cocoa-50"
+                >
+                  <MapPin className="size-4" />
+                  {t.order.payment.viewLocation}
+                </button>
+              ) : null}
+
               {/* Steven 13-10-2026: kartu yang dulu ada di sini DIHAPUS.
 
                   Kartu itu berlabel "ALAMAT PENGIRIMAN" padahal isinya
@@ -1331,10 +1634,21 @@ export function OrderFlow({
                       }`}
                 </ReviewRow>
                 <ReviewRow label={t.order.review.deliveryLabel} onEdit={() => goTo("payment")} editLabel={t.order.review.editPayment}>
-                  {draft.deliveryMethod === "delivery"
-                    ? `${t.order.payment.delivery} — ${draft.address}`
-                    : `${t.order.payment.pickup}${settings.address ? ` — ${settings.address}` : ""}`}
+                  {deliveryLabel}
+                  {currentZone ? ` — ${lang === "en" ? currentZone.name_en : currentZone.name_id}` : ""}
+                  {draft.deliveryMethod === "delivery" && draft.address
+                    ? ` — ${draft.address}`
+                    : ""}
                 </ReviewRow>
+                {poBatch ? (
+                  <ReviewRow
+                    label={t.order.review.pickupDateLabel}
+                    onEdit={() => goTo("date")}
+                    editLabel={t.order.review.editDetails}
+                  >
+                    {formatPickupDate(poBatch.pickupDate, lang)}
+                  </ReviewRow>
+                ) : null}
                 <ReviewRow
                   label={t.order.review.itemsLabel}
                   onEdit={() => goTo("menu")}
@@ -1615,6 +1929,12 @@ export function OrderFlow({
         continueDisabled={totalItems === 0}
       />
 
+      <LocationPopup
+        zone={locationPopup}
+        storeAddress={settings.address ?? null}
+        onClose={() => setLocationPopup(null)}
+      />
+
       {qrisPayload ? (
         <QrisPaymentModal
           payload={qrisPayload}
@@ -1650,6 +1970,92 @@ function StepHeading({
       <div className="min-w-0">
         <h1 className="text-xl leading-tight font-extrabold text-cocoa-900">{title}</h1>
         <p className="mt-1 text-[13px] text-cocoa-500">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Popup detail lokasi pengambilan / pengantaran.
+ *
+ * Steven 13-10-2026: popup muncul untuk KEDUA metode — "Ambil di Toko"
+ * maupun "Diantar". Titik dan jamnya ditentukan admin, jadi pembeli perlu
+ * tahu sebelum menekan lanjut. Isinya sengaja memakai data yang sudah ada
+ * (nama + catatan zona dari "Ambil & Kirim", alamat toko dari Pengaturan)
+ * — tidak ada data komersial yang dikarang di sini.
+ */
+function LocationPopup({
+  zone,
+  storeAddress,
+  onClose,
+}: {
+  zone: DeliveryZone | null;
+  storeAddress: string | null;
+  onClose: () => void;
+}) {
+  const { t, lang } = useI18n();
+
+  useEffect(() => {
+    if (!zone) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zone, onClose]);
+
+  if (!zone) return null;
+
+  const isPickup = zone.kind === "pickup";
+  const name = lang === "en" ? zone.name_en : zone.name_id;
+  const note = (lang === "en" ? zone.note_en : zone.note_id) ?? "";
+  // Alamat toko hanya relevan untuk ambil di toko. Untuk antar, alamat
+  // tujuan itu milik pembeli dan sudah ditulis di form.
+  const address = isPickup ? storeAddress : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-cocoa-900/50 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t.order.payment.locationPopup}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3.5">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-cocoa-800 text-cream-50">
+            {isPickup ? <Store className="size-5" /> : <MapPin className="size-5" />}
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg leading-tight font-extrabold text-cocoa-900">{name}</h2>
+            <p className="mt-1 text-[13px] text-cocoa-500">
+              {isPickup ? t.order.payment.pickup : t.order.payment.delivery}
+            </p>
+          </div>
+        </div>
+
+        {note ? (
+          <p className="mt-4 rounded-xl bg-cream-50 px-3.5 py-3 text-sm leading-relaxed font-semibold text-cocoa-700">
+            {note}
+          </p>
+        ) : null}
+
+        {address ? (
+          <p className="mt-3 text-sm leading-relaxed text-cocoa-600">{address}</p>
+        ) : null}
+
+        {!note && !address ? (
+          <p className="mt-4 text-sm text-cocoa-500">
+            {t.order.payment.locationEmpty}
+          </p>
+        ) : null}
+
+        <button type="button" onClick={onClose} className="btn-primary mt-6 w-full">
+          {t.common.close}
+        </button>
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/data";
 import { getDashboardStatsAction, getOrdersAction } from "@/app/admin/actions";
 import { DashboardClient } from "@/components/admin/DashboardClient";
 import type { DashboardStats } from "@/lib/types";
@@ -23,17 +22,15 @@ const EMPTY_STATS: DashboardStats = {
 };
 
 export default async function AdminDashboardPage() {
-  const [statsRes, ordersRes, settings] = await Promise.all([
+  const [statsRes, ordersRes] = await Promise.all([
     getDashboardStatsAction(),
     getOrdersAction(null, "", 8, 0),
-    getSettings(),
   ]);
 
   return (
     <DashboardClient
       initialStats={statsRes.data ?? EMPTY_STATS}
       initialOrders={ordersRes.data?.orders ?? []}
-      isPreorderOpen={settings?.is_preorder_open ?? true}
     />
   );
 }

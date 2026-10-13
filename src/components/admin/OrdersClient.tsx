@@ -24,6 +24,7 @@ import {
   formatFullDateTime,
   formatIDR,
   formatPhone,
+  formatPickupDate,
   paymentLabel,
   statusLabel,
   waOrderLink,
@@ -380,6 +381,17 @@ export function OrdersClient({
                         <>
                           <span>·</span>
                           <span className="text-matcha-600">{t.admin.orders.viewProof}</span>
+                        </>
+                      ) : null}
+                      {/* Tanggal ambil dari batch PO (migration-49). Null untuk
+                          pesanan lama dan mode tanpa batch. */}
+                      {o.pickup_date ? (
+                        <>
+                          <span>·</span>
+                          <span className="font-bold text-cocoa-700">
+                            {t.admin.orders.pickupDate}:{" "}
+                            {formatPickupDate(o.pickup_date, lang)}
+                          </span>
                         </>
                       ) : null}
                     </div>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  CalendarRange,
   ClipboardList,
   ExternalLink,
   FileText,
@@ -26,6 +27,9 @@ import { signOutAction } from "@/app/admin/actions";
 
 const NAV = [
   { href: "/admin", key: "dashboard" as const, icon: LayoutDashboard, exact: true },
+  // Steven 13-10-2026: batch PO jadi halaman sendiri, menggantikan tombol
+  // buka/tutup pre-order yang tadinya ada di dashboard.
+  { href: "/admin/po", key: "batch" as const, icon: CalendarRange, exact: false },
   { href: "/admin/orders", key: "orders" as const, icon: ClipboardList, exact: false },
   { href: "/admin/sales", key: "sales" as const, icon: TrendingUp, exact: false },
   { href: "/admin/menu", key: "menu" as const, icon: UtensilsCrossed, exact: false },
@@ -52,6 +56,8 @@ export function AdminShell({
   logoUrl?: string | null;
   labels: {
     dashboard: string;
+    // Steven 13-10-2026: bar batch PO baru (menunjuk /admin/po).
+    batch: string;
     orders: string;
     menu: string;
     customers: string;

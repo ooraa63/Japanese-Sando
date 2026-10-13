@@ -230,12 +230,16 @@ export function OrderMenuBrowser({
   categories,
   bundles = [],
   soldCounts = {},
+  stockOverride = null,
 }: {
   categories: Category[];
   /** Bundle berdiri sendiri (category_id=NULL) atau per-kategori. */
   bundles?: Bundle[];
   /** Map flavorId -> jumlah pcs terjual (accepted/ready/delivered). */
   soldCounts?: Record<number, number>;
+  /** Sisa stok per kategori dari batch PO yang dipilih (lihat `po.ts`).
+   *  Null = belum ada batch, pakai `categories.stock` seperti mode lama. */
+  stockOverride?: Map<number, number> | null;
 }) {
   const { t, lang } = useI18n();
   const { quantities, bundles: cartBundles } = useCart();
@@ -282,8 +286,8 @@ export function OrderMenuBrowser({
   // bundle 2 pcs -> kartu biasa masih tulis 10, padahal sudah sisa 8).
   // Logikanya sama dengan `OrderBundleModal` karena keduanya lewat helper.
   const remainingByCategory = useMemo(
-    () => remainingStockByCategory(categories, quantities, cartBundles),
-    [categories, quantities, cartBundles]
+    () => remainingStockByCategory(categories, quantities, cartBundles, [], stockOverride),
+    [categories, quantities, cartBundles, stockOverride]
   );
 
   // Gabungan semua rasa dari kategori terpilih, lalu disaring & diurutkan.
@@ -571,6 +575,7 @@ export function OrderMenuBrowser({
           onClose={() => setOpenBundleId(null)}
           soldCounts={soldCounts}
           editingEntry={editingEntry}
+          stockOverride={stockOverride}
         />
       ) : null}
     </>

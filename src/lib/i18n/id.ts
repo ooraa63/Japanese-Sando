@@ -242,12 +242,22 @@ export const id: Dict = {
     // Fitur Account dimatikan sementara (11-10-2026), jadi jangan menjanjikan
     // akun di sini. Sekarang teksnya jujur: tanpa daftar, cukup isi data.
     subtitle: "Tanpa daftar akun. Cuma isi data, lalu pilih rasa favoritmu.",
+    stepDate: "Tanggal Ambil",
     stepIdentity: "Data Kamu",
     stepMenu: "Pilih Rasa",
     stepPayment: "Pembayaran",
     stepReview: "Konfirmasi",
     stepOf: "Langkah {n} dari {total}",
     goBackTo: "Kembali ke {step}",
+    // Langkah "pilih tanggal ambil" (batch PO, migration-49).
+    date: {
+      title: "Kapan mau ambil?",
+      subtitle: "Pilih tanggal yang tersedia. Stok di langkah berikutnya mengikuti tanggal ini.",
+      empty: "Belum ada jadwal ambil yang dibuka. Sementara ini kamu bisa langsung pilih rasa saja.",
+      chooseFirst: "Pilih tanggal ambil dulu ya.",
+      loading: "Sebentar, stok tanggal itu sedang disiapkan.",
+      unavailable: "Jadwal untuk tanggal itu sudah berubah. Pilih tanggal lain ya.",
+    },
     guestPrompt: {
       title: "Mau pesan pakai akun atau tamu?",
       subtitle: "Boleh pakai akun, boleh juga tidak. Cuma butuh satu menit.",
@@ -298,7 +308,14 @@ export const id: Dict = {
       // menerima barang.
       deliveryTitle: "Pengambilan",
       delivery: "Diantar",
-      deliveryDesc: "Kami antarkan ke alamatmu.",
+      deliveryDesc: "Kami antarkan ke zona yang kamu pilih.",
+      // Metode ketiga (13-10-2026): pembeli yang memesan armada sendiri,
+      // jadi ongkir ditanggung pembeli dan tidak perlu alamat dari kami.
+      courier: "Pesan Kurir",
+      courierDesc: "Kamu yang memesan armada sendiri. Ongkir ditanggung pembeli.",
+      viewLocation: "Lihat lokasi",
+      locationPopup: "Detail lokasi",
+      locationEmpty: "Detail lokasi untuk titik ini belum diisi penjual.",
       deliveryZoneTitle: "Antar ke zona mana?",
       address: "Alamat pengiriman",
       addressPlaceholder: "Jalan, nomor, kelurahan, kota",
@@ -368,6 +385,7 @@ export const id: Dict = {
       itemsLabel: "Pesanan",
       paymentLabel: "Pembayaran",
       deliveryLabel: "Pengiriman",
+      pickupDateLabel: "Tanggal ambil",
       deliveryFee: "Ongkos kirim",
       freeShipping: "Gratis ongkir",
       shippingDiscount: "Potongan ongkir",
@@ -490,7 +508,8 @@ export const id: Dict = {
     empty: "Tidak ada yang cocok. Coba kata kunci lain.",
     back: "Kembali ke beranda",
   },
-  /** Halaman /syarat-ketentuan — dibuka dari bar menu Profil. */
+
+    /** Halaman /admin/po —-nav dan judul layout dashboard. */
   termsPage: {
     title: "Syarat & Ketentuan",
     subtitle: "Aturan pemesanan, pembayaran, dan layanan kami.",
@@ -652,6 +671,7 @@ export const id: Dict = {
       total: "Total",
       pickup: "Ambil di toko",
       delivery: "Diantar",
+      courier: "Pesan Kurir",
       total_label: "{n} pesanan",
       activeTitle: "Sedang diproses",
       activeHint: "Pre-order yang belum kamu terima",
@@ -737,11 +757,61 @@ export const id: Dict = {
       rateLimited:
         "Terlalu banyak percobaan barusan. Tunggu sekitar satu jam, atau matikan email confirmation di dashboard Supabase.",
     },
+    /**
+     * Halaman /admin/po — batch pre-order (Steven 13-10-2026).
+     * Menggantikan tombol buka/tutup pre-order di dashboard.
+     */
+    po: {
+      title: "Batch PO",
+      subtitle:
+        "Setiap batch punya tanggal buka, tanggal tutup, tanggal pengambilan, dan stok sendiri per jenis menu. Pembeli hanya melihat tanggal pengambilannya.",
+      addBatch: "Tambah batch",
+      empty: "Belum ada batch PO.",
+      emptyHint:
+        "Sampai ada batch yang dibuka, pembeli masih bisa pesan seperti biasa dan stok diambil dari pengaturan menu.",
+      newBatch: "Batch baru",
+      editBatch: "Ubah batch",
+      label: "Nama batch",
+      labelPlaceholder: "mis. PO Oktober A",
+      labelHint: "Hanya buat kamu. Pembeli tidak pernah melihat nama ini.",
+      openAt: "Tanggal buka",
+      closeAt: "Tanggal tutup",
+      pickupDate: "Tanggal pengambilan",
+      dateHint: "Pembeli memilih tanggal pengambilan, bukan nama batch.",
+      stockTitle: "Stok batch ini",
+      stockHint:
+        "Kosongkan atau isi 0 kalau jenis menu ini tidak dibuat di batch ini.",
+      stockUnit: "pcs",
+      save: "Simpan batch",
+      delete: "Hapus batch",
+      deleteConfirm: "Hapus batch ini?",
+      deleteBlocked:
+        "Batch ini sudah dipakai pesanan, jadi tidak bisa dihapus. Nonaktifkan saja.",
+      active: "Aktif",
+      inactive: "Nonaktif",
+      statusBuka: "Sedang buka",
+      statusAkan: "Akan dibuka",
+      statusSelesai: "Selesai",
+      statusNonaktif: "Nonaktif",
+      sold: "Terjual",
+      revenue: "Pendapatan",
+      pcsLeft: "sisa",
+      soldLabel: "{n} pesanan",
+      pcsSoldLabel: "{n} pcs terjual",
+      saved: "Batch PO disimpan.",
+      deleted: "Batch PO dihapus.",
+      buyerPreview: "Pembeli akan melihat",
+      stockBelowReserved:
+        "Stok tidak bisa dikecilkan di bawah jumlah yang sudah dipesan.",
+    },
+
     nav: {
       dashboard: "Dashboard",
       orders: "Pesanan",
       batch: "Batch",
-      menu: "Menu & Stok",
+      // Steven 13-10-2026: "Menu & Stok" -> "Menu". Stok pindah ke batch PO,
+      // jadi nama menunya tidak lagi menjanjikan pengaturan stok.
+      menu: "Menu",
       customers: "Pelanggan",
       settings: "Pengaturan",
       viewSite: "Lihat website",
@@ -766,7 +836,8 @@ export const id: Dict = {
       viewBatch: "Lihat batch & daftar produksi",
       noBatch: "Belum ada batch yang dibuka.",
       stockTitle: "Stok",
-      stockPerCategory: "Stok sekarang diatur per menu. Buka Menu & Stok untuk mengelola.",
+      stockPerCategory:
+        "Stok sekarang diatur per batch PO. Buka halaman PO untuk mengelola.",
       pcsLeft: "pcs tersisa",
       stockUsed: "{n} pcs sudah dipesan di batch berjalan",
       stockAllFlavors: "Stok berlaku untuk semua rasa, bukan per rasa.",
@@ -791,6 +862,7 @@ export const id: Dict = {
       newBadge: "baru",
       createdFull: "Waktu pesanan dibuat",
       viewProof: "Lihat bukti",
+      pickupDate: "Ambil",
       noProof: "Tidak ada bukti",
       downloadProof: "Unduh",
       openProof: "Buka ukuran penuh",
@@ -970,7 +1042,7 @@ export const id: Dict = {
       errorTitleRequired: "Judulnya wajib diisi.",
     },
     menu: {
-      title: "Menu & Stok",
+      title: "Menu",
       subtitle:
         "Mulai dari jenis makanan, lalu isi rasa-rasanya. Contoh: Sando Sandwich, Croissant, Kue Ultah.",
       addCategory: "Tambah jenis makanan",
@@ -1149,10 +1221,10 @@ export const id: Dict = {
       orderRules: "Aturan pesanan",
       deliveryFee: "Ongkos kirim (Rp)",
       stockHint:
-        "Stok sekarang diatur per menu. Buka halaman Menu & Stok untuk mengelola stok kategori.",
+        "Stok sekarang diatur per batch PO. Buka halaman PO untuk mengelola stok tiap batch.",
       bundleTitle: "Bundle (paket eksplisit)",
       bundleHint:
-        "Bundle adalah paket kombinasi yang dijual sebagai item. Mis. ‘2 Sando Sandwich = Rp35.000’. Buka tab Bundle di Menu & Stok untuk mengelolanya.",
+        "Bundle adalah paket kombinasi yang dijual sebagai item. Mis. ‘2 Sando Sandwich = Rp35.000’. Buka tab Bundle di halaman Menu untuk mengelolanya.",
       bundleSize: "Jumlah slot",
       bundlePrice: "Harga bundle",
       bundleEmpty: "Belum ada bundle. Tambahkan dari tab Bundle di Menu & Stok.",
@@ -1176,10 +1248,10 @@ export const id: Dict = {
       popularPicker: "Populer",
       popularPickerHint: "Tampil sebagai kartu-kartu di bagian atas beranda.",
       // Section "Menu Baru" sekarang diisi dari toggle "New" di form flavor
-      // (Menu & Stok), bukan dari pemilih di halaman ini — satu sumber
+      // (halaman Menu), bukan dari pemilih di halaman ini — satu sumber
       // kebenaran, supaya label "New" tidak bisa tidak sinkron dengan daftar.
       newPickerHint:
-        "Bagian 'Menu Baru' di beranda diisi dari tab Menu & Stok: nyalakan toggle 'New' pada produk yang baru.",
+        "Bagian 'Menu Baru' di beranda diisi dari halaman Menu: nyalakan toggle 'New' pada produk yang baru.",
       bestPicker: "Terlaris",
       bestPickerHint: "Tampil sebagai daftar baris di beranda.",
       pickerAuto: "Otomatis",
@@ -1227,6 +1299,9 @@ export const id: Dict = {
         saved: "Bar menu tersimpan.",
         deleted: "Bar menu dihapus.",
         deleteConfirm: "Hapus bar menu ini dari aplikasi?",
+        // Steven 13-10-2026 (poin 11): tombol ini membawa penjual ke editor yang
+        // benar-benar menyimpan isi halaman, bukan ke form popup di bawah.
+        managePage: "Kelola isi halaman",
         contactCopiedFromSettings:
           "Bar ini diisi otomatis dari Pengaturan > Kontak & Lokasi saat pertama dibuat. Sekarang isinya salinan: kalau alamat atau jam buka diubah di sana, teks popup ini tidak ikut berubah — salin manual di sini.",
       },

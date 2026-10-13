@@ -10,6 +10,7 @@ import {
   HelpCircle,
   Loader2,
   MessageCircle,
+  PencilRuler,
   Plus,
   Save,
   Sparkles,
@@ -44,6 +45,30 @@ const ICON_CHOICES = [
 ] as const;
 
 type Draft = Omit<ProfileMenuItem, "id"> & { id?: number };
+
+/**
+ * Steven 13-10-2026 (poin 11): "menu profil itu seperti tidak ada gunanya karena
+ * FAQ bukan diisi dari sana".
+ *
+ * Betul: isi FAQ disimpan di tabel `faq_items`, syarat di `terms_sections`, jam
+ * buka dan kontak di `store_settings`. Jadi bar "FAQ" di sheet Profil tidak
+ * pernah jadi tempat mengisinya — dia cuma tautan ke /faq.
+ *
+ * Perbaikannya: setiap bar yang punya halaman tujuan sekarang menampilkan
+ * tombol "Kelola isi" yang langsung membuka editor yang BENAR-BENAR menyimpan
+ * isi halaman itu. Satu klik dari daftar bar ke tempat mengisi kontennya, dan
+ * tidak ada lagi dua editor yang bisa menyimpan FAQ.
+ *
+ * Peta di bawah memakai `code` bar, bukan `href`, supaya tetap berlaku walau
+ * penjual mengubah link halaman di form.
+ */
+const PAGE_EDITOR: Record<string, string> = {
+  faq: "/admin/faq",
+  terms: "/admin/terms",
+  hours: "/admin/settings",
+  contact: "/admin/settings",
+  account: "/admin/settings",
+};
 
 const EMPTY: Draft = {
   code: "",
@@ -228,6 +253,17 @@ export function ProfileMenuClient({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
+                  {PAGE_EDITOR[item.code] ? (
+                    <button
+                      type="button"
+                      onClick={() => router.push(PAGE_EDITOR[item.code])}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-matcha-50 px-2.5 py-1.5 text-[12px] font-bold text-matcha-700 transition hover:bg-matcha-100"
+                      title={t.admin.settings.profileMenu.managePage}
+                    >
+                      <PencilRuler className="size-3.5" />
+                      {t.admin.settings.profileMenu.managePage}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => move(item, -1)}

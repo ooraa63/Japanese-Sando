@@ -106,12 +106,43 @@ async function loadDeliveryZones(): Promise<DeliveryZone[]> {
   }
 }
 
+/**
+ * Tanggal pengambilan yang sedang dibuka.
+ *
+ * diambil di SERVER supaya daftar langkah / progress bar tidak berubah
+ * setelah hydration. Kalau RPC gagal atau admin belum membuat batch,
+ * hasilnya `[]` dan pembeli tetap bisa memesan dengan mode lama.
+ */
+async function loadPoPickupDates(): Promise<
+  Array<{ pickupDate: string; sisa: number }>
+> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("public_po_pickup_dates");
+    if (error || !data) return [];
+    const payload = data as {
+      ada_batch?: boolean;
+      tanggal?: Array<{ pickup_date?: string | null; sisa?: number | null }> | null;
+    };
+    if (!payload.ada_batch || !Array.isArray(payload.tanggal)) return [];
+    return payload.tanggal
+      .map((row) => ({
+        pickupDate: String(row.pickup_date ?? "").slice(0, 10),
+        sisa: Number(row.sisa ?? 0),
+      }))
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.pickupDate));
+  } catch {
+    return [];
+  }
+}
+
 export default async function OrderPage() {
-  const [settings, menu, dicts, deliveryZones] = await Promise.all([
+  const [settings, menu, dicts, deliveryZones, poDates] = await Promise.all([
     getSettings(),
     getPublicMenu(),
     getI18nDict(),
     loadDeliveryZones(),
+    loadPoPickupDates(),
   ]);
   const categories = menu.categories;
   const bundles = menu.bundles;
@@ -153,6 +184,7 @@ export default async function OrderPage() {
           settings={settings as StoreSettings}
           deliveryZones={deliveryZones}
           midtransReady={Boolean(process.env.MIDTRANS_SERVER_KEY)}
+          poDates={poDates}
         />
       </main>
       <SiteFooter settings={settings} />

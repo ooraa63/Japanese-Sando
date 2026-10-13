@@ -33,7 +33,7 @@ const qrisOrderSchema = z.object({
   customerEmail: z.string().trim().max(120).optional().nullable(),
   instagram: z.string().trim().min(1).max(40),
   phone: z.string().trim().min(9).max(30),
-  deliveryMethod: z.enum(["pickup", "delivery"]),
+  deliveryMethod: z.enum(["pickup", "delivery", "courier"]),
   deliveryZone: z.string().trim().max(20).optional(),
   address: z.string().trim().max(300).optional().nullable(),
   addressNote: z.string().trim().max(120).optional().nullable(),
@@ -56,6 +56,13 @@ const qrisOrderSchema = z.object({
   ),
   language: z.enum(["id", "en"]).default("id"),
   userId: z.string().uuid().nullable().optional(),
+  /** Batch PO + tanggal ambil (migration-49). Null = mode lama. */
+  poBatchId: z.number().int().positive().nullable().optional(),
+  pickupDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
 });
 
 /**
@@ -139,7 +146,7 @@ export async function createQrisOrderAction(
       p_phone: data.phone,
       p_payment_method: "qris_midtrans",
       p_delivery_method: data.deliveryMethod,
-      p_delivery_zone: data.deliveryZone ?? (data.deliveryMethod === "delivery" ? "other" : "pickup"),
+      p_delivery_zone: data.deliveryZone ?? (data.deliveryMethod === "delivery" ? "other" : data.deliveryMethod === "courier" ? "courier" : "pickup"),
       p_address: data.address ?? null,
       p_address_note: data.addressNote ?? null,
       p_lat: data.lat ?? null,
@@ -150,6 +157,8 @@ export async function createQrisOrderAction(
       p_items: data.items,
       p_bundles: data.bundles,
       p_user_id: data.userId ?? null,
+      p_po_batch_id: data.poBatchId ?? null,
+      p_pickup_date: data.pickupDate ?? null,
     });
     rpcResult = result.data as { order_code: string; order_id: number } | null;
     rpcErr = result.error;

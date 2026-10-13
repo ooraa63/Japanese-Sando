@@ -20,12 +20,18 @@ import type { CartBundleEntry, Category } from "@/lib/types";
  * `stock_enabled = false` (stok tidak dibatasi).
  *
  * @param extraSlots slot bundle yang sedang dipilih di modal (masih lokal).
+ * @param stockOverride sisa stok per kategori dari batch PO yang dipilih
+ *   pembeli. Kalau diisi, angka ini yang jadi sumber kebenaran dan
+ *   `stock_enabled` kategori diabaikan untuk kategori yang ada di map —
+ *   karena stok batch adalah activasinya sendiri. Kategori yang TIDAK ada
+ *   di map tetap memakai `categories.stock` (mode lama, tanpa batch).
  */
 export function remainingStockByCategory(
   categories: Category[],
   quantities: Record<string, number>,
   bundles: CartBundleEntry[] = [],
-  extraSlots: Array<number | null> = []
+  extraSlots: Array<number | null> = [],
+  stockOverride?: Map<number, number> | null
 ): Map<number, number | null> {
   // Peta flavorId -> categoryId, dibangun sekali supaya tidak searching ulang
   // tiap slot (sebelumnya pakai `flatMap().find()` di dalam loop).
@@ -64,9 +70,11 @@ export function remainingStockByCategory(
 
   const out = new Map<number, number | null>();
   for (const c of categories) {
+    const base = stockOverride?.has(c.id) ? stockOverride.get(c.id)! : c.stock;
+    const enabled = stockOverride?.has(c.id) ? true : c.stock_enabled;
     out.set(
       c.id,
-      c.stock_enabled ? Math.max(0, (c.stock ?? 0) - (used.get(c.id) ?? 0)) : null
+      enabled ? Math.max(0, (base ?? 0) - (used.get(c.id) ?? 0)) : null
     );
   }
   return out;
