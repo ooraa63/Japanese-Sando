@@ -1519,3 +1519,43 @@ interaksi (qty > 0, dialog terbuka) TIDAK bisa diuji lewat
 `test-pages.mjs` karena skrip itu cuma GET HTTP tanpa state browser.
 Untuk kasus seperti ini andalkan headless CDP, dan pastikan tetap
 tidak mengirim order.
+
+## Gotcha #92 — Cek teks di HTML gagal kalau memuat `&`
+
+HTML meng-escape `&` jadi `&amp;`. Jadi `openPage` di
+`scripts/test-pages.mjs` yang memakai `text.includes("Syarat & Ketentuan")`
+selalu gagal walaupun halamannya benar — bukan bug produk.
+
+Jadi `openPage` sekarang men-decode entitas dulu lewat `decodeEntities()`.
+Urutannya penting: `&amp;` HARUS diproses terakhir, kalau tidak `"&amp;lt;"`
+akan jadi `"<"` dan merusak teks yang memang harus literal.
+
+Kalau menambah cek baru yang teksnya mengandung `&`, `>`, atau `'`, itu
+sekarang aman. Kalau menulis helper pencocokan sendiri, beware hal yang sama.
+
+## Gotcha #93 — `overflow-x: hidden` di `html` mematikan `position: sticky`
+
+Untuk menahan scrollbar horizontal, `html { overflow-x: hidden }` adalah
+solusi yang paling sering dicari — tapi itu mengubah `html` jadi scroll
+container, dan `position: sticky` di dalamneya ikut rusak karena tidak ada lagi
+scrollport di santo.
+
+Pakai `clip` sebagai gantinya: `html { overflow-x: clip }`. `clip` tidak
+membuat scroll container, jadi `overflow-y: visible` tetap `visible`
+(beda dengan `hidden`, yang memaksa sumbu lain jadi `auto`), dan sticky
+tetap jalan. Didukung Chrome 90+, Edge 90+, Firefox 81+, Safari 16+.
+
+## Gotcha #94 — Cek "apakah ada scrollbar" bukan lewat screenshot
+
+Screenshot `Page.captureScreenshot` di headless TIDAK pernah menunjukkan
+scrollbar browser sama sekali — itu UI browser, bukan konten halaman. Cara
+yang benar mengukur layout:
+
+```js
+document.documentElement.clientHeight === window.innerHeight
+```
+
+Kalau false, ada ruang yang biasanya dipakai scrollbar horizontal. Ini yang
+membuktikan bug Steven: konten `/riwayat` berhenti di y=845 pada viewport
+861, jadi 16px-nya milik scrollbar. Way yang lebih langsung: ukur
+`clientHeight` vs `innerHeight` setelah `Emulation.setDeviceMetricsOverride`.

@@ -295,7 +295,7 @@ function ProfileRow({
     );
   }
 
-  // Penjual bisa_arahkan bar ke halaman nyata (mis. "/faq") lewat kolom
+  // Penjual bisa mengarahkan bar ke halaman nyata (mis. "/faq") lewat kolom
   // `href`. Kalau terisi, bar jadi link biasa dan sheet langsung tertutup --
   // isi popup hanya dipakai kalau `href` kosong (perilaku lama).
   const href = item.href?.trim() ? item.href.trim() : null;

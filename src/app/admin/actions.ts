@@ -819,3 +819,55 @@ export async function deleteFaqAction(id: number): Promise<ActionResult> {
   revalidatePath("/admin/faq");
   return { ok: true };
 }
+
+/* ==========================================================================
+ *  SYARAT & KETENTUAN (isi halaman /syarat-ketentuan)
+ *  Teksnya sebelumnya cuma satu kalimat di `profile_menu_items.body_id`, jadi
+ *  tidak ada tempat yang bisa manage daftar bagian. Sekarang pindah ke tabel
+ *  `terms_sections` (supabase/migration-47.sql), pola yang sama seperti FAQ.
+ * ========================================================================== */
+
+/** Bar Ketentuan versi admin: termasuk yang disembunyikan dari pembeli. */
+export interface AdminTermItem {
+  id: number;
+  title_id: string;
+  title_en: string;
+  body_id: string;
+  body_en: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export async function listTermsAction(): Promise<ActionResult<AdminTermItem[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error || !data) return { ok: false, error: "not_authorized" };
+
+  const { data: rows, error: sErr } = await supabase.rpc("admin_list_terms");
+  if (sErr) return { ok: false, error: humanize(sErr.message) };
+
+  const payload = (rows ?? {}) as { items?: AdminTermItem[] };
+  return { ok: true, data: payload.items ?? [] };
+}
+
+export async function saveTermsAction(
+  payload: Record<string, unknown>
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_save_terms", { p_payload: payload });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/syarat-ketentuan");
+  revalidatePath("/admin/terms");
+  return { ok: true };
+}
+
+export async function deleteTermsAction(id: number): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_delete_terms", { p_id: id });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/syarat-ketentuan");
+  revalidatePath("/admin/terms");
+  return { ok: true };
+}

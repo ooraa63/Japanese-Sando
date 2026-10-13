@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/customer/SiteFooter";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { CustomerAuthForm } from "./CustomerAuthForm";
 import { getSettings } from "@/lib/data";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function LoginPage({
     getSettings(),
   ]);
 
-  const storeName = settings?.store_name ?? "Rumakomugi";
+  const storeName = settings?.store_name ?? DEFAULT_STORE_NAME;
   const logoUrl = settings?.logo_url ?? null;
   const brandLine = settings?.brand_line ?? "";
 

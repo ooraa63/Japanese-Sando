@@ -480,6 +480,26 @@ export const en = {
     empty: "No match. Try another keyword.",
     back: "Back to home",
   },
+  /** Halaman /syarat-ketentuan — dibuka dari bar menu Profil. */
+  termsPage: {
+    title: "Terms & Conditions",
+    subtitle: "Our rules on ordering, payment, and service.",
+    empty: "The terms and conditions have not been filled in yet.",
+    emptyHint:
+      "If anything is still unclear, ask us on WhatsApp and we will explain it.",
+    chat: "Ask on WhatsApp",
+    back: "Back to home",
+  },
+  /** Halaman /jam-buka — dibuka dari bar menu Profil. */
+  hoursPage: {
+    title: "Opening Hours",
+    subtitle: "When we take orders and when we are in store.",
+    empty: "Opening hours have not been filled in yet.",
+    emptyHint:
+      "Our hours are not listed here yet. Ask on WhatsApp and we will tell you when we open.",
+    chat: "Ask on WhatsApp",
+    back: "Back to home",
+  },
   /** Halaman /riwayat — daftar pesanan dari localStorage perangkat ini. */
   historyPage: {
     title: "My order history",
@@ -920,6 +940,23 @@ export const en = {
       deleted: "Question deleted.",
       confirmDelete: "Delete this question?",
       errorQuestionRequired: "The question text is required.",
+    },
+    terms: {
+      title: "Terms & Conditions",
+      subtitle:
+        "Sections shown on the /syarat-ketentuan page. Changes go live immediately.",
+      new: "Add section",
+      empty: "No terms and conditions sections yet.",
+      titleIdLabel: "Title (ID)",
+      titleEnLabel: "Title (EN)",
+      bodyIdLabel: "Body (ID)",
+      bodyEnLabel: "Body (EN)",
+      sortOrderLabel: "Display order",
+      activeLabel: "Visible to customers",
+      saved: "Terms and conditions saved.",
+      deleted: "Section deleted.",
+      confirmDelete: "Delete this section?",
+      errorTitleRequired: "The title is required.",
     },
     menu: {
       title: "Menu & stock",

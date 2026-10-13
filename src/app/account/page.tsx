@@ -13,6 +13,7 @@ import { ContactDetails, ContactSection } from "@/components/customer/ContactSec
 import { ContactMenuRow } from "@/components/customer/ContactMenuRow";
 import { CompleteProfileCard } from "@/components/customer/CompleteProfileCard";
 import { ACCOUNT_FEATURE_ENABLED } from "@/lib/featureFlags";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function AccountPage() {
     getSettings(),
   ]);
 
-  const storeName = settings?.store_name ?? "Rumakomugi";
+  const storeName = settings?.store_name ?? DEFAULT_STORE_NAME;
   const logoUrl = settings?.logo_url ?? null;
   const brandLine = settings?.brand_line ?? "";
 

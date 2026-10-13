@@ -5,6 +5,7 @@ import { HistoryList } from "@/components/customer/HistoryList";
 import { OrderHubTabs } from "@/components/customer/OrderHubTabs";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function RiwayatPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
       <SiteHeader
-        storeName={settings?.store_name ?? "Rumakomugi"}
+        storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
         logoUrl={settings?.logo_url ?? null}
         brandLine={settings?.brand_line ?? ""}
       />

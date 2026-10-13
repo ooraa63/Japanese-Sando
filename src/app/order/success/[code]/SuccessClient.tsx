@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
@@ -132,7 +133,7 @@ export function SuccessClient({
 
   const { t, lang } = useI18n();
 
-  const storeName = settings?.store_name ?? "Rumakomugi";
+  const storeName = settings?.store_name ?? DEFAULT_STORE_NAME;
   const dict = t.success;
   const docRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);

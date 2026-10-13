@@ -6,6 +6,7 @@ import { getSettings, getFaq } from "@/lib/data";
 import { FaqList } from "@/components/customer/FaqList";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export async function generateMetadata(): Promise<Metadata> {
   const dicts = await getI18nDict();
@@ -42,7 +43,7 @@ export default async function FaqPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col">
       <SiteHeader
-        storeName={settings?.store_name ?? "Rumakomugi"}
+        storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
         logoUrl={settings?.logo_url ?? null}
         brandLine={settings?.brand_line ?? ""}
       />

@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -23,7 +24,7 @@ import {
 } from "@/lib/featureFlags";
 
 export function SiteHeader({
-  storeName = "Rumakomugi",
+  storeName = DEFAULT_STORE_NAME,
   logoUrl = null,
   brandLine = "",
 }: {

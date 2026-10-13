@@ -1153,3 +1153,41 @@ produk sendiri.
 - `FlavorCard` punya DUA blok render (dense dan non-dense). Kalau
   suatu saat badge-nya dibikin bisa muncul lagi, **keduanya** harus
   dicek, bukan cuma yang satu. Lihat gotcha #89.
+
+- **D49** — Nama fallback toko dipatok jadi **satu konstanta**
+  (`DEFAULT_STORE_NAME` di `src/lib/brand.ts`), bukan literal per file.
+  Alasannya bukan cuma soal estetika: 17 literal `"Rumakomugi"` di 16 file
+  hampir pasti akan tersisa satu-dua saat nama diganti lagi. Nilai DB
+  (`store_settings.store_name`) tetap yang diutamakan; konstanta cuma
+  jaring pengaman. Nama file aset (`/logo-rumakomugi.jpg`) **tidak**
+  ikut diubah — itu path, bukan brand.
+- **D50** — `/jam-buka` **tidak** pakai tabel baru; sumbernya
+  `store_settings.hours_*` yang sudah dipakai footer, /contact, /order, dan
+  /account. Aturan yang dipakai: satu isi = satu sumber. Kalau halaman ini
+  punya tabel sendiri, jam buka bisa berbeda antara footer dan halaman —
+  persis regresi yang sudah pernah dihindari di FAQ ("Section FAQ di /contact
+  membaca sumber yang sama").
+- **D51** — `/syarat-ketentuan` **boleh** pakai tabel baru, karena isinya
+  memang belum ada di mana pun (hanya satu kalimat di
+  `profile_menu_items.body_id`). Steven minta bisa diedit dari dashboard, jadi
+  polanya `terms_sections` + RPC `admin_*`, meniru `faq_items`.
+- **D52** — **Tidak ada array cadangan** untuk `terms_sections`, berbeda dari
+  `faq_items`. FAQ punya isi lama yang harus tetap tampil kalau RPC mati;
+  terms baru dibuat sekarang, jadi menyalin 8 bagian antara migrasi dan kode
+  hanya menciptakan dua sumber yang harus dijaga. Array kosong + empty state
+  yang jujur lebih baik daripada teks karangan. Prinsipnya: cadangan hanya
+  berguna kalau ada isi lama yang bisa hilang.
+- **D53** — Seed Syarat & Ketentuan **tidak boleh berisi angka komersial yang
+  dikarang** (ongkir, jadwal, harga, nama promo). Yang ditulis hanya aturan
+  umum pre-order yang memang berlaku, plus kalimat asli Steven yang ada di
+  `profile_menu_items.body_id` supaya tidak hilang. Angka komersial
+  adalah keputusan toko dan harus masuk lewat dashboard.
+- **D54** — Force browser UI lewat CSS global, bukan JS:
+  `html { color-scheme: light; overflow-x: clip; }`. `color-scheme` denying
+  scrollbar gelap tanpa harus tahu apakah OS pengguna mode gelap;
+  `overflow-x: clip` menutup kemungkinan scrollbar horizontal tanpa
+  merusak `position: sticky`. Keduanya di `html`, bukan per halaman,
+  karena ini masalah global bukan masalah satu route.
+- **D55** — Migration SQL harus pakai `update ... where code = 'x' and href is
+  null`, bukan `update ... where code = 'x'` polos. Bar `profile_menu_items`
+  yang tidak sengaja kosongkan `href`-nya tidak boleh ikut berubah diam-diam.

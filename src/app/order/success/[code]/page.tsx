@@ -2,6 +2,7 @@ import { getSettings } from "@/lib/data";
 import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { SuccessClient } from "./SuccessClient";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function SuccessPage({
   return (
     <>
       <SiteHeader
-        storeName={settings?.store_name ?? "Rumakomugi"}
+        storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
         logoUrl={settings?.logo_url ?? null}
         brandLine={settings?.brand_line ?? ""}
       />

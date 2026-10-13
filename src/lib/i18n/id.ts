@@ -484,6 +484,26 @@ export const id: Dict = {
     empty: "Tidak ada yang cocok. Coba kata kunci lain.",
     back: "Kembali ke beranda",
   },
+  /** Halaman /syarat-ketentuan — dibuka dari bar menu Profil. */
+  termsPage: {
+    title: "Syarat & Ketentuan",
+    subtitle: "Aturan pemesanan, pembayaran, dan layanan kami.",
+    empty: "Syarat & ketentuan belum diisi.",
+    emptyHint:
+      "Kalau masih ada yang mengganjal, tanya langsung lewat WhatsApp supaya kami jelaskan.",
+    chat: "Tanya lewat WhatsApp",
+    back: "Kembali ke beranda",
+  },
+  /** Halaman /jam-buka — dibuka dari bar menu Profil. */
+  hoursPage: {
+    title: "Jam Buka",
+    subtitle: "Waktu kami menerima pesanan dan siap di toko.",
+    empty: "Jam buka belum diisi.",
+    emptyHint:
+      "Jam bukanya belum kami cantumkan. Tanya lewat WhatsApp supaya kami kabari kapan Buka.",
+    chat: "Tanya lewat WhatsApp",
+    back: "Kembali ke beranda",
+  },
   /** Halaman /riwayat — daftar pesanan dari localStorage perangkat ini. */
   historyPage: {
     title: "Riwayat Pesanan",
@@ -925,6 +945,23 @@ export const id: Dict = {
       deleted: "Pertanyaan dihapus.",
       confirmDelete: "Hapus pertanyaan ini?",
       errorQuestionRequired: "Teks pertanyaannya wajib diisi.",
+    },
+    terms: {
+      title: "Syarat & Ketentuan",
+      subtitle:
+        "Bagian yang tampil di halaman /syarat-ketentuan. Langsung tampil setelah disimpan.",
+      new: "Tambah bagian",
+      empty: "Belum ada bagian syarat & ketentuan.",
+      titleIdLabel: "Judul (ID)",
+      titleEnLabel: "Judul (EN)",
+      bodyIdLabel: "Isi (ID)",
+      bodyEnLabel: "Isi (EN)",
+      sortOrderLabel: "Urutan tampil",
+      activeLabel: "Tampil untuk pembeli",
+      saved: "Syarat & ketentuan disimpan.",
+      deleted: "Bagian dihapus.",
+      confirmDelete: "Hapus bagian ini?",
+      errorTitleRequired: "Judulnya wajib diisi.",
     },
     menu: {
       title: "Menu & Stok",

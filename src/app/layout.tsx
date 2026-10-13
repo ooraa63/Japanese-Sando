@@ -10,6 +10,7 @@ import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider
 import { AuthModal } from "@/components/customer/AuthModal";
 import { MobileBottomNav } from "@/components/customer/MobileBottomNav";
 import { getCustomerProfile, getProfileMenuItems } from "@/lib/data";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 // Playfair (serif) DIHAPUS 12-10-2026 — semua judul sekarang sans-serif.
 // Font Playfair sengaja tidak di-load supaya tidak ada request font sia-sia.
@@ -22,13 +23,12 @@ const jakarta = Plus_Jakarta_Sans({
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-const DEFAULT_STORE = "Rumakomugi";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${DEFAULT_STORE} — Pre-order Sando Sandwich`,
-    template: `%s | ${DEFAULT_STORE}`,
+    default: `${DEFAULT_STORE_NAME} — Pre-order Sando Sandwich`,
+    template: `%s | ${DEFAULT_STORE_NAME}`,
   },
   description:
     "Japanese sando dibuat fresh khusus pre-order. Pilih rasa favoritmu, bayar transfer atau cash on delivery.",
@@ -40,20 +40,20 @@ export const metadata: Metadata = {
     "roti lapis",
     "cash on delivery",
   ],
-  authors: [{ name: DEFAULT_STORE }],
+  authors: [{ name: DEFAULT_STORE_NAME }],
   openGraph: {
     type: "website",
     locale: "id_ID",
     url: SITE_URL,
-    siteName: DEFAULT_STORE,
-    title: `${DEFAULT_STORE} — Pre-order Sando Sandwich`,
+    siteName: DEFAULT_STORE_NAME,
+    title: `${DEFAULT_STORE_NAME} — Pre-order Sando Sandwich`,
     description:
       "Japanese sando dibuat fresh khusus pre-order. Roti sederhana, rasa luar biasa.",
-    images: [{ url: "/hero-sando.jpg", width: 1242, height: 1242, alt: DEFAULT_STORE }],
+    images: [{ url: "/hero-sando.jpg", width: 1242, height: 1242, alt: DEFAULT_STORE_NAME }],
   },
   twitter: {
     card: "summary_large_image",
-    title: `${DEFAULT_STORE} — Pre-order Sando Sandwich`,
+    title: `${DEFAULT_STORE_NAME} — Pre-order Sando Sandwich`,
     description: "Japanese sando dibuat fresh khusus pre-order.",
     images: ["/hero-sando.jpg"],
   },

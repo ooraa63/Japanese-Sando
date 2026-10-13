@@ -4,6 +4,128 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-13 - Nama fallback "RK", halaman Jam Buka + Syarat & Ketentuan, scrollbar paksa terang
+
+**Scope:** 3 permintaan Steven sekaligus (13-10-2026 10:15)
+
+### 1. Nama toko di kode jadi "RK"
+
+Steven: "Untuk kode JS diubah jadi RK aja karena nanti nama tokonya Ruma
+Komugi". Setelah ditanya, pilihannya `RK` (bukan "Ruma Komugi").
+
+Sebelumnya ada **17 literal `"Rumakomugi"`** tersebar di 16 file sebagai
+fallback `settings?.store_name ?? "Rumakomugi"`. Semuanya sekarang memakai
+satu konstanta baru, `DEFAULT_STORE_NAME = "RK"` di `src/lib/brand.ts`.
+
+Konstanta lokal `DEFAULT_STORE` di `src/app/layout.tsx` dihapus dan diganti
+konstanta bersama, supaya ada **satu** tempat untuk mengubah nama fallback.
+
+Catatan: yang tampil di situs sebenarnya tetap nilai DB
+`store_settings.store_name` (masih "Rumakomugi") — Steven bisa mengubahnya
+dari Admin > Pengaturan. Nilai `RK` hanya muncul kalau `store_settings` kosong
+atau gagal dimuat. Nama file `/logo-rumakomugi.jpg` **tidak** diubah, karena
+itu path aset, bukan teks brand.
+
+### 2. "Navbar" gelap di bawah footer /riwayat
+
+Steven kirim screenshot 975x861 sambil menyebut bagian paling bawahnya
+"kelihatan kayak ngebug, muncul nav". Forensics piksel per baris (sharp):
+
+```
+y=848  cream + coklat footer + cream
+y=852  full-width rgb(64,64,64)
+y=856  full-width rgb(28,28,28)
+y=859  rgb(28,28,28) + run rgb(41,41,41) di x=56-100
+```
+
+Tiga bukti bahwa itu **bukan elemen situs**:
+
+1. **Tingginya 16px dan konten berhenti tepat 16px di atas batas bawah
+   viewport** (861 - 845 = 16). Scrollbar horizontal memakan tinggi layout
+   dengan cara persis seperti itu. Band gelap itu scorch-nya, bukan navbar.
+2. Warnanya abu-abu netral, bukan palet situs: cream `#fdfaf4` dan
+   cocoa-900 `rgb(26,17,10)`. Nilai `28/41/64` abu-abu itu warna scrollbar
+   Chrome mode gelap.
+3. Steven mengonfirmasi perangkatnya **Windows + Chrome**.
+
+Perbaikannya di `src/app/globals.css`, pada blok `html` di `@layer base`:
+
+```css
+color-scheme: light;   /* scrollbar & kontrol form ikut tema situs */
+overflow-x: clip;       /* insure tak ada scrollbar horizontal */
+```
+
+`overflow-x: clip` dipilih, **bukan** `hidden`: `clip` tidak membuat elemen
+jadi scroll container, jadi `position: sticky` (header melayang, sheet profil)
+tetap jalan. Kenapa bukan `hidden` + kompensasi padding — itu guncang.
+
+### 3. Halaman /jam-buka dan /syarat-ketentuan
+
+Steven: "yang jam buka dan syarat & ketentuan belum ada /nya". Ternyata di
+`profile_menu_items`, hanya `faq` (`/faq`) dan `contact` (`/contact`) yang
+punya `href`; `hours` dan `terms` punya `href = NULL` sehingga `ProfileSheet`
+membuka popup — dan popup Ketentuan cuma berisi satu kalimat.
+
+Migration-47 (`supabase/migration-47.sql`, sudah DITERAPKAN ke produksi):
+
+- Tabel baru `terms_sections` + RLS + RPC `public_terms`, `admin_list_terms`,
+  `admin_save_terms`, `admin_delete_terms` — pola meniru `faq_items`
+  (migration-46).
+- Seed 8 bagian. **Tidak ada angka komersial yang dikarang**: ongkir, jadwal,
+  promo sengaja tidak ditulis. Kalimat asli dari
+  `profile_menu_items.body_id` ("Pesanan dibuat setelah pembayaran
+  dikonfirmasi...") ikut dipertahankan utuh di bagian Pembayaran dan
+  Pembatalan.
+- `update ... where code = 'hours' and href is null` → `/jam-buka`, dan
+  `code = 'terms'` → `/syarat-ketentuan`. Filter `where code = ...` dipakai
+  supaya bar lain yang kebetulan `href` kosong tidak ikut berubah diam-diam.
+
+**"/jam-buka" tidak butuh tabel baru.** Sumber tunggalnya sudah ada:
+`store_settings.hours_id` / `hours_en`, diisi dari Admin > Pengaturan, dan
+sudah dipakai footer, /contact, /order, dan /account. Halaman baru membaca
+sumber yang sama, jadi tidak mungkin berbeda isi satu sama lain.
+
+**Kolom jam buka di database saat ini KOSONG.** Jadi `/jam-buka` menampilkan
+empty state + ajakan tanya WhatsApp. Isi jam buka yang sebenarnya harus
+diisi Steven lewat dashboard — tidak dikarang di kode.
+
+`body_id`/`body_en` bar `terms` sengaja tidak dihapus: begitu `href` terisi,
+frontend melewati popup, tapi kalau `href` dikosongkan lagi isinya masih ada.
+
+**Tidak ada array cadangan** untuk terms, berbeda dengan `faq.ts`. FAQ punya
+isi lama yang harus tetap tampil kalau RPC mati; terms justru baru dibuat,
+jadi menyalin 8 bagian antara migrasi dan kode hanya menciptakan dua sumber
+yang harus dijaga. Array kosong + empty state jujur lebih baik daripada teks
+karangan.
+
+File baru: `src/lib/terms.ts`, `src/lib/brand.ts`, `src/app/jam-buka/page.tsx`,
+`src/app/syarat-ketentuan/page.tsx`, `src/components/admin/TermsClient.tsx`,
+`src/app/admin/(dashboard)/terms/page.tsx`. Menu `/admin/terms` ditambahkan
+di `AdminShell.tsx` tepat setelah `/admin/faq`.
+
+### Perbaikan tes
+
+`openPage` di `scripts/test-pages.mjs` sekarang men-decode entitas HTML
+sebelum mencocokkan. Sebelumnya cek `"Syarat & Ketentuan"` selalu gagal padahal
+halamannya benar, karena HTML menulisnya `Syarat &amp; Ketentuan`. Ini akan
+menyakiti setiap cek berikutnya yang memuat tanda `&`.
+
+### Verifikasi
+
+tsc 0 error, eslint 0 error, `npm run build` sukses (route `/jam-buka`,
+`/syarat-ketentuan`, `/admin/terms` terdaftar), `test-pages.mjs` **30/30**,
+headless CDP **20/20**:
+
+- 4 bar sheet Profil semuanya `<a href>`: Hubungi Kami=/contact, FAQ=/faq,
+  Jam Buka=/jam-buka, Syarat & Ketentuan=/syarat-ketentuan — tidak ada yang
+  jatuh ke popup lagi.
+- Klik bar Ketentuan benar-benar pindah ke `/syarat-ketentuan`.
+- 8 `h2` dari database tampil, urut dari Pemesanan sampai Perubahan Ketentuan.
+- `getComputedStyle(html).colorScheme === "light"`, `overflowX === "clip"`.
+- `/riwayat` 975x861: `clientHeight === innerHeight` (861) — tidak ada lagi
+  ruang 16px tempat scrollbar pernah muncul.
+- 0 request `/api/flavor-like`, tidak ada storage produksi yang disentuh.
+
 ## 2026-10-12 - Field catatan per rasa muncul lagi di halaman pre-order
 
 **Scope:** fix - laporan Steven 12-10-2026 15:46 dengan screenshot kartu

@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { TrackForm } from "@/components/customer/TrackForm";
 import { OrderHubTabs } from "@/components/customer/OrderHubTabs";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export async function generateMetadata(): Promise<Metadata> {
   const dicts = await getI18nDict();
@@ -31,7 +32,7 @@ export default async function TrackPage({
   return (
     <>
       <SiteHeader
-        storeName={settings?.store_name ?? "Rumakomugi"}
+        storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
         logoUrl={settings?.logo_url ?? null}
         brandLine={settings?.brand_line ?? ""}
       />

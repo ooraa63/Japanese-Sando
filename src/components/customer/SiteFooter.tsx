@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -11,7 +12,7 @@ import { LanguageToggle } from "@/components/ui/LanguageToggle";
 export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
   const { t, lang } = useI18n();
 
-  const storeName = settings?.store_name || "Rumakomugi";
+  const storeName = settings?.store_name || DEFAULT_STORE_NAME;
   const hours = lang === "en" ? settings?.hours_en : settings?.hours_id;
   const deadline = lang === "en" ? settings?.deadline_en : settings?.deadline_id;
 

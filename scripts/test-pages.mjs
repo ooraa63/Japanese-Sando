@@ -57,12 +57,37 @@ check("login berhasil", !error && Boolean(data?.session), error?.message ?? "");
 if (error) process.exit(1);
 console.log(`  cookie session: ${[...jar.keys()].join(", ")}`);
 
+/**
+ * Buka entitas HTML yang paling sering muncul.
+ *
+ * HTML meng-escape `&` jadi `&amp;`, jadi teks yang dicari tidak akan cocok kalau
+ * ditulis polos: "Syarat & Ketentuan" ada di halaman sebagai
+ * "Syarat &amp; Ketentuan". Tanpa ini, setiap cek yang memuat tanda `&` selalu
+ * gagal padahal halamannya benar.
+ *
+ * Urutannya penting — `&amp;` HARUS diproses terakhir, kalau tidak
+ * "&amp;lt;" akan jadi "<" dan merusak teks yang memang harus literal.
+ */
+function decodeEntities(html) {
+  return html
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
+}
+
 async function openPage(url, { expectStatus = 200, mustContain = [], mustNotContain = [] } = {}) {
   const res = await fetch(`${APP}${url}`, {
     redirect: "manual",
     headers: { cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") },
   });
-  const text = res.status === 200 || res.status === 307 ? await res.text() : "";
+  const text =
+    res.status === 200 || res.status === 307
+      ? decodeEntities(await res.text())
+      : "";
   const missing = mustContain.filter((s) => !text.includes(s));
   const present = mustNotContain.filter((s) => text.includes(s));
   check(
@@ -125,6 +150,11 @@ await openPage("/admin/profile-menu", {
 await openPage("/admin/faq", {
   mustContain: ["FAQ", "Tambah pertanyaan"],
 });
+// Menu Syarat & Ketentuan (migration-47): isi /syarat-ketentuan pindah ke
+// tabel `terms_sections`, jadi bisa disunting dari dashboard seperti FAQ.
+await openPage("/admin/terms", {
+  mustContain: ["Syarat & Ketentuan", "Tambah bagian", "Pemesanan"],
+});
 
 console.log("\n=== 4. Halaman publik tetap terbuka ===");
 // Nama merek = "Rumakomugi" (dari store_settings.store_name).
@@ -161,6 +191,19 @@ await openPage("/track", { mustContain: ["Cek Status Pesanan"] });
 // /faq harus menampilkan isi dari database: pertanyaan seed pertama.
 await openPage("/faq", {
   mustContain: ["FAQ", "Bagaimana cara memesan?"],
+});
+// Item 3 Steven (13-10-2026): bar "Jam Buka" dan "Syarat & Ketentuan" di
+// sheet Profil sebelumnya tidak punya halaman — hanya popup, dan popup
+// Ketentuan cuma satu kalimat. Keduanya sekarang punya halaman.
+// /syarat-ketentuan harus menampilkan isi dari tabel `terms_sections`, bukan
+// teks yang ditulis di kode.
+await openPage("/syarat-ketentuan", {
+  mustContain: ["Syarat & Ketentuan", "Pemesanan", "Pembayaran", "Pembatalan"],
+});
+// /jam-buka membaca `store_settings.hours_*`. Kolomnya masih kosong di
+// database, jadi yang wajib ada adalah judul + empty state, bukan isi karangan.
+await openPage("/jam-buka", {
+  mustContain: ["Jam Buka", "belum diisi"],
 });
 await openPage("/riwayat", { mustContain: ["Riwayat Pesanan"] });
 // /contact juga memuat FAQ yang sama (sumbernya satu tabel).

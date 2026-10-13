@@ -4,6 +4,7 @@ import { getCurrentAdmin, getIsAdmin } from "@/lib/supabase/server";
 import { getI18nDict } from "@/lib/i18n-server";
 import { getSettings } from "@/lib/data";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     <AdminShell
       email={admin?.email ?? ""}
       fullName={admin?.full_name ?? ""}
-      storeName={settings?.store_name || "Rumakomugi"}
+      storeName={settings?.store_name || DEFAULT_STORE_NAME}
       logoUrl={settings?.logo_url ?? null}
       labels={{
         dashboard: dicts.admin.nav.dashboard,
@@ -33,6 +34,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         pickupDelivery: dicts.admin.nav.pickupDelivery,
         profileMenu: dicts.admin.settings.profileMenuTitle,
         faq: dicts.admin.faq.title,
+        terms: dicts.admin.terms.title,
         viewSite: dicts.admin.nav.viewSite,
         signOut: dicts.admin.login.signOut,
       }}

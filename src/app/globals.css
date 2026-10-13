@@ -75,6 +75,27 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+
+    /* Steven 13-10-2026: di /riwayat muncul "navbar" gelap 16px full-width tepat
+       di bawah footer. Setelah dibandingkan piksel per baris dengan screenshot,
+       itu scrollbar horizontal Chrome, bukan elemen situs:
+         - tinggi 16px persis, dan konten halaman justru berhenti 16px di atas
+           batas bawah viewport (861 - 845 = 16) — tanda khas scrollbar yang
+           memakan tinggi layout;
+         - warnanya abu-abu netral (rgb(28,28,28) track, rgb(41,41,41) thumb),
+           bukan coklat palet situs (cream #fdfaf4 / cocoa-900 #1a110a);
+         - Steven membuka situsnya di Windows + Chrome.
+       Dua aturan ini menutupnya dari akar:
+       - `color-scheme: light` memaksa scrollbar dan kontrol form browser ikut
+         tema terang situs, bukan tema gelap sistem operasi. Tanpa ini, Windows mode
+         gelap membuat scrollbar gelap walau halaman sudah full cream.
+       - `overflow-x: clip` insure halaman tidak pernah bisa digeser ke samping,
+         sehingga scrollbar horizontal itu tidak akan muncul lagi. Sengaja pakai
+         `clip`, bukan `hidden`: `clip` tidak mengubah elemen jadi scroll
+         container, jadi `position: sticky` (header melayang, sheet profil)
+         tetap normal seperti sebelumnya. */
+    color-scheme: light;
+    overflow-x: clip;
   }
 
   body {

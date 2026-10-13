@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { FAQ_FALLBACK, normalizeFaq, type FaqEntry } from "@/lib/faq";
+import { normalizeTerms, type TermSection } from "@/lib/terms";
 import type {
   Category,
   CustomerOrderSummary,
@@ -48,6 +49,26 @@ export const getFaq = cache(async (): Promise<FaqEntry[]> => {
   // Tabel sengaja boleh kosong (penjual bisa menyembunyikan semua pertanyaan),
   // jadi array kosong dari RPC itu jawaban yang sah, bukan kegagalan.
   return normalizeFaq(data);
+});
+
+/**
+ * Isi Syarat & Ketentuan aktif, dibaca dari tabel `terms_sections` lewat RPC
+ * `public_terms` (migration-47). Dipakai halaman `/syarat-ketentuan`.
+ *
+ * Tidak ada array cadangan (berbeda dengan `getFaq`) karena teksnya memang
+ * baru dibuat sekarang — lihat catatan panjang di `src/lib/terms.ts`.
+ * Kalau RPC gagal, array kosong membuat halaman menampilkan empty state
+ * beserta ajakan chat, bukan teks karangan.
+ */
+export const getTerms = cache(async (): Promise<TermSection[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("public_terms");
+
+  if (error) {
+    console.error("Gagal memuat Syarat & Ketentuan:", error.message);
+    return [];
+  }
+  return normalizeTerms(data);
 });
 
 /** Ambil pengaturan toko. Aman dipanggil tanpa login. */

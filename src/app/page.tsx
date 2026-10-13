@@ -10,10 +10,11 @@ import { AppHome } from "@/components/customer/AppHome";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
-  const store = settings?.store_name || "Rumakomugi";
+  const store = settings?.store_name || DEFAULT_STORE_NAME;
   const desc =
     settings?.description_id ||
     "Japanese sando dibuat fresh khusus pre-order. Pilih rasa favoritmu, bayar transfer atau cash on delivery.";
@@ -49,7 +50,7 @@ export default async function HomePage() {
   return (
     <>
       <SiteHeader
-        storeName={settings?.store_name ?? "Rumakomugi"}
+        storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
         logoUrl={settings?.logo_url ?? null}
         brandLine={settings?.brand_line ?? ""}
       />

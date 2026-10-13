@@ -10,6 +10,7 @@ import type {
   ShippingDiscount,
   StoreSettings,
 } from "@/lib/types";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export async function generateMetadata(): Promise<Metadata> {
   const dicts = await getI18nDict();
@@ -118,7 +119,7 @@ export default async function OrderPage() {
   // Selalu mulai dari langkah identitas (nama + telepon), apa pun URL-nya.
   // Pembeli tidak bisa melompat ke langkah pembayaran/konfirmasi.
 
-  const storeName = settings?.store_name ?? "Rumakomugi";
+  const storeName = settings?.store_name ?? DEFAULT_STORE_NAME;
   const logoUrl = settings?.logo_url ?? null;
   const brandLine = settings?.brand_line ?? "";
 
