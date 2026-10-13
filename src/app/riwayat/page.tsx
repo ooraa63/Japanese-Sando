@@ -34,20 +34,27 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RiwayatPage() {
   const [settings] = await Promise.all([getSettings()]);
 
+  // Wrapper `max-w-2xl` hanya boleh membungkus header + main. Kalau footer
+  // ikut masuk ke dalamnya, blok coklatnya jadi kotak sempit melayang di atas
+  // cream — berbeda dari / dan /contact yang footer-nya full width. Steven
+  // menandai ini di screenshot 13-10-2026. Pola yang sama dipakai /faq,
+  // /jam-buka, dan /syarat-ketentuan.
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
-      <SiteHeader
-        storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
-        logoUrl={settings?.logo_url ?? null}
-        brandLine={settings?.brand_line ?? ""}
-      />
+    <div className="flex min-h-dvh w-full flex-col">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
+        <SiteHeader
+          storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
+          logoUrl={settings?.logo_url ?? null}
+          brandLine={settings?.brand_line ?? ""}
+        />
 
-      <main className="flex-1 px-4 pt-4 pb-16 sm:px-6">
-        <OrderHubTabs />
-        <div className="pt-6">
-          <HistoryList />
-        </div>
-      </main>
+        <main className="flex-1 px-4 pt-4 pb-16 sm:px-6">
+          <OrderHubTabs />
+          <div className="pt-6">
+            <HistoryList />
+          </div>
+        </main>
+      </div>
 
       <SiteFooter settings={settings} />
     </div>

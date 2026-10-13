@@ -1191,3 +1191,19 @@ produk sendiri.
 - **D55** — Migration SQL harus pakai `update ... where code = 'x' and href is
   null`, bukan `update ... where code = 'x'` polos. Bar `profile_menu_items`
   yang tidak sengaja kosongkan `href`-nya tidak boleh ikut berubah diam-diam.
+
+- **D56** - Wrapper `max-w-XXxl` di halaman konten **hanya boleh membungkus
+  header + main**, tidak boleh membungkus `SiteFooter`. Footer adalah blok
+  informasi toko yang secara desain selalu full width; membungkusnya di
+  wrapper konten bikin blok coklatnya jadi kotak sempit melayang di atas
+  cream, dan ini yang Steven tandai di screenshot 13-10-2026. Pola tetap:
+  `<div flex min-h-dvh w-full flex-col>` > `<div mx-auto max-w-3xl flex-1
+  flex-col>` (header + main) + `<SiteFooter>` > `</div>`.
+  Halaman yang sudah benar: `/`, `/contact`. Jangan buat halaman baru
+  dengan menaruh footer di dalam wrapper konten.
+- **D57** - Saat Steven melaporkan "masih ngebug" dengan screenshot, kode PNG
+ -nya harus dibaca dulu sebelum Theorizing: cek `info.channels`, alpha per
+  baris, dan dimensi. Entry sebelumnya menyimpulkan "scrollbar" hanya dari
+  nilai RGB — dan salah, karena piksel transparan terbaca hitam. Verifikasi
+  dengan render ulang halaman LIVE pada ukuran yang sama sebelum menyentuh
+  kode.

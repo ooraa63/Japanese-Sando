@@ -4,6 +4,74 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-13 - Footer /riwayat (dan 3 halaman lain) jadi full width
+
+**Scope:** lanjutan permintaan Steven (13-10-2026 11:24) — "masih ngebug
+itu bawahnya", dengan screenshot 1125x875 dan lingkaran tangan di area
+footer.
+
+### Koreksi hipotesis sebelumnya: itu BUKAN scrollbar
+
+Entry sebelumnya menyimpulkan band gelap = scrollbar horizontal Chrome mode
+gelap. **Kesimpulan itu salah**, dan sudah dibuktikan dengan membaca channel
+alpha screenshot-nya:
+
+```
+y=0..11    rgba(60,60,60,255)  -> title bar jendela Chrome yang ikut tertangkap
+y=12..850  opaque              -> isi halaman
+y=851      rgba(...,64)        -> 1px anti-alias tepi tangkapan
+y=852..874 rgba(0,0,0,0)       -> 23px FULLY TRANSPARANT
+```
+
+Band "hitam" di bawah itu **nol piksel dari website**. Dia cuma transparan
+yang dirender gelap oleh image viewer Steven. Render langsung halaman LIVE
+di 1125x875 menunjukkan y=0 dan y=874 sama-sama cream, tanpa band apa pun,
+`clientHeight === innerHeight`, dan `color-scheme: light` sudah aktif.
+
+Jadi perbaikan `color-scheme: light` + `overflow-x: clip` tetap dipertahankan
+(mMurah, benar, dan menutup kemungkinan nyata), tapi alasannya bukan untuk
+menyembunyikan band yang ada.
+
+### Bug NYATA yang Steven maksud: footer tidak full width
+
+Mengukur `getBoundingClientRect()` footer di 6 halaman (viewport 1125px):
+
+| Halaman        | Lebar footer |
+|----------------|--------------|
+| `/`             | 1110px (full) |
+| `/contact`      | 1110px (full) |
+| `/faq`          | **768px** (`max-w-3xl`) |
+| `/syarat-ketentuan` | **768px** |
+| `/jam-buka`     | **768px** |
+| `/riwayat`      | **672px** (`max-w-2xl`) |
+
+Penyebabnya struktural: di halaman-halaman itu, `SiteFooter` berada **di
+dalam** wrapper `max-w-XXxl`, sedangkan di `/` dan `/contact` wrapper-nya
+hanya membungkus `main` sehingga footer otomatis full width. Akibatnya blok
+coklat footer jadi kotak sempit melayang di atas cream — persis yang Steven
+lingkari.
+
+Perbaikan: di keempat halaman, wrapper `max-w` dipindah ke dalam satu div
+lagi yang membungkus header + main saja, dan `SiteFooter` jadi saudara di
+luarnya:
+
+```jsx
+<div className="flex min-h-dvh w-full flex-col">
+  <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
+    <SiteHeader ... />
+    <main className="flex-1 ...">...</main>
+  </div>
+  <SiteFooter settings={settings} />
+</div>
+```
+
+Hasil: keenam halaman sekarang footer `0..1110` atau `0..1125` (seluruh
+lebar viewport), tanpa scrollbar horizontal di mana pun.
+
+### Verifikasi
+
+tsc 0, eslint 0, build sukses, test-pages 30/30, dan pengukuran ulang keenam
+halaman: semua footer full width, `clientHeight === innerHeight` di semua.
 ## 2026-10-13 - Nama fallback "RK", halaman Jam Buka + Syarat & Ketentuan, scrollbar paksa terang
 
 **Scope:** 3 permintaan Steven sekaligus (13-10-2026 10:15)

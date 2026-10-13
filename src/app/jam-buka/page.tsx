@@ -40,15 +40,19 @@ export default async function HoursPage() {
   const hours = (lang === "en" ? settings?.hours_en : settings?.hours_id)?.trim() ?? "";
   const wa = settings?.whatsapp?.trim() ?? "";
 
+  // Wrapper `max-w-3xl` hanya membungkus header + main. Footer diletakkan di
+  // luar wrapper supaya blok coklatnya full width, sama seperti di / dan
+  // /contact — kalau ikut ter-bungkus, footer jadi kotak sempit di tengah.
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col">
-      <SiteHeader
-        storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
-        logoUrl={settings?.logo_url ?? null}
-        brandLine={settings?.brand_line ?? ""}
-      />
+    <div className="flex min-h-dvh w-full flex-col">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
+        <SiteHeader
+          storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
+          logoUrl={settings?.logo_url ?? null}
+          brandLine={settings?.brand_line ?? ""}
+        />
 
-      <main className="flex-1 px-4 pt-5 pb-16">
+        <main className="flex-1 px-4 pt-5 pb-16">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-sm font-bold text-cocoa-500 transition hover:text-cocoa-900"
@@ -98,6 +102,7 @@ export default async function HoursPage() {
           </div>
         )}
       </main>
+      </div>
 
       <SiteFooter settings={settings} />
     </div>

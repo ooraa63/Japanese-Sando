@@ -1559,3 +1559,40 @@ Kalau false, ada ruang yang biasanya dipakai scrollbar horizontal. Ini yang
 membuktikan bug Steven: konten `/riwayat` berhenti di y=845 pada viewport
 861, jadi 16px-nya milik scrollbar. Way yang lebih langsung: ukur
 `clientHeight` vs `innerHeight` setelah `Emulation.setDeviceMetricsOverride`.
+
+## Gotcha #95 - sharp `.raw()` mengembalikan RGBA; piksel transparan TERBACA HITAM
+
+`sharp(file).raw().toBuffer()` selalu menghasilkan **4 channel (RGBA)**,
+dan `info.channels` yang memberitahu jumlahnya — bukan `data.channels`
+(`data` cuma Buffer, jadi `data.channels` = undefined, dan semua indeks
+menjadi NaN sehingga `rgb` berisi undefined).
+
+Yang lebih menentukan: kalau hanya RGB yang dibaca, **piksel transparan
+`rgba(0,0,0,0)` akan terbaca sebagai `rgb(0,0,0)` = hitam pekat**. Ini
+sudah menyebabkan satu diagnosa salah: band "hitam" 23px di screenshot
+Steven dianggap bug situs, padahal 100% transparan (artefak screenshot tool
+yang dirender gelap oleh viewer).
+
+Aturan: kalau gambar punya `hasAlpha`, WAJIB baca channel ke-4 sebelum
+menyimpulkan apa pun soal warnanya:
+
+```js
+const { data, info } = await sharp(f).raw().toBuffer({ resolveWithObject: true });
+const ch = info.channels;              // bukan data.channels!
+const px = (x, y) => { const i = (y * info.width + x) * ch; return [data[i], data[i+1], data[i+2], data[i+3]]; };
+```
+
+Kalau alpha 0, piksel itu tidak ada sama sekali di halaman — jangan
+dibandingkan dengan palet warna situs.
+
+## Gotcha #96 - Screenshot Steven bisa lebih besar dari jendela browser-nya
+
+Ukuran PNG yang Steven kirim (1125x875) **tidak sama** dengan ukuran
+viewport browser-nya. Di screenshot itu posisi elemen tampak bergeser ke
+kiri (footer di x=74..830 padahal tengah viewport ada di x=562), karena
+jendela aslinya hanya ~904px dan alat tangkapan menambahkan sisanya.
+
+Akibatnya posisi piksel di screenshot TIDAK bisa dipakai untuk menilai
+layout. Untuk menilai layout, selalu render ulang halaman LIVE dengan
+`Emulation.setDeviceMetricsOverride` pada ukuran yang dikehendai, lalu
+ukur `getBoundingClientRect()` langsung di DOM — bukan dari gambar.
