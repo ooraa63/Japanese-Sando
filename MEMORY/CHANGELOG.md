@@ -69,7 +69,42 @@ Catatan alat: screenshot full-viewport **tidak** menangkap `CartStickyBar` karen
 harus lewat DOM, bukan gambar. Dan viewport Browser mengikuti lebar panel, jadi
 tampilan desktop tidak bisa difoto langsung (gotcha #116).
 
-Belum di-push / belum live — menunggu persetujuan Steven.
+**Deploy (commit `1b66866`, 14-10-2026, sudah live):**
+
+Steven menyetujui push + deploy. Verifikasi pakai marker build, bukan HTTP 200
+— karena HTML awal `/order` di server selalu merender langkah pertama, dan bar
+keranjang hanya ada di langkah "Pilih Rasa" yang dirender di client. Jadi HTML
+awal praktis sama antara build lama dan baru.
+
+Marker: `scripts/wait-for-deploy-final.mjs` (READ-ONLY).
+
+| | build lama | build baru |
+|---|---|---|
+| `backdrop-blur md:hidden` | ADA | hilang |
+| `backdrop-blur md:px-6` | tidak | ADA |
+| `bottom-full right-3 mb-2.5` | tidak | ADA |
+
+Baseline sebelum push: baru `belum`, lama `ADA`, WA-atas `tidak`. Setelah push,
+pada percobaan ke-2 marker baru + WA-atas `ADA` dan marker lama hilang, di
+`/_next/static/immutable/chunks/3mqlzpbq9g-fq.js`.
+
+Verifikasi langsung di `https://japanese-sando.vercel.app/order`: bar di langkah
+`03 / 05` terbaca `backdrop-blur md:px-6` (tanpa `md:hidden`) dengan WA di
+`absolute bottom-full`; alur `03 / 05` → logo ke `/` → hamburger → "Pre-order"
+→ `/order` tampil `01 / 05 Tanggal Ambil`. Console 0 error / 0 warning.
+
+**Catatan observasi (tidak diperbaiki, belum diminta):** di langkah tanpa bar
+keranjang, tombol WA mengambang `fixed right-4 bottom-4` kadang menutupi sudut
+kanan bawah tombol "Lanjut" dari `StepNav` kalau form pendek dan sedang di posisi
+scroll itu. Tidak disentuh karena di luar 3 permintaan.
+
+**Status backend (terverifikasi, bukan lagi "belum"):** `scripts/verify-live-no-batch.mjs`
+→ **9 OK, 0 GAGAL**. Guard `no_active_batch` sudah terpasang di produksi, `v_batch := null`
+hilang, order tanpa batch ditolak, tidak ada order tersimpan (tetap 6), stok tidak
+berubah (tetap 20). Jadi proteksi backend sudah aktif; yang baru saja live adalah
+bagian frontend.
+
+**Batch tes:** Steven memutuskan biarkan saja, dia yang atur dari admin.
 
 ---
 
