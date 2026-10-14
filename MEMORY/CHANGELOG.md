@@ -78,6 +78,43 @@ sisa 30) saat sesi ini berjalan — jadi alur "batch sedang dibuka" yang tadinya
 ditandai belum pernah diuji **akhirnya ikut terverifikasi**: Tanggal Ambil →
 Data Kamu → Pilih Rasa → Pembayaran berjalan normal.
 
+**Deploy (22-10-2026, setelah Steven bilang "ya, push dan deploy"):** commit
+`23a60c6` → `main`, Vercel auto-deploy. Penanda deploy-nya **kelas CSS tombol
+WhatsApp di `/order`**, karena itu persis yang berubah:
+
+- Build LAMA: `WhatsAppFab` tidak menyembunyikan diri di `/order` →
+  kelas `bottom-[84px] z-40`.
+- Build BARU: WA dirender `OrderFlow` sendiri → `bottom-4 z-40`, atau di dalam
+  `CartStickyBar` untuk langkah menu.
+
+Dicek kondisi **sebelum** push (kelas lama ada, kelas baru belum) lalu di-poll
+sampai keduanya berubah: attempt 1 (4 detik) masih kelas lama, attempt 2
+(22 detik) kelas lama hilang dan yang baru muncul. `scripts/wait-for-deploy-cart.mjs`
+mencetak keduanya tiap polling supaya perubahan kelas tidak dianggap bukti.
+
+**Verifikasi end-to-end di situs LIVE** (`japanese-sando.vercel.app`, viewport
+639px):
+1. Tanggal Ambil → WA mengambang di pojok kanan bawah.
+2. Pilih "Jumat, 16 Oktober 2026" (tersisa 30 pcs) → Lanjut.
+3. Data Kamu → Lanjut → **Pilih Rasa**: bar bawah tampil dalam state kosong
+   ("Keranjang masih kosong…", disabled, abu-abu) dan **tetap menempel saat
+   di-scroll**.
+4. Kartu rasa menampilkan **"Tersedia 30"** — angka stok BATCH, bukan 20 global
+   lama. Ini bukti langsung bahwa fix `cart-stock.ts` (kategori tanpa baris
+   batch tidak lagi jatuh ke `categories.stock`) benar-benar jalan di produksi.
+5. Klik "+ Tambah" → kartu expand ke stepper; klik "+" → bar berubah jadi
+   **"1 item" / "Lanjut" / "Rp 18.000"**, tombol tidak lagi disabled.
+6. Klik bar → advance ke **04/05 Pembayaran**, WA kembali mengambang di pojok.
+
+Order **tidak** dikirim (berhenti di langkah pembayaran). Setelah itu dicek:
+`orders` tetap **6** (tidak ada order tersimpan), `po_batch_stock` tetap 30 (tidak
+ada stok terpakai), `categories.stock` tetap 20 (nilai lama tidak tersentuh),
+dan `verify-live-no-batch.mjs` tetap **9 OK, 0 GAGAL**.
+
+Console live: 0 error dari situs. Dua error yang muncul berasal dari selector
+CSS milik alat Browser (`:text-is()` itu Playwright-only, bukan
+`querySelector`) — stack-nya menunjuk ke sandbox Electron, bukan kode situs.
+
 ---
 
 ## 2026-10-14 — Tidak ada batch PO = tidak ada pesanan
