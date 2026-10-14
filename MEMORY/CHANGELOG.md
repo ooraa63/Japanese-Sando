@@ -4,6 +4,67 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Pre-order tidak ke-reset lagi saat pindah halaman
+
+Steven 14-10-2026: *"Kalau misal di pre-order udh sampai step 3 atau 4
+misal tpi kita back ke home, semua lgnsung kereset jaa, kecuali cuman refresh
+tetap stay di web itu"*.
+
+Ternyata ada **dua** efek yang membersihkan state saat komponen `OrderFlow`
+lepas dari layar, dan keduanya harus dihapus supaya perilakunya konsisten.
+
+**Efek 1 — reset total saat unmount (`src/components/customer/OrderFlow.tsx`).**
+Menghapus `js_order_step`, `js_po_pickup_date`, lalu memanggil `reset()` yang
+mengosongkan seluruh keranjang. Efek ini punya penjaga StrictMode
+(`reallyMountedRef`) supaya cleanup saat development probe tidak ikut
+menghapus. **Efek beserta penjaganya sekarang dihapus seluruhnya** — tidak ada
+lagi reset saat berpindah halaman.
+
+**Efek 2 — hapus identitas saat unmount + `pagehide`.** Ini yang tidak terlihat
+dari gejala Steven, tapi justru bikin perilakunya setengah-setelah: langkah
+dan keranjang comeback ke posisi sebelumnya, sementara kolom nama/telepon
+kembali kosong. Efek ini beserta `clearIdentityRef`-nya juga dihapus, dan
+`clearIdentity` tidak lagi di-destructure di `OrderFlow`.
+
+**Reset sekarang HANYA terjadi setelah pesanan benar-benar tersimpan**, di
+`handleSubmit` (`clearOrderSession()` -> `reset()` -> `router.push` ke halaman
+sukses). Fungsi `clearOrderSession()` yang baru membersihkan `js_order_step` +
+`js_po_pickup_date`: tanpa itu, pembeli yang balik ke `/order` setelah pesanannya
+masuk akan menemukan keranjang kosong tapi sudah di langkah "Konfirmasi", dan
+tidak bisa mundur karena `goTo()` hanya maju dari langkah saat ini.
+
+**Catatan konsekuensi untuk approve:** nama, telepon, email, dan Instagram
+sekarang ikut bertahan sampai pesanan dikirim — persis konsekuensi dari
+permintaan Steven. `clearIdentity()` di `CartProvider` sengaja tidak dihapus
+dari API, cuma pemanggilnya; kalau nanti mau "identitas dihapus tapi keranjang
+tetap", cukup panggil sekali di `handleSubmit`, bukan di effect unmount.
+
+---
+
+## 2026-10-14 — Fix loop takfinite di lonceng notifikasi
+
+Error runtime di dev overlay:
+`The result of getServerSnapshot should be cached to avoid an infinite loop`
+(`src/components/customer/NotificationBell.tsx:56`).
+
+Penyebabnya `getNotificationServerSnapshot()` di `src/lib/notifications.ts`
+yang `return []` di dalam fungsi — itu mengembalikan referensi array **baru**
+setiap panggilan, dan `useSyncExternalStore` membandingkan hasilnya pakai
+`Object.is`, jadi React menganggap store selalu berubah.
+
+Fix: array kosongnya dinaikkan ke konstanta modul `SERVER_SNAPSHOT` yang
+dipakai ulang, sama seperti snapshot sisi klien yang sudah di-cache di
+`cachedRaw` / `cachedList`. Nilai pertamanya kosong masih valid — `readRaw()`
+langsung membaca localStorage saat hydration.
+
+**Verifikasi:** console bersih (`query kind=console` levels error+warn = 0 entry)
+setelah reload; test navigasi `isi data -> step 2 -> tambah Choco Matcha ->
+ke beranda -> balik ke /order` hasilnya: masih di `02 / 04 Pilih Rasa`, Choco
+Matcha qty 1 (stok 20 -> 19), nama `Uji Navigasi` dan telepon `081234567890`
+utuh di form.
+
+---
+
 ## 2026-10-14 — Ketuk kartu di beranda -> popup tambah ke keranjang
 
 Steven 14-10-2026: *"yang di home yang untuk bundle, favorite, intinya semua

@@ -109,9 +109,19 @@ export function getNotificationSnapshot(): AppNotification[] {
   return readRaw();
 }
 
-/** Snapshot untuk server render — harus nilai yang STABIL, bukan array baru. */
+/**
+ * Snapshot untuk server render — harus nilai yang STABIL, bukan array baru.
+ *
+ * `useSyncExternalStore` membandingkan hasil snapshot dengan `Object.is`, jadi
+ * `return []` di dalam fungsi akan mengembalikan referensi BARU tiap panggilan
+ * -> React menganggap store selalu berubah -> loop takfinite. Karena itu array
+ * kosongnya dinaikkan ke konstanta modul sekali saja (dibiarkan immutable,
+ * tidak pernah di-mutate).
+ */
+const SERVER_SNAPSHOT: AppNotification[] = [];
+
 export function getNotificationServerSnapshot(): AppNotification[] {
-  return [];
+  return SERVER_SNAPSHOT;
 }
 
 export function subscribeNotifications(fn: () => void): () => void {

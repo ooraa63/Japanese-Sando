@@ -116,8 +116,9 @@ function subscribeOrderStep(): () => void {
  * Tanpa ini, refresh di tengah alur menghapus pilihan tanggal — pembeli
  * yang sudah jauh di langkah "Pilih Rasa" tiba-tiba diminta memilih ulang,
  * dan `poBatch` ikut jadi null sehingga angka stok yang tampil balik ke
- * `categories.stock`. Kuncinya dihapus saat /order ditinggalkan, sama
- * seperti `js_order_step`.
+ * `categories.stock`. Kuncinya dihapus hanya setelah pesanan berhasil dikirim
+ * (lihat `clearOrderSession`) — bukan saat halaman ditinggalkan, supaya
+ * pindah halaman tidak menghapus apa pun.
  */
 const PO_DATE_KEY = "js_po_pickup_date";
 
@@ -137,6 +138,25 @@ function writePoDate(value: string | null) {
     else sessionStorage.removeItem(PO_DATE_KEY);
   } catch {
     // Mode privat / storage diblokir — pilihan tetap jalan di state.
+  }
+}
+
+/**
+ * Bersihkan seluruh sisa alur pre-order di sessionStorage.
+ *
+ * Dipanggil HANYA setelah pesanan berhasil dikirim. Efek unmout yang dulu
+ * membersihkannya saat pindah halaman sudah dihapus (permintaan Steven), jadi
+ * tanpa fungsi ini `js_order_step` akan tetap menunjuk ke langkah terakhir —
+ * pembeli yang balik ke /order setelah pesanannya masuk akan menemukan
+ * keranjang kosong tapi sudah di langkah "Konfirmasi", dan tidak bisa mundur
+ * karena `goTo` hanya maju dari langkah saat ini.
+ */
+function clearOrderSession() {
+  try {
+    sessionStorage.removeItem("js_order_step");
+    sessionStorage.removeItem(PO_DATE_KEY);
+  } catch {
+    // Mode privat / storage diblokir — tidak ada yang perlu dibersihkan.
   }
 }
 
@@ -267,32 +287,22 @@ export function OrderFlow({
     totalItems,
     updateDraft,
     reset,
-    clearIdentity,
   } = useCart();
 
-  // Jangan biarkan nama & nomor telepon tertinggal di browser kalau pembeli
-  // meninggalkan halaman ini — baik lewat navigasi dalam aplikasi (komponen
-  // di-unmount) maupun menutup / memuat ulang tab.
+  // CATATAN: dulu ada efek `pagehide` + unmount yang memanggil
+  // `clearIdentity()` supaya nama/telepon tidak tertinggal di browser. Efek itu
+  // sekarang DIHAPUS, karena bertentangan dengan permintaan Steven (pindah
+  // halaman tidak boleh menghapus apa pun).
   //
-  // `clearIdentity` disimpan di ref supaya listener tidak dibuat ulang tiap
-  // kali keranjang berubah; tanpa ini data akan terhapus saat pembeli masih
-  // sedang mengetik.
-  const clearIdentityRef = useRef(clearIdentity);
-  useEffect(() => {
-    clearIdentityRef.current = clearIdentity;
-  }, [clearIdentity]);
-
-  useEffect(() => {
-    const onLeave = () => clearIdentityRef.current();
-    // Saat komponen di-unmount (pindah halaman)
-    const onUnmount = () => clearIdentityRef.current();
-    // Saat tab ditutup atau dimuat ulang
-    window.addEventListener("pagehide", onLeave);
-    return () => {
-      window.removeEventListener("pagehide", onLeave);
-      onUnmount();
-    };
-  }, []);
+  // Kalau tetap ada, hasilnya setengah-setengah dan membingungkan: langkah dan
+  // keranjang balik ke posisi sebelumnya, tapi kolom nama/telepon kosong — jadi
+  // pembeli harus isi ulang padahal ia cuma mampir ke beranda sebentar.
+  //
+  // Data identitas sekarang ikut bertahan bersama draft sampai pesanan berhasil
+  // dikirim, saat `reset()` mengosongkan `draft` sekaligus (lihat
+  // `handleSubmit`). Kalau nanti Steven mau identitas dihapus tapi keranjang
+  // tetap, itu cukup panggil `clearIdentity()` di `handleSubmit` sebelum
+  // `reset()` — bukan di sini.
 
   // Profil lengkap? Skip identity step — auto-fill dari profil, langsung
   // ke menu. Kalau belum lengkap (guest / OAuth tanpa phone), tetap
@@ -675,53 +685,25 @@ export function OrderFlow({
   // restore selalu gagal. Karena `setStep` hanya dipanggil dari `goTo()`,
   // menulis storage di sana sudah menutup semua perpindahan langkah.
 
-  // Reset cart + step saat user meninggalkan halaman /order. Tujuannya:
-  //   1. Privacy — data identitas (nama, telepon, IG) gak kesimpan ke pre-order
-  //      berikutnya.
-  //   2. UX bersih — next visit selalu mulai dari awal, gak ada leftover.
-  // Pakai ref supaya effect unmount tetap jalan HANYA SEKALI tanpa memaksa
-  // `reset` (yang identitasnya berubah tiap render) masuk dependencies — kalau
-  // tidak, keranjang ikut ke-reset setiap kali komponen render.
-  const resetRef = useRef(reset);
-  useEffect(() => {
-    resetRef.current = reset;
-  }, [reset]);
-
-  // Penanda "komponen sudah benar-benar ter-mount", untuk membedakan
-  // unmount sungguhan dari probe unmount milik StrictMode. Di-set lewat
-  // timeout 0ms: kalau cleanup datang SEBELUM timeout itu, itu probe
-  // StrictMode (mount kedua menyusul sesaat kemudian), bukan navigasi.
-  const reallyMountedRef = useRef(false);
-
-  useEffect(() => {
-    reallyMountedRef.current = false;
-    const timer = window.setTimeout(() => {
-      reallyMountedRef.current = true;
-    }, 0);
-    return () => {
-      window.clearTimeout(timer);
-      if (typeof window === "undefined") return;
-      // PROBE STRICT MODE — jangan bersihkan.
-      //
-      // Di `next dev`, React StrictMode (default `true` untuk app router
-      // sejak Next 13.5.1) menjalankan seluruh efek SEKALI LAGI di awal
-      // development: mount -> unmount -> mount. Cleanup di atas kelihatan
-      // persis seperti "pembeli meninggalkan halaman", padahal yang terjadi
-      // baru saja halaman dimuat.
-      //
-      // Akibatnya di dev: begitu /order terbuka, `js_order_step` dan
-      // keranjang langsung terhapus, dan setiap kali pembeli refresh di
-      // tengah pesanan halaman balik ke "Data Kamu" dengan keranjang kosong.
-      if (!reallyMountedRef.current) return;
-
-      // Unmount sungguhan = pindah halaman. Bersihin.
-      sessionStorage.removeItem("js_order_step");
-      sessionStorage.removeItem(PO_DATE_KEY);
-      resetRef.current();
-    };
-  }, []);
-
-  // Reset cart setelah orderan berhasil (di-handle via router.push to success).
+  // Reset keranjang HANYA terjadi kalau pesanan benar-benar berhasil dikirim
+  // (lihat `handleSubmit` -> `reset()` sebelum `router.push` ke halaman sukses).
+  //
+  // Steven 14-10-2026: "kalau misal di pre-order udah sampai step 3 atau 4
+  // misal tapi kita back ke home, semua langsung kereset. kecuali cuma refresh
+  // tetap stay di web itu".
+  //
+  // Sebelumnya ada effect unmount yang menghapus `js_order_step`, tanggal PO,
+  // dan seluruh keranjang setiap kali komponen lepas dari layar — jadi begitu
+  // pembeli mampir ke beranda, seluruh pesanan yang sudah halfway hilang. Efek
+  // itu sekarang DIHAPUS: pindah halaman tidak lagi menghapus apa pun, sama
+  // seperti yang sudah terjadi saat refresh. Yang tersisa reset setelah submit,
+  // sehingga pesanan berikutnya selalu mulai dari keranjang kosong.
+  //
+  // Catatan: data identitas (nama/telepon/IG) juga ikut bertahan karena ada di
+  // draft yang sama. Itu konsekuensi dari permintaan Steven — isi form tidak
+  // hilang kalau ia bolak-balik ke beranda. Kalau nanti ingin identitas saja
+  // yang dibersihkan, itu cukup dilakukan di `reset()` pada `CartProvider`
+  // tanpa menyentuh keranjang maupun langkah.
 
   function goTo(target: Step) {
     setErrors({});
@@ -1019,7 +1001,9 @@ export function OrderFlow({
       };
       saveInvoice(invoice);
       // Kosongkan keranjang + data pengirim supaya pesanan berikutnya
-      // dimulai dari form yang bersih.
+      // dimulai dari form yang bersih. Ini satu-satunya titik reset, dan
+      // hanya reached kalau pesanan benar-benar tersimpan.
+      clearOrderSession();
       reset();
       router.push(`/order/success/${code}`);
     } catch {

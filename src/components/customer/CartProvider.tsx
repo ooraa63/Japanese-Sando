@@ -312,8 +312,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   /**
    * Menghapus nama & nomor telepon saja, tanpa menyentuh isi keranjang.
-   * Dipanggil saat pembeli meninggalkan halaman /order, supaya data pribadi
-   * tidak ikut tersimpan untuk pesanan berikutnya.
+   *
+   * CATATAN: dulu `OrderFlow` memanggil ini saat pembeli meninggalkan halaman
+   * /order. Pemanggil itu dihapus 14-10-2026 — Steven minta pindah halaman tidak
+   * boleh menghapus apa pun, dan episode "langkah kembali ke 3 tapi form kosong"
+   * jauh lebih mengganggu daripada nama yang masih tersimpan. Identitas kini
+   * ikut bertahan sampai `reset()` dijalankan setelah pesanan berhasil dikirim.
+   *
+   * Fungsi ini dipertahankan karena masih berguna kalau nanti adminsinya
+   * "identitas dihapus tapi keranjang tetap" — tinggal panggil sekali di
+   * `handleSubmit`, bukan di effect unmount.
    */
   const clearIdentity = useCallback(() => {
     const next = {
