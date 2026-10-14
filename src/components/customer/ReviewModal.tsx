@@ -5,6 +5,7 @@ import { CheckCircle2, Loader2, Star, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Modal } from "@/components/ui/Modal";
 import { submitReviewAction } from "@/app/review-actions";
+import { ReviewPhotoUploader } from "@/components/customer/ReviewPhotoUploader";
 
 /**
  * Pop-up review yang muncul ketika pembeli mengecek order berstatus
@@ -24,6 +25,9 @@ export function ReviewModal({
   const [open, setOpen] = useState(initialOpen);
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState("");
+  // Migration-58: path foto di bucket review-photos (bukan URL). null = tanpa
+  // foto. Path-nya baru dikirim ke database kalau pembeli menekan submit.
+  const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -51,7 +55,7 @@ export function ReviewModal({
       return;
     }
     setSubmitting(true);
-    const res = await submitReviewAction(orderCode, rating, comment);
+    const res = await submitReviewAction(orderCode, rating, comment, photoPath);
     setSubmitting(false);
     if (res.ok) {
       setDone(true);
@@ -61,7 +65,9 @@ export function ReviewModal({
           ? t.reviews.alreadyReviewed
           : res.error === "order_not_delivered"
             ? t.reviews.notDelivered
-            : t.reviews.errorGeneric
+            : res.error === "invalid_photo_path"
+              ? t.reviews.photoFormatError
+              : t.reviews.errorGeneric
       );
     }
   }
@@ -149,6 +155,9 @@ export function ReviewModal({
                 {comment.length}/1000
               </span>
             </label>
+
+            {/* Migration-58: foto opsional, satu per ulasan. */}
+            <ReviewPhotoUploader path={photoPath} onChange={setPhotoPath} />
 
             {error ? (
               <p className="rounded-lg bg-berry-500/10 p-2.5 text-center text-xs font-semibold text-berry-600">

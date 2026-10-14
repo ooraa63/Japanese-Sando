@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { OrderReview, ReviewListResult } from "@/lib/types";
+import { parseReviewSort } from "@/lib/reviews";
+import type {
+  OrderReview,
+  ReviewListResult,
+  ReviewSort,
+} from "@/lib/types";
 
 export interface ReviewActionResult<T = undefined> {
   ok: boolean;
@@ -19,6 +24,7 @@ function humanize(error: string | undefined): string {
     "comment_too_long",
     "order_not_delivered",
     "already_reviewed",
+    "invalid_photo_path",
   ];
   return known.includes(error.trim()) ? error.trim() : "generic";
 }
@@ -26,11 +32,17 @@ function humanize(error: string | undefined): string {
 /**
  * Kirim review untuk pesanan yang sudah delivered. Idempoten: kalau order
  * sudah pernah di-review, return error 'already_reviewed'.
+ *
+ * `photoPath` opsional (migration-58). Kalau diisi, harus path di bucket
+ * `review-photos` pada folder `reviews/` — aturan yang sama diverifikasi ulang
+ * di dalam `submit_review`, jadi pemeriksaan di sini cuma untuk umpan balik
+ * yang lebih cepat, bukan penjaga.
  */
 export async function submitReviewAction(
   orderCode: string,
   rating: number,
-  comment: string
+  comment: string,
+  photoPath: string | null = null
 ): Promise<ReviewActionResult<OrderReview>> {
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
     return { ok: false, error: "invalid_rating" };
@@ -40,12 +52,18 @@ export async function submitReviewAction(
   if (trimmedComment.length > 1000) {
     return { ok: false, error: "comment_too_long" };
   }
+  // Samakan dengan validasi di submit_review supaya error yang muncul sama
+  // dengan yang akan ditolak database.
+  if (photoPath && !photoPath.startsWith("reviews/")) {
+    return { ok: false, error: "invalid_photo_path" };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("submit_review", {
     p_order_code: orderCode.trim(),
     p_rating: rating,
     p_comment: trimmedComment,
+    p_photo_path: photoPath,
   });
 
   if (error) return { ok: false, error: humanize(error.message) };
@@ -63,11 +81,23 @@ export async function hasReviewAction(orderCode: string): Promise<boolean> {
   return Boolean(data);
 }
 
-export async function listReviewsAction(): Promise<ReviewListResult> {
+/**
+ * Daftar ulasan publik.
+ *
+ * `sort` datang dari query string homepage, jadi divalidasi di sini lewat
+ * `parseReviewSort`. Nilai yang tidak dikenal jadi 'newest', bukan error --
+ * URL yang diketik tangan tidak boleh membuat halaman kosong.
+ */
+export async function listReviewsAction(
+  sort: ReviewSort = "newest"
+): Promise<ReviewListResult> {
   const supabase = await createClient();
   const { data } = await supabase.rpc("list_reviews", {
     p_limit: 12,
     p_offset: 0,
+    p_sort: parseReviewSort(sort),
   });
-  return (data as ReviewListResult) ?? { avg_rating: 0, total_count: 0, reviews: [] };
+  return (
+    (data as ReviewListResult) ?? { avg_rating: 0, total_count: 0, reviews: [] }
+  );
 }

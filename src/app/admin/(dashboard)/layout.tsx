@@ -35,6 +35,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         sales: dicts.admin.nav.sales,
         pickupDelivery: dicts.admin.nav.pickupDelivery,
         announcements: dicts.admin.announcements.title,
+        // Steven 15-10-2026: halaman kelola ulasan pembeli.
+        reviews: dicts.admin.nav.reviews,
         profileMenu: dicts.admin.settings.profileMenuTitle,
         faq: dicts.admin.faq.title,
         terms: dicts.admin.terms.title,

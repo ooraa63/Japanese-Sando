@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { REVIEW_PHOTO_BUCKET } from "@/lib/reviews";
 import type {
+  AdminReviewListResult,
   AdminUser,
   Category,
   DashboardStats,
@@ -54,6 +56,7 @@ function humanize(error: string | undefined): string {
     "not_authorized",
     "status_unchanged",
     "order_not_found",
+    "review_not_found",
     "flavor_not_found",
     "invalid_price",
     "invalid_payload",
@@ -1229,6 +1232,94 @@ export async function deleteAnnouncementAction(
 
   revalidatePath("/", "layout");
   revalidatePath("/admin/announcements");
+  return { ok: true };
+}
+
+/* =============================================================================
+ *  ULASAN PEMBELI (migration-58)
+ * ========================================================================== */
+
+/**
+ * Semua ulasan untuk halaman admin, termasuk yang disembunyikan.
+ *
+ * `admin_list_reviews` sudah memanggil `is_admin()` sendiri dan mengembalikan
+ * NULL kalau pemanggil bukan admin, jadi pemeriksa `is_admin` di sini
+ * cuma supaya pesannya jelas ("not_authorized") dan bukan `data: null` yang
+ * membuat halaman kosong tanpa penjelasan.
+ */
+export async function listAdminReviewsAction(): Promise<
+  ActionResult<AdminReviewListResult>
+> {
+  const supabase = await createClient();
+  const { data: isAdmin, error: aErr } = await supabase.rpc("is_admin");
+  if (aErr || !isAdmin) return { ok: false, error: "not_authorized" };
+
+  const { data, error } = await supabase.rpc("admin_list_reviews");
+  if (error) return { ok: false, error: humanize(error.message) };
+  if (!data) return { ok: false, error: "not_authorized" };
+
+  return {
+    ok: true,
+    data: data as AdminReviewListResult,
+  };
+}
+
+/**
+ * Sembunyikan / tampilkan lagi ulasan.
+ *
+ * Ini aksi yang dipakai admin PERTAMA KALI. Kalau ulasan ternyata tidak
+ * bermasalah, tombol "Tampilkan lagi" mengembalikannya tanpa data hilang --
+ * berbeda dengan `deleteAdminReviewAction` yang permanen.
+ */
+export async function setReviewVisibilityAction(
+  reviewId: number,
+  visible: boolean
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_review_visible", {
+    p_review_id: reviewId,
+    p_visible: visible,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/reviews");
+  return { ok: true };
+}
+
+/**
+ * Hapus ulasan permanen, INCLUDING foto di storage.
+ *
+ * Urutannya penting: RPC dulu (hapus baris), baru file. Kalau file dihapus
+ * lebih dulu dan RPC-nya gagal, pembeli kehilangan foto tanpa alasan. Setelah
+ * baris hilang, `photo_path` dikembalikan RPC supaya file bisa dibersihkan.
+ *
+ * Kegagalan hapus file TIDAK membatalkan aksi: baris ulasan sudah hilang,
+ * jadi dari sisi pembeli produknya sudah bersih. File sisa hanya memakan
+ * ruang di bucket.
+ */
+export async function deleteAdminReviewAction(
+  reviewId: number
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_delete_review", {
+    p_review_id: reviewId,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  const hasil = (data ?? {}) as { photo_path?: string | null };
+  if (hasil.photo_path) {
+    try {
+      await supabase.storage
+        .from(REVIEW_PHOTO_BUCKET)
+        .remove([hasil.photo_path]);
+    } catch {
+      // Bucket penuh atau policy berubah. Ulasannya tetap sudah terhapus.
+    }
+  }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/reviews");
   return { ok: true };
 }
 

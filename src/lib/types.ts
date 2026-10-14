@@ -490,13 +490,59 @@ export interface OrderReview {
   comment: string;
   created_at: string;
   order_code?: string;
+  /**
+   * Migration-58: path objek foto di bucket `review-photos`, BUKAN URL.
+   * `null` = ulasan tanpa foto. Bucket-nya publik, jadi URL-nya dibuat saat
+   * render lewat `getPublicUrl` — bukan disimpan di database supaya bucket
+   * bisa dipindah tanpa mengubah data.
+   */
+  photo_path?: string | null;
 }
+
+/**
+ * Cara mengurutkan daftar ulasan (migration-58).
+ *
+ * Nilai ini dibaca langsung dari query string `?sort=` di homepage, jadi
+ * `parseReviewSort()` di `src/lib/reviews.ts` adalah satu-satunya tempat yang
+ * memutuskan nilai mana yang sah. Nilai di luar daftar ini jatuh ke `newest`
+ * di sisi database juga.
+ */
+export type ReviewSort = "newest" | "highest" | "lowest" | "photo";
+
+export const REVIEW_SORTS: readonly ReviewSort[] = [
+  "newest",
+  "highest",
+  "lowest",
+  "photo",
+] as const;
 
 /** Hasil RPC list_reviews: agregat + list. */
 export interface ReviewListResult {
   avg_rating: number;
   total_count: number;
   reviews: OrderReview[];
+}
+
+/**
+ * Migration-58: satu baris dari `admin_list_reviews()` untuk halaman admin.
+ *
+ * Beda dari `OrderReview`:
+ * - `is_visible` ikut dibawa supaya admin bisa melihat ulasan yang disembunyikan
+ * - `order_code` selalu ada (dipakai untuk melacak asal ulasan)
+ */
+export interface AdminReview extends OrderReview {
+  order_id: number;
+  order_code: string;
+  is_visible: boolean;
+}
+
+/** Hasil RPC admin_list_reviews: agregat + semua ulasan. */
+export interface AdminReviewListResult {
+  total_count: number;
+  visible_count: number;
+  hidden_count: number;
+  avg_rating: number;
+  reviews: AdminReview[];
 }
 
 /** Buyer opsional — kalau customer login, profil ini tersedia untuk auto-fill. */

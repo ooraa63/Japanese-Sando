@@ -12,6 +12,7 @@ import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
 import { QuickAddProvider } from "@/components/customer/QuickAdd";
 import { DEFAULT_STORE_NAME } from "@/lib/brand";
+import { parseReviewSort } from "@/lib/reviews";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
@@ -27,14 +28,32 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function HomePage() {
-  const [settings, menu, lang, profile] = await Promise.all([
+/**
+ * Migration-58: `?sort=` untuk urutan ulasan.
+ *
+ * Halaman tetap server-rendered supaya daftar ulasan terindeks mesin pencari.
+ * Nilainya divalidasi lewat `parseReviewSort`, jadi `/?sort=ngawur` tidak
+ * membuat error — dia jatuh ke `newest`.
+ *
+ * `searchParams` membuat halaman ini dinamis; itu memang wajar karena
+ * homepage sudah mengambil menu, pengaturan, dan profil dari database.
+ */
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [settings, menu, lang, profile, sp] = await Promise.all([
     getSettings(),
     getPublicMenu(),
     getLang(),
     // Null kalau belum login — beranda tetap jalan untuk pengunjung.
     getCustomerProfile().catch(() => null),
+    searchParams,
   ]);
+  const reviewSort = parseReviewSort(
+    Array.isArray(sp.sort) ? sp.sort[0] : sp.sort
+  );
   const categories = menu.categories;
   const bundles = menu.bundles;
   const dicts = await getI18nDict();
@@ -114,9 +133,12 @@ export default async function HomePage() {
         </section>
 
         {/* ===================== REVIEWS ===================== */}
-        <section className="border-y border-cocoa-200/60 bg-cream-100/40 py-12 lg:py-16">
+        <section
+          id="reviews"
+          className="scroll-mt-20 border-y border-cocoa-200/60 bg-cream-100/40 py-12 lg:py-16"
+        >
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <ReviewsSection lang={lang} />
+            <ReviewsSection lang={lang} sort={reviewSort} />
           </div>
         </section>
 

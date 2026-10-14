@@ -248,6 +248,25 @@ export const id: Dict = {
     ratingRequired: "Pilih rating dulu.",
     commentRequired: "Tulis komentar singkat dulu.",
     errorGeneric: "Gagal mengirim ulasan. Coba lagi.",
+    // Migration-58: foto opsional pada ulasan.
+    photoLabel: "Tambah foto",
+    photoOptional: "(opsional)",
+    photoPick: "Pilih foto",
+    photoHint: "JPG/PNG/WebP, maksimal 5 MB. Satu foto saja.",
+    photoReplace: "Ganti",
+    photoRemove: "Hapus",
+    photoUploaded: "Foto sudah diunggah.",
+    photoUploadFailed: "Gagal mengunggah foto. Coba lagi.",
+    photoFormatError: "Format foto harus JPG, PNG, atau WebP.",
+    photoTooLarge: "Ukuran foto maksimal 5 MB.",
+    // Migration-58: tab pengurutan di beranda.
+    sort: {
+      label: "Urutkan:",
+      newest: "Terbaru",
+      highest: "Bintang tertinggi",
+      lowest: "Bintang terendah",
+      photo: "Punya foto",
+    },
   },
   order: {
     title: "Pesan Sandonya Sekarang",
@@ -922,6 +941,8 @@ export const id: Dict = {
       sales: "Mutasi",
       vouchers: "Voucher",
       pickupDelivery: "Ambil & Kirim",
+      // Steven 15-10-2026: halaman baru untuk mengelola ulasan pembeli.
+      reviews: "Ulasan",
     },
     dash: {
       title: "Dashboard",
@@ -1144,6 +1165,30 @@ export const id: Dict = {
       deleted: "Bagian dihapus.",
       confirmDelete: "Hapus bagian ini?",
       errorTitleRequired: "Judulnya wajib diisi.",
+    },
+    // Steven 15-10-2026: kelola ulasan pembeli — sembunyikan yang tidak
+    // pantas, atau hapus permanen kalau memang tidak ada gunanya.
+    reviews: {
+      title: "Ulasan Pembeli",
+      subtitle:
+        "Semua ulasan di beranda. Sembunyikan dulu kalau masih ragu; hapus kalau memang tidak boleh terlihat.",
+      empty: "Belum ada ulasan dari pembeli.",
+      hidden: "Tersembunyi",
+      shown: "Tampil",
+      hide: "Sembunyikan",
+      show: "Tampilkan lagi",
+      hideDone: "Ulasan disembunyikan dari beranda.",
+      showDone: "Ulasan tampil lagi di beranda.",
+      delete: "Hapus permanen",
+      deleteConfirm:
+        "Hapus ulasan ini selamanya? Ulasannya dan fotonya tidak bisa dikembalikan.",
+      deleteDone: "Ulasan dihapus.",
+      withPhoto: "Ada foto",
+      noPhoto: "Tanpa foto",
+      all: "Semua",
+      onlyHidden: "Hanya yang tersembunyi",
+      summary: "{visible} tampil, {hidden} tersembunyi dari {total} ulasan",
+      viewOnSite: "Lihat di beranda",
     },
     announcements: {
       title: "Pengumuman",

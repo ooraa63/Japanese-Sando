@@ -12,6 +12,7 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  MessageSquareQuote,
   Settings,
   Store,
   TrendingUp,
@@ -38,6 +39,10 @@ const NAV = [
   // pembeli. Taruh setelah "Ambil & Kirim" dan sebelum "Menu Profil" karena
   // ini juga soal komunikasi ke pembeli.
   { href: "/admin/announcements", key: "announcements" as const, icon: Megaphone, exact: false },
+  // Steven 15-10-2026: kelola ulasan pembeli. Taruh setelah "Ambil & Kirim"
+  // dan sebelum "Menu Profil" — sama seperti pengumuman, ini soal apa yang
+  // dilihat pembeli di halaman depan.
+  { href: "/admin/reviews", key: "reviews" as const, icon: MessageSquareQuote, exact: false },
   /* Steven 14-10-2026 (gambar 1): "faq syarat ketentuan, dll masih di side
      bar utama, yang saya mau dia ada di dalam yang profile menu".
 
@@ -77,6 +82,8 @@ export function AdminShell({
     sales: string;
     pickupDelivery: string;
     announcements: string;
+    // Steven 15-10-2026
+    reviews: string;
     profileMenu: string;
     faq: string;
     terms: string;

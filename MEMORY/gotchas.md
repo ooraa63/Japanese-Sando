@@ -2053,3 +2053,82 @@ Skrip bantu: `scripts/check-batch-window.mjs` (READ-ONLY) — mencetak
 `current_date`, `now()`, zona waktu, dan `current_date between open_at and
 close_at` per batch.
 
+### #119 - Tambah argumen RPC = tambah OVERLOAD, bukan mengganti
+
+Migration-58 menambah parameter ke `submit_review` dan `list_reviews` yang
+dipanggil langsung dari kode frontend lewat PostgREST. Dua jebakan muncul
+berurutan, keduanya hanya ketahuan karena tes rollback.
+
+**1. Overload lama harus tetap ada, sebagai pembungkus.**
+
+`CREATE OR REPLACE FUNCTION f(a, b, c, d)` saat `f(a, b, c)` sudah ada
+MEMBUAT fungsi baru dengan signature lain. `f(a,b,c)` tidak otomatis ikut
+berubah -- jadi kalau kode yang sedang LIVE masih memanggil signature lama,
+dan migration itu memakai `DROP FUNCTION`, ada jeda antara "migration
+di-apply" dan "deploy kode baru sampai" ketika fitur itu error
+`function ... does not exist`.
+
+Di project ini urutannya bisa dibalik, jadi jeda itu nyata: migration harus
+di-apply duluan supaya bisa diuji di dev server, tapi kode baru belum live.
+
+Solusinya: **pertahankan overload lama sebagai pembungkus tipis** yang
+memanggil yang baru.
+
+```sql
+create or replace function public.list_reviews(p_limit integer, p_offset integer)
+returns jsonb language sql security definer stable set search_path = public
+as $$ select public.list_reviews(p_limit, p_offset, 'newest'::text); $$;
+```
+
+PostgREST memilih berdasarkan JUMLAH ARGUMEN secara persis, jadi tidak ada
+ambiguitas. Sekarang migration boleh di-apply duluan ATAU kode lebih dulu.
+
+**2. `DEFAULT` pada parameter baru = ambiguitas, bukan overdraft.**
+
+Awalnya `p_photo_path text default null`. Akibatnya `submit_review(a,b,c)`
+cocok ke DUA fungsi -- yang 4-argumen (memakai default) dan pembungkus 3-argumen
+-- dan PostgreSQL menolak:
+
+```
+function public.submit_review(text, smallint, text) is not unique
+```
+
+Paramater baru harus TANPA default, agar jumlah argumen menentukan
+fungsi secara tegas.
+
+**3. Jangan `drop function` tanpa grant ulang** (ini gotcha #24, tapi jadi
+penting di sini karena ada dua signature).
+
+Urutan yang aman: `create` versi baru -> `grant` -> buat pembungkus ->
+`grant` pembungkus. Tidak ada `drop` sama sekali.
+
+### #120 - PostgreSQL tidak mengizinkan variabel di OFFSET
+
+`list_reviews(p_limit => $1, p_offset => $2, p_sort => $3)` dengan
+`limit p.lim offset p.off` gagal:
+
+```
+GAGAL: argument of OFFSET must not contain variables
+```
+
+`LIMIT` BOLEH berisi variabel, `OFFSET` TIDAK. Karena keduanya datang dari
+parameter, ambil halaman lewat `row_number()`:
+
+```sql
+numbered as (
+  select v.*, row_number() over (order by ...) as rn
+  from visible v cross join params p
+),
+rows as (
+  select n.* from numbered n cross join params p2
+  where n.rn > p2.off and n.rn <= p2.off + p2.lim
+)
+```
+
+Keuntungannya: urutan ditetapkan DI `row_number()`, lalu `jsonb_agg(... order by rn)`
+mengulang urutan yang sama -- jadi urutan yang dikirim ke frontend sama persis
+dengan urutan paging, tidak ada dua tempat yang bisa berbeda.
+
+Catatan: dry-run (`scripts/dry-run-migration.js`) menangkap error ini sebelum
+sana menyentuh produksi. Jalankan selalu, jangan langsung apply.
+

@@ -243,6 +243,25 @@ export const en = {
     ratingRequired: "Please pick a rating.",
     commentRequired: "Please add a short comment.",
     errorGeneric: "Couldn't send your review. Please try again.",
+    // Migration-58: optional photo on a review.
+    photoLabel: "Add a photo",
+    photoOptional: "(optional)",
+    photoPick: "Choose a photo",
+    photoHint: "JPG/PNG/WebP, up to 5 MB. One photo only.",
+    photoReplace: "Replace",
+    photoRemove: "Remove",
+    photoUploaded: "Photo uploaded.",
+    photoUploadFailed: "Couldn't upload the photo. Please try again.",
+    photoFormatError: "Photo must be JPG, PNG, or WebP.",
+    photoTooLarge: "Photo must be under 5 MB.",
+    // Migration-58: sort tabs on the homepage.
+    sort: {
+      label: "Sort:",
+      newest: "Newest",
+      highest: "Highest rated",
+      lowest: "Lowest rated",
+      photo: "With photo",
+    },
   },
   order: {
     title: "Pre-order your sando",
@@ -903,6 +922,8 @@ export const en = {
       sales: "Sales ledger",
       vouchers: "Vouchers",
       pickupDelivery: "Pickup & Delivery",
+      // Steven 15-10-2026: new page to manage buyer reviews.
+      reviews: "Reviews",
     },
     dash: {
       title: "Dashboard",
@@ -1125,6 +1146,30 @@ export const en = {
       deleted: "Section deleted.",
       confirmDelete: "Delete this section?",
       errorTitleRequired: "The title is required.",
+    },
+    // Steven 15-10-2026: manage buyer reviews -- hide the unsuitable ones, or
+    // delete permanently when they should not exist at all.
+    reviews: {
+      title: "Buyer Reviews",
+      subtitle:
+        "Every review shown on the homepage. Hide it first if you are unsure; delete only when it should never be seen.",
+      empty: "No reviews from buyers yet.",
+      hidden: "Hidden",
+      shown: "Visible",
+      hide: "Hide",
+      show: "Show again",
+      hideDone: "Review hidden from the homepage.",
+      showDone: "Review is visible on the homepage again.",
+      delete: "Delete permanently",
+      deleteConfirm:
+        "Delete this review forever? The review and its photo cannot be restored.",
+      deleteDone: "Review deleted.",
+      withPhoto: "Has photo",
+      noPhoto: "No photo",
+      all: "All",
+      onlyHidden: "Hidden only",
+      summary: "{visible} visible, {hidden} hidden out of {total} reviews",
+      viewOnSite: "View on site",
     },
     announcements: {
       title: "Announcements",
