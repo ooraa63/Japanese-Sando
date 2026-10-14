@@ -89,7 +89,7 @@ export interface PoDetailLabels {
     bundlesSubtitle: string;
     bundlesEmpty: string;
     bundlesAllHint: string;
-    bundlesPrice: string;
+    /** Steven 14-10-2026: harga tidak bisa diset di batch, selalu ikut utama. */
     bundlesPriceHint: string;
     /** Judul blok centang rasa per kategori. */
     rasaTitle: string;
@@ -295,11 +295,16 @@ function StockTab({
     return draft;
   });
 
-  const [picked, setPicked] = useState<Record<number, number | null>>(() => {
-    const draft: Record<number, number | null> = {};
-    for (const b of initial.bundles) draft[b.bundle_id] = b.dipakai ? (b.harga_batch ?? null) : null;
-    return draft;
-  });
+  // Steven 14-10-2026: "untuk harga tetap ikutin yang utama jadi kita gabisa
+  // set harga disini". Jadi draft ini hanya menyimpan DAFTAR paket yang dicentang
+  // — tidak ada harga sama sekali di halaman batch.
+  //
+  // Sekalian menutup bug lama: `dipakai && harga_batch == null` dulu ditulis
+  // sebagai `null` (= "tidak dicentang"), jadi paket yang dipakai di batch tapi
+  // tanpa harga khusus tampil tidak tercentang padahal database bilang dipakai.
+  const [picked, setPicked] = useState<Set<number>>(
+    () => new Set(initial.bundles.filter((b) => b.dipakai).map((b) => b.bundle_id))
+  );
 
   // Rasa yang ditampilkan di batch ini (migration-53).
   // `initial.semua_rasa_aktif` = Steven belum pernah memilih -> semua tampil.
@@ -369,13 +374,12 @@ function StockTab({
 
   function toggleBundle(id: number) {
     setDirtyBundles(true);
-    setPicked((prev) => ({ ...prev, [id]: prev[id] == null ? 0 : null }));
-  }
-
-  function setBundlePrice(id: number, value: string) {
-    setDirtyBundles(true);
-    const n = Number(value.replace(/\D/g, ""));
-    setPicked((prev) => ({ ...prev, [id]: value === "" ? null : n }));
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   function simpan() {
@@ -391,10 +395,7 @@ function StockTab({
         setDirtyStock(false);
       }
       if (dirtyBundles) {
-        const list = Object.entries(picked)
-          .filter(([, v]) => v != null)
-          .map(([id, v]) => ({ bundle_id: Number(id), price: v }));
-        const res = await savePoBatchBundlesAction(initial.batch.id, list);
+        const res = await savePoBatchBundlesAction(initial.batch.id, [...picked]);
         if (!res.ok) {
           toast.error(res.error ?? t.errors.generic);
           return;
@@ -486,7 +487,7 @@ function StockTab({
             )}
             <ul className="mt-4 space-y-2.5">
               {initial.bundles.map((b) => {
-                const on = picked[b.bundle_id] != null;
+                const on = picked.has(b.bundle_id);
                 return (
                   <li
                     key={b.bundle_id}
@@ -520,25 +521,15 @@ function StockTab({
                         </span>
                       </button>
 
-                      <div className="mt-2 pl-8">
-                        <label className="block text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
-                          {labels.stok.bundlesPrice}
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          inputMode="numeric"
-                          disabled={!on}
-                          placeholder={String(b.harga_bawaan)}
-                          aria-label={`${b.nama} — ${labels.stok.bundlesPrice}`}
-                          value={picked[b.bundle_id] ?? ""}
-                          onChange={(e) => setBundlePrice(b.bundle_id, e.target.value)}
-                          className="input tabular mt-0.5 w-full text-right disabled:opacity-50"
-                        />
-                        <p className="mt-0.5 text-[11px] text-cocoa-400">
+                      {/* Steven 14-10-2026: "untuk harga tetap ikutin yang
+                          utama jadi kita gabisa set harga disini". Input harga
+                          per batch DIHAPUS; harga selalu dari tabel `bundles`
+                          dan diubah lewat menu utama saja. */}
+                      {on ? (
+                        <p className="mt-1.5 pl-8 text-[11px] text-cocoa-400">
                           {labels.stok.bundlesPriceHint}
                         </p>
-                      </div>
+                      ) : null}
                     </li>
                   );
                 })}

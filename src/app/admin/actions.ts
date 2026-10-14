@@ -989,7 +989,10 @@ export interface PoBatchBundleRow {
   required_qty: number;
   /** True kalau bundle ini dipakai di batch ini. */
   dipakai: boolean;
-  /** Harga khusus batch; null = pakai `harga_bawaan`. */
+  /**
+   * Harga khusus batch. Tidak bisa diset dari UI lagi (14-10-2026) dan
+   * selalu null di database — harga Effective tetap mengikuti menu utama.
+   */
   harga_batch: number | null;
 }
 
@@ -1127,19 +1130,20 @@ export async function savePoBatchStockAction(
  *
  * Array KOSONG berarti "semua bundle aktif boleh dipakai" (mode lama) —
  * itulah perilaku default untuk batch yang belum pernah diset.
+ *
+ * Steven 14-10-2026: "untuk harga tetap ikutin yang utama jadi kita gabisa set
+ * harga disini". Karena itu action ini HANYA menerima daftar id paket; kolom
+ * `price` selalu dikirim `null`, sehingga `public_po_batch_for_date` jatuh ke
+ * `coalesce(pb.price, bu.price)` = harga di menu utama. Harga paket diubah dari
+ * halaman Menu, bukan dari halaman batch.
  */
 export async function savePoBatchBundlesAction(
   batchId: number,
-  bundles: Array<{ bundle_id: number; price: number | null }>
+  bundleIds: number[]
 ): Promise<ActionResult> {
-  const payload = bundles
-    .filter((b) => Number.isInteger(b.bundle_id) && b.bundle_id > 0)
-    .map((b) => ({
-      bundle_id: b.bundle_id,
-      // null = pakai harga bawaan bundle.
-      price: b.price != null && b.price > 0 ? Math.floor(b.price) : null,
-      is_active: true,
-    }));
+  const payload = bundleIds
+    .filter((id) => Number.isInteger(id) && id > 0)
+    .map((id) => ({ bundle_id: id, price: null, is_active: true }));
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("admin_save_po_batch_bundles", {

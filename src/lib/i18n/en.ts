@@ -823,8 +823,7 @@ export const en = {
           bundlesEmpty: "No active bundles to pick yet.",
           bundlesAllHint:
             "No bundle has been picked yet, so every active bundle can be bought. Tick the ones you want to limit.",
-          bundlesPrice: "Batch price",
-          bundlesPriceHint: "Empty = use the default price",
+          bundlesPriceHint: "Price follows the main menu, not editable here",
           rasaTitle: "Flavors shown",
           rasaCount: "{n} selected",
           rasaAllHint: "all shown",

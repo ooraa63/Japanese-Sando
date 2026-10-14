@@ -4,6 +4,65 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Harga bundle tidak bisa diset di batch (hanya centang + harga utama)
+
+Steven 14-10-2026: *"pertama ada semua menu dan bundle yang udh kita set di sidebar
+utama ... lalu di sub menu untuk PO ini, kita nanti tinggal tentuin mana yang mau
+kita jual untuk batch ini, rasa apa aja, dan stocknya berapa, untuk harga tetap
+ikutin yang utama jadi kita gabisa set harga disini"*
+
+Checklist dari pesan itu:
+1. Semua menu + bundle dari sidebar utama tampil di tab Stok → **sudah terpenuhi**.
+   Diverifikasi ke `public_menu`: yang aktif cuma 1 kategori (Sando Sandwich,
+   5 rasa) + 1 bundle (Sando 2, Rp 35.000) — persis yang tampil di layar Steven.
+2. Tentukan rasa mana yang dijual → sudah ada (migration-53).
+3. Tentukan stok → sudah ada per kategori.
+4. **Harga tidak bisa diset di sini → baru dikerjakan sekarang.**
+
+**Perubahan:**
+- `PoBatchDetailClient.tsx`: input "Harga batch" + label + hint dihapus. Yang
+  tersisa cuma teks kecil di bawah paket yang dicentang: "Harga ikut menu utama,
+  tidak bisa diubah di sini".
+- State `picked` berubah dari `Record<number, number|null>` (harga) jadi
+  `Set<number>` (daftar id paket yang dicentang). `setBundlePrice()` dihapus.
+- `savePoBatchBundlesAction(batchId, bundleIds: number[])` — signature-nya
+  berubah, `price` tidak lagi diterima dari pemanggil dan selalu dikirim `null`,
+  sehingga `public_po_batch_for_date` jatuh ke `coalesce(pb.price, bu.price)` =
+  harga menu utama. Jadi-even kalau ada form/API lain yang mencoba, harga batch
+  tidak bisa diisi lagi.
+- `src/lib/i18n/{id,en}.ts`: `bundlesPrice` dihapus, `bundlesPriceHint` diubah
+  jadi kalimat "harga ikut menu utama".
+
+**Bonus — bug lama ikut tertutup.** Draft lama menulis
+`draft[id] = b.dipakai ? (b.harga_batch ?? null) : null`, artinya paket yang
+dipakai tapi `harga_batch` null jadi `null` = "tidak dicentang". Jadi paket aktif
+bisa tampil tidak tercentang padahal database bilang dipakai. Sekarang state-nya
+murni dari `b.dipakai`.
+
+**Kenapa tidak ada migration baru:** `po_batch_bundles` masih punya kolom `price`,
+tapi tabelnya **kosong** (dicek langsung ke produksi: 0 baris) dan payload baru
+selalu `price: null`. `coalesce` otomatis jatuh ke harga utama, jadi tidak ada
+data yang perlu dibersihkan dan tidak ada risiko merusak apa pun. Kolomnya
+dibiarkan supaya tidak perlu migration; kalau nanti Steven mau sekalian dihapus
+dari skema, itu migration terpisah.
+
+**Verifikasi:**
+- `npx tsc --noEmit` bersih · `npx eslint src --max-warnings=0` bersih ·
+  `npm run build` sukses.
+- `node scripts/test-bundle-price.mjs` → **10 OK, 0 GAGAL** ke database asli:
+  simpan bundle dengan `price: null`, lalu `public_po_batch_for_date` mengirim
+  `price: 35000` = harga di `public_menu`, dan `po_batch_bundles.harga_batch`
+  null untuk batch 2 maupun 12. Data uji dibersihkan di akhir.
+- Layout belum dicek Steven di browser (butuh login admin).
+
+**Gotcha yang kena lagi saat nulis tes:** `public_po_batch_for_date` menerima
+parameter **`p_pickup_date`** (bukan `p_date`), dan key bundle di payload-nya
+**`bundle_id`** (bukan `id`). Teeth juga: fungsi itu memilih batch dengan sisa
+stok terkecil, jadi tidak bisa diarahkan ke satu batch — harus di-set ke semua
+batch aktif biar tesnya kena sasaran.
+
+---
+
 ## 2026-10-14 — Bundle di samping, kartu menu ikut melebar (flex-grow)
 
 Steven 14-10-2026, koreksi ketiga untuk masalah yang sama.

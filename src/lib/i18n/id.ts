@@ -836,8 +836,7 @@ export const id: Dict = {
           bundlesEmpty: "Belum ada paket aktif yang bisa dipilih.",
           bundlesAllHint:
             "Belum ada paket yang dipilih, jadi semua paket aktif boleh dibeli. Centang yang mau dibatasi kalau perlu.",
-          bundlesPrice: "Harga batch",
-          bundlesPriceHint: "Kosong = pakai harga bawaan",
+          bundlesPriceHint: "Harga ikut menu utama, tidak bisa diubah di sini",
           rasaTitle: "Rasa yang tampil",
           rasaCount: "{n} dipilih",
           rasaAllHint: "semua tampil",
