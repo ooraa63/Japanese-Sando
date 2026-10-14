@@ -2021,3 +2021,35 @@ from pg_constraint
 where conrelid = 'public.orders'::regclass and contype = 'c';
 ```
 
+### #118 - Jendela batch PO dibandingkan per TANGGAL, jam.close_at diabaikan
+
+Ditemukan 15-10-2026 sambil mengerjakan #117. Batch "Tes" punya
+`close_at = 2026-10-14T17:00:00Z`, yang secara kalender berarti 15-10 00:00 WIB.
+Dipercayai sudah tutup — tapi tidak.
+
+`public_po_pickup_dates()` memakai:
+
+```sql
+current_date between open_at and close_at
+```
+
+`current_date` itu **DATE**, bukan timestamp. Waktu dicek 2026-10-14 17:11 UTC,
+`current_date` = `2026-10-14`, dan itu masih di antara `2026-10-13 17:00` dan
+`2026-10-14 17:00`. Batch baru benar-benar tertutup ketika **tanggal UTC**
+berganti — 15-10 07:00 WIB, yaitu 7 jam setelah `close_at` yang tertulis.
+
+Konsekuensi praktis:
+
+- Jam pada `close_at` praktis tidak berpengaruh. Yang menentukan cuma tanggalnya.
+- Kalau `close_at` punya tanggal yang sama dengan `open_at`, batch terbuka
+  selama seluruh hari itu (UTC).
+- Untuk stok dan alike: jangan pernah menyimpulkan "batch sudah tutup" dari
+  membandingkan `close_at` dengan `now()` di kepala. Cek `current_date` /
+  panggil RPC-nya.
+- Zona waktu database adalah UTC (`current_setting('TimeZone')` = UTC), jadi
+  semua tanggal di sini berbasis UTC. WIB = UTC+7.
+
+Skrip bantu: `scripts/check-batch-window.mjs` (READ-ONLY) — mencetak
+`current_date`, `now()`, zona waktu, dan `current_date between open_at and
+close_at` per batch.
+

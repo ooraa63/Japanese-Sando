@@ -78,9 +78,12 @@ bug-nya beres", jadi sengaja belum dikerjakan.
 - Tidak ada perubahan kode frontend, jadi tidak perlu deploy ulang untuk
   perbaikannya — frontend sudah mengirim `courier` dengan benar sejak awal.
 
-**Sisa satu langkah dari Steven:** batch "Tes" sudah tutup (tutup 15-10-2026
-00:00 WIB). Sampai batch baru dibuka dari admin, `/order` menampilkan panel
-"Belum ada batch PO" dan tidak ada pesanan yang bisa masuk sama sekali.
+**Penting — batch "Tes" MASIH TERBUKA, jadi Steven bisa langsung menguji.**
+Kelihatannya sudah tutup (close_at 2026-10-14 17:00 UTC = 15-10 00:00 WIB),
+tapi `public_po_pickup_dates()` membandingkan `current_date` — TANGGAL, bukan jam
+— antara open_at dan close_at. Waktu server saat dicek: 2026-10-14 17:11 UTC,
+`current_date` = 2026-10-14, jadi `masih_buka_rpc = true`. Baru tertutup ketika
+tanggal UTC berganti, yaitu 15-10 07:00 WIB. Lihat gotcha #118.
 
 ---
 
