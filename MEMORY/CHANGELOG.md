@@ -4,7 +4,38 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
-## 2026-10-14 - Fix: checkbox rasa tidak bisa di-uncheck + Bundle ke kolom kanan
+## 2026-10-14 — Bundle balik ke bawah, label "Stock", tombol simpan mengambang
+
+Steven 14-10-2026 lewat screenshot ketiga (setelah versi kolom kanan). Tiga
+koreksi atas perubahan sebelumnya:
+
+1. **Bundle dikembalikan ke BAWAH kartu menu.** Versi kolom kanan
+   (`lg:grid-cols-[minmax(0,1fr)_20rem]`) Steven tolak: "bundle jangan di
+   samping sana, intinya untuk menu dan bundle itu satu itu layout yang sama
+   aja". Kolom 20rem membuat area menu terasa sempit. Sekarang satu kolom,
+   Bundle jadi `mt-6 border-t pt-6` di bawah grid menu.
+2. **Label kaki kartu: "Sisa (ubah di sini)" → "Stock".** Kata "sisa" membingungkan
+   karena di sebelah kanannya sudah ada badge "0 pcs tersisa" — dua-duanya
+   bicara hal sama dengan nada berbeda.
+3. **Tombol Simpan tidak lagi nangkot di ujung kanan bawah halaman.** Sekarang
+   pill mengambang di TENGAH bawah layar: `sticky bottom-3` + `flex
+   justify-center`, isi badge "Belum disimpan" + tombol. Steven: "jangan di
+   ujung kanan bawah bgt susah lihat". Sticky membuat tombolnya selalu kelihatan
+   tanpa harus menggulir sampai paling bawah — itu masalah vertikalnya,
+   bukan horizontalnya.
+
+Bonus: list Bundle jadi `sm:grid-cols-2` supaya tidak melebar penuh.
+
+**Pelajaran:** "susah lihat" pada tombol yang melayang hampir selalu soal
+posisi VERTIKAL (harus scroll sampai bawah), bukan horizontal. Menggeser dari
+kanan ke tengah saja tidak akan menolong — yang menolong adalah `sticky` +
+kartu pengingat "Belum disimpan".
+
+**Verifikasi:** `tsc` bersih · `eslint --max-warnings=0` bersih · `build` sukses.
+
+---
+
+## 2026-10-14 — Fix: checkbox rasa tidak bisa di-uncheck + Bundle ke kolom kanan
 
 Steven 14-10-2026 lewat screenshot `D:\eror.png`.
 
