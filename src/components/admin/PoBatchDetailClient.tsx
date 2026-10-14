@@ -430,7 +430,7 @@ function StockTab({
        (bukan grid kolom tetap) sehingga 1 kategori melebar penuh, 2 membagi
        dua, 3 membagi tiga — selalu memenuhi lebar yang tersedia. */
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-      <section className="card p-5">
+      <section className="card p-4">
         <h2 className="text-lg font-extrabold text-cocoa-900">{labels.stok.title}</h2>
         <p className="mt-1 text-[13px] text-cocoa-500">{labels.stok.subtitle}</p>
 
@@ -442,7 +442,7 @@ function StockTab({
           Sekarang kartu-kartunya memakai `flex-1 basis-[19rem]` supaya ikut
           melebar: kalau kategorinya cuma satu, kartunya memenuhi seluruh
           lebar kolom dan tidak ada rongga di sebelahnya. */}
-        <ul className="mt-4 flex flex-wrap gap-4">
+        <ul className="mt-3 flex flex-wrap gap-3">
           {menu.length === 0 ? (
             <li className="w-full px-1 py-6 text-sm text-cocoa-400">{labels.stok.empty}</li>
           ) : (
@@ -472,7 +472,7 @@ function StockTab({
       </section>
 
       {/* ---------- Bundle (di samping kanan, ikut nempel) ---------- */}
-      <aside className="card p-5 lg:sticky lg:top-24">
+      <aside className="card p-4 lg:sticky lg:top-24">
         <h3 className="text-base font-extrabold text-cocoa-900">{labels.stok.bundlesTitle}</h3>
         <p className="mt-1 text-[12px] text-cocoa-500">{labels.stok.bundlesSubtitle}</p>
 
@@ -672,11 +672,19 @@ function MenuStockCard({
           : "bg-matcha-50 text-matcha-700";
 
   return (
-    <li className="card flex flex-1 basis-[19rem] flex-col overflow-hidden">
-      {/* Kepala: gambar + nama + jumlah rasa + badge status */}
-      <div className="flex items-start gap-3.5 p-4">
+    <li className="card flex flex-1 basis-[21rem] flex-col overflow-hidden">
+      {/* Steven 14-10-2026 (screenshot "stok"): "untuk yang menu untuk stok,
+          terlalu besar dan makan tempat buat jadi petak juga aja jangan makan
+          tempat".
+
+          Jadi kartu ini DIPIPIHKAN, bukan dikurangi isinya: ikon 56px -> 40px,
+          badge status pindah ke kanan kepala, chip rasa lebih rapat, dan kaki
+          kartu jadi dua baris (badge + input satu baris, angka stok awal di
+          bawahnya). Penjelasan panjang dipindah ke `title` supaya tetap ada
+          kalau ditunggu, tapi tidak memakan tinggi kartu. */}
+      <div className="flex items-center gap-3 p-3">
         <span
-          className={`relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl ${
+          className={`relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg ${
             category.image_url ? "bg-cocoa-100" : "bg-gradient-to-br from-cocoa-300 to-cocoa-500"
           }`}
         >
@@ -689,22 +697,24 @@ function MenuStockCard({
               loading="lazy"
             />
           ) : (
-            <LayoutGrid className="size-7 text-white/70" />
+            <LayoutGrid className="size-5 text-white/70" />
           )}
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-base font-bold text-cocoa-900">{name}</p>
-          <p className="mt-0.5 block text-xs text-cocoa-400">
+          <p className="truncate text-[15px] font-bold text-cocoa-900">{name}</p>
+          <p className="text-[11px] text-cocoa-400">
             {flavors.length} {t.menu.flavors}
           </p>
-          <span
-            className={`mt-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${meta.tone}`}
-          >
-            <Icon className="size-3" />
-            {meta.label}
-          </span>
         </div>
+
+        <span
+          title={meta.hint.replace("{n}", String(sisa))}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${meta.tone}`}
+        >
+          <Icon className="size-3" />
+          {meta.label}
+        </span>
       </div>
 
       {/* ---------- Rasa: centang yang mau dimunculin di batch ini ----------
@@ -715,10 +725,10 @@ function MenuStockCard({
           belum ada yang dicentang = semua rasa tampil (mode lama). Begitu ada
           satu rasa dicentang, HANYA rasa itu yang dilihat pembeli. */}
       {rasaRows.length === 0 ? (
-        <p className="px-4 pb-3 text-[13px] text-cocoa-400">—</p>
+        <p className="px-3 pb-2.5 text-[12px] text-cocoa-400">—</p>
       ) : (
-        <div className="px-4 pb-3.5">
-          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="px-3 pb-2.5">
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
             <span className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
               {labels.stok.rasaTitle}
             </span>
@@ -745,7 +755,7 @@ function MenuStockCard({
             </div>
           </div>
 
-          <ul className="flex flex-wrap gap-1.5">
+          <ul className="flex flex-wrap gap-1">
             {rasaRows.map((r) => {
               // Baca draft lokal, BUKAN `semuaRasaAktif` — kalau baca yang
               // itu, uncheck tidak akan kelihatan sampai disimpan.
@@ -753,7 +763,7 @@ function MenuStockCard({
               return (
                 <li key={r.flavor_id}>
                   <label
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-[12px] transition ${
+                    className={`flex cursor-pointer items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] transition ${
                       on
                         ? "border-matcha-600 bg-matcha-50 text-matcha-700"
                         : "border-cocoa-200 bg-cream-50 text-cocoa-400"
@@ -763,7 +773,7 @@ function MenuStockCard({
                       type="checkbox"
                       checked={on}
                       onChange={() => onToggleRasa(r.flavor_id)}
-                      className="size-3.5 accent-matcha-600"
+                      className="size-3 accent-matcha-600"
                     />
                     <span className={on ? "" : "line-through"}>{r.nama}</span>
                   </label>
@@ -774,31 +784,32 @@ function MenuStockCard({
         </div>
       )}
 
-      {/* Kaki: input stok batch + angka stok awal / terjual */}
-      <div className="mt-auto border-t border-cocoa-100 bg-cocoa-50/60 px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
+      {/* Kaki ringkas: baris 1 = label + badge sisa + input stok,
+          baris 2 = stok awal / terjual. Dua hint panjang yang sebelumnya
+          memakan 3 baris jadi tooltips (`title`). */}
+      <div className="mt-auto border-t border-cocoa-100 bg-cocoa-50/60 px-3 py-2.5">
+        <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
             {labels.stok.colInput}
           </span>
-          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${stockTone}`}>
+          <span
+            title={meta.hint.replace("{n}", String(sisa))}
+            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${stockTone}`}
+          >
             {sisa} {t.admin.dash.pcsLeft}
           </span>
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            aria-label={`${name} — ${labels.stok.colInput}`}
+            value={sisa}
+            onChange={(e) => onSisa(Math.max(0, Number.parseInt(e.target.value || "0", 10) || 0))}
+            className="input tabular ml-auto w-24 shrink-0 text-center"
+          />
         </div>
 
-        <input
-          type="number"
-          min={0}
-          inputMode="numeric"
-          aria-label={`${name} — ${labels.stok.colInput}`}
-          value={sisa}
-          onChange={(e) => onSisa(Math.max(0, Number.parseInt(e.target.value || "0", 10) || 0))}
-          className="input tabular mt-1.5 w-full text-right"
-        />
-
-        <p className="mt-1.5 text-[11px] text-cocoa-500">
-          {meta.hint.replace("{n}", String(sisa))}
-        </p>
-        <p className="text-[11px] text-cocoa-400 tabular">
+        <p className="mt-1 text-[11px] text-cocoa-400 tabular">
           {labels.stok.colInitial}: {sisa + terjual} · {labels.stok.colSold}: {terjual}
         </p>
       </div>

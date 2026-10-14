@@ -4,6 +4,41 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Kartu menu di tab Stok dipipihkan jadi petak
+
+Steven 14-10-2026 lewat screenshot `D:\eror.png`: *"untuk yang menu untuk stok,
+terlalu besar dan makan tempat buat jadi petak juga aja jangan makan tempat"*.
+
+Kartu "Sando Sandwich" di tab Stok memang boros: ikon 56px, badge status di
+baris sendiri, input stok melebar penuh, plus DUA baris teks penjelasan — total
+kartu ±380px tinggi untuk isi yang sebenarnya cuma 4 baris.
+
+**Perubahan (semanya `MenuStockCard` di `PoBatchDetailClient.tsx`):**
+
+| Bagian | Sebelum | Sesudah |
+|---|---|---|
+| Ikon kategori | `size-14`, padding `p-4` | `size-10`, padding `p-3` |
+| Badge status | baris sendiri di bawah nama | pindah ke kanan kepala, satu baris dengan nama |
+| Chip rasa | `px-2 py-1 text-[12px]`, gap `1.5` | `px-1.5 py-0.5 text-[11px]`, gap `1` |
+| Kaki kartu | 4 baris: label / input full width / hint panjang / stok awal | 2 baris: label + badge + input (w-24) / stok awal |
+| Teks penjelasan panjang | tampil 2 baris | dipindah ke atribut `title` (tooltip) |
+| `basis` kartu | `19rem` | `21rem` (ruang untuk kaki 2 baris itu) |
+| Padding section + aside | `p-5` | `p-4` |
+
+**Tidak ada yang dihapus dari fungsinya** — rasa, tombol Pilih semua/Kosongkan,
+input stok, badge sisa, dan angka stok awal semuanya masih ada. Yang dipipihkan
+cuma jarak, bukan isinya. Total tinggi kartu turun ±80px (dari ±380 ke ±295).
+
+**Catatan:** `basis-` tetap pakai flex-grow, bukan `grid-cols-N` — pelajaran dari
+14-10-2026 (lihat entri "Bundle di samping"), grid dengan N kolom tetap
+menyisakan sel kosong kalau kategorinya kurang dari N.
+
+**Verifikasi:** `tsc` bersih · `eslint --max-warnings=0` bersih. **Belum dicek
+Steven secara visual** — halaman butuh login admin, jadi AI tidak bisa membuka
+sendiri; dia melihatnya di dev server localhost:3000 yang sedang jalan.
+
+---
+
 ## 2026-10-14 — Harga bundle tidak bisa diset di batch (hanya centang + harga utama)
 
 Steven 14-10-2026: *"pertama ada semua menu dan bundle yang udh kita set di sidebar
