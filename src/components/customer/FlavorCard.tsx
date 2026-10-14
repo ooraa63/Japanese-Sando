@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Flame, Heart, MessageSquare, Minus, PackageX, Plus, ShoppingBag, Sparkles, Star } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useCart } from "@/components/customer/CartProvider";
+import { useQuickAdd } from "@/components/customer/QuickAdd";
 import { useToast } from "@/components/ui/Toast";
 import { useFlavorLikes } from "@/lib/useFlavorLikes";
 import { PriceTag } from "./PriceTag";
@@ -126,6 +127,11 @@ export function FlavorCard({
 }) {
   const { t, lang } = useI18n();
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
+  /* Steven 14-10-2026: di beranda, mengetuk kartu makanan membuka popup
+     tambah ke keranjang. `useQuickAdd()` mengembalikan `null` di luar
+     beranda (mis. `/order`), jadi halaman lain tidak ikut berubah. */
+  const quickAdd = useQuickAdd();
+  const quickAddEnabled = Boolean(quickAdd?.enabled) && !selectable;
   // Steven 14-10-2026: `desc_id` / `desc_en` tidak lagi dirender di kartu
   // rasa. Kolomnya tetap dipakai untuk PENCARIAN (lihat MenuBrowser.tsx),
   // jadi data di database tidak hilang.
@@ -345,7 +351,45 @@ export function FlavorCard({
    * ------------------------------------------------------------------ */
   if (dense) {
     return (
-      <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-cocoa-200/70 bg-white transition hover:border-cocoa-300">
+      <div
+        /* Steven 14-10-2026: "yang di home ... semua makanan saya mau buat
+           dimana saat kita tap, bisa popup untuk kita add to cart".
+
+           Kartu dense dipakai di beranda (section Menu Baru, Favorite, dan
+           grid Menu), jadi satu ketukan membuka popup tambah cepat. Di
+           `/order` QuickAddProvider tidak dipasang sama sekali (dan kartu
+           sana `selectable`), jadi sana perilaku lamanya — tidak ada klik
+           pada kartu — tetap utuh.
+
+           `<div>` + role/tabIndex dipakai, bukan `<button>`, karena di dalam
+           kartu ada tombol like yang harus tetap jadi `<button>` (button
+           di dalam button itu HTML tidak valid). */
+        role={quickAddEnabled ? "button" : undefined}
+        tabIndex={quickAddEnabled ? 0 : undefined}
+        onClick={
+          quickAddEnabled
+            ? (e) => {
+                // Klik pada tombol di dalam kartu (jantung) tidak boleh
+                // ikut membuka popup.
+                if ((e.target as HTMLElement).closest("button")) return;
+                quickAdd?.openFlavor(flavor);
+              }
+            : undefined
+        }
+        onKeyDown={
+          quickAddEnabled
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  quickAdd?.openFlavor(flavor);
+                }
+              }
+            : undefined
+        }
+        className={`relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-cocoa-200/70 bg-white transition hover:border-cocoa-300 ${
+          quickAddEnabled ? "cursor-pointer active:scale-[0.99]" : ""
+        }`}
+      >
         <div
           className={`flavor-photo relative aspect-square shrink-0 overflow-hidden bg-gradient-to-br ${gradientFor(flavor.slug)}`}
         >

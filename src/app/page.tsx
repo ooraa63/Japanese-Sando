@@ -10,6 +10,7 @@ import { AppHome } from "@/components/customer/AppHome";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
+import { QuickAddProvider } from "@/components/customer/QuickAdd";
 import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -48,7 +49,15 @@ export default async function HomePage() {
   ].filter((u): u is string => Boolean(u));
 
   return (
-    <>
+    /* Steven 14-10-2026: mengetuk kartu makanan di beranda (Menu Baru,
+       Paket Hemat, Favorite, dan grid Menu) membuka popup tambah ke
+       keranjang. Provider-nya dipasang di sini, membungkus SELURUH isi
+       beranda, supaya `AppHome` maupun `MenuBrowser` bisa memakainya tanpa
+       prop yang diteruskan berlapis-lapis.
+
+       `categories` ikut diteruskan karena popup paket (`OrderBundleModal`)
+       butuh daftar rasa untuk dipilih pembelinya. */
+    <QuickAddProvider categories={categories}>
       <SiteHeader
         storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
         logoUrl={settings?.logo_url ?? null}
@@ -148,6 +157,6 @@ export default async function HomePage() {
       </main>
 
       <SiteFooter settings={settings} />
-    </>
+    </QuickAddProvider>
   );
 }

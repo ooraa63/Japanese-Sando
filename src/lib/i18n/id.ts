@@ -51,6 +51,9 @@ export const id: Dict = {
     title: "Keranjangmu",
     empty: "Keranjang masih kosong.",
     subtotal: "Subtotal",
+    /* Steven 14-10-2026: popup tambah cepat dari kartu di beranda. */
+    quickAdd: "Tambah ke keranjang",
+    alreadyInCart: "Sudah di keranjang: {n}",
   },
   nav: {
     home: "Beranda",

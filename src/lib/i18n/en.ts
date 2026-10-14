@@ -53,6 +53,9 @@ export const en = {
     title: "Your cart",
     empty: "Your cart is empty.",
     subtotal: "Subtotal",
+    /* Steven 14-10-2026: quick add popup from the cards on the home page. */
+    quickAdd: "Add to cart",
+    alreadyInCart: "Already in cart: {n}",
   },
   nav: {
     home: "Home",

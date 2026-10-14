@@ -5,6 +5,7 @@ import { Gift, Sparkles } from "lucide-react";
 import type { Bundle } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { PriceTag } from "./PriceTag";
+import { useQuickAdd } from "./QuickAdd";
 
 /**
  * Deretan kartu "Paket Hemat" di beranda.
@@ -54,8 +55,29 @@ function BundleCard({ bundle }: { bundle: Bundle }) {
   const name = lang === "en" ? bundle.name_en : bundle.name_id;
   const desc = lang === "en" ? bundle.desc_en : bundle.desc_id;
 
+  /* Steven 14-10-2026: "yang di home yang untuk bundle, favorite, intinya
+     semua makanan ... saat kita tap, bisa popup untuk kita add to cart".
+
+     Untuk paket, popup-nya adalah `OrderBundleModal` yang sudah ada — pembeli
+     memilih isi paket (2 rasa untuk "Sando 2") lalu masuk ke keranjang. Popup
+     itu dipasang sekali di `QuickAddProvider`, jadi kartu ini hanya membuka. */
+  const quickAdd = useQuickAdd();
+
   return (
-    <article className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-cocoa-200/70 bg-white transition hover:border-cocoa-300">
+    <article
+      role={quickAdd?.enabled ? "button" : undefined}
+      tabIndex={quickAdd?.enabled ? 0 : undefined}
+      onClick={() => quickAdd?.openBundle(bundle)}
+      onKeyDown={(e) => {
+        if (quickAdd?.enabled && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          quickAdd.openBundle(bundle);
+        }
+      }}
+      className={`flex h-full w-full flex-col overflow-hidden rounded-2xl border border-cocoa-200/70 bg-white transition hover:border-cocoa-300 ${
+        quickAdd?.enabled ? "cursor-pointer active:scale-[0.99]" : ""
+      }`}
+    >
       <div className="bundle-photo relative aspect-square shrink-0 overflow-hidden bg-gradient-to-br from-honey-300 to-berry-500">
         {bundle.image_url ? (
           <Image

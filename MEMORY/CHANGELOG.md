@@ -4,6 +4,46 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Ketuk kartu di beranda -> popup tambah ke keranjang
+
+Steven 14-10-2026: *"yang di home yang untuk bundle, favorite, intinya semua
+makanan saya mau buat dimana saat kita tap, bisa popup untuk kita add to cart"*.
+
+Sebelumnya kartu di beranda benar-benar.view-only — diklik tidak terjadi
+apa-apa, pembeli harus pindah ke `/order` dulu baru bisa memilih rasa.
+
+**File baru `src/components/customer/QuickAdd.tsx`:**
+- `QuickAddProvider` — dipasang SEKALI di `src/app/page.tsx` membungkus seluruh
+  isi beranda. Kartu-kartu memanggil `useQuickAdd()` sendiri, jadi tidak ada
+  prop yang diteruskan berlapis (`AppHome` -> `NewShowcase` -> `FlavorCard`).
+- `QuickAddModal` — foto, nama, harga, stepper jumlah, tombol "Tambah ke
+  keranjang". Memakai `setQuantity(flavorId, qty)`, BUKAN `add(flavor)`:
+  kalau pembeli sudah punya 2 dan memilih 3, totalnya jadi 3, bukan 5.
+- Popup **paket** bukan ditulis ulang — `OrderBundleModal` yang sudah ada
+  DIPAKAI ULANG, jadi validasi jumlah slot = `required_qty` dan penambahan ke
+  keranjang tetap satu sumber kebenaran.
+
+**`useQuickAdd()` mengembalikan `null` di luar provider, bukan melempar error.**
+Ini yang membuat halaman `/order` aman: kartu di sana `selectable` (punya
+tombol +/− sendiri) dan sengaja tidak diklik. Kalau hook-nya melempar,
+`/order` ikut mati.
+
+**Kartu jadi `role="button"` + `tabIndex`, bukan `<button>`** — karena di dalam
+kartu ada tombol like, dan `<button>` di dalam `<button>` itu HTML tidak valid.
+Klik pada tombol di dalam dicek dengan `closest("button")` supaya menekan
+jantung tidak ikut membuka popup.
+
+**Label lewat i18n** (`cart.quickAdd`, `cart.alreadyInCart` di id + en), bukan
+teks Indonesia yang ditulis langsung.
+
+**Verifikasi:** `tsc` bersih · `eslint --max-warnings=0` bersih ·
+`npm run build` sukses · beranda punya 9 `role="button"` (New + Paket Hemat +
+Favorite + grid Menu) · popup tidak terbuka saat halaman dimuat · `/order` punya
+**0** `role="button"` (kartu di sana tidak ikut diklik). Belum dicoba Steven
+dengan tangan.
+
+---
+
 ## 2026-10-14 — Tombol WhatsApp mengambang di kanan bawah
 
 Steven 14-10-2026 (gambar `D:\Gambar 1.png`): *"saya sekalian mau tambahkan
