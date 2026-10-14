@@ -1298,3 +1298,21 @@ produk sendiri.
 - **D78** - **Angka "terjual" di halaman batch mengikuti semantik kartu batch, bukan
   semantik Mutasi.** Kalau yang dipakai semantik Mutasi, kolom Terjual dan Sisa
   di tabel stok yang sama akan terlihat bertentangan tanpa penjelasan.
+
+- **D79** - **Batch punya daftar bundle sendiri, defaultnya "semua paket boleh".**
+  Nol baris `po_batch_bundles` = semua bundle aktif boleh dipakai. Begitu
+  Steven mencentang satu, itu jadi batasnya. Ini supaya batch yang sudah ada
+  sebelum fitur ini tidak langsung kehilangan paketnya.
+- **D80** - **Bundle tidak punya stok sendiri.** Tiap slot paket tetap memakan
+  1 pcs dari stok kategori rasa-nya. Yang dibatasi batch hanya "paket mana yang
+  boleh dibeli" dan "harganya berapa". Menambah stok per bundle akan jadi
+ sumber kebenaran kedua yang bisa bentrok dengan stok kategori.
+- **D81** - **Simpan stok & bundle lewat RPC terpisah dari `admin_save_po_batch`.**
+  Halaman detail tidak perlu mengirim ulang tanggal dan label batch, jadi
+  mengetik angka tidak berisiko menimpa field lain.
+- **D82** - **Empat tab dimuat sekali di server, bukan per-tab.**
+  Data satu batch kecil; pemuatan sekali membuat pindah tab instan dan tidak
+  ada permintaan bolak-balik.
+- **D83** - **Aksi ubah status pesanan hanya menawarkan langkah BERIKUTNYA**
+  (pending → accepted → ready → delivered), bukan semua tombol sekaligus.
+  Menolak hanya muncul saat masih pending.

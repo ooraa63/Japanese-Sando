@@ -978,6 +978,21 @@ export interface PoBatchStockRow {
   stok_awal: number;
 }
 
+/** Bundle (paket) yang bisa dipilih Steven untuk satu batch (migration-52). */
+export interface PoBatchBundleRow {
+  bundle_id: number;
+  nama: string;
+  desc: string;
+  /** Harga bawaan dari tabel `bundles`. */
+  harga_bawaan: number;
+  /** Berapa pcs yang harus dipilih pembeli untuk satu paket. */
+  required_qty: number;
+  /** True kalau bundle ini dipakai di batch ini. */
+  dipakai: boolean;
+  /** Harga khusus batch; null = pakai `harga_bawaan`. */
+  harga_batch: number | null;
+}
+
 export interface PoBatchDetailSummary {
   terjual: number;
   pcs_terjual: number;
@@ -998,6 +1013,10 @@ export interface PoBatchDetail {
     status: PoBatchStatus;
   };
   stok: PoBatchStockRow[];
+  /** Semua bundle aktif + apakah dipakai di batch ini (migration-52). */
+  bundles: PoBatchBundleRow[];
+  /** True = belum pernah diset, semua bundle aktif boleh dipakai. */
+  semua_bundle_aktif: boolean;
   ringkasan: PoBatchDetailSummary;
 }
 
@@ -1042,7 +1061,77 @@ export async function getPoBatchDetailAction(
     data: {
       batch: payload.batch,
       stok: payload.stok ?? [],
+      bundles: payload.bundles ?? [],
+      semua_bundle_aktif: payload.semua_bundle_aktif ?? true,
       ringkasan: payload.ringkasan ?? EMPTY_DETAIL_SUMMARY,
     },
   };
+}
+
+/**
+ * Simpan stok per jenis menu untuk satu batch (migration-52).
+ *
+ * `stock` boleh berisi kategori yang tidak ada di `stok` (kategori baru yang
+ * Steven set sekarang juga) dan kategori yang di-row `stok` tapi tidak disebut
+ * akan dihapus — jadi yang tersimpan selalu sama persis dengan yang terlihat
+ * di layar.
+ */
+export async function savePoBatchStockAction(
+  batchId: number,
+  stock: Record<string, number>
+): Promise<ActionResult<Array<{ category_id: number; stock: number }>>> {
+  const payload: Record<string, { stock: number }> = {};
+  for (const [key, value] of Object.entries(stock)) {
+    const catId = Number(key);
+    if (!Number.isInteger(catId) || catId <= 0) continue;
+    payload[key] = { stock: Math.max(0, Math.floor(Number(value) || 0)) };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_save_po_batch_stock", {
+    p_batch_id: batchId,
+    p_stock: payload,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/po");
+  revalidatePath(`/admin/po/${batchId}`);
+  revalidatePath("/order");
+  revalidatePath("/");
+  const hasil = data as { stok?: Array<{ category_id: number; stock: number }> } | null;
+  return { ok: true, data: hasil?.stok ?? [] };
+}
+
+/**
+ * Simpan bundle yang ditawarkan untuk satu batch (migration-52).
+ *
+ * Array KOSONG berarti "semua bundle aktif boleh dipakai" (mode lama) —
+ * itulah perilaku default untuk batch yang belum pernah diset.
+ */
+export async function savePoBatchBundlesAction(
+  batchId: number,
+  bundles: Array<{ bundle_id: number; price: number | null }>
+): Promise<ActionResult> {
+  const payload = bundles
+    .filter((b) => Number.isInteger(b.bundle_id) && b.bundle_id > 0)
+    .map((b) => ({
+      bundle_id: b.bundle_id,
+      // null = pakai harga bawaan bundle.
+      price: b.price != null && b.price > 0 ? Math.floor(b.price) : null,
+      is_active: true,
+    }));
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_save_po_batch_bundles", {
+    p_batch_id: batchId,
+    p_bundles: payload,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/admin/po");
+  revalidatePath(`/admin/po/${batchId}`);
+  revalidatePath("/order");
+  revalidatePath("/");
+  return { ok: true };
 }

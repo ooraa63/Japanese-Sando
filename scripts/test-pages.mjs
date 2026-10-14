@@ -134,7 +134,15 @@ await openPage("/admin/po", { mustContain: ["Batch PO"] });
   check("  /admin/po punya tautan ke detail batch", Boolean(m), m ? `id=${m[1]}` : "tidak ada kartu batch");
   if (m) {
     await openPage(`/admin/po/${m[1]}`, {
-      mustContain: ["Stok", "Pesanan", "Pelanggan", "Mutasi", "Stok awal", "Sisa", "Terjual"],
+      mustContain: [
+        "Semua batch",
+        "Stok",
+        "Pesanan",
+        "Pelanggan",
+        "Mutasi",
+        "Stok & Bundle",
+        "Tanggal pengambilan",
+      ],
     });
     // Semua tab harus benar-benar menampilkan sesuatu untuk batch ini, bukan
     // cuma label sidebar-nya. Diverifikasi lewat isi JSON yang ikut terkirim.

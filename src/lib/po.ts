@@ -23,12 +23,27 @@ export interface PoPickupDate {
   sisa: number;
 }
 
+/** Bundle (paket) yang boleh dipesan di batch ini (migration-52). */
+export interface PoBatchBundle {
+  bundleId: number;
+  /** Harga untuk batch ini (sudah di-fallback ke harga bawaan bundle). */
+  price: number;
+}
+
 /** Batch yang dipakai untuk satu tanggal + stok per kategori. */
 export interface PoBatchStock {
   batchId: number;
   pickupDate: string;
   /** `categoryId` -> sisa stok pcs untuk kategori itu. */
   stockByCategory: Map<number, number>;
+  /**
+   * Bundle yang boleh dipesan di batch ini.
+   *
+   * `null` = batch ini belum pernah diset bundle, jadi semua bundle aktif
+   * boleh dipakai (mode lama). `[]` yang bukan null = Steven sudah memilih
+   * tapi tidak ada satu pun yang aktif, jadi tidak ada paket yang bisa dibeli.
+   */
+  bundles: PoBatchBundle[] | null;
 }
 
 /**
@@ -82,6 +97,7 @@ export async function fetchBatchForDate(
       batch_id?: number | null;
       pickup_date?: string | null;
       stok?: Record<string, { sisa?: number | null }> | null;
+      bundles?: Array<{ bundle_id?: number | null; price?: number | null }> | null;
     };
     if (payload.batch_id == null) return null;
 
@@ -91,10 +107,21 @@ export async function fetchBatchForDate(
       if (Number.isFinite(catId)) stockByCategory.set(catId, Number(cell?.sisa ?? 0));
     }
 
+    const bundles =
+      Array.isArray(payload.bundles)
+        ? payload.bundles
+            .map((b) => ({
+              bundleId: Number(b.bundle_id),
+              price: Number(b.price ?? 0),
+            }))
+            .filter((b) => Number.isInteger(b.bundleId) && b.bundleId > 0)
+        : null;
+
     return {
       batchId: Number(payload.batch_id),
       pickupDate: String(payload.pickup_date ?? pickupDate).slice(0, 10),
       stockByCategory,
+      bundles,
     };
   } catch {
     return null;

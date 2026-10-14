@@ -4,6 +4,80 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 - Detail batch jadi halaman penuh + batch punya bundle sendiri
+
+**Permintaan Steven (14-10-2026):** tunjuk `EROR1.png` (halaman lama: kotak nav
+kecil + tabel tipis) dan `OK1.png` (halaman Mutasi asli). "Bukan hanya gini
+maksudnya... yang akan kita butuhkan nanti, stock (buat konsep yang sama seperti
+sebelumnya yang menu dan stock), mutasi, pelanggan." Dan lewat kuesioner: nav
+tetap kotak di dalam halaman, tapi tiap tab jadi halaman lengkap; halaman Stok
+bisa diset DAN bundle bisa diset per batch; tab Pesanan tetap ada dengan aksi
+ubah status.
+
+### BUG KRITIS YANG KETEMU (dan sudah diperbaiki)
+
+Migration-49 ternyata tidak pernah benar-benar meng-apply bagian `create_order`.
+Di produksi ada DUA overload:
+
+| signature | punya logika batch? | pernah dipanggil? |
+|---|---|---|
+| 18 argumen | TIDAK | tidak (frontend selalu pakai 20) |
+| 20 argumen (ada `p_po_batch_id`) | YA | ya |
+
+Artinya batch yang Steven buat HARI INI belum benar-benar jadi: stokka dipotong
+dari `categories.stock`, bukan dari `po_batch_stock`. Ketahuan waktu
+menguji harga bundle — masih Rp 17.500/slot padahal batch diset Rp 15.000.
+Penyebabnya `create or replace` dengan signature berbeda membuat overload,
+bukan mengganti (lihat gotcha #107).
+
+Migration-52 sekarang: overload 18 argumen di-drop, dan overload 20 argumen
+di-patch dari definisi LIVE-nya — bukan ditulis ulang dari nol — supaya logika
+batch dari migration-49 tetap utuh.
+
+### Migration-52 (SUDAH LIVE, idempoten)
+
+- Tabel `po_batch_bundles` (batch_id, bundle_id, price, is_active) + index.
+- RPC `admin_save_po_batch_stock` (satu batch, stok per kategori, tidak boleh
+  turun di bawah yang sudah dipesan) dan `admin_save_po_batch_bundles`.
+- `admin_list_po_batch_detail` +`bundles` + `semua_bundle_aktif`.
+- `public_po_batch_for_date` +`bundles` (id + harga) untuk sisi pembeli.
+- `create_order` (20 argumen) di-patch: bundle di luar batch ditolak
+  (`bundle_unavailable`), harga pakai harga batch kalau diisi.
+
+Diuji langsung ke produksi, 4 kasus: batch tanpa set bundle → semua paket boleh
+(mode lama); bundle nonaktif → ditolak; bundle aktif harga 30.000 → harga per
+slot 15.000; dikosongkan lagi → kembali mode lama.
+
+### Halaman detail
+
+Empat tab sekarang halaman LENGKAP, bukan tabel tipis:
+
+- **Stok** — `Stok & Bundle`. Tabel stok per jenis menu bisa DIEDIT langsung
+  (kolom "Sisa" adalah input), plus daftar paket dengan checkbox dan kolom
+  "Harga batch" (kosong = pakai harga bawaan). Tombol Simpan muncul hanya
+  saat ada perubahan, dan mengexclude `admin_save_po_batch` supaya halaman ini
+  tidak perlu mengirim ulang tanggal/label.
+- **Pesanan** — tabel lengkap dengan cara ambil + cara bayar, dan tombol aksi
+  status (terima / siap / selesai / tolak) yang mengikuti rantai
+  pending → accepted → ready → delivered.
+- **Pelanggan** — pencarian + tabel (nama, telepon, IG, jumlah pesanan, total,
+  kode pesanan terakhir), terfilter ke batch ini.
+- **Mutasi** — kartu ringkasan + rasa terlaris + pencarian + tabel transaksi,
+  meniru halaman Mutasi di sidebar utama.
+
+### Sisi pembeli
+
+`visibleBundles` di `OrderFlow`: kalau batch punya daftar bundle, hanya itu
+yang tampil (dengan harga batch). Kalau belum pernah diset (`bundles: null`),
+semua bundle aktif tetap tampil seperti dulu. `validateMenu` menolak keranjang
+yang masih punya paket yang sudah dihapus Steven dari batch itu.
+
+### Verifikasi
+
+`tsc` 0, `eslint` 0, build sukses, `test:pages` 41/41, headless dengan sesi
+admin asli 9/9 termasuk screenshot. Data produksi utuh: 6 pesanan, 1 batch
+(milik Steven), tidak ada sisa batch uji.
+
 ## 2026-10-14 - Detail batch: klik batch -> sidebar Stok/Pesanan/Pelanggan/Mutasi
 
 **Permintaan Steven:** "yang saya inginkan adalah contoh setelah kita buat batch

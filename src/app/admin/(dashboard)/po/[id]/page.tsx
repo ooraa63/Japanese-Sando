@@ -5,6 +5,7 @@ import {
   getMutasiAction,
   getOrdersAction,
   getPoBatchDetailAction,
+  listPoBatchesAction,
 } from "@/app/admin/actions";
 import { PoBatchDetailClient } from "@/components/admin/PoBatchDetailClient";
 import { getI18nDict } from "@/lib/i18n-server";
@@ -40,13 +41,18 @@ export default async function AdminPoBatchDetailPage({
   const batchId = Number.parseInt(id, 10);
   if (!Number.isInteger(batchId) || batchId <= 0) notFound();
 
-  const [detailRes, dicts, ordersRes, mutasiRes, customersRes] = await Promise.all([
-    getPoBatchDetailAction(batchId),
-    getI18nDict(),
-    getOrdersAction(null, "", 100, 0, batchId),
-    getMutasiAction({ limit: 100, offset: 0, poBatchId: batchId }),
-    getCustomersAction(batchId),
-  ]);
+  const [detailRes, dicts, ordersRes, mutasiRes, customersRes, poRes] =
+    await Promise.all([
+      getPoBatchDetailAction(batchId),
+      getI18nDict(),
+      getOrdersAction(null, "", 100, 0, batchId),
+      getMutasiAction({ limit: 100, offset: 0, poBatchId: batchId }),
+      getCustomersAction(batchId),
+      // Daftar kategori aktif dibutuhkan supaya Steven bisa menambah jenis
+      // menu yang belum pernah ada di batch ini. `admin_list_po_batch_detail`
+      // hanya mengembalikan kategori yang sudah punya stok / sudah terjual.
+      listPoBatchesAction(),
+    ]);
 
   // Batch hilang (dihapus admin) -> 404, bukan halaman kosong yang menyesatkan.
   if (!detailRes.ok || !detailRes.data) notFound();
@@ -54,6 +60,11 @@ export default async function AdminPoBatchDetailPage({
   return (
     <PoBatchDetailClient
       initial={detailRes.data}
+      kategori={
+        poRes.ok && poRes.data
+          ? poRes.data.kategori.map((k) => ({ id: k.id, name: k.nama }))
+          : []
+      }
       orders={ordersRes.ok ? (ordersRes.data?.orders ?? []) : []}
       ordersFailed={!ordersRes.ok}
       mutasi={

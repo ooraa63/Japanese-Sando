@@ -456,6 +456,21 @@ export function OrderFlow({
     return m;
   }, [categories, poBatch]);
 
+  // Bundle yang boleh dibeli di batch yang dipilih (migration-52).
+  //
+  // `poBatch.bundles === null` berarti Steven belum pernah menyet bundle untuk
+  // batch ini, jadi semua bundle aktif tetap boleh (mode lama). Kalau sudah
+  // diset, hanya bundle di daftar itu yang muncul — dan harganya pakai harga
+  // batch kalau Steven mengisinya.
+  const visibleBundles = useMemo(() => {
+    const allowed = poBatch?.bundles ?? null;
+    if (allowed === null) return bundles;
+    const priceById = new Map(allowed.map((b) => [b.bundleId, b.price]));
+    return bundles
+      .filter((b) => priceById.has(b.id))
+      .map((b) => ({ ...b, price: priceById.get(b.id) ?? b.price }));
+  }, [bundles, poBatch]);
+
   // Semua rasa dikumpulkan dari kategori yang tampil.
   const flavors = useMemo(
     () => categories.flatMap((c) => c.flavors ?? []),
@@ -701,6 +716,16 @@ export function OrderFlow({
       const s = stockByCategory.get(catId);
       if (s?.enabled && pcs > s.left) {
         toast.error(t.errors.insufficient_stock);
+        return false;
+      }
+    }
+    // Bundle yang Steven hapus dari batch ini tidak boleh ikut terkirim —
+    // kalau tidak, server akan menolak dengan pesan yang membingungkan.
+    if (poBatch?.bundles) {
+      const boleh = new Set(poBatch.bundles.map((b) => b.bundleId));
+      const ada = cartBundles.some((e) => !boleh.has(e.bundle.id));
+      if (ada) {
+        toast.warning(t.order.menu.bundleGone);
         return false;
       }
     }
@@ -1289,7 +1314,7 @@ export function OrderFlow({
               ) : (
                 <OrderMenuBrowser
                   categories={categories}
-                  bundles={bundles}
+                  bundles={visibleBundles}
                   soldCounts={soldCounts}
                   stockOverride={poBatch?.stockByCategory ?? null}
                 />

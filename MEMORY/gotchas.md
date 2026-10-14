@@ -1801,3 +1801,39 @@ Artinya verifikasi visual halaman admin BISA otomatis: login dengan
 `@supabase/ssr` di Node, ambil cookie `sb-*-auth-token`, lalu `Network.setCookies`
 di CDP sebelum `Page.navigate`. Dipakai untuk memverifikasi `/admin/po/[id]`
 (10/10 termasuk screenshot).
+
+### #109 - Dua overload create_order tersembunyi di produksi
+
+Migration-49 menambah `p_po_batch_id` dan `p_pickup_date` ke `create_order`.
+Karena `create or replace` dengan JUMLAH ARGUMEN BERBEDA membuat OVERLOAD
+(lihat #107), versi 20 argumen dibuat sebagai fungsi BARU — dan versi lama
+18 argumen tetap ada. Frontend memanggil dengan named-argument
+`p_po_batch_id =>`, jadi yang berjalan adalah yang 20 argumen; yang 18
+argumenDiam-diam jadi sampah.
+
+Masalahnya: `select pg_get_functiondef(...)` TANPA `order by` `mengembalikan
+satu baris acak. Cek pertama mengambil yang salah, dan terlihat seperti
+"fungsi di database tidak punya batch sama sekali" — padahal yang benar ada
+di overload lain.
+
+Aturan:
+1. Saat menambah parameter ke RPC, `drop function if exists` versi lama dulu.
+2. Saat mau patch, `order by array_length(p.proargnames, 1)` dan CEK SEMUA
+   overload, jangan cuma `rows[0]`.
+3. `pg_get_functiondef` mengembalikan CRLF dan TANPA titik koma di akhir.
+   Pola patch multi-baris harus `.replace(/\r\n/g, "\n")` dan statement
+   berikutnya butuh `;` yang ditambahkan manual.
+
+### #110 - Aggregate bersarang di `jsonb_object_agg` (muncul lagi)
+
+`jsonb_object_agg(k, coalesce(sum(x), 0))` → "aggregate function calls cannot
+be nested". Sudah pernah kena di migration-49 (Sisa dari
+`public_po_pickup_dates`), dan kena lagi di migration-52 untuk
+`admin_save_po_batch_stock`. Dua tingkat selalu: CTE `group by` dulu, baru
+`object_agg`.
+
+Bonus dari error yang sama: `jsonb_each` mengembalikan DUA KOLOM (key, value).
+Kalau variabel dideklarasikan `jsonb`, `v_entry.key` ditafsirkan sebagai kolom
+dari tabel dan gagal dengan "missing FROM-clause entry". Declare key-nya
+langsung di level query: `select (e.key)::bigint as cat_id, ... from
+jsonb_each(...) e`.
