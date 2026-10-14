@@ -98,6 +98,24 @@ definisi live, `v_batch := null` hilang, validasi batch lama masih utuh,
 `anon` masih boleh memanggil `create_order`, order tanpa batch ditolak
 `no_active_batch`, dan order tetap 6 / stok tetap 20 (tidak ada efek samping).
 
+Commit `d2f71c6` ("Tidak ada batch PO = tidak ada pesanan") sudah di-push ke
+`main`, jadi Vercel auto-deploy. Buktinya deploy benar-benar build baru, bukan
+halaman lama yang kebetulan 200: **sebelum** push `/order` live balas 44791 byte
+dan marker `Belum ada batch PO` **tidak ada**; **sesudah** push balas 40692
+byte dan marker **ada**. `scripts/prove-deploy-live.mjs` → 13 dari 15 cek OK,
+dan dua yang "gagal" ternyata salah cek, bukan regresi:
+
+- `/faq` balas **307** ke `/profile-menu/faq` — itu perilaku yang **disengaja**
+  (lihat entri "8 perbaikan dari screenshot Steven": URL lama `/faq`, `/contact`,
+  `/jam-buka`, `/syarat-ketentuan` dipertahankan sebagai redirect 307 supaya
+  link yang sudah dibagikan tidak mati). Keempatnya terverifikasi redirect
+  dengan benar, dan `/profile-menu/faq` balas 200.
+- `buildId` "tidak ketemu" karena Next.js 16 (Turbopack) tidak lagi menaruh
+  field JSON `buildId` di HTML. Penanda build yang benar adalah nama aset
+  ber-content-hash `/_next/static/immutable/chunks/<nama>-<hash>`.
+  `scripts/check-deploy-fingerprint.mjs`: 6 request → **1** varian fingerprint
+  dengan 16 chunk, artinya satu build yang stabil dilayani.
+
 **Belum:** alur "batch sedang dibuka" belum diuji dengan batch sungguhan
 (butuh batch nyata di produksi). Buyer masih bisa menambah barang ke keranjang
 dari kartu di beranda (fitur QuickAdd) lalu menemui panel ini di `/order`;
