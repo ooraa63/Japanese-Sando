@@ -1,25 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import {
-  Banknote,
-  Calendar,
-  Download,
-  Filter,
-  Loader2,
-  Package,
-  RotateCcw,
-  Search,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import type { SalesSummary, SalesTransaction } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { formatFullDateTime, formatIDR, paymentLabel, statusLabel } from "@/lib/utils";
+import { paymentLabel, statusLabel } from "@/lib/utils";
 import { getMutasiAction } from "@/app/admin/actions";
 import { useToast } from "@/components/ui/Toast";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import {
+  SalesSummaryCards,
+  SalesTransactionsSection,
+} from "@/components/admin/shared/SalesTransactions";
 
 interface SalesFilters {
   fromDate: string;
@@ -47,7 +38,6 @@ export function SalesClient({
   const [transactions, setTransactions] = useState<SalesTransaction[]>(initialTransactions);
   const [total, setTotal] = useState(initialTotal);
   const [filters, setFilters] = useState<SalesFilters>(initialFilters);
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [pending, startTransition] = useTransition();
 
   const applyFilters = useCallback(
@@ -91,15 +81,6 @@ export function SalesClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  function toggleExpanded(id: number) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   async function exportCsv() {
     if (transactions.length === 0) return;
     const header = [
@@ -136,9 +117,7 @@ export function SalesClient({
     const wb = new ExcelJS.Workbook();
     wb.creator = "Japanese Sando Admin";
     wb.created = new Date();
-    const ws = wb.addWorksheet("Mutasi", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
+    const ws = wb.addWorksheet("Mutasi", { views: [{ state: "frozen", ySplit: 1 }] });
     ws.columns = [
       { header: header[0], key: "code", width: 18 },
       { header: header[1], key: "date", width: 22 },
@@ -177,321 +156,27 @@ export function SalesClient({
     URL.revokeObjectURL(url);
   }
 
-  const summaryBlocks = [
-    {
-      key: "total",
-      icon: TrendingUp,
-      label: t.admin.sales.summaryRevenue,
-      value: formatIDR(summary.revenue_total, lang),
-      tone: "bg-matcha-100 text-matcha-700",
-    },
-    {
-      key: "today",
-      icon: Sparkles,
-      label: t.admin.sales.summaryToday,
-      value: formatIDR(summary.revenue_today, lang),
-      sub: t.admin.sales.summaryTodayOrders.replace(
-        "{n}",
-        String(summary.orders_today)
-      ),
-      tone: "bg-honey-100 text-honey-700",
-    },
-    {
-      key: "orders",
-      icon: Package,
-      label: t.admin.sales.summaryOrders,
-      value: String(summary.orders_count),
-      tone: "bg-cocoa-100 text-cocoa-700",
-    },
-    {
-      key: "pcs",
-      icon: Banknote,
-      label: t.admin.sales.summaryPcs,
-      value: String(summary.pcs_sold),
-      tone: "bg-cream-200 text-cocoa-800",
-    },
-  ];
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <header className="space-y-1">
-        <h1 className="font-display text-2xl font-bold text-cocoa-900">
-          {t.admin.sales.title}
-        </h1>
+        <h1 className="font-display text-2xl font-bold text-cocoa-900">{t.admin.sales.title}</h1>
         <p className="text-sm text-cocoa-500">{t.admin.sales.subtitle}</p>
       </header>
 
-      {/* Summary cards */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {summaryBlocks.map((b) => {
-          const Icon = b.icon;
-          return (
-            <div
-              key={b.key}
-              className="rounded-2xl border border-cocoa-200 bg-cream-50 p-4 shadow-sm"
-            >
-              <div
-                className={`mb-2 inline-flex size-9 items-center justify-center rounded-xl ${b.tone}`}
-              >
-                <Icon className="size-4.5" />
-              </div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-cocoa-500">
-                {b.label}
-              </p>
-              <p className="mt-1 font-display text-xl font-bold text-cocoa-900">
-                {b.value}
-              </p>
-              {b.sub ? (
-                <p className="mt-1 text-xs font-semibold text-cocoa-500">{b.sub}</p>
-              ) : null}
-            </div>
-          );
-        })}
-      </section>
+      <SalesSummaryCards summary={summary} />
 
-      {/* Top flavors */}
-      <section className="rounded-2xl border border-cocoa-200 bg-cream-50 p-4">
-        <h2 className="mb-3 text-sm font-bold text-cocoa-700">
-          {t.admin.sales.topFlavors}
-        </h2>
-        {summary.top_flavors.length === 0 ? (
-          <p className="text-sm text-cocoa-400">{t.admin.sales.topFlavorsEmpty}</p>
-        ) : (
-          <ol className="space-y-2">
-            {summary.top_flavors.map((f, i) => {
-              const max = Math.max(...summary.top_flavors.map((x) => x.qty), 1);
-              const pct = Math.round((f.qty / max) * 100);
-              return (
-                <li key={f.flavor_name} className="flex items-center gap-3">
-                  <span className="w-6 shrink-0 text-xs font-bold text-cocoa-400">
-                    #{i + 1}
-                  </span>
-                  <span className="flex-1 truncate text-sm font-semibold text-cocoa-800">
-                    {f.flavor_name}
-                  </span>
-                  <span className="font-mono text-xs text-cocoa-500">{pct}%</span>
-                  <span className="w-20 text-right font-mono text-sm font-bold text-cocoa-900">
-                    {f.qty}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </section>
-
-      {/* Filters */}
-      <section className="rounded-2xl border border-cocoa-200 bg-cream-50 p-4">
-        <div className="flex items-center gap-2 mb-3 text-sm font-bold text-cocoa-700">
-          <Filter className="size-4" />
-          {t.admin.sales.filtersLabel}
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="space-y-1">
-            <span className="block text-[11px] font-semibold uppercase tracking-wide text-cocoa-500">
-              <Calendar className="mr-1 inline size-3" />
-              {t.admin.sales.filterDateFrom}
-            </span>
-            <input
-              type="date"
-              value={filters.fromDate}
-              onChange={(e) =>
-                applyFilters({ ...filters, fromDate: e.target.value })
-              }
-              className="w-full rounded-lg border border-cocoa-200 bg-cream-100 px-3 py-2 text-sm focus:border-matcha-600 focus:outline-none"
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="block text-[11px] font-semibold uppercase tracking-wide text-cocoa-500">
-              <Calendar className="mr-1 inline size-3" />
-              {t.admin.sales.filterDateTo}
-            </span>
-            <input
-              type="date"
-              value={filters.toDate}
-              onChange={(e) =>
-                applyFilters({ ...filters, toDate: e.target.value })
-              }
-              className="w-full rounded-lg border border-cocoa-200 bg-cream-100 px-3 py-2 text-sm focus:border-matcha-600 focus:outline-none"
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="block text-[11px] font-semibold uppercase tracking-wide text-cocoa-500">
-              <Search className="mr-1 inline size-3" />
-              {t.admin.sales.searchLabel}
-            </span>
-            <input
-              type="search"
-              value={filters.search}
-              onChange={(e) =>
-                applyFilters({ ...filters, search: e.target.value })
-              }
-              placeholder={t.admin.sales.searchPlaceholder}
-              className="w-full rounded-lg border border-cocoa-200 bg-cream-100 px-3 py-2 text-sm focus:border-matcha-600 focus:outline-none"
-            />
-          </label>
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-cocoa-200 px-3 py-1.5 text-xs font-semibold text-cocoa-700 hover:bg-cocoa-100"
-          >
-            <RotateCcw className="size-3.5" />
-            {t.admin.sales.filterReset}
-          </button>
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={transactions.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-cocoa-800 px-3 py-1.5 text-xs font-bold text-cream-50 hover:bg-cocoa-900 disabled:opacity-40"
-          >
-            <Download className="size-3.5" />
-            {t.admin.sales.exportCsv}
-          </button>
-        </div>
-      </section>
-
-      {/* Transactions table */}
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-cocoa-700">
-            {t.admin.sales.tableHeader}
-          </h2>
-          <span className="text-xs text-cocoa-500">
-            {t.admin.sales.showingOf
-              .replace("{n}", String(transactions.length))
-              .replace("{total}", String(total))}
-          </span>
-        </div>
-
-        {pending && transactions.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-cocoa-400">
-            <Loader2 className="size-5 animate-spin" />
-          </div>
-        ) : transactions.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-cocoa-200 bg-cream-50 p-8 text-center text-sm text-cocoa-500">
-            {t.admin.sales.empty}
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-2xl border border-cocoa-200 bg-cream-50">
-            {/* Template lebar kolom ini dipakai header (baris di bawah ini)
-                DAN setiap baris data — harus selalu sama, kalau tidak kolom
-                tidak sejajar.
-
-                Kolom PELANGGAN & ITEM dulunya dua-duanya `1fr`, jadi di layar
-                lebar sisa ruang dibagi rata. Teks ITEM yang pendek
-                ("Cookies & Cream x1") menyisakan jarak kosong raksasa
-                sebelum kolom TOTAL — Steven: "jaraknya masih jauh bgt".
-                Sekarang ITEM dikunci maksimal 220px, sisa ruang diberikan ke
-                PELANGGAN, dan gap dikecilkan 4 -> 3. */}
-            <div className="hidden border-b border-cocoa-200 bg-cream-100/70 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-cocoa-500 lg:grid lg:grid-cols-[130px_140px_minmax(0,1fr)_minmax(0,220px)_110px_minmax(150px,auto)] lg:gap-3">
-              <div>{t.admin.sales.colDate}</div>
-              <div>{t.admin.sales.colCode}</div>
-              <div>{t.admin.sales.colCustomer}</div>
-              <div>{t.admin.sales.colItems}</div>
-              <div className="text-right">{t.admin.sales.colTotal}</div>
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                {t.admin.sales.colPayment}
-              </div>
-            </div>
-            <ul className="divide-y divide-cocoa-200">
-              {transactions.map((tr) => {
-                const isExpanded = expanded.has(tr.id);
-                return (
-                  <li key={tr.id} className="text-sm">
-                    <button
-                      type="button"
-                      onClick={() => toggleExpanded(tr.id)}
-                      className="grid w-full grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3.5 text-left transition hover:bg-cocoa-100/40 lg:grid-cols-[130px_140px_minmax(0,1fr)_minmax(0,220px)_110px_minmax(150px,auto)] lg:items-center lg:gap-3"
-                    >
-                      <div className="font-mono text-xs text-cocoa-500">
-                        {formatFullDateTime(tr.created_at, lang)}
-                      </div>
-                      <div className="font-mono text-xs font-bold text-cocoa-900">
-                        {tr.order_code}
-                      </div>
-                      <div className="truncate text-sm text-cocoa-800">
-                        {tr.customer_name}
-                      </div>
-                      <div className="text-xs text-cocoa-500 lg:truncate">
-                        {tr.items.length === 0
-                          ? "—"
-                          : tr.items
-                              .slice(0, 2)
-                              .map((i) => `${i.flavor_name} ×${i.quantity}`)
-                              .join(", ") +
-                            (tr.items.length > 2
-                              ? ` +${tr.items.length - 2}`
-                              : "")}
-                      </div>
-                      <div className="text-right font-bold text-cocoa-900">
-                        {formatIDR(tr.total_price, lang)}
-                      </div>
-                      <div className="flex items-center gap-2 whitespace-nowrap">
-                        <StatusBadge status={tr.status} label={statusLabel(tr.status, lang)} size="sm" />
-                        <span className="text-[10px] tracking-wider text-cocoa-500 uppercase">
-                          {paymentLabel(tr.payment_method, lang)}
-                        </span>
-                      </div>
-                    </button>
-                    {isExpanded ? (
-                      <div className="border-t border-cocoa-200/60 bg-cream-100/40 px-4 py-4 text-xs">
-                        <ul className="space-y-2">
-                          {tr.items.map((i, idx) => (
-                            <li
-                              key={idx}
-                              className="flex items-center justify-between gap-4"
-                            >
-                              <span className="text-cocoa-700">
-                                {i.flavor_name}{" "}
-                                <span className="text-cocoa-400">×{i.quantity}</span>
-                              </span>
-                              <span className="font-mono text-cocoa-500">
-                                {formatIDR(i.line_total, lang)}
-                              </span>
-                            </li>
-                          ))}
-                          <li className="flex items-center justify-between gap-4 border-t border-cocoa-200/70 pt-2 font-bold text-cocoa-900">
-                            <span>{t.admin.sales.itemSubtotal}</span>
-                            <span className="font-mono">
-                              {formatIDR(tr.subtotal, lang)}
-                            </span>
-                          </li>
-                          {tr.delivery_fee > 0 ? (
-                            <li className="flex items-center justify-between gap-4 text-cocoa-600">
-                              <span>{t.admin.sales.itemDelivery}</span>
-                              <span className="font-mono">
-                                {formatIDR(tr.delivery_fee, lang)}
-                              </span>
-                            </li>
-                          ) : null}
-                          {/* Baris TOTAL penutup.
-                              Sebelumnya panel detail berhenti di
-                              "Subtotal" (+ Ongkir kalau ada) tanpa
-                              menampilkan total akhir — jadi yang terlihat
-                              cuma "Subtotal Rp 18.000" padahal kolom TOTAL
-                              di kanan menulis Rp 18.000. Itu yang Steven laporkan
-                              sebagai "total bayar masih tidak pas".
-                              Sekarang subtotal + ongkir + total kelihatan
-                              lengkap dalam satu panel. */}
-                          <li className="flex items-center justify-between gap-4 border-t-2 border-cocoa-300 pt-2 text-sm font-extrabold text-cocoa-900">
-                            <span>{t.admin.sales.colTotal}</span>
-                            <span className="font-mono">
-                              {formatIDR(tr.total_price, lang)}
-                            </span>
-                          </li>
-                        </ul>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </section>
+      {/* Filter + daftar transaksi. Bentuk ringkas (14-10-2026, Steven:
+          "filter itu dibuat kecil aja di tempat daftar transaksi") —
+          implementasinya ada di SalesTransactionsSection. */}
+      <SalesTransactionsSection
+        transactions={transactions}
+        total={total}
+        filters={filters}
+        onChangeFilters={applyFilters}
+        onReset={resetFilters}
+        onExport={exportCsv}
+        loading={pending}
+      />
     </div>
   );
 }

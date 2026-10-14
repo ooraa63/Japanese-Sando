@@ -811,10 +811,6 @@ export const id: Dict = {
       // untuk batch itu.
       detail: {
         back: "Semua batch",
-        subtitle:
-          "Semua angka di halaman ini hanya untuk batch ini. Pembeli tetap tidak pernah melihat nama batch.",
-        scopeNote:
-          "Semua angka di bawah hanya untuk batch ini. Pembeli tetap tidak pernah melihat nama batch.",
         tabs: {
           stok: "Stok",
           pesanan: "Pesanan",
@@ -825,10 +821,8 @@ export const id: Dict = {
           title: "Stok & Bundle",
           subtitle:
             "Atur stok per jenis menu dan pilih paket yang ditawarkan di batch ini.",
-          colName: "Jenis menu",
           colInitial: "Stok awal",
           colSold: "Terjual",
-          colLeft: "Sisa",
           colInput: "Sisa (ubah di sini)",
           empty: "Belum ada jenis menu aktif.",
           initialHint:
@@ -844,6 +838,17 @@ export const id: Dict = {
             "Belum ada paket yang dipilih, jadi semua paket aktif boleh dibeli. Centang yang mau dibatasi kalau perlu.",
           bundlesPrice: "Harga batch",
           bundlesPriceHint: "Kosong = pakai harga bawaan",
+          rasaTitle: "Rasa yang tampil",
+          rasaCount: "{n} dipilih",
+          rasaAllHint: "semua tampil",
+          soldHere: "Dijual di batch ini",
+          soldOutHere: "Sisa habis",
+          outsideBatch: "Di luar batch ini",
+          hiddenFromBuyer: "Disembunyikan",
+          soldHereHint: "Ada sisa {n} pcs untuk pembeli di batch ini.",
+          soldOutHereHint: "Sudah habis di batch ini, pembeli hanya melihat tulisannya habis.",
+          outsideBatchHint: "Pakai stok global, bukan stok batch ini.",
+          hiddenFromBuyerHint: "Stok jenis menu ini 0, jadi disembunyikan dari pembeli.",
         },
         pesanan: {
           title: "Pesanan",
@@ -851,29 +856,12 @@ export const id: Dict = {
             "Pesanan yang masuk lewat tanggal pengambilan ini. Ubah statusnya langsung dari sini.",
           empty: "Belum ada pesanan di batch ini.",
           failed: "Pesanan gagal dimuat.",
-          colCode: "Kode",
-          colCustomer: "Pelanggan",
-          colItems: "Item",
-          colTotal: "Total",
-          colStatus: "Status",
-          colDate: "Tanggal",
-          accept: "Terima",
-          reject: "Tolak",
-          ready: "Siap diambil",
-          deliver: "Selesai",
         },
         pelanggan: {
           title: "Pelanggan",
           subtitle: "Orang yang sudah pernah pesan di batch ini.",
           empty: "Belum ada pelanggan di batch ini.",
           failed: "Pelanggan gagal dimuat.",
-          search: "Cari nama, telepon, email, IG…",
-          colName: "Nama",
-          colPhone: "Telepon",
-          colIg: "Instagram",
-          colOrders: "Pesanan",
-          colSpent: "Total",
-          colLast: "Pesanan terakhir",
         },
         mutasi: {
           title: "Mutasi Penjualan",
@@ -881,27 +869,11 @@ export const id: Dict = {
             "Pesanan yang sudah jadi pendapatan di batch ini, sama seperti halaman Mutasi di sidebar.",
           empty: "Belum ada mutasi di batch ini.",
           failed: "Mutasi gagal dimuat.",
-          search: "Kode, nama, telepon…",
-          colDate: "Tanggal",
-          colCode: "Kode",
-          colCustomer: "Pelanggan",
-          colItems: "Item",
-          colTotal: "Total",
         },
-        summary: {
-          terjual: "Ringkasan batch",
-          revenue: "Pendapatan",
-          revenueToday: "Pendapatan hari ini",
-          orders: "Pesanan",
-          pcs: "PCS terjual",
-          pending: "Menunggu",
-          selesai: "Diproses",
-          ditolak: "Dibatalkan",
-        },
+        // Dipakai di daftar batch (/admin/po) sebagai pintu ke halaman detail.
         viewDetail: "Lihat detail",
       },
     },
-
     nav: {
       dashboard: "Dashboard",
       orders: "Pesanan",

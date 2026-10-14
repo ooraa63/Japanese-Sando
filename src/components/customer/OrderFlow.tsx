@@ -471,10 +471,29 @@ export function OrderFlow({
       .map((b) => ({ ...b, price: priceById.get(b.id) ?? b.price }));
   }, [bundles, poBatch]);
 
-  // Semua rasa dikumpulkan dari kategori yang tampil.
+  // Rasa yang boleh dibeli di batch yang dipilih (migration-53).
+  //
+  // `poBatch.flavors === null` berarti Steven belum pernah menyaring rasa,
+  // jadi semua rasa aktif tetap tampil (mode lama, sama seperti bundle). Kalau
+  // sudah diset, HANYA rasa di daftar itu yang terlihat.
+  //
+  // Kategori yang filters-nya kosong DIHILANGKAN juga — kategori dengan nol rasa
+  // tidak akan menampilkan apa-apa dan cuma bikin pembeli bingung.
+  const batchFlavorAllowlist = poBatch?.flavors ?? null;
+  const visibleCategories = useMemo(() => {
+    if (batchFlavorAllowlist === null) return categories;
+    return categories
+      .map((c) => ({
+        ...c,
+        flavors: (c.flavors ?? []).filter((f) => batchFlavorAllowlist.has(f.id)),
+      }))
+      .filter((c) => (c.flavors?.length ?? 0) > 0);
+  }, [categories, batchFlavorAllowlist]);
+
+  // Semua rasa dikumpulkan dari kategori yang TAMPIL (setelah penyaringan).
   const flavors = useMemo(
-    () => categories.flatMap((c) => c.flavors ?? []),
-    [categories]
+    () => visibleCategories.flatMap((c) => c.flavors ?? []),
+    [visibleCategories]
   );
   const flavorById = useMemo(() => new Map(flavors.map((f) => [f.id, f])), [flavors]);
 
@@ -1308,12 +1327,14 @@ export function OrderFlow({
                 />
               </div>
 
-              {/* Rincian item: klik kategori dulu, lalu rasa-rasanya */}
-              {categories.length === 0 && bundles.length === 0 ? (
+              {/* Rincian item: klik kategori dulu, lalu rasa-rasanya.
+                  `visibleCategories` = kategori + rasa yang sudah disaring
+                  sesuai allowlist batch (migration-53). */}
+              {visibleCategories.length === 0 && visibleBundles.length === 0 ? (
                 <p className="card p-8 text-center text-cocoa-400 sm:p-10">{t.menu.empty}</p>
               ) : (
                 <OrderMenuBrowser
-                  categories={categories}
+                  categories={visibleCategories}
                   bundles={visibleBundles}
                   soldCounts={soldCounts}
                   stockOverride={poBatch?.stockByCategory ?? null}
@@ -1628,7 +1649,13 @@ export function OrderFlow({
           ) : null}
 
           {/* ============ LANGKAH 4: KONFIRMASI ============ */}
+          {/* Steven 14-10-2026 (gambar 7): "itu terlalu besar di desktop".
+              Tanpa batas lebar, kartu ini melar sampai ~1100px di monitor
+              admin/pembeli — baris "Nama / Telepon" jadi jauh dan harga
+              menyingkir ke tengah. Sekarang langkah konfirmasi dikunci
+              max-w-2xl supaya isinya terbaca seperti struk di kertas. */}
           {step === "review" ? (
+            <div className="mx-auto w-full max-w-2xl">
             <section className="card p-6 sm:p-8">
               <StepHeading
                 icon={<Check className="size-5" />}
@@ -1688,20 +1715,23 @@ export function OrderFlow({
                           </p>
                         ) : null}
                         {g.lines.map((l) => (
-                          <div key={l.flavor.id} className="flex justify-between gap-4">
-                            <span>
+                          <div
+                            key={l.flavor.id}
+                            className="flex items-baseline justify-between gap-4"
+                          >
+                            <span className="min-w-0">
                               {l.qty}× {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
                             </span>
-                            <span className="tabular text-cocoa-500">
+                            <span className="shrink-0 tabular text-cocoa-500">
                               {formatIDR(l.flavor.price * l.qty, lang)}
                             </span>
                           </div>
                         ))}
-                        <div className="flex justify-between gap-4 font-bold text-cocoa-800">
+                        <div className="flex items-baseline justify-between gap-4 font-bold text-cocoa-800">
                           <span>
                             {g.qty} {t.common.qty.toLowerCase()}
                           </span>
-                          <span className="tabular">{formatIDR(g.total, lang)}</span>
+                          <span className="shrink-0 tabular">{formatIDR(g.total, lang)}</span>
                         </div>
                       </li>
                     ))}
@@ -1731,40 +1761,37 @@ export function OrderFlow({
                 </ReviewRow>
               </div>
 
-              {/* Catatan */}
-              <div className="mt-6">
-                <label htmlFor="note" className="label">
-                  {t.common.notes}{" "}
-                  <span className="font-normal text-cocoa-400">({t.common.optional})</span>
-                </label>
-                <textarea
-                  id="note"
-                  rows={2}
-                  className="input resize-none"
-                  placeholder={t.common.note}
-                  value={draft.note}
-                  maxLength={500}
-                  onChange={(e) => updateDraft({ note: e.target.value })}
-                />
-              </div>
+              {/* ---------- Bill: subtotal + total bayar ---------- */}
+              {/* Steven 14-10-2026 (gambar 8): "sub total dan total bayar
+                  di atas, catatan di akhir, yang untuk terakhir ini buat jadi
+                  seperti bill bener" + "harga itu buat di agak ujung kanan".
 
-              {/* Ringkasan biaya */}
-              <div className="mt-6 rounded-2xl bg-cocoa-50 p-4">
-                <div className="flex justify-between text-sm text-cocoa-600">
-                  <span>{t.common.subtotal}</span>
-                  <span className="tabular">{formatIDR(subtotal, lang)}</span>
+                  Jadi: (1) blok biaya dipindah ke ATAS kolom catatan,
+                  (2) blok ini digambar seperti struk — garis putus-putus
+                  pemisah, semua nominal rata di kolom kanan, total ditebalkan,
+                  (3) field catatan turun ke paling akhir. */}
+              <div className="mt-6 rounded-2xl border border-cocoa-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex items-baseline justify-between gap-4 border-b border-dashed border-cocoa-300 pb-2">
+                  <span className="text-sm text-cocoa-600">{t.common.subtotal}</span>
+                  <span className="tabular text-sm font-semibold text-cocoa-800">
+                    {formatIDR(subtotal, lang)}
+                  </span>
                 </div>
 
                 {saving > 0 ? (
-                  <div className="mt-2 flex justify-between text-sm font-bold text-matcha-600">
-                    <span>{t.order.review.saving}</span>
-                    <span className="tabular">−{formatIDR(saving, lang)}</span>
+                  <div className="mt-2 flex items-baseline justify-between gap-4">
+                    <span className="text-sm font-bold text-matcha-600">
+                      {t.order.review.saving}
+                    </span>
+                    <span className="tabular text-sm font-bold text-matcha-600">
+                      −{formatIDR(saving, lang)}
+                    </span>
                   </div>
                 ) : null}
 
                 {draft.deliveryMethod === "delivery" ? (
                   <>
-                    <div className="mt-2 flex justify-between text-sm text-cocoa-600">
+                    <div className="mt-2 flex items-baseline justify-between gap-4 text-sm text-cocoa-600">
                       <span>{t.order.review.deliveryFee}</span>
                       <span className="tabular">
                         {deliveryFee === 0
@@ -1780,9 +1807,16 @@ export function OrderFlow({
                     />
                   </>
                 ) : null}
-                <div className="mt-3 flex justify-between border-t border-cocoa-200 pt-3 text-lg font-extrabold text-cocoa-900">
-                  <span>{t.order.review.totalLabel}</span>
-                  <span className="tabular">{formatIDR(total, lang)}</span>
+
+                {/* Baris total penutup — garis putus-putus + nominal besar,
+                    persis seperti bagian "TOTAL BAYAR" di struk. */}
+                <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-dashed border-cocoa-300 pt-3">
+                  <span className="text-base font-extrabold text-cocoa-900">
+                    {t.order.review.totalLabel}
+                  </span>
+                  <span className="font-display text-xl font-extrabold text-cocoa-900 tabular">
+                    {formatIDR(total, lang)}
+                  </span>
                 </div>
               </div>
 
@@ -1814,6 +1848,25 @@ export function OrderFlow({
                   </div>
                 </div>
               ) : null}
+
+              {/* ---------- Catatan (PALING AKHIR) ---------- */}
+              {/* Steven 14-10-2026: "catatan di akhir" — field ini sekarang
+                  jadi isian terakhir sebelum persetujuan + tombol kirim. */}
+              <div className="mt-6">
+                <label htmlFor="note" className="label">
+                  {t.common.notes}{" "}
+                  <span className="font-normal text-cocoa-400">({t.common.optional})</span>
+                </label>
+                <textarea
+                  id="note"
+                  rows={2}
+                  className="input resize-none"
+                  placeholder={t.common.note}
+                  value={draft.note}
+                  maxLength={500}
+                  onChange={(e) => updateDraft({ note: e.target.value })}
+                />
+              </div>
 
               <p className="mt-4 text-xs leading-relaxed text-cocoa-400">{t.order.review.consent}</p>
 
@@ -1847,6 +1900,7 @@ export function OrderFlow({
                 </button>
               </div>
             </section>
+            </div>
           ) : null}
         </div>
 
@@ -1947,7 +2001,7 @@ export function OrderFlow({
       </div>
 
       <CartDrawer
-        categories={categories}
+        categories={visibleCategories}
         open={cartOpen && step === "menu"}
         onClose={() => setCartOpen(false)}
         onContinue={handleNext}

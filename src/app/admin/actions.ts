@@ -1017,7 +1017,24 @@ export interface PoBatchDetail {
   bundles: PoBatchBundleRow[];
   /** True = belum pernah diset, semua bundle aktif boleh dipakai. */
   semua_bundle_aktif: boolean;
+  /**
+   * Semua rasa aktif + apakah ditampilkan di batch ini (migration-53).
+   * Steven mencentang rasa yang mau dimunculin di batch ini.
+   */
+  flavors: PoBatchFlavorRow[];
+  /** True = belum pernah diset, semua rasa aktif ditampilkan. */
+  semua_rasa_aktif: boolean;
   ringkasan: PoBatchDetailSummary;
+}
+
+/** Satu rasa yang bisa ditampilkan di batch (migration-53). */
+export interface PoBatchFlavorRow {
+  flavor_id: number;
+  nama: string;
+  category_id: number | null;
+  harga: number;
+  /** true = Steven mencentang rasa ini untuk batch ini. */
+  dipakai: boolean;
 }
 
 const EMPTY_DETAIL_SUMMARY: PoBatchDetailSummary = {
@@ -1063,6 +1080,8 @@ export async function getPoBatchDetailAction(
       stok: payload.stok ?? [],
       bundles: payload.bundles ?? [],
       semua_bundle_aktif: payload.semua_bundle_aktif ?? true,
+      flavors: payload.flavors ?? [],
+      semua_rasa_aktif: payload.semua_rasa_aktif ?? true,
       ringkasan: payload.ringkasan ?? EMPTY_DETAIL_SUMMARY,
     },
   };
@@ -1126,6 +1145,35 @@ export async function savePoBatchBundlesAction(
   const { error } = await supabase.rpc("admin_save_po_batch_bundles", {
     p_batch_id: batchId,
     p_bundles: payload,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/admin/po");
+  revalidatePath(`/admin/po/${batchId}`);
+  revalidatePath("/order");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/**
+ * Simpan daftar rasa yang ditampilkan di satu batch (migration-53).
+ *
+ * Array KOSONG berarti "semua rasa aktif boleh ditampilkan" (mode lama).
+ * Begitu Steven mencentang satu rasa, itu yang berlaku — pembeli hanya
+ * melihat rasa yang dicentang untuk batch tersebut.
+ */
+export async function savePoBatchFlavorsAction(
+  batchId: number,
+  flavors: number[]
+): Promise<ActionResult> {
+  const payload = flavors
+    .filter((id) => Number.isInteger(id) && id > 0)
+    .map((id) => ({ flavor_id: id, is_active: true }));
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_save_po_batch_flavors", {
+    p_batch_id: batchId,
+    p_flavors: payload,
   });
   if (error) return { ok: false, error: humanize(error.message) };
 

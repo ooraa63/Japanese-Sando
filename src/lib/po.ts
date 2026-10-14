@@ -44,6 +44,14 @@ export interface PoBatchStock {
    * tapi tidak ada satu pun yang aktif, jadi tidak ada paket yang bisa dibeli.
    */
   bundles: PoBatchBundle[] | null;
+  /**
+   * Rasa yang boleh dipesan di batch ini (migration-53).
+   *
+   * `null` = Steven belum pernah menyaring rasa, jadi semua rasa aktif tampil
+   * (mode lama). `[]` yang bukan null = Steven sudah menyaring tapi tidak ada
+   * satu pun yang aktif, jadi tidak ada rasa yang bisa dibeli.
+   */
+  flavors: Set<number> | null;
 }
 
 /**
@@ -98,6 +106,7 @@ export async function fetchBatchForDate(
       pickup_date?: string | null;
       stok?: Record<string, { sisa?: number | null }> | null;
       bundles?: Array<{ bundle_id?: number | null; price?: number | null }> | null;
+      flavors?: Array<number | null> | null;
     };
     if (payload.batch_id == null) return null;
 
@@ -117,11 +126,17 @@ export async function fetchBatchForDate(
             .filter((b) => Number.isInteger(b.bundleId) && b.bundleId > 0)
         : null;
 
+    // null dari RPC = belum pernah diset, semua rasa aktif tampil.
+    const flavors = Array.isArray(payload.flavors)
+      ? new Set(payload.flavors.map(Number).filter((id) => Number.isInteger(id) && id > 0))
+      : null;
+
     return {
       batchId: Number(payload.batch_id),
       pickupDate: String(payload.pickup_date ?? pickupDate).slice(0, 10),
       stockByCategory,
       bundles,
+      flavors,
     };
   } catch {
     return null;

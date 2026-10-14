@@ -4,6 +4,210 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 - Migration-53: pilih rasa mana yang tampil di satu batch PO
+
+**Permintaan Steven:** "untuk yang menu pastikan kita bisa set rasa itu rasa
+apa aja yang mau dimunculin pada batch po itu".
+
+**Masalah:** stok batch (migration-49) itu **per KATEGORI** — itu disengaja,
+karena stok dipakai buat produksi. Yang tidak ada adalah lapisan
+"tampilkan/sembunyikan rasa". Batch lama tidak bisa menyembunyikan satu rasa
+tanpa menyembunyikan seluruh kategorinya.
+
+### Semantik (sengaja sama dengan po_batch_bundles)
+
+| Baris di `po_batch_flavors` | Arti |
+|---|---|
+| Nol baris | Semua rasa aktif tampil (mode lama) |
+| Ada baris | HANYA rasa yang dipilih yang boleh dibeli |
+
+Batch yang dibuat sebelum migrasi ini punya nol baris, jadi **tidak ada produk
+yang tiba-tiba hilang**. Begitu Steven mencentang satu rasa, itu yang berlaku.
+
+### Database — `supabase/migration-53.sql` (SUDAH DI-APPLY)
+
+- Tabel baru `po_batch_flavors (batch_id, flavor_id, is_active, created_at)` +
+  2 index + RLS (tanpa policy SELECT untuk anon).
+- `admin_save_po_batch_flavors(bigint, jsonb)` — array kosong = kembali ke
+  mode "semua rasa". Menolak rasa yang sudah tidak aktif.
+- `admin_list_po_batch_detail` + key `flavors` (semua rasa aktif + flag
+  `dipakai`) dan `semua_rasa_aktif`.
+- `public_po_batch_for_date` + key `flavors` (array id, `null` = semua).
+- `create_order` menolak rasa tersembunyi di **DUA titik**: item satuan **dan**
+  slot bundle — kalau cuma item yang dicek, pembeli bisa menembus lewat paket.
+
+### Dua jebakan yang memakan waktu (penting!)
+
+1. **`pg_get_functiondef` mengembalikan definisi yang acak kalau ada overload.**
+   Gotcha lama masih berlaku. `scripts/verify-overloads.js` dipakai dulu untuk
+   memastikan tidak ada overload sebelum patch — sekarang sudah bersih
+   (migration-52 yang membuangnya).
+2. **`create or replace` gagal dengan `42P13 cannot remove parameter defaults
+   from existing function`** kalau default parameter tidak ditulis ulang.
+   Solusinya: tulis ulang signature lengkap dengan `DEFAULT ...` seperti
+   migration-52, bukan cuma nama + tipe dari dump.
+3. **Fungsi hasil `pg_get_functiondef` ada yang perlu patch di tengah-tengah.**
+   `admin_list_po_batch_detail` punya `ringkasan` sebagai objek NESTED, jadi
+   menyisipkan key baru sebelum `) into v_result;` akan menaruh kuncinya
+   DI LUAR `jsonb_build_object` → syntax error. Anchor yang benar: sebelum
+   `'ringkasan', jsonb_build_object(`.
+4. **`node scripts/dump-fn.js X > file` lewat PowerShell menulis UTF-16.**
+   Pakai `cmd /c "node ... > file"` supaya byte apa adanya.
+
+### Kode
+
+- `lib/po.ts` — `PoBatchStock.flavors: Set<number> | null` + parsing key baru.
+- `OrderFlow.tsx` — `visibleCategories` menyaring rasa per allowlist; dipakai
+  untuk `OrderMenuBrowser` DAN `CartDrawer`. `flavors`/`cartLines` otomatis
+  aman karena diturunkan dari daftar yang sudah disaring, jadi rasa yang baru
+  disembunyikan **langsung hilang dari keranjang**.
+- `admin/actions.ts` — `savePoBatchFlavorsAction` + tipe `PoBatchFlavorRow`.
+- `PoBatchDetailClient.tsx` — chip rasa jadi checkbox; badge "semua tampil" vs
+  "{n} dipilih"; ikut tersimpan bareng stok & bundle di tombol Simpan yang sama.
+
+### Verifikasi
+
+`npx tsc --noEmit` bersih · `npx eslint src --max-warnings=0` bersih ·
+`npm run build` sukses.
+
+`node scripts/test-batch-flavors.mjs` — **11 OK, 0 GAGAL** (butuh
+`ADMIN_EMAIL` + `ADMIN_PASSWORD` di `.env.local`; variabelnya
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, bukan `ANON_KEY`):
+
+```
+OK  detail batch mengirim key flavors
+OK  admin_save_po_batch_flavors berhasil
+OK  hanya rasa yang dipilih yang ditandai dipakai [1]
+OK  RPC publik hanya mengirim rasa yang diizinkan [1]
+OK  create_order MENOLAK rasa tersembunyi -> 22023 flavor_unavailable
+OK  create_order MENERIMA rasa yang diizinkan -> RK-261014-041
+OK  allowlist uji dibersihkan di semua batch
+```
+
+Skrip cleans up sendiri: allowlist dikosongkan, stok dikembalikan, order uji
+dihapus. Dicek ulang: 0 baris allowlist, 0 order uji, total stok batch 0.
+
+**Gotcha tes:** `public_po_batch_for_date` memilih batch dengan **sisa stok
+terkecil**. Kalau cuma satu batch yang diset, RPC bisa memilih batch lain dan
+tesnya salah sasaran — harus apply ke SEMUA batch aktif.
+
+---
+
+## 2026-10-14 - "Perubahan tidak muncul": dev server mati, bukan kode salah
+
+**Gejala:** Steven kirim `Eror 1/2/3` (11:15-11:16) yang masih menunjuk tampilan
+LAMA — nav kolom-kiri, kartu header, dan "Ringkasan batch" yang sudah dihapus.
+
+**Penyebab sebenarnya:** tidak ada Next.js server yang jalan sama sekali saat
+screenshot diambil (port 3000 kosong, nol proses `node`). Chrome Steven started
+10:17 — SEBELUM kode ditulis (10:40-10:52) — jadi tab-nya masih memegang DOM lama
+yang tidak pernah di-refresh, lalu difoto. SemuaScreenshot itu basi, bukan
+regresi.
+
+**Kenapa build hijau tidakantee apa pun:** `tsc`/`eslint`/`build` hanya
+membuktikan kode benar, bukan bahwa ada proses yang menyajikan kode itu.
+
+### Yang diperbaiki sekalian (2 dari3 poin Steven memang sah)
+
+- **Header dikecilkan lagi.** Satu baris tanpa padding, font 12-13px, tinggi
+  ~24px. Tombol tab dinaikkan ke `py-3 text-[15px]` supaya sub-menu bar jadi
+  fokus utama halaman.
+- **Tab Stok sekarang "Menu & Stok".** Steven (EROR 2): "belum ada perubahan,
+  lihat masih tidak ada seperti konssep yang menu & stock sebelumnya yang di
+  Menu bar utama". Tabel angka (JENIS MENU / STOK AWAL / TERJUAL / SISA) DAN
+  pratinjau menu terpisah DIGABUNG jadi satu panel kartu per kategori —
+  meniru grid kategori `/admin/menu`: gambar, jumlah rasa, badge status
+  visibility, chip rasa, dan input stok di kaki kartu. `MenuPreview` dihapus,
+  digantikan `MenuStockCard`. Label `colName`/`colLeft`/`menuTitle`/
+  `menuSubtitle`/`menuEmpty`/`pcsLeft`/`noStock` dihapus dari kamus karena
+  sudah tidak dipakai.
+
+### Gotcha baru (nomor berikutnya)
+
+**Screenshot "tidak berubah" hampir selalu berarti tidak ada yang menyajikan
+kode baru — cek proses SEBELUM membaca kodenya lagi.** Urutan yang benar:
+
+1. `Get-NetTCPConnection -LocalPort 3000 -State Listen` — kosong? tidak ada
+   server, apa pun isi `.next`.
+2. `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` — StartTime proses
+   browser bisa jauh lebih tua dari file yang diedit.
+3. Baru setelah yakin server hidup, barleyt koding ulang.
+
+Melihat kode yang "benar" berulang kali wastes satu turn penuh kalau
+penyebabnya proses yang mati. Hubungkan juga gotcha #55 (proses `node` lama
+duduk di port 3000 dengan build basi).
+
+**Verifikasi:**
+- `npx tsc --noEmit` bersih · `npx eslint src --max-warnings=0` bersih.
+- `npm run dev` dijalankan ulang; `GET http://localhost:3000/admin/login` → 200.
+- Catatan: `/admin/po/1` tanpa sesi admin akan balas halaman login (title
+  "Seller sign in"), jadi verifikasi markup detail batch butuh login dulu.
+
+---
+
+## 2026-10-14 - Tab batch disamakan dengan sidebar + "Ringkasan batch" dihapus
+
+**Permintaan Steven (14-10-2026, 8 poin dari `D:\Gambar eror\Gambar 1-8.png`):**
+hapus tulisan atas di halaman detail batch, pratinjau menu per batch, tab
+Pesanan/Pelanggan/Mutasi harus sama dengan halaman sidebar, hapus Ringkasan
+batch, filter Mutasi jadi ringkas, langkah konfirmasi pembeli jangan terlalu
+lebar, dan bill (subtotal/total di atas, catatan di akhir, harga di ujung kanan).
+
+### Komponen bersama baru (`src/components/admin/shared/`)
+
+Tiap tab batch tadinya menulis ulang tabel sendiri yang jauh lebih sulit dibaca
+(text 11px, tombol ikon tanpa label). Sekarang penampilannya DIEKSTRAK dan
+dipakai dua tempat, jadi tidak bisa lagi melenceng:
+
+| File | Dipakai oleh |
+|---|---|
+| `shared/OrderCards.tsx` | `/admin/orders` + tab Pesanan di `/admin/po/[id]` |
+| `shared/CustomerTable.tsx` | `/admin/customers` + tab Pelanggan |
+| `shared/SalesTransactions.tsx` | `/admin/sales` + tab Mutasi |
+
+`OrderDetailModal` (modal detail pesanan + simpan catatan admin) ikut
+dipindahkan ke `shared/OrderCards.tsx` dengan state internal.
+
+### Mengubah
+
+- `PoBatchDetailClient.tsx` — kartu header (tanggal buka/tutup, badge, catatan
+  ruang lingkup) dihapus; sisa baris link kembali + nama batch + status +
+  tanggal ambil, semuanya satu baris. Nav Stok/Pesanan/Pelanggan/Mutasi jadi
+  BARIS PENUH (4 tombol `flex-1`) tanpa grid `lg:grid-cols-[210px_...]`.
+  Blok "Ringkasan batch" dihapus dari semua tab.
+- `PoBatchDetailClient.tsx` — `MenuPreview` baru di tab Stok: pratinjau
+  READ-ONLY kategori + rasa yang benar-benar dilihat pembeli, dengan badge
+  `Dijual di batch ini` / `Sisa habis` / `Di luar batch ini` / `Disembunyikan`.
+  Aturannya dibalik dari `stockByCategory` di `OrderFlow` (batch pakai sisa
+  batch, kategori tanpa baris batch pakai `stock_enabled` + `stock` global).
+- `po/[id]/page.tsx` — ambil `getPublicMenu()` dan kirim `menu` ke client
+  untuk pratinjau di atas. Tidak ada migration baru.
+- `SalesTransactions.tsx` — filter dipindah dari kartu besar terpisah jadi
+  tombol kecil + baris input ringkas di KEPALA "Daftar transaksi". Teks kecil
+  diperbesar: header kolom `text-[11px]` -> `text-xs`, tanggal/kode `text-xs`
+  -> `text-[13px]`, nama pembayaran `text-[10px]` -> `text-[12px]`.
+- `OrderFlow.tsx` — langkah "Konfirmasi" dibungkus `max-w-2xl` (sebelumnya
+  melar ~1100px di desktop). Blok subtotal/total dipindah ke ATAS kolom catatan
+  dan digambar seperti struk (garis putus-putus, nominal rata kanan, total
+  ditebalkan); field Catatan turun ke isian terakhir sebelum persetujuan.
+- `i18n/id.ts`, `i18n/en.ts` — blok `admin.po.detail` dirapikan: `subtitle`,
+  `scopeNote`, `summary.*`, dan label kolom yang tidak lagi dipakai dihapus;
+  label pratinjau menu baru ditambahkan. `viewDetail` DIPERTAHANKAN karena
+  masih dipakai daftar batch di `/admin/po`.
+
+### Catatan
+
+- Tidak ada perubahan skema database, jadi tidak ada migration baru.
+- `getPublicMenu()` memakai `cache()` dari React, jadi pemanggilan di
+  `po/[id]/page.tsx` tidak menambah query kalau sudah dipanggil di halaman lain.
+
+**Verifikasi:**
+- `npx tsc --noEmit` — bersih.
+- `npx eslint src --max-warnings=0` — bersih.
+- `npm run build` — lihat entri bila ada kegagalan.
+
+---
+
 ## 2026-10-14 - Detail batch jadi halaman penuh + batch punya bundle sendiri
 
 **Permintaan Steven (14-10-2026):** tunjuk `EROR1.png` (halaman lama: kotak nav

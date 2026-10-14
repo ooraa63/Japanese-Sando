@@ -8,6 +8,7 @@ import {
   listPoBatchesAction,
 } from "@/app/admin/actions";
 import { PoBatchDetailClient } from "@/components/admin/PoBatchDetailClient";
+import { getPublicMenu } from "@/lib/data";
 import { getI18nDict } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export default async function AdminPoBatchDetailPage({
   const batchId = Number.parseInt(id, 10);
   if (!Number.isInteger(batchId) || batchId <= 0) notFound();
 
-  const [detailRes, dicts, ordersRes, mutasiRes, customersRes, poRes] =
+  const [detailRes, dicts, ordersRes, mutasiRes, customersRes, poRes, menuRes] =
     await Promise.all([
       getPoBatchDetailAction(batchId),
       getI18nDict(),
@@ -52,6 +53,10 @@ export default async function AdminPoBatchDetailPage({
       // menu yang belum pernah ada di batch ini. `admin_list_po_batch_detail`
       // hanya mengembalikan kategori yang sudah punya stok / sudah terjual.
       listPoBatchesAction(),
+      // Menu publik dipakai untuk PRATINJAU di tab Stok: kategori + rasa yang
+      // benar-benar dilihat pembeli, supaya Steven bisa lihat mana yang
+      // dijual di batch ini dan mana yang disembunyikan.
+      getPublicMenu(),
     ]);
 
   // Batch hilang (dihapus admin) -> 404, bukan halaman kosong yang menyesatkan.
@@ -65,6 +70,7 @@ export default async function AdminPoBatchDetailPage({
           ? poRes.data.kategori.map((k) => ({ id: k.id, name: k.nama }))
           : []
       }
+      menu={menuRes.categories}
       orders={ordersRes.ok ? (ordersRes.data?.orders ?? []) : []}
       ordersFailed={!ordersRes.ok}
       mutasi={
