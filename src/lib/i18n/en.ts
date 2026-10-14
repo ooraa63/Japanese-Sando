@@ -27,6 +27,10 @@ export const en = {
     total: "Total",
     subtotal: "Subtotal",
     qty: "Qty",
+    // Counter noun for cart item count. Indonesian does not inflect after a
+    // number, so the plural form stays "item"; English needs "items".
+    itemOne: "item",
+    itemMany: "items",
     price: "Price",
     notes: "Notes",
     note: "Note",

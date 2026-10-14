@@ -4,6 +4,82 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Bar keranjang kembali di bawah + tombol WA turun ke pojok
+
+Steven 14-10-2026, dari screenshot `Eror 1.png`: *"itu keranjangnya kok hilang di
+bagian PO ... yang ada dibawah itu yang kita klik itu nanti untuk lanjut"* dan
+*"untuk fitur WA itu terlalu tinggi buat di kanan bawah"* — di screenshot itu
+tombol WA jelas menimpa kartu produk.
+
+**Dua sebab, keduanya struktural:**
+
+1. **Bar keranjang memang dihapus** di commit `ac8508c` ("8 perbaikan dari
+   screenshot", atas permintaan Steven sendiri: *"keranjangnya dihilangkan aja,
+   karena terlalu bawah juga orang gaChamp"*). Yang ikut hilang: sticky bar
+   bawah, panel `<aside>`, dan `CartDrawer.tsx`. Drawer tidak dihidupkan
+   lagi — isinya cuma informasi yang sudah ada di kartu Flavor, dan tidak ada
+   tombol "Lanjut" di dalam drawer itu. Yang dikembalikan justru **bar-nya**
+   sebagai tombol lanjut.
+
+   Efek samping yang tidak disangka: bar itu adalah tempat tombol "Lanjut"
+   berada. Kalau drawer dihapus tanpa pamit, pembeli harus menggulir ke ujung
+   daftar untuk advancing.
+
+2. **Offset tombol WA cocok untuk halaman yang salah.** `bottom-[84px]` itu
+   disetel untuk melewati `MobileBottomNav` (fixed, 68px, `md:hidden`). Tapi
+   `MobileBottomNav` menyembunyikan diri di `/order` — jadi di halaman PO tidak
+   ada bar yang perlu dilompati, dan tombolnya melayang 84px di atas dasar
+   layar, tepat di atas kartu produk.
+
+   Ironisnya komentar `MobileBottomNav` masih menyebut alasannya: nav disembunyikan
+   "karena alur pemesanan punya sticky bar keranjang sendiri". Bar itu sudah
+   dihapus di commit yang sama, jadi alasannya sudah tidak berlaku.
+
+**Yang diubah:**
+
+- `src/components/customer/OrderFlow.tsx` — `CartStickyBar` dikembalikan:
+  `fixed inset-x-0 bottom-0 z-30`, `md:hidden`. Isinya tombol lanjut
+  (`handleNext`) yang menampilkan jumlah item + subtotal, dan link WhatsApp
+  di sisi kanannya. Keranjang kosong = tombol disabled dengan teks
+  "keranjang masih kosong".
+- `StepNav` — `onNext` jadi opsional + prop `hideNextBelowMd`, supaya di HP
+  tidak ada dua tombol "Lanjut" di layar sama (bar bawah + StepNav).
+- `src/components/customer/WhatsAppLink.tsx` — BARU. Satu `<a>` untuk link
+  `wa.me`, dipakai di tiga tempat.
+- `src/components/customer/WhatsAppFab.tsx` — sekarang disembunyikan di
+  `/order`, karena WA dirender sendiri oleh `OrderFlow`.
+- `src/lib/i18n/{id,en}.ts` — `common.itemOne` / `itemMany`. Sebelumnya label
+  jumlah pakai `common.qty` yang isinya "Jumlah", jadi terbaca "1 Jumlah".
+
+**Kenapa WA masuk ke dalam bar, bukan tetap mengambang:** bar itu
+`inset-x-0`, jadi occupies seluruh lebar dasar layar. Tombol mengambang di sana
+pasti menimpanya. "Kanan bawah" yang tidak menutupi apa pun = sisi kanan bar.
+Strukturnya pembungkus `<div>` dengan dua saudara (`<button>` + `<a>`), bukan
+`<a>` di dalam `<button>` — HTML tidak valid begitu.
+
+**Penting — panel `early return` ikut dapat WA.** `closed` dan `noBatch`
+(migration-56) adalah `early return` di atas seluruh isi. Kalau `WhatsAppFab`
+disembunyikan di `/order` tanpa menambahkan WA di kedua panel itu, pembeli
+kehilangan akses chat justru di saat toko tutup — kondisi paling butuh bantuan.
+
+**Verifikasi (browser, viewport 639px = HP):**
+- Langkah Tanggal Ambil: WA mengambang `bottom-4`, tepi bawah 16px dari dasar
+  layar.
+- Langkah Pilih Rasa: bar bawah tampil — ikon `lucide-shopping-bag`, "1 item",
+  "Lanjut", "Rp 18.000", panah, dan WA hijau di kanannya. Tombol bar diklik →
+  **advance ke 04/05 Pembayaran** (berfungsi).
+- Langkah Pembayaran: WA kembali mengambang di pojok, bar keranjang ikut
+  hilang (memang hanya ada di langkah menu).
+- Console: 0 error, 0 warn. `tsc` bersih, `eslint --max-warnings=0` bersih,
+  `npm run build` sukses.
+
+**BONUS:** Steven membuka batch test (id 13, label "Tes", pickup 16 Oktober,
+sisa 30) saat sesi ini berjalan — jadi alur "batch sedang dibuka" yang tadinya
+ditandai belum pernah diuji **akhirnya ikut terverifikasi**: Tanggal Ambil →
+Data Kamu → Pilih Rasa → Pembayaran berjalan normal.
+
+---
+
 ## 2026-10-14 — Tidak ada batch PO = tidak ada pesanan
 
 Steven 14-10-2026, dari produksi: *"tidak ada batch po sama sekali tapi kenapa di

@@ -35,6 +35,7 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
+import { WhatsAppLink } from "@/components/customer/WhatsAppLink";
 import { AddressPicker } from "@/components/customer/AddressPicker";
 import { QrisPaymentModal } from "@/components/customer/QrisPaymentModal";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
@@ -1048,9 +1049,16 @@ export function OrderFlow({
         </div>
         <h1 className="mt-5 text-2xl font-bold text-cocoa-900">{t.order.closed.title}</h1>
         <p className="mt-3 text-sm font-semibold text-cocoa-500">{t.order.closed.desc}</p>
-        <Link href="/" className="btn-primary mt-6">
-          {t.success.home}
-        </Link>
+        <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <Link href="/" className="btn-primary">
+            {t.success.home}
+          </Link>
+          {/* Panel ini `early return`, jadi tombol WA harus ikut di sini —
+              `WhatsAppFab` menyembunyikan dirinya di `/order` (dipakai
+              `CartStickyBar` di langkah menu). Tanpa ini pembeli tidak punya
+              jalan chat sama sekali saat toko tutup. */}
+          {settings.whatsapp?.trim() ? <WhatsAppLink whatsapp={settings.whatsapp} compact /> : null}
+        </div>
       </div>
     );
   }
@@ -1075,9 +1083,14 @@ export function OrderFlow({
         </div>
         <h1 className="mt-5 text-2xl font-bold text-cocoa-900">{t.order.noBatch.title}</h1>
         <p className="mt-3 text-sm font-semibold text-cocoa-500">{t.order.noBatch.desc}</p>
-        <Link href="/" className="btn-primary mt-6">
-          {t.success.home}
-        </Link>
+        <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <Link href="/" className="btn-primary">
+            {t.success.home}
+          </Link>
+          {/* Sama seperti panel `closed` di atas: ini `early return`, jadi WA
+              harus ikut dirender — `WhatsAppFab` tidak muncul di `/order`. */}
+          {settings.whatsapp?.trim() ? <WhatsAppLink whatsapp={settings.whatsapp} compact /> : null}
+        </div>
       </div>
     );
   }
@@ -1419,8 +1432,17 @@ export function OrderFlow({
                punya cara advance ke pembayaran. Jadi di bawah ini StepNav
                dikembalikan ke langkah menu, dengan tombol Lanjut yang
                disabled saat keranjang masih kosong — supaya tidak ada jalan
-               buntu. */
-            <section>
+               buntu.
+
+               Steven 14-10-2026 (screenshot `Eror 1.png`), koreksi: yang hilang
+               bukan drawernya, tapi BAR BAWAH-nya — "yang ada di bawah itu yang
+               kita klik itu nanti untuk lanjut". Makanya drawer TIDAK dihidupkan
+               lagi (ia cuma informasi yang sudah ada di kartu Flavor), tapi
+               `CartStickyBar` dikembalikan sebagai tombol lanjut yang selalu
+               terlihat di bawah layar. Di desktop nav bawah tidak ada
+               (`md:hidden`), jadi bar disembunyikan di sana dan StepNav tetap
+               menyediakan "Lanjut" seperti sebelumnya. */
+            <section className="pb-24 md:pb-0">
               <div className="card mb-6 p-6 sm:p-8">
                 <StepHeading
                   icon={<ShoppingBag className="size-5" />}
@@ -1443,22 +1465,33 @@ export function OrderFlow({
                 />
               )}
 
-              {/* Ganti sticky bottom cart bar + drawer jadi navigasi langkah biasa.
+              {/* Bar bawah keranjang (mobile) = tombol lanjut + WA di kanan.
+                  Di desktop bar ini `md:hidden`, jadi "Lanjut" tetap ada di
+                  StepNav agar tidak ada langkah tanpa jalan keluar. */}
+              <CartStickyBar
+                totalItems={totalItems}
+                subtotal={subtotal}
+                nextLabel={t.common.next}
+                emptyLabel={t.order.menu.cartEmpty}
+                whatsapp={settings.whatsapp}
+                onNext={handleNext}
+              />
 
-                 -"Lanjut" dulu hidup di dalam drawer keranjang; karena
-                  drawer dihapus (Steven 14-10-2026), tombolnya dikembalikan
-                  ke alur langkah biasa. Disabled kalau keranjang masih kosong
-                  supaya pembeli tidak bisa advance tanpa memilih rasa. */}
               {/* Langkah SEBELUM "menu" diambil dari daftar langkah yang aktif
                   (prevStep), bukan ditulis manual: untuk profil lengkap +
-                  batch PO sebelumnya "date", untuk tamu "identity", dan kalau
-                  tidak ada PO tidak ada tombol back. */}
+                  batch PO sebelumnya "date", untuk tamu "identity".
+
+                  `hideNextBelowMd`: di HP tombol lanjut-nya sudah ada di
+                  CartStickyBar, jadi yang di sini disembunyikan agar tidak
+                  dobel. Di desktop CartStickyBar `md:hidden`, jadi "Lanjut"
+                  tetap muncul dari StepNav. */}
               <StepNav
                 onBack={prevStep ? () => goTo(prevStep) : null}
                 onNext={handleNext}
                 nextLabel={t.common.next}
                 nextIcon={<ArrowRight className="size-4" />}
                 disabled={totalItems === 0}
+                hideNextBelowMd
               />
             </section>
           ) : null}
@@ -2016,6 +2049,21 @@ export function OrderFlow({
 
       </div>
 
+      {/* Tombol WhatsApp untuk langkah yang TIDAK punya bar keranjang
+          (tanggal, identitas, pembayaran, konfirmasi). Di langkah "Pilih
+          Rasa" tombolnya sudah ada di dalam `CartStickyBar` — dua-duanya
+          tidak dirender sekaligus supaya tidak ada dua link WA yang sama
+          di layar.
+
+          `bottom-4` aman di sini karena `MobileBottomNav` menyembunyikan
+          dirinya di `/order` dan bar keranjang hanya ada di langkah menu. */}
+      {step !== "menu" && settings.whatsapp?.trim() ? (
+        <WhatsAppLink
+          whatsapp={settings.whatsapp}
+          compact
+          className="fixed right-4 bottom-4 z-40 grid size-14 place-items-center rounded-2xl bg-[#25D366] text-white shadow-lg shadow-black/25 transition hover:bg-[#1EBE5A] active:scale-95 md:right-6 md:bottom-6"
+        />
+      ) : null}
 
       <LocationPopup
         zone={locationPopup}
@@ -2274,12 +2322,22 @@ function StepNav({
   nextLabel,
   nextIcon,
   disabled,
+  hideNextBelowMd,
 }: {
   onBack: (() => void) | null;
-  onNext: () => void;
-  nextLabel: string;
+  /**
+   * Migration-57: boleh dikosongkan. Di langkah "Pilih Rasa" tombol lanjut
+   * pindah ke `CartStickyBar` di bawah layar (Steven 14-10-2026: "yang ada
+   * dibawah itu yang kita klik itu nanti untuk lanjut"), jadi bar ini hanya
+   * menyediakan tombol "Kembali".
+   */
+  onNext?: () => void;
+  nextLabel?: string;
   nextIcon?: React.ReactNode;
   disabled?: boolean;
+  /** Sembunyikan tombol lanjut di HP — dipakai langkah menu yang sudah punya
+   *  `CartStickyBar`, supaya tidak ada dua tombol "Lanjut" di layar sama. */
+  hideNextBelowMd?: boolean;
 }) {
   const { t } = useI18n();
   return (
@@ -2292,10 +2350,103 @@ function StepNav({
       ) : (
         <span />
       )}
-      <button type="button" onClick={onNext} disabled={disabled} className="btn-primary sm:min-w-44">
-        {nextLabel}
-        {nextIcon}
-      </button>
+      {onNext ? (
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={disabled}
+          className={`btn-primary sm:min-w-44${hideNextBelowMd ? " hidden md:inline-flex" : ""}`}
+        >
+          {nextLabel}
+          {nextIcon}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Sticky bar keranjang di bawah layar — selalu terlihat, tidak ikut ter-scroll.
+ *
+ * Steven 14-10-2026 (screenshot `Eror 1.png`): *"itu keranjangnya kok hilang di
+ * bagian PO ... yang ada di bawah itu yang kita klik itu nanti untuk lanjut"*.
+ * Bar seperti ini pernah ada lalu dihapus di commit `ac8508c`, dan saat itu
+ * tombol "Lanjut" dipindah ke StepNav di akhir daftar — yang memaksa pembeli
+ * menggulir sampai bawah halaman untuk lanjut.
+ *
+ * Yang dikembalikan di sini BUKAN drawer (CartDrawer sudah dihapus, tidak
+ * ada gunanya menghidupkan lagi 350 baris hanya untuk melihat isi keranjang —
+ * kartu Flavor sudah menampilkan jumlahnya sendiri). Bar ini langsung
+ * menjalankan "lanjut" ke langkah pembayaran.
+ *
+ * Struktur: pembungkus `<div>` berisi DUA saudara — tombol lanjut (`flex-1`)
+ * dan link WhatsApp. Bukan `<button>` yang membungkus `<a>`, karena HTML
+ * tidak valid punya link di dalam tombol.
+ *
+ * Tombol WhatsApp ikut masuk ke sini (bukan mengambang): bar ini menempati
+ * dasar layar, jadi tombol mengambang di sana pasti menimpanya. Steven minta
+ * WA "di kanan bawah", dan di dalam bar ini itu posisi paling kanan yang
+ * tidak menutupi apa pun.
+ *
+ * `z-30` dengan sengaja: di bawah nav bawah (z-40) dan di bawah modal (z-50).
+ * Bar ini hanya muncul di langkah "Pilih Rasa".
+ */
+function CartStickyBar({
+  totalItems,
+  subtotal,
+  nextLabel,
+  emptyLabel,
+  whatsapp,
+  onNext,
+}: {
+  totalItems: number;
+  subtotal: number;
+  nextLabel: string;
+  emptyLabel: string;
+  whatsapp: string | null;
+  onNext: () => void;
+}) {
+  const { t, lang } = useI18n();
+  const ada = totalItems > 0;
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-cocoa-200 bg-cream-50/95 px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] backdrop-blur md:hidden">
+      <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!ada}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-cocoa-800 px-4 py-3 text-left text-cream-50 shadow-lg transition enabled:hover:bg-cocoa-900 enabled:active:scale-[0.99] disabled:opacity-55"
+        >
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-matcha-500">
+            <ShoppingBag className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base leading-tight font-extrabold tabular">
+              {ada
+                ? `${totalItems} ${totalItems === 1 ? t.common.itemOne : t.common.itemMany}`
+                : emptyLabel}
+            </span>
+            {ada ? (
+              <span className="mt-0.5 block truncate text-[12px] font-semibold text-cream-200">
+                {nextLabel}
+              </span>
+            ) : null}
+          </span>
+          {ada ? (
+            <>
+              <span className="shrink-0 text-base leading-none font-extrabold tabular">
+                {formatIDR(subtotal, lang)}
+              </span>
+              <ArrowRight className="size-5 shrink-0 text-cream-200" />
+            </>
+          ) : null}
+        </button>
+
+        {whatsapp && whatsapp.trim() ? (
+          <WhatsAppLink whatsapp={whatsapp} compact />
+        ) : null}
+      </div>
     </div>
   );
 }

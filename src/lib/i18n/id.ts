@@ -25,6 +25,10 @@ export const id: Dict = {
     total: "Total",
     subtotal: "Subtotal",
     qty: "Jumlah",
+    // Kata benda pencacah untuk jumlah item di keranjang. Bahasa Indonesia
+    // tidak melakukan jamak setelah angka, jadi bentuk jamak tetap "item".
+    itemOne: "item",
+    itemMany: "item",
     price: "Harga",
     notes: "Catatan",
     note: "Catatan",
