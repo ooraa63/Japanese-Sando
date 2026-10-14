@@ -126,7 +126,9 @@ export function FlavorCard({
 }) {
   const { t, lang } = useI18n();
   const name = lang === "en" ? flavor.name_en : flavor.name_id;
-  const desc = lang === "en" ? flavor.desc_en : flavor.desc_id;
+  // Steven 14-10-2026: `desc_id` / `desc_en` tidak lagi dirender di kartu
+  // rasa. Kolomnya tetap dipakai untuk PENCARIAN (lihat MenuBrowser.tsx),
+  // jadi data di database tidak hilang.
   const stockEnabled = remainingStock !== null && remainingStock !== undefined;
   const left = stockEnabled ? remainingStock : 0;
   // `is_active` bisa undefined kalau objek rasa datang dari public_menu()
@@ -226,9 +228,8 @@ export function FlavorCard({
           <h3 className="font-display text-sm leading-tight font-bold text-cocoa-900">
             {name}
           </h3>
-          <p className="mt-1 line-clamp-2 min-h-[2.4em] text-[11px] leading-snug text-cocoa-500">
-            {desc ?? " "}
-          </p>
+          {/* Steven 14-10-2026: deskripsi rasa dihapus juga di varian kartu
+              ringkas ini, sama seperti di kartu besar. */}
 
           {/* Baris info: jumlah like + jumlah terjual + sisa stok.
               Permintaan Steven (11-10-2026). Semuanya read-only di sini:
@@ -582,11 +583,18 @@ export function FlavorCard({
           ) : null}
         </div>
 
-        {!compact ? (
-          <p className="flavor-desc mt-1.5 line-clamp-3 min-h-[3.6em] text-[13px] leading-relaxed text-cocoa-500">
-            {desc ?? " "}
-          </p>
-        ) : null}
+        {/* Steven 14-10-2026: "untuk description setiap menu (rasa) itu
+            dihilangkan aja, ga perlu ada description".
+
+            Deskripsi rasa DIHAPUS dari kartu. Efek sampingnya: kartu jadi
+            jauh lebih pendek dan `min-h-[3.6em]` yang sebelumnya_areused
+            untuk menyamakan tinggi kartu antar-rasa juga tidak perlu lagi —
+            kartu sekarang setinggi isinya sendiri.
+
+            Kolom `desc_id` / `desc_en` di database TIDAK dihapus dan tetap
+            masih dipakai untuk PENCARIAN (lihat `MenuBrowser.tsx` — pencarian
+            masih cocok kalau kata kunci ada di deskripsi). Jadi data lama
+            tidak hilang, hanya tidak ditampilkan lagi. */}
 
         {/* Harga DI BAWAH foto — dibuat sebesar mungkin di kartu beranda
             supaya pembeli cepat lihat tanpa menebak dari chip kecil. */}

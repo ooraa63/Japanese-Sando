@@ -4,6 +4,73 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Tombol WhatsApp mengambang di kanan bawah
+
+Steven 14-10-2026 (gambar `D:\Gambar 1.png`): *"saya sekalian mau tambahkan
+ini fitur kayak tombol untuk bs chat lgsng ke whatsaapp yang selalu ngikut
+ketika scroll letak di kanan bawah aja"*.
+
+- `src/components/customer/WhatsAppFab.tsx` — BARU. Tombol hijau `size-14`
+  dengan ikon gelembung, `position: fixed` di kanan bawah sehingga nempel
+  saat halaman digulir, membuka `wa.me` dengan pesan pembuka.
+- `src/app/layout.tsx` — satu-satunya tempat pemanggilannya, jadi tidak perlu
+  dipasang di tiap halaman. Root layout ini juga yang merender
+  `MobileBottomNav`, jadi posisinya konsisten.
+
+**Tiga hal yang sengaja diperhatikan:**
+1. **Sembunyi di `/admin`.** Dicek `usePathname()` di dalam komponen — kalau
+   tidak, tombolnya akan menutupi sidebar dashboard.
+2. **Offset bawah memakai titik potong `md`, bukan `sm`.** `MobileBottomNav`
+   juga `fixed bottom-0` dan baru hilang di `md:hidden` (>=768px). Kalau
+   tombolnya pakai `sm:bottom-6`, di lebar 640-767px tombol akan menutupi item
+   paling kanan di nav bawah. Jadi di bawah 768px tombol naik ke
+   `bottom-[84px]` (68px nav + 16px), di atas 768px turun lagi ke `bottom-6`.
+   `z-40` sengaja — di bawah modal (`z-50`), supaya tidak muncul di atas popup
+   pemesanan.
+3. **Tidak dirender kalau nomor kosong.** `store_settings.whatsapp` boleh kosong;
+   tombol tanpa nomor hanya menghasilkan halaman WhatsApp yang kosong.
+
+**PERINGATAN untuk Steven:** nomor WhatsApp di database masih **placeholder
+`621234567890`** (dicek 14-10-2026, `scripts/check-store-contact.mjs`). Jadi
+setelah deploy, tombolnya akan tampil tapi membuka nomor yang salah. Isi
+nomor asli di `/admin/pengaturan` → tab kontak. Nomor TIDAK dikarang di kode.
+
+**Verifikasi:** `tsc` bersih · `eslint --max-warnings=0` bersih ·
+tombol terdeteksi di HTML beranda (`wa.me/621234567890` + kelas fixed) · tidak
+ada di `/admin/login` · `npm run build` sukses. Belum dicek Steven visual.
+
+---
+
+## 2026-10-14 — Deskripsi rasa dihapus dari kartu menu
+
+Steven 14-10-2026: *"untuk description setiap menu (rasa) itu dihilangkan aja,
+ga perlu ada description"*.
+
+- `src/components/customer/FlavorCard.tsx` — blok `<p className="flavor-desc">`
+  dihapus di KEDUA varian kartu (kartu besar beranda + kartu ringkas
+  `/order`), beserta variabel `desc` yang jadi tidak terpakai.
+- `src/app/globals.css` — blok `@media (max-width: 639px)` untuk
+  `.density-flavor-grid > article .flavor-desc` ikut dihapus karena elemennya
+  sudah tidak ada (CSS mati = jebakan "kelas tak dikenal = no-op senyap").
+
+**Yang SENGAJA tidak dihapus:**
+- Kolom `flavors.desc_id` / `desc_en` di database. Datanya masih dipakai
+  **pencarian** di `MenuBrowser.tsx` (haystack menyertakan deskripsi), jadi
+  kata kunci lama purchaser tetap menemukan rasa yang relevan. Field edit
+  deskripsi di admin Menu juga dibiarkan supaya data lama tidak hilang.
+- Deskripsi **kategori** (`MenuBrowser`, `OrderCategoryModal`) dan deskripsi
+  **bundle** (`BundleShowcase`, `OrderBundleModal`) — itu entitas lain, bukan
+  "menu (rasa)", dan Steven tidak minta dihapus.
+
+**Efek sampingan yang bagus:** `min-h-[3.6em]` pada deskripsi dulu dipakai
+menyamakan tinggi kartu antar-rasa; sekarang kartu setinggi isinya sendiri,
+jadi grid jadi lebih padat.
+
+**Verifikasi:** `tsc` bersih · `eslint --max-warnings=0` bersih ·
+`npm run build` sukses. Belum dicek Steven secara visual.
+
+---
+
 ## 2026-10-14 — 8 perbaikan dari screenshot Steven (gambar 1-8)
 
 Steven mengirim 8 screenshot (`D:\Gambar error\Gambar 1-8.png`) + 8 keluhan.

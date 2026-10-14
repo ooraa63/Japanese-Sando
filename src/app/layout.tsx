@@ -9,7 +9,8 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { CustomerAuthProvider } from "@/components/customer/CustomerAuthProvider";
 import { AuthModal } from "@/components/customer/AuthModal";
 import { MobileBottomNav } from "@/components/customer/MobileBottomNav";
-import { getCustomerProfile, getProfileMenuItems } from "@/lib/data";
+import { WhatsAppFab } from "@/components/customer/WhatsAppFab";
+import { getCustomerProfile, getProfileMenuItems, getSettings } from "@/lib/data";
 import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 // Playfair (serif) DIHAPUS 12-10-2026 — semua judul sekarang sans-serif.
@@ -83,6 +84,11 @@ export default async function RootLayout({
   // di sini supaya sheet ter-render dari server dan tidak flash kosong.
   const profileMenu = await getProfileMenuItems();
 
+  // Nomor WhatsApp untuk tombol chat mengambang (Steven 14-10-2026). Satu
+  // query lagi per render layout, tapi `getSettings()` di-cache (React
+  // `cache`), jadi halaman yang ambil settings sendiri tidak.query dua kali.
+  const settings = await getSettings();
+
   return (
     // `data-scroll-behavior` dipakai Next.js 16 agar navigasi antar halaman
     // tetap langsung ke atas, bukan smooth-scroll.
@@ -109,6 +115,10 @@ export default async function RootLayout({
                 {children}
                 <AuthModal />
                 <MobileBottomNav profileMenu={profileMenu} />
+                {/* Steven 14-10-2026: tombol WhatsApp mengambang di kanan
+                    bawah, selalu nempel saat scroll. Sembunyi otomatis di
+                    route /admin (dicek di dalam komponennya). */}
+                <WhatsAppFab whatsapp={settings?.whatsapp} />
               </CustomerAuthProvider>
             </CartProvider>
           </ToastProvider>
