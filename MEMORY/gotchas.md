@@ -1837,3 +1837,85 @@ Kalau variabel dideklarasikan `jsonb`, `v_entry.key` ditafsirkan sebagai kolom
 dari tabel dan gagal dengan "missing FROM-clause entry". Declare key-nya
 langsung di level query: `select (e.key)::bigint as cat_id, ... from
 jsonb_each(...) e`.
+
+### #111 - `stock_enabled = false` berarti TANPA BATAS STOK, bukan "toko tutup"
+
+Pola di `create_order` (dan `consume_order_stock`) selalu berbentuk:
+
+```sql
+if v_category.stock_enabled and v_cat_pcs > v_category.stock then
+  raise exception 'insufficient_stock';
+end if;
+```
+
+Jadi `stock_enabled = false` = stok TIDAK dibatasi = pesanan lolos tanpa cek
+stok. Mematikannya bukan cara menutup toko; justru melepas pembatasnya.
+
+Untuk "toko tutup" yang benar, yang dipakai adalah:
+1. `store_settings.is_preorder_open` → panel `order.closed` (masih dipakai), dan
+2. **`migration-56`**: `p_po_batch_id is null` → `raise exception
+   'no_active_batch'`. Ini guard yang benar-benar menutup jalan pemesanan.
+
+Konsekuensi: setelah `no_active_batch` aktif, angka sisa di `categories.stock`
+tidak lagi dipakai pemesanan sama sekali. Nilainya boleh dibiarkan sebagai
+jejak audit — aman, karena tidak ada lagi kode yang memotong atau membacanya
+untuk keputusan order.
+
+### #112 - Fallback `categories.stock` ada di DUA tempat, bukan satu
+
+Bug "pembeli lihat stok yang tak bisa dibeli" punya dua salinan:
+
+| File | Fungsi | Yang diawasi |
+| --- | --- | --- |
+| `src/components/customer/OrderFlow.tsx` | `stockByCategory` | validasi sebelum submit |
+| `src/lib/cart-stock.ts` | `remainingStockByCategory()` | **angka yang tampil** di kartu menu + modal bundle |
+
+Hanya memperbaiki yang pertama TIDAK mengubah apa yang dilihat pembeli, karena
+`MenuBrowser` dan `OrderBundleModal` memakai `stockOverride` (= `poBatch.stockByCategory`)
+langsung, bukan `stockByCategory`. Saat memperbaiki salah satu, selalu cek
+satu lagi.
+
+Semantik yang benar di keduanya: kalau batch sudah dipilih, `po_batch_stock`
+adalah sumber kebenaran untuk **semua** kategori. Kategori tanpa baris = 0
+(tampil "Habis"), bukan `categories.stock` — itu persis yang dihitung backend
+`coalesce(v_batch_stock, 0) < v_cat_pcs`.
+
+### #113 - Bikin migration dari definisi LIVE, jangan ketik ulang
+
+`create_order` versi 20 argumen punya body ±19,6 KB. Menyalin manual berisiko
+satu karakter salah dan hampir tidak mungkin direview.
+
+Pola yang dipakai `scripts/gen-migration-56.mjs`:
+1. Ambil `prosrc` persis lewat `where p.oid = '<signature>'::regprocedure` —
+   JANGAN `where proname = 'create_order'` tanpa `order by`, itu gotcha #109.
+2. Pastikan anchor (blok yang akan diganti) ada **tepat satu** kali; kalau 0 atau
+   >1, berhenti.
+3. Sisipkan blok baru, lalu hitung selisihnya: daftar baris yang hilang, dan
+   jumlah baris yang berubah isinya. Untuk penyisipan murni, "berubah isinya"
+   harus 0 dan daftar "hilang" harus persis baris yang memang sengaja dibuang.
+4. Tulis file HANYA kalau differ cocok.
+
+Bukti seperti ini yang bikin migrasi bisa dipercaya tanpa applying.
+
+### #114 - Sesi AI lain bisa menulis ke repo ini SERENTAK
+
+Terjadi 14-10-2026: sesi lain menulis `OrderFlow.tsx`, `supabase/migration-55.sql`,
+dan menerapkan migration ke produksi **sambil** sesi ini bekerja, lalu menimpa
+seluruh edit yang sudah dibuat di `OrderFlow.tsx`.
+
+Tanda-tandanya:
+- `git status` menunjukkan banyak file `M`/??`?` yang tidak kamusentuh.
+- Tampilan database berubah di tengah sesi (jumlah overload `create_order`
+  turun dari 2 menjadi 1 tanpa ada perintah dari sesi ini).
+- File yang baru kamu edit tiba kembali ke isi lama.
+
+Aturan: kalau editmu hilang tanpa sebab, ** jangan langsung mengulang** — cek
+`git status` + `git log` + `Get-ChildItem -Recurse | Sort LastWriteTime -Desc`
+untuk melihat siapa yang menulis terakhir. Mengulang edit tanpa cek hanya
+menghasilkan file yang saling timpa dua kali.
+
+Untuk menguji migration tanpa menyentuh produksi: jalankan isi migration di
+`BEGIN ... ROLLBACK` (`scripts/test-migration-56.mjs`). Panggilan yang
+diharapkan gagal HARUS dibungkus `SAVEPOINT` — tanpa itu, `raise exception`
+membuat seluruh transaksi jadi *aborted* dan panggilan berikutnya tidak jalan.
+

@@ -49,18 +49,20 @@ import type { ShippingQuote } from "@/lib/utils";
 import { fetchBatchForDate, type PoBatchStock, type PoPickupDate } from "@/lib/po";
 
 /**
- * Batch PO menentukan tanggal ambil, jadi langkah "pilih tanggal" harus
- * ada SEBELUM pembeli isi identitas — begitu begitu tanggal dipilih, stok
- * yang tampil di langkah "Pilih Rasa" langsung mengikuti batch tanggal itu.
+ * Batch PO menentukan tanggal ambil, jadi langkah "pilih tanggal" SELALU ada
+ * di depan — begitu begitu tanggal dipilih, stok yang tampil di langkah
+ * "Pilih Rasa" langsung mengikuti batch tanggal itu.
  *
- * Kalau admin belum membuat batch yang sedang dibuka, langkah tanggal
- * DIHILANGKAN dan pembeli tetap bisa memesan dengan mode lama (stok dari
- * `categories.stock`). Ini yang membuat migrasi tidak membrikkan toko.
+ * Migration-56 (Steven 14-10-2026): kalau admin tidak punya batch yang sedang
+ * dibuka, pembeli DITOLAK seluruhnya lewat panel `noBatch` — bukan dialihkan
+ * ke mode lama. Mode lama itulah yang membuat pembeli melihat "20 pcs
+ * tersisa" dan tetap bisa order padahal tidak ada batch sama sekali.
+ * Sisi servernya ditutup di `supabase/migration-56.sql` (`no_active_batch`).
+ *
+ * Karena tidak ada lagi alur tanpa batch, hanya ada SATU daftar langkah.
  */
 const FULL_STEPS = ["date", "identity", "menu", "payment", "review"] as const;
 const LOGGED_IN_STEPS = ["date", "menu", "payment", "review"] as const;
-const NO_PO_FULL_STEPS = ["identity", "menu", "payment", "review"] as const;
-const NO_PO_LOGGED_IN_STEPS = ["menu", "payment", "review"] as const;
 type Step = (typeof FULL_STEPS)[number];
 
 /**
@@ -75,12 +77,17 @@ type Step = (typeof FULL_STEPS)[number];
  * angka tabular. Satu kelas = satu kolom = struk yang rapi.
  */
 const PRICE_COL = "w-28 shrink-0 text-right tabular";
-/** Step list untuk user yang sudah login + profile lengkap — skip identity.
- *  Guest (= tanpa profile) tetap melewati identity dulu.
- *  `hasPo` = ada batch yang sedang dibuka, jadi langkah tanggal ditampilkan. */
-function stepsFor(profileComplete: boolean, hasPo: boolean): readonly Step[] {
-  if (hasPo) return profileComplete ? LOGGED_IN_STEPS : FULL_STEPS;
-  return profileComplete ? NO_PO_LOGGED_IN_STEPS : NO_PO_FULL_STEPS;
+/**
+ * Step list untuk user yang sudah login + profile lengkap — skip identity.
+ * Guest (= tanpa profile) tetap melewati identity dulu.
+ *
+ * Migration-56: parameter `hasPo` dihapus. Tanpa batch yang dibuka, komponen
+ * ini tidak pernah merender langkah apa pun — pemanggilnya mengembalikan
+ * panel "belum ada batch" lebih dulu. Jadi daftar langkah yang mungkin dipakai
+ * hanya yang BERISI langkah tanggal.
+ */
+function stepsFor(profileComplete: boolean): readonly Step[] {
+  return profileComplete ? LOGGED_IN_STEPS : FULL_STEPS;
 }
 
 /**
@@ -272,7 +279,7 @@ export function OrderFlow({
    *  component (page.tsx) supaya kita tidak perlu expose env ke client. */
   midtransReady?: boolean;
   /** Tanggal pengambilan yang sedang dibuka (server-fetched). Kosong =
-   *  belum ada batch, pembeli pesan dengan mode lama. */
+   *  belum ada batch — pembeli tidak bisa memesan (lihat panel `noBatch`). */
   poDates: PoPickupDate[];
 }) {
   const { t, lang } = useI18n();
@@ -309,10 +316,7 @@ export function OrderFlow({
   // melalui identity dulu.
   const profileComplete = isProfileComplete(profile);
   const hasPo = poDates.length > 0;
-  const steps = useMemo(
-    () => stepsFor(profileComplete, hasPo),
-    [profileComplete, hasPo]
-  );
+  const steps = useMemo(() => stepsFor(profileComplete), [profileComplete]);
 
   // Catatan: useState initial hanya jalan sekali, jadi user yang logout
   // setelah halaman dimuat akan tetap di step dia sekarang sampai dia
@@ -463,17 +467,37 @@ export function OrderFlow({
   // (tiap slot = 1 pcs fisik, dari kategori bundle atau bebas kalau
   // bundle berdiri sendiri).
   //
-  // Kalau pembeli sudah memilih tanggal ambil, sumber stoknya adalah batch
-  // PO tanggal itu — bukan `categories.stock`. Fallback ke `categories.stock`
-  // kalau batch belum selesai dimuat atau kategori tidak ada di batch.
+  // Sumber stok HANYA batch PO. Kalau batch sudah dimuat (pembeli sudah pilih
+  // tanggal), `po_batch_stock` adalah satu-satunya sumber kebenaran: kategori
+  // yang tidak punya baris di batch itu berarti stok batch-nya 0 — persis
+  // seperti yang dilakukan backend `create_order`
+  // (`coalesce(v_batch_stock, 0) < v_cat_pcs` -> `insufficient_stock`).
+  //
+  // Migration-56: sebelumnya kategori yang tidak ada di batch jatuh ke
+  // `c.stock` (stok global lama). Akibatnya pembeli diberi angka "20 pcs"
+  // untuk menu yang tidak diproduksi di batch itu, bisa masuk keranjang, lalu
+  // DITOLAK backend saat submit — pesan error yang sangat membingungkan.
+  // Sekarang angka itu tidak pernah muncul.
+  //
+  // Fallback ke `c.stock` hanya berlaku untuk kondisi `poBatch === null`,
+  // yaitu sela sekejap sebelum RPC balasan (selama `poLoading`). Kalau
+  // `poLoading` sudah selesai tapi `poBatch` masih null, berarti batch-nya
+  // hilang dan pemanggil sudah memaksa pembeli memilih ulang tanggal.
   const stockByCategory = useMemo(() => {
     const m = new Map<number, { enabled: boolean; left: number }>();
     const override = poBatch?.stockByCategory ?? null;
     for (const c of categories) {
-      const fromBatch = override?.has(c.id) ? override.get(c.id)! : null;
+      if (override) {
+        // Batch sudah dimuat: kategori tanpa baris = stok 0 di batch ini.
+        m.set(c.id, {
+          enabled: override.has(c.id),
+          left: Math.max(0, override.get(c.id) ?? 0),
+        });
+        continue;
+      }
       m.set(c.id, {
-        enabled: fromBatch != null ? true : c.stock_enabled,
-        left: Math.max(0, fromBatch ?? c.stock ?? 0),
+        enabled: c.stock_enabled,
+        left: Math.max(0, c.stock ?? 0),
       });
     }
     return m;
@@ -855,9 +879,10 @@ export function OrderFlow({
         note: entry.note ?? null,
       })),
       pUserId: profile?.user_id ?? null,
-      // Batch PO. Kalau pembeli tidak memilih tanggal (belum ada batch
-      // yang dibuka), keduanya null dan `create_order` memotong stok dari
-      // `categories.stock` seperti mode lama.
+      // Batch PO. Migration-56: `poBatch` tidak mungkin null di sini —
+      // komponen mengembalikan panel `noBatch` sebelum sampai langkah mana
+      // pun kalau tidak ada batch yang dibuka. Backend tetap defensif juga:
+      // `create_order` raise `no_active_batch` kalau `p_po_batch_id` null.
       pPoBatchId: poBatch?.batchId ?? null,
       pPickupDate: poBatch ? poBatch.pickupDate : null,
     };
@@ -1023,6 +1048,33 @@ export function OrderFlow({
         </div>
         <h1 className="mt-5 text-2xl font-bold text-cocoa-900">{t.order.closed.title}</h1>
         <p className="mt-3 text-sm font-semibold text-cocoa-500">{t.order.closed.desc}</p>
+        <Link href="/" className="btn-primary mt-6">
+          {t.success.home}
+        </Link>
+      </div>
+    );
+  }
+
+  // Migration-56: tidak ada batch yang sedang dibuka = tidak ada pesanan.
+  // Dulu kondisi ini dialihkan ke "mode lama": langkah tanggal dihilangkan dan
+  // stok dibaca dari `categories.stock`, sehingga pembeli tetap melihat
+  // "20 pcs tersisa" dan order-nya diterima — padahal tidak ada batch sama
+  // sekali (dilaporkan Steven 14-10-2026 dari produksi).
+  //
+  // Placeholder ini dikembalikan SEBELUM ada langkah yang bisa diklik, jadi
+  // tidak ada satu pun tombol tambah-ke-keranjang yang hidup.
+  //
+  // Sengaja dipisah dari `closed` di atas: `is_preorder_open` itu sakelar
+  // global, sedangkan `!hasPo` berarti Steven belum membuka batch untuk
+  // periode ini — dua hal berbeda bagi pembeli, jadi dua pesan berbeda.
+  if (!hasPo) {
+    return (
+      <div className="card mx-auto max-w-lg p-10 text-center">
+        <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-cocoa-100">
+          <CalendarDays className="mx-auto size-7 text-cocoa-500" />
+        </div>
+        <h1 className="mt-5 text-2xl font-bold text-cocoa-900">{t.order.noBatch.title}</h1>
+        <p className="mt-3 text-sm font-semibold text-cocoa-500">{t.order.noBatch.desc}</p>
         <Link href="/" className="btn-primary mt-6">
           {t.success.home}
         </Link>

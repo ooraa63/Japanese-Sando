@@ -21,10 +21,17 @@ import type { CartBundleEntry, Category } from "@/lib/types";
  *
  * @param extraSlots slot bundle yang sedang dipilih di modal (masih lokal).
  * @param stockOverride sisa stok per kategori dari batch PO yang dipilih
- *   pembeli. Kalau diisi, angka ini yang jadi sumber kebenaran dan
- *   `stock_enabled` kategori diabaikan untuk kategori yang ada di map —
- *   karena stok batch adalah activasinya sendiri. Kategori yang TIDAK ada
- *   di map tetap memakai `categories.stock` (mode lama, tanpa batch).
+ *   pembeli. Kalau diisi, angka ini yang jadi sumber kebenaran untuk
+ *   SELURUH kategori — bukan cuma kategori yang ada di map. Kategori yang
+ *   tidak ada di map berarti stok batch-nya 0, persis seperti yang dihitung
+ *   `create_order` (`coalesce(v_batch_stock, 0) < v_cat_pcs`).
+ *
+ *   Migration-56: sebelumnya kategori yang tidak ada di map jatuh ke
+ *   `categories.stock` (stok global lama, mis. 20). Akibatnya pembeli diberi
+ *   angka sisa untuk menu yang tidak diproduksi di batch itu, bisa menambah
+ *   ke keranjang, lalu DITOLAK backend saat submit dengan pesan
+ *   `insufficient_stock` yang membingungkan. Sekarang angka "20" itu tidak
+ *   pernah muncul kalau batch sudah dipilih.
  */
 export function remainingStockByCategory(
   categories: Category[],
@@ -70,12 +77,17 @@ export function remainingStockByCategory(
 
   const out = new Map<number, number | null>();
   for (const c of categories) {
-    const base = stockOverride?.has(c.id) ? stockOverride.get(c.id)! : c.stock;
-    const enabled = stockOverride?.has(c.id) ? true : c.stock_enabled;
-    out.set(
-      c.id,
-      enabled ? Math.max(0, (base ?? 0) - (used.get(c.id) ?? 0)) : null
-    );
+    const usedHere = used.get(c.id) ?? 0;
+
+    if (stockOverride) {
+      // Batch sudah dipilih: batch yang jadi sumber kebenaran untuk semua
+      // kategori. Tidak ada baris untuk kategori ini = 0 pcs di batch ini.
+      out.set(c.id, Math.max(0, (stockOverride.get(c.id) ?? 0) - usedHere));
+      continue;
+    }
+
+    // Tanpa batch: perilaku lama, `categories.stock` + `stock_enabled`.
+    out.set(c.id, c.stock_enabled ? Math.max(0, (c.stock ?? 0) - usedHere) : null);
   }
   return out;
 }

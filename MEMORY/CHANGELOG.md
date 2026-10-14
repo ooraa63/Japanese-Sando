@@ -4,6 +4,113 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Tidak ada batch PO = tidak ada pesanan
+
+Steven 14-10-2026, dari produksi: *"tidak ada batch po sama sekali tapi kenapa di
+web pembeli ada stock 20 dan mereka bisa po padahl admin tidak ada buka batch
+po"*. Bukti dari produksi saat itu: `po_batches` **0 baris**,
+`public_po_pickup_dates()` = `{"ada_batch": false, "tanggal": []}`, tapi
+`categories` (Sando Sandwich) masih `stock_enabled = true, stock = 20`.
+
+**Penyebabnya dua lapis, bukan satu.** Ini yang bikin masalahnya bertahan:
+perbaikan satu sisi saja tidak akan menutup jalan pemesanan yang lain.
+
+1. **Sisi pembeli.** `hasPo = poDates.length > 0` bernilai false saat tidak ada
+   batch, jadi langkah "pilih tanggal" dihilangkan dan `stockByCategory`
+   jatuh ke `categories.stock`. Angka 20 itu dari sana — bukan dari batch.
+2. **Sisi server.** `create_order` punya cabang `else v_batch := null;`, jadi
+   pesanan tanpa batch tetap valid dan potong stoknya jatuh ke
+   `categories.stock`.
+
+**Yang diubah:**
+
+- `supabase/migration-56.sql` — BARU. Cabang `else` pada validasi batch
+  (`p_po_batch_id is null`) sekarang `raise exception 'no_active_batch'`
+  pakai errcode `22023`. Guard di sisi server, bukan cuma UI.
+- `src/components/customer/OrderFlow.tsx` — panel baru `noBatch` ("Belum ada
+  batch PO") dirender saat `!hasPo`, dikembalikan **sebelum** ada langkah yang
+  bisa diklik. `NO_PO_FULL_STEPS` / `NO_PO_LOGGED_IN_STEPS` dihapus dan
+  `stepsFor(profileComplete, hasPo)` jadi `stepsFor(profileComplete)` — tidak
+  ada lagi alur tanpa batch, jadi tidak perlu dua daftar langkah.
+- `src/lib/cart-stock.ts` — `remainingStockByCategory()` punya fallback yang
+  sama persis. **Ini yang mengatur angka yang benar-benar tampil** di halaman
+  menu dan modal bundle, jadi memperbaiki `OrderFlow` saja tidak cukup.
+- `src/lib/i18n/{id,en}.ts` — `order.noBatch` + `errors.no_active_batch`.
+  Tiga teks lama yang jadi berbohong dikoreksi: `order.date.empty`,
+  `admin.po.emptyHint` ("pembeli masih bisa pesan seperti biasa" — sudah tidak
+  benar).
+- `tsconfig.json` — `scripts` masuk `exclude` (lihat catatan di bawah).
+
+**Jebakan yang hampir terlewat:** `categories.stock_enabled = false` **bukan**
+cara menutup toko. Di `create_order` polanya
+`if v_category.stock_enabled and v_cat_pcs > v_category.stock then raise
+insufficient_stock` — jadi `stock_enabled = false` artinya **TANPA BATAS STOK**,
+order lolos tanpa cek. Mematikannya tanpa guard `no_active_batch` akan membuat
+masalah lebih parah. Jadi angka `categories.stock` sengaja **dibiarkan** 20
+sebagai jejak audit; setelah migration-56 aktif, kolom itu tidak lagi dipakai
+pemesanan sama sekali.
+
+**Leak kedua yang ikut tertutup:** kategori yang tidak punya baris di
+`po_batch_stock` dulu ikut menampilkan sisa `categories.stock`. Pembeli diberi
+angka "20 pcs" untuk menu yang **tidak diproduksi** di batch itu, bisa masuk
+keranjang, lalu ditolak backend saat submit dengan `insufficient_stock` yang
+membingungkan. Sekarang kategori tanpa baris = 0 (tampil "Habis"), persis
+seperti perhitungan backend (`coalesce(v_batch_stock, 0) < v_cat_pcs`).
+
+**Nomor migration 55 sudah dipakai** commit `65440dd` ("Bundle dua mode: Combo
+vs Beli pilih rasa sendiri") — jangan menabrak. Sekalian, migration-55 itu
+menjatuhkan overload `create_order` 18 parameter yang bisa dipanggil anon
+tanpa validasi batch apa pun; overload itu sudah tidak ada di produksi.
+
+**Cara bikin migration dari definisi live** (dipakai untuk 56): jangan ketik
+ulang body `create_order` (±19,6 KB) manual. Ambil `pg_proc.prosrc`, sisipkan
+satu blok, lalu buktikan selisihnya cuma blok itu — `scripts/gen-migration-56.mjs`
+mencetak jumlah baris yang dihapus dan yang berubah isinya sebelum menulis
+file. `scripts/verify-migration-56.mjs` cek statiknya, `scripts/test-migration-56.mjs`
+menjalankannya di transaksi yang di-ROLLBACK lalu membuktikan order tanpa batch
+ditolak dan produksi tetap utuh.
+
+**Catatan `tsconfig.json`:** folder `scripts/` dikeluarkan dari type-check.
+Alasannya teknis: `node --experimental-strip-types` mewajibkan
+import berakhiran `.ts`, sedangkan `tsc` menolaknya tanpa
+`allowImportingTsExtensions` (yang tidak bisa aktif bareng `next build`). Semua
+skrip lain di sana masih `.js`/`.mjs` dan memang tidak pernah ikut type-check,
+jadi tidak ada yang kehilangan pemeriksaan.
+
+**Verifikasi:**
+- `node scripts/test-migration-56.mjs` → **10 OK, 0 GAGAL**: guard aktif,
+  `create_order` tanpa batch ditolak `no_active_batch`, batch bogus tetap ditolak
+  `batch_not_found`, order tetap 6 dan stok tetap 20 setelah rollback.
+- `node --experimental-strip-types scripts/test-cart-stock-batch.ts` → **10 OK,
+  0 GAGAL**, termasuk kasus inti "kategori tanpa baris batch = 0, bukan 20".
+- `npx tsc --noEmit` bersih · `npx eslint src --max-warnings=0` bersih ·
+  `npm run build` sukses.
+- `/order` di dev server (HTML + browser): `<h1>Belum ada batch PO</h1>`, ikon
+  `lucide-calendar-days`, **0** "Tambah ke keranjang" / "Pilih Rasa" / "Kapan
+  mau ambil" / "20 pcs" / "tersisa". Console browser 0 error + 0 warn (tidak ada
+  hydration mismatch).
+
+**Status produksi (22-10-2026, setelah Steven bilang "push dan deploy"):**
+`supabase/migration-56.sql` sudah **diterapkan** ke produksi lewat
+`scripts/run-migration.js`, lalu diverifikasi ulang dengan
+`scripts/verify-live-no-batch.mjs` → **9 OK, 0 GAGAL**: guard terpasang di
+definisi live, `v_batch := null` hilang, validasi batch lama masih utuh,
+`anon` masih boleh memanggil `create_order`, order tanpa batch ditolak
+`no_active_batch`, dan order tetap 6 / stok tetap 20 (tidak ada efek samping).
+
+**Belum:** alur "batch sedang dibuka" belum diuji dengan batch sungguhan
+(butuh batch nyata di produksi). Buyer masih bisa menambah barang ke keranjang
+dari kartu di beranda (fitur QuickAdd) lalu menemui panel ini di `/order`;
+tidak ada order yang bisa masuk, tapi membuat QuickAdd ikut menghormati batch
+adalah pekerjaan terpisah.
+
+**Peringatan operasional:** sesi AI lain pernah menulis ke repo ini **secara
+bersamaan** (21:34-22:02) dan menerapkan migration ke produksi tanpa koordinasi.
+Kalau sebuah file tiba kembali ke isi lama padahal baru saja diedit, cek
+`git status` + `git log` dulu sebelum mengulang — bukan berarti edit-nya salah.
+
+---
+
 ## 2026-10-14 — Bundle dua mode: Combo (isi terkunci) vs Beli pilih rasa sendiri
 
 Steven 14-10-2026: *"kadang kalau misal ada bundle combo: strawberry dan choco
