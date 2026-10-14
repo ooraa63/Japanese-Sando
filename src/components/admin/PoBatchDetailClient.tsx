@@ -99,6 +99,8 @@ export interface PoDetailLabels {
     rasaAllHint: string;
     rasaSelectAll: string;
     rasaClearAll: string;
+    /** Label pill di tombol simpan yang mengambang. */
+    unsavedHint: string;
     soldHere: string;
     soldOutHere: string;
     outsideBatch: string;
@@ -415,10 +417,11 @@ function StockTab({
   const adaPerubahan = dirtyStock || dirtyBundles || dirtyRasa;
 
   return (
-    /* Steven 14-10-2026: "untuk bundle letak di kanannya aja biar ga makan
-       tempat". Jadi blok Bundle dipindah dari bawah ke kolom kanan, menu tetap
-       di kiri. Di layar sempit (HP) kolomnya tetap menumpuk ke bawah. */
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+    <>
+      {/* Steven 14-10-2026: "bundle jangan di samping sana, intinya untuk menu
+          dan bundle itu satu itu layout yang sama aja" — jadi Bundle kembali
+          DI BAWAH kartu menu, satu kolom, seperti sebelumnya. Kolom kanan
+         Dicoba sekali tapi bikin area menu terasa sempit. */}
       <section className="card p-5">
         <h2 className="text-lg font-extrabold text-cocoa-900">{labels.stok.title}</h2>
         <p className="mt-1 text-[13px] text-cocoa-500">{labels.stok.subtitle}</p>
@@ -462,92 +465,114 @@ function StockTab({
         </ul>
 
         <p className="mt-2.5 text-[12px] text-cocoa-500">{labels.stok.initialHint}</p>
+
+        {/* ---------- Bundle (di bawah menu, satu kolom) ---------- */}
+        <div className="mt-6 border-t border-cocoa-200 pt-6">
+          <h3 className="text-base font-extrabold text-cocoa-900">
+            {labels.stok.bundlesTitle}
+          </h3>
+          <p className="mt-1 text-[13px] text-cocoa-500">{labels.stok.bundlesSubtitle}</p>
+
+          {initial.bundles.length === 0 ? (
+            <p className="mt-4 text-sm text-cocoa-400">{labels.stok.bundlesEmpty}</p>
+          ) : (
+            <>
+              {!semuaBundleAktif ? null : (
+                <p className="mt-3 rounded-xl bg-honey-300/20 px-3.5 py-2.5 text-[13px] font-semibold text-honey-500">
+                  {labels.stok.bundlesAllHint}
+                </p>
+              )}
+              <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
+                {initial.bundles.map((b) => {
+                  const on = picked[b.bundle_id] != null;
+                  return (
+                    <li
+                      key={b.bundle_id}
+                      className={`rounded-2xl border-2 p-3.5 transition ${
+                        on ? "border-cocoa-900 bg-cream-50" : "border-cocoa-200 bg-white"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleBundle(b.bundle_id)}
+                        aria-pressed={on}
+                        className="flex w-full items-center gap-2.5 text-left"
+                      >
+                        <span
+                          className={`grid size-6 shrink-0 place-items-center rounded-md border transition ${
+                            on
+                              ? "border-cocoa-900 bg-cocoa-900 text-cream-50"
+                              : "border-cocoa-300"
+                          }`}
+                          aria-hidden
+                        >
+                          {on ? <Check className="size-4" /> : null}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-cocoa-900">
+                            {b.nama}
+                          </span>
+                          <span className="block text-[12px] text-cocoa-500">
+                            {b.required_qty} pcs · {formatIDR(b.harga_bawaan, lang)}
+                          </span>
+                        </span>
+                      </button>
+
+                      <div className="mt-2 pl-8">
+                        <label className="block text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
+                          {labels.stok.bundlesPrice}
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          inputMode="numeric"
+                          disabled={!on}
+                          placeholder={String(b.harga_bawaan)}
+                          aria-label={`${b.nama} — ${labels.stok.bundlesPrice}`}
+                          value={picked[b.bundle_id] ?? ""}
+                          onChange={(e) => setBundlePrice(b.bundle_id, e.target.value)}
+                          className="input tabular mt-0.5 w-full text-right disabled:opacity-50"
+                        />
+                        <p className="mt-0.5 text-[11px] text-cocoa-400">
+                          {labels.stok.bundlesPriceHint}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </div>
       </section>
 
-      {/* ---------- Bundle (kolom kanan) ---------- */}
-      <aside className="card p-5 lg:sticky lg:top-24">
-        <h3 className="text-base font-extrabold text-cocoa-900">{labels.stok.bundlesTitle}</h3>
-        <p className="mt-1 text-[12px] text-cocoa-500">{labels.stok.bundlesSubtitle}</p>
-
-        {initial.bundles.length === 0 ? (
-          <p className="mt-4 text-sm text-cocoa-400">{labels.stok.bundlesEmpty}</p>
-        ) : (
-          <>
-            {!semuaBundleAktif ? null : (
-              <p className="mt-3 rounded-xl bg-honey-300/20 px-3.5 py-2.5 text-[12px] font-semibold text-honey-500">
-                {labels.stok.bundlesAllHint}
-              </p>
-            )}
-            <ul className="mt-4 space-y-2.5">
-              {initial.bundles.map((b) => {
-                const on = picked[b.bundle_id] != null;
-                return (
-                  <li
-                    key={b.bundle_id}
-                    className={`rounded-2xl border-2 p-3 transition ${
-                      on ? "border-cocoa-900 bg-cream-50" : "border-cocoa-200 bg-white"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleBundle(b.bundle_id)}
-                      aria-pressed={on}
-                      className="flex w-full items-center gap-2.5 text-left"
-                    >
-                      <span
-                        className={`grid size-5 shrink-0 place-items-center rounded-md border transition ${
-                          on ? "border-cocoa-900 bg-cocoa-900 text-cream-50" : "border-cocoa-300"
-                        }`}
-                        aria-hidden
-                      >
-                        {on ? <Check className="size-3.5" /> : null}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold text-cocoa-900">
-                          {b.nama}
-                        </span>
-                        <span className="block text-[11px] text-cocoa-500">
-                          {b.required_qty} pcs · {formatIDR(b.harga_bawaan, lang)}
-                        </span>
-                      </span>
-                    </button>
-
-                    <div className="mt-2 pl-7">
-                      <label className="block text-[10px] font-bold tracking-wide text-cocoa-500 uppercase">
-                        {labels.stok.bundlesPrice}
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
-                        disabled={!on}
-                        placeholder={String(b.harga_bawaan)}
-                        aria-label={`${b.nama} — ${labels.stok.bundlesPrice}`}
-                        value={picked[b.bundle_id] ?? ""}
-                        onChange={(e) => setBundlePrice(b.bundle_id, e.target.value)}
-                        className="input tabular mt-0.5 w-full text-right text-[13px] disabled:opacity-50"
-                      />
-                      <p className="mt-0.5 text-[10px] text-cocoa-400">
-                        {labels.stok.bundlesPriceHint}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-      </aside>
-
+      {/* Steven 14-10-2026: "yang simpan stok & bundle jangan di ujung kanan
+          bawah bgt susah lihat". Tombolnya jadi pill mengambang di TENGAH
+          bawah layar dan nempel (sticky), jadi selalu kelihatan tanpa harus
+          menggulir sampai paling bawah. */}
       {adaPerubahan ? (
-        <div className="sticky bottom-4 flex justify-end lg:col-span-2">
-          <button type="button" onClick={simpan} disabled={pending} className="btn-primary shadow-lg">
-            {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            {pending ? labels.stok.saving : labels.stok.save}
-          </button>
+        <div className="sticky bottom-3 z-10 mt-4 flex justify-center">
+          <div className="flex items-center gap-3 rounded-full border border-cocoa-200 bg-white/95 py-2 pr-2 pl-4 shadow-lg backdrop-blur">
+            <span className="text-[12px] font-bold text-cocoa-600">
+              {labels.stok.unsavedHint}
+            </span>
+            <button
+              type="button"
+              onClick={simpan}
+              disabled={pending}
+              className="btn-primary !px-4 !py-2 !text-[13px]"
+            >
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              {pending ? labels.stok.saving : labels.stok.save}
+            </button>
+          </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }
 

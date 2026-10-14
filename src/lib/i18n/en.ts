@@ -810,7 +810,7 @@ export const en = {
           subtitle: "Set stock per menu type and pick the packages offered in this batch.",
           colInitial: "Initial stock",
           colSold: "Sold",
-          colInput: "Left (edit here)",
+          colInput: "Stock",
           empty: "No active menu type yet.",
           initialHint:
             "Initial stock is derived from left + sold, because it is not stored separately.",
@@ -830,6 +830,7 @@ export const en = {
           rasaAllHint: "all shown",
           rasaSelectAll: "Select all",
           rasaClearAll: "Clear",
+          unsavedHint: "Not saved yet",
           soldHere: "Sold in this batch",
           soldOutHere: "Sold out",
           outsideBatch: "Outside this batch",

@@ -823,7 +823,7 @@ export const id: Dict = {
             "Atur stok per jenis menu dan pilih paket yang ditawarkan di batch ini.",
           colInitial: "Stok awal",
           colSold: "Terjual",
-          colInput: "Sisa (ubah di sini)",
+          colInput: "Stock",
           empty: "Belum ada jenis menu aktif.",
           initialHint:
             "Stok awal dihitung dari sisa + terjual, karena stok awal tidak disimpan terpisah.",
@@ -843,6 +843,7 @@ export const id: Dict = {
           rasaAllHint: "semua tampil",
           rasaSelectAll: "Pilih semua",
           rasaClearAll: "Kosongkan",
+          unsavedHint: "Belum disimpan",
           soldHere: "Dijual di batch ini",
           soldOutHere: "Sisa habis",
           outsideBatch: "Di luar batch ini",
