@@ -352,6 +352,37 @@ export function OrderFlow({
   const setStep = useCallback((target: Step) => {
     setStepOverride(target);
   }, []);
+
+  // Steven 14-10-2026: "misal saya sekarang di step ke 3, lalu saya pergi ke
+  // home, baru saya mau pre-order lagi buat ngulang dari step awal, jangan stay
+  // di step ke 3".
+  //
+  // Jadi saat komponen LEPAS dari layar, langkah yang tersimpan dihapus.
+  // Balik ke /order = mulai lagi dari langkah pertama, apa pun yang tadi
+  // sedang dikerjakan.
+  //
+  // Ini membatalkan effect unmount yang dulu dihapus di commit `c19559e`
+  // ("pre-order tidak ke-reset saat pindah halaman") — Steven waktu itu tidak
+  // mau pesanan halfway hilang. Sekarang permintaannya kebalikan: yang penting
+  // langkah awal, bukan melanjutkan diam-diam dari tengah alur.
+  //
+  // YANG TIDAK DIBERSIHKAN di sini, dan itu disengaja:
+  //   - `js_po_pickup_date`: tanggal ambil tetap tersimpan. Memilih ulang
+  //     tanggal itu satu klik, dan mengulanginya akan membingungkan kalau
+  //     tanggal yang sama ikut hilang.
+  //   - keranjang (CartProvider) dan draft identitas: keduanya di luar
+  //     komponen ini dan bertahan melewati navigasi. Kalau nanti Steven mau
+  //     pre-order benar-benar dari nol, itu masalah `reset()` di CartProvider
+  //     - bukan di sini.
+  useEffect(() => {
+    return () => {
+      try {
+        sessionStorage.removeItem("js_order_step");
+      } catch {
+        // Mode privat / storage diblokir — tidak ada yang perlu dibersihkan.
+      }
+    };
+  }, []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [soldCounts, setSoldCounts] = useState<Record<number, number>>({});
@@ -1439,10 +1470,20 @@ export function OrderFlow({
                kita klik itu nanti untuk lanjut". Makanya drawer TIDAK dihidupkan
                lagi (ia cuma informasi yang sudah ada di kartu Flavor), tapi
                `CartStickyBar` dikembalikan sebagai tombol lanjut yang selalu
-               terlihat di bawah layar. Di desktop nav bawah tidak ada
-               (`md:hidden`), jadi bar disembunyikan di sana dan StepNav tetap
-               menyediakan "Lanjut" seperti sebelumnya. */
-            <section className="pb-24 md:pb-0">
+               terlihat di bawah layar.
+
+               Steven 14-10-2026 (screenshot ke-2): "di desktop gada keranjang
+               jadi orang gabis lihat pesanannya jika pakai laptop".
+               Sebelumnya bar ini `md:hidden`, dengan alasan "di desktop nav
+               bawah tidak ada, jadi StepNav saja yang menyediakan Lanjut".
+               Tapi StepNav-nya ada di AKHIR daftar - artinya orang laptop harus
+               menggulir sampai bawah halaman hanya untuk melihat isi
+               keranjangnya. Sekarang bar tampil di SEMUA lebar layar.
+
+               Karena bar sudah ada di mana-mana, `StepNav` di bawahnya tidak
+               lagi punya tombol "Lanjut" - hanya "Kembali". Dua tombol lanjut
+               di satu layar hanya membingungkan. */
+            <section className="pb-28">
               <div className="card mb-6 p-6 sm:p-8">
                 <StepHeading
                   icon={<ShoppingBag className="size-5" />}
@@ -1465,9 +1506,8 @@ export function OrderFlow({
                 />
               )}
 
-              {/* Bar bawah keranjang (mobile) = tombol lanjut + WA di kanan.
-                  Di desktop bar ini `md:hidden`, jadi "Lanjut" tetap ada di
-                  StepNav agar tidak ada langkah tanpa jalan keluar. */}
+              {/* Bar bawah keranjang = tombol lanjut, dengan WhatsApp
+                  melayang DI ATASNYA. Tampil di semua lebar layar. */}
               <CartStickyBar
                 totalItems={totalItems}
                 subtotal={subtotal}
@@ -1477,22 +1517,13 @@ export function OrderFlow({
                 onNext={handleNext}
               />
 
-              {/* Langkah SEBELUM "menu" diambil dari daftar langkah yang aktif
-                  (prevStep), bukan ditulis manual: untuk profil lengkap +
-                  batch PO sebelumnya "date", untuk tamu "identity".
+              {/* Cuma "Kembali". Tombol "Lanjut" sekarang milik
+                  `CartStickyBar`, jadi tidak ada dua di satu layar.
 
-                  `hideNextBelowMd`: di HP tombol lanjut-nya sudah ada di
-                  CartStickyBar, jadi yang di sini disembunyikan agar tidak
-                  dobel. Di desktop CartStickyBar `md:hidden`, jadi "Lanjut"
-                  tetap muncul dari StepNav. */}
-              <StepNav
-                onBack={prevStep ? () => goTo(prevStep) : null}
-                onNext={handleNext}
-                nextLabel={t.common.next}
-                nextIcon={<ArrowRight className="size-4" />}
-                disabled={totalItems === 0}
-                hideNextBelowMd
-              />
+                  Langkah SEBELUM "menu" diambil dari daftar langkah yang aktif
+                  (prevStep), bukan ditulis manual: untuk profil lengkap +
+                  batch PO sebelumnya "date", untuk tamu "identity". */}
+              <StepNav onBack={prevStep ? () => goTo(prevStep) : null} />
             </section>
           ) : null}
 
@@ -2322,22 +2353,17 @@ function StepNav({
   nextLabel,
   nextIcon,
   disabled,
-  hideNextBelowMd,
 }: {
   onBack: (() => void) | null;
   /**
-   * Migration-57: boleh dikosongkan. Di langkah "Pilih Rasa" tombol lanjut
-   * pindah ke `CartStickyBar` di bawah layar (Steven 14-10-2026: "yang ada
-   * dibawah itu yang kita klik itu nanti untuk lanjut"), jadi bar ini hanya
+   * Boleh dikosongkan. Di langkah "Pilih Rasa" tombol lanjut pindah ke
+   * `CartStickyBar` yang menempel di bawah layar, jadi bar ini hanya
    * menyediakan tombol "Kembali".
    */
   onNext?: () => void;
   nextLabel?: string;
   nextIcon?: React.ReactNode;
   disabled?: boolean;
-  /** Sembunyikan tombol lanjut di HP — dipakai langkah menu yang sudah punya
-   *  `CartStickyBar`, supaya tidak ada dua tombol "Lanjut" di layar sama. */
-  hideNextBelowMd?: boolean;
 }) {
   const { t } = useI18n();
   return (
@@ -2351,12 +2377,7 @@ function StepNav({
         <span />
       )}
       {onNext ? (
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={disabled}
-          className={`btn-primary sm:min-w-44${hideNextBelowMd ? " hidden md:inline-flex" : ""}`}
-        >
+        <button type="button" onClick={onNext} disabled={disabled} className="btn-primary sm:min-w-44">
           {nextLabel}
           {nextIcon}
         </button>
@@ -2379,14 +2400,27 @@ function StepNav({
  * kartu Flavor sudah menampilkan jumlahnya sendiri). Bar ini langsung
  * menjalankan "lanjut" ke langkah pembayaran.
  *
- * Struktur: pembungkus `<div>` berisi DUA saudara — tombol lanjut (`flex-1`)
- * dan link WhatsApp. Bukan `<button>` yang membungkus `<a>`, karena HTML
- * tidak valid punya link di dalam tombol.
+ * Struktur: pembungkus `<div>` berisi tombol lanjut, dan link WhatsApp
+ * positioned ABSOLUT DI ATAS bar itu (`bottom-full`). Bukan `<button>` yang
+ * membungkus `<a>`, karena HTML tidak valid punya link di dalam tombol.
  *
- * Tombol WhatsApp ikut masuk ke sini (bukan mengambang): bar ini menempati
- * dasar layar, jadi tombol mengambang di sana pasti menimpanya. Steven minta
- * WA "di kanan bawah", dan di dalam bar ini itu posisi paling kanan yang
- * tidak menutupi apa pun.
+ * Kenapa WA di ATAS, bukan di samping (Steven 14-10-2026: "itu Wa buat di
+ * atas bar yang keranjang aja jangan disamping"): di samping, tombol WA
+ * memakan lebar bar dan jadi terlihat seperti bagian dari keranjang, padahal
+ * ia bukan. Di atas, bar tetap milik keranjang saja.
+ *
+ * Kenapa bar TIDAK `md:hidden` lagi (Steven 14-10-2026: "di desktop gada
+ * keranjang jadi orang gabis lihat pesanannya jika pakai laptop"): versi
+ * sebelumnya menyembunyikan bar di desktop dengan alasan "StepNav saja yang
+ * menyediakan Lanjut". Tapi StepNav-nya ada di AKHIR daftar, jadi orang laptop
+ * harus menggulir ke bawah halaman hanya untuk melihat isi keranjang — dan di
+ * laptop tidak ada nav bawah yang menggesah. Sekarang tombolnya dibuat rata
+ * kanan dan dibatasi `sm:max-w-md` supaya tidak membentang full-width di
+ * layar lebar.
+ *
+ * Padding bar ikut jadi `md:px-6` supaya tepi kanan tombol lanjut sejajar
+ * dengan ikon WhatsApp (`md:right-6`). Kalau tidak, di desktop keduanya
+ * berdiri di jarak berbeda dari tepi layar dan terlihat tidak sengaja.
  *
  * `z-30` dengan sengaja: di bawah nav bawah (z-40) dan di bawah modal (z-50).
  * Bar ini hanya muncul di langkah "Pilih Rasa".
@@ -2410,13 +2444,20 @@ function CartStickyBar({
   const ada = totalItems > 0;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-cocoa-200 bg-cream-50/95 px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] backdrop-blur md:hidden">
-      <div className="flex items-center gap-2.5">
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-cocoa-200 bg-cream-50/95 px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] backdrop-blur md:px-6">
+      {/* WhatsApp melayang di atas bar, rata kanan. */}
+      {whatsapp && whatsapp.trim() ? (
+        <div className="absolute bottom-full right-3 mb-2.5 md:right-6">
+          <WhatsAppLink whatsapp={whatsapp} compact />
+        </div>
+      ) : null}
+
+      <div className="flex justify-end">
         <button
           type="button"
           onClick={onNext}
           disabled={!ada}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-cocoa-800 px-4 py-3 text-left text-cream-50 shadow-lg transition enabled:hover:bg-cocoa-900 enabled:active:scale-[0.99] disabled:opacity-55"
+          className="flex w-full min-w-0 items-center gap-3 rounded-2xl bg-cocoa-800 px-4 py-3 text-left text-cream-50 shadow-lg transition enabled:hover:bg-cocoa-900 enabled:active:scale-[0.99] disabled:opacity-55 sm:max-w-md"
         >
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-matcha-500">
             <ShoppingBag className="size-5" />
@@ -2442,10 +2483,6 @@ function CartStickyBar({
             </>
           ) : null}
         </button>
-
-        {whatsapp && whatsapp.trim() ? (
-          <WhatsAppLink whatsapp={whatsapp} compact />
-        ) : null}
       </div>
     </div>
   );

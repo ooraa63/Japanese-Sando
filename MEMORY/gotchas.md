@@ -1919,3 +1919,54 @@ Untuk menguji migration tanpa menyentuh produksi: jalankan isi migration di
 diharapkan gagal HARUS dibungkus `SAVEPOINT` — tanpa itu, `raise exception`
 membuat seluruh transaksi jadi *aborted* dan panggilan berikutnya tidak jalan.
 
+### #115 - Screenshot Browser tidak menangkap layer `backdrop-blur`
+
+Terlihat 14-10-2026 saat memverifikasi `CartStickyBar` di dev server.
+Screenshot full-viewport (`scope: viewport`) **tidak menampilkan** bar keranjang
+padahal elemennya jelas ada dan `fixed bottom-0`.
+
+Penyebabnya `backdrop-blur`: elemen itu dipromosikan ke compositing layer sendiri,
+dan capture CDP tidak selalu menyertakannya di frame full-viewport. Yang
+kelihatan di screenshot biasanya `visualObservation` dengan `scope: clip` —
+karena saat itu elemennya sendiri yang jadi target capture.
+
+Aturan: untuk elemen fixed + blur, **verifikasi lewat DOM, bukan gambar**:
+
+```
+mcp_browser({ action: "query", input: { kind: "dom", selector: "div[class*='backdrop-blur'][class*='bottom-0']", maxChars: 1200 } })
+```
+
+Class hasil Tailwind di `class="..."` adalah bukti yang lebih kuat daripada
+screenshot: `md:hidden` masih ada atau tidak, `absolute bottom-full` benar
+tidak, tinggal dibaca. Screenshot tetap dipakai untuk hal yang benar-benar
+visual (jarak, proporsi, warna).
+
+### #116 - Viewport Browser mengikuti panel, dan `next/link` bukan navigasi dokumen
+
+Dua hal yang membuat verifikasi `/order` di Browser tricky:
+
+1. **Lebar viewport = lebar panel Browser**, bukan ukuran layar asli. Di sesi
+   ini panel sedang 639px, jadi `md:` (768px) tidak pernah aktif dan tampilan
+   desktop tidak bisa difoto. Browser tidak punya aksi resize. Untuk breakpoint,
+   andalkan DOM + CSS bundle hasil build:
+
+   ```
+   Get-ChildItem .next -Recurse -Filter *.css
+   # lalu hitung kemunculan kelas: .sm\:max-w-md, .md\:px-6, .md\:hidden
+   ```
+
+   Kalau kelasnya ada di CSS dan tidak ada `md:hidden` di DOM, berarti elemennya
+   benar-benar tampil di semua lebar layar.
+
+2. **`click_and_wait_for_navigation` gagal untuk navigasi App Router.**
+   `next/link` melakukan navigasi client-side, jadi tidak ada main-document
+   navigation — action itu menunggu 30 detik lalu `ACTION_TIMEOUT` walau
+   URL sudah berubah. Gunakan `click` biasa dengan selector, lalu cek
+   URL dengan `query` (`kind: "text"`, selector `main`).
+
+   Catatan tambahan: di viewport 639px, CTA "Pre-order" di header tersembunyi
+   (`md:flex`), dan link `/order` di halaman home hanya ada di dalam panel
+   hamburger. Kalau `click` "tidak terjadi", cek dulu apakah target-nya
+   `hidden md:flex` — elemen yang resolved tapi tidak terlihat akan diklik
+   tanpa efek apa pun.
+

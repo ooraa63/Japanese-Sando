@@ -4,6 +4,75 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — WA pindah ke atas bar keranjang, bar tampil di desktop, pre-order baru mulai dari step 1
+
+Tiga permintaan Steven dari screenshot `Eror 1.png` (versi kedua). Semuanya
+hanya menyentuh `src/components/customer/OrderFlow.tsx`.
+
+**1. WhatsApp pindah dari samping ke ATAS bar keranjang.**
+*"itu Wa buat di atas bar yang keranjang aja jangan disamping"*.
+Sebelumnya `CartStickyBar` punya dua saudara: tombol lanjut (`flex-1`) dan
+link WA di sisinya. Di samping, tombol WA memakan lebar bar dan — karena
+warnanya hijau solidify — terlihat seperti bagian dari keranjang, padahal ia
+bukan. Sekarang link WA di dalam `div.absolute.bottom-full.right-3.mb-2.5.md:right-6`,
+jadi melayang tepat di atas bar, rata kanan. Structurally tetap dua saudara
+(bukan `<button>` membungkus `<a>`, yang tidak valid HTML).
+
+**2. Bar keranjang tidak lagi `md:hidden`.**
+*"di desktop gada keranjang jadi orang gabis lihat pesanannya jika pakai
+laptop"*. Bar disembunyikan di desktop dengan alasan "di desktop tidak ada nav
+bawah, jadi `StepNav` saja yang menyediakan Lanjut". Tapi `StepNav` ada di
+AKHIR daftar — orang laptop harus menggulir sampai ujung halaman hanya untuk
+melihat isi keranjangnya. Sekarang bar tampil di semua lebar layar, tombolnya
+`w-full sm:max-w-md` di dalam wrapper `flex justify-end` supaya tidak
+membentang full-width di layar lebar, dan padding bar ikut jadi `md:px-6` agar
+tepi kanannya sejajar dengan ikon WA (`md:right-6`).
+
+Efek samping yang disengaja: `StepNav` di langkah "Pilih Rasa" kehilangan
+tombol "Lanjut" (dan prop `hideNextBelowMd` dihapus dari `StepNav`). Kalau bar
+hilang lagi, tidak akan ada jalan advance — lihat komentar di `CartStickyBar`.
+Section menu juga `pb-24 md:pb-0` → `pb-28` supaya isi langkah tidak tertutup
+bar di lebar manapun.
+
+**3. Balik ke `/order` mulai dari langkah pertama.**
+*"misal saya sekarang di step ke 3, lalu saya pergi ke home, baru saya mau
+pre-order lagi buat ngulang dari step awal, jangan stay di step ke 3"*.
+Ditambahkan `useEffect` dengan deps `[]` yang return cleanup
+`sessionStorage.removeItem("js_order_step")`. Jadi saat `OrderFlow` dilepas dari
+layar, langkah yang tersimpan hilang.
+
+Ini **membatalkan** effect unmount yang dulu dihapus di commit `c19559e`
+("Pre-order tidak ke-reset saat pindah halaman") — Steven waktu itu tidak mau
+pesanan halfway hilang, sekarang permintaannya kebalikan.
+
+Yang **tidak** dibersihkan, dan itu pilihan sadar:
+- `js_po_pickup_date` tetap stored, jadi tanggal ambil masih terpilih (satu
+  klik untuk ganti). Menghapus yang tidak diminta hanya bikin membingungkan.
+- Keranjang (`CartProvider`) dan draft identitas juga bertahan. Kalau nanti
+  Steven mau pre-order benar-benar dari nol, itu masalah `reset()` di
+  `CartProvider`, bukan di `OrderFlow`.
+
+**Verifikasi** (dev server lokal, alur nyata sampai langkah 03/05):
+- `npx tsc --noEmit` → 0. `npx eslint src --max-warnings=0` → 0. `npm run build` → sukses.
+- DOM bar di langkah menu: WA di `absolute bottom-full`, tidak ada `md:hidden`
+  di wrapper bar, `md:px-6` + tombol `sm:max-w-md` di `justify-end`. Label
+  jumlah item terbaca "1 item" (bukan "1 Jumlah").
+- Skenario Steven: di step 3 → klik logo ke `/` → buka hamburger → "Pre-order".
+  `/order` tampil `01 / 05 Tanggal Ambil`, dan tanggal 16 Oktober tetap
+  `aria-pressed="true"`.
+- Console 0 error / 0 warning.
+- CSS bundle hasil build memuat `.sm\:max-w-md`, `.md\:px-6`, `.bottom-full`,
+  `.md\:right-6`.
+
+Catatan alat: screenshot full-viewport **tidak** menangkap `CartStickyBar` karena
+`backdrop-blur` — elemen itu compositing layer sendiri (gotcha #115). Verifikasi
+harus lewat DOM, bukan gambar. Dan viewport Browser mengikuti lebar panel, jadi
+tampilan desktop tidak bisa difoto langsung (gotcha #116).
+
+Belum di-push / belum live — menunggu persetujuan Steven.
+
+---
+
 ## 2026-10-14 — Bar keranjang kembali di bawah + tombol WA turun ke pojok
 
 Steven 14-10-2026, dari screenshot `Eror 1.png`: *"itu keranjangnya kok hilang di
