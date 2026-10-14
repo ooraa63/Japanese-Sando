@@ -4,6 +4,70 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-15 — "Pesan Kurir" gagal pre-order: check constraint lupa menambah `courier`
+
+Steven 15-10-2026, dari FORM pre-order yang sudah terisi bukti transfer:
+
+```
+Something went wrong. Please try again.
+new row for relation "orders" violates check constraint
+"orders_delivery_method_check"
+```
+
+**Akar masalahnya bukan kode frontend.** Metode pengambilan ketiga "Pesan Kurir"
+sudah ada di mana-mana — kecuali di CHECK constraint tabelnya:
+
+| Tempat | Ada `courier`? |
+|---|---|
+| `src/lib/types.ts` (`DeliveryMethod`) | ya |
+| `src/lib/utils.ts` (`deliveryLabel`) | ya |
+| `src/lib/i18n/id.ts` + `en.ts` | ya |
+| `src/app/account/qris-actions.ts` (zod enum) | ya |
+| `create_order` (validasi `p_delivery_method`) | ya |
+| `AccountClient.tsx`, `SuccessClient.tsx` | ya |
+| `OrderFlow.tsx` (kartu pilihan ketiga) | ya |
+| **`orders_delivery_method_check`** | **tidak** |
+| **`orders_delivery_zone_check`** | **tidak** |
+
+Feature-nya sengaja (keputusan **D73** di `MEMORY/decisions.md`), jadi yang
+tertinggal adalah constraint-nya. Migration yang menambahkan `courier` pernah
+menyentuh function, zod, i18n, dan tipe — tapi tidak pernah menyentuh DDL tabel.
+
+Alurnya: `validatePayment()` lolos -> `create_order` lolos -> INSERT kena
+constraint tabel -> pembeli melihat pesan database mentah.
+
+**Dua constraint, bukan satu.** `create_order` menulis `p_delivery_zone` apa adanya
+di baris INSERT-nya, dan form mengirim `deliveryZone: "courier"` saat metodenya
+Pesan Kurir. Jadi `orders_delivery_zone_check` akan menolak tepat setelah yang
+pertama dilonggarkan. Kalau hanya memperbaiki yang pertama, errornya akan
+berpindah ke `orders_delivery_zone_check` dan kelihatan seperti "hanya separuh
+selesai".
+
+**Reproduksi** (`scripts/repro-courier-constraint.mjs`, semua INSERT di
+`BEGIN ... ROLLBACK`):
+
+```
+courier/courier  -> DITOLAK  orders_delivery_method_check   (persis error Steven)
+pickup/courier   -> DITOLAK  orders_delivery_zone_check     (_constraint kedua_)
+pickup/pickup    -> DITERIMA  (baseline sehat)
+orders           -> 6 -> 6
+```
+
+**Perbaikan: `supabase/migration-57.sql`** — melonggarkan dua constraint, menambah
+`'courier'`, plus `COMMENT ON` yang memperingatkan bahwa daftar constraint harus
+sama dengan validasi di dalam `create_order`.
+
+**Verifikasi** (`scripts/test-migration-57.mjs`, di dalam `BEGIN ... ROLLBACK`):
+**13 OK, 0 GAGAL** — kedua constraint berubah isi, `courier/courier` diterima,
+`pickup/pickup` dan `delivery/vihara` tidak regresi, nilai ngawur tetap ditolak
+(constraint tidak mati), dan setelah rollback definisi kembali ke semula dengan
+order tetap 6. `dry-run-migration.js` juga bersih.
+
+Catatan: error ke pembeli apa adanya berbahasa Inggris dan teknis. Sudah
+dibahas dengan Steven, belum dikerjakan — bukan bagian permintaan ini.
+
+---
+
 ## 2026-10-14 — WA pindah ke atas bar keranjang, bar tampil di desktop, pre-order baru mulai dari step 1
 
 Tiga permintaan Steven dari screenshot `Eror 1.png` (versi kedua). Semuanya

@@ -1970,3 +1970,54 @@ Dua hal yang membuat verifikasi `/order` di Browser tricky:
    `hidden md:flex` — elemen yang resolved tapi tidak terlihat akan diklik
    tanpa efek apa pun.
 
+### #117 - Validasi di dalam RPC TIDAK menggantikan CHECK constraint di tabel
+
+Terjadi 15-10-2026: pembeli memilih "Pesan Kurir" + transfer, lalu mendapat
+`new row for relation "orders" violates check constraint
+"orders_delivery_method_check"`.
+
+Migration yang menambahkan `courier` (D73) menyentuh **semua** tempat kecuali
+DDL tabelnya: tipe `DeliveryMethod`, `deliveryLabel`, i18n dua bahasa, zod enum
+di `qris-actions.ts`, validasi `p_delivery_method` di dalam `create_order`, dan
+tampilan admin + halaman sukses. Yang tertinggal hanya
+`orders_delivery_method_check` dan `orders_delivery_zone_check` yang masih
+sekitar tahun 2025 (`pickup`, `delivery`).
+
+Pelajaran: **function validation jalan SETELAH validasi kolom tabel**, bukan
+sebaliknya. Baris yang lolos `raise exception 'invalid_delivery_method'` tetap
+bisa ditolak INSERT karena constraint. Jadi kalau menambah nilai enum baru,
+DAFTAR LENGKAP yang harus ikut berubah:
+
+1. tipe di `src/lib/types.ts`
+2. i18n (id + en) — label, deskripsi, pesan error
+3. zod schema di server action
+4. validasi di dalam RPC
+5. **`CHECK` constraint di tabel** ← yang paling sering terlupa
+6. tampilan admin / halaman sukses / invoice
+
+Tiga jebakan tambahan dari kasus ini:
+
+- **Uji dengan INSERT, bukan cuma baca definisi constraint.** `delivery_method`
+  punya `default 'pickup'::text`, jadi kalau tes INSERT tidak menyebut kolomnya,
+  PostgreSQL diam-diam memakai default dan tesnya lolos padahal tidak
+  menguji apa pun. Kolom dengan default TIDAK muncul di
+  `information_schema.columns` yang `is_nullable = 'NO' and column_default is
+  null` — itu jebakan pertama yang sempat bikin tes saya.
+- **Satu fitur bisa ditolak di DUA constraint.** Form mengirim
+  `delivery_zone = 'courier'` juga, jadi memperbaiki constraint method saja
+  membuat errornya BERPINDAH ke `orders_delivery_zone_check`. Kalau tidak
+  diuji dua-duanya, "perbaikan" terlihat seperti berhasil padahal hanya
+  menggeser masalah.
+- **Uji balik di `BEGIN ... ROLLBACK`,** lalu pastikan definisi constraint
+  kembali ke semula setelah rollback (`scripts/test-migration-57.mjs`).
+  Kalau setelah rollback masih longgar, berarti ada yang men-commit di luar
+  transaksi.
+
+Cara cepat melihat semua constraint sebuah tabel:
+
+```sql
+select conname, pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'public.orders'::regclass and contype = 'c';
+```
+
