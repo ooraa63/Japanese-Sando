@@ -64,7 +64,23 @@ sama dengan validasi di dalam `create_order`.
 order tetap 6. `dry-run-migration.js` juga bersih.
 
 Catatan: error ke pembeli apa adanya berbahasa Inggris dan teknis. Sudah
-dibahas dengan Steven, belum dikerjakan — bukan bagian permintaan ini.
+dibahas dengan Steven (15-10-2026) — jawabannya "nanti dulu, yang penting
+bug-nya beres", jadi sengaja belum dikerjakan.
+
+**Sudah LIVE di produksi** (Steven menyetujui apply + push):
+
+- `scripts/run-migration.js supabase/migration-57.sql` → `TERPASANG`.
+- `scripts/verify-live-courier.mjs` → **11 OK, 0 GAGAL**. Kedua constraint di
+  produksi sudah memuat `'courier'`, `courier/courier` (kasus Steven) DITERIMA,
+  `pickup/pickup` + `delivery/vihara|uvers|other` tidak regresi, nilai ngawur
+  tetap ditolak, dan `orders` tetap 6 karena semua percobaan INSERT di
+  `BEGIN ... ROLLBACK`.
+- Tidak ada perubahan kode frontend, jadi tidak perlu deploy ulang untuk
+  perbaikannya — frontend sudah mengirim `courier` dengan benar sejak awal.
+
+**Sisa satu langkah dari Steven:** batch "Tes" sudah tutup (tutup 15-10-2026
+00:00 WIB). Sampai batch baru dibuka dari admin, `/order` menampilkan panel
+"Belum ada batch PO" dan tidak ada pesanan yang bisa masuk sama sekali.
 
 ---
 
