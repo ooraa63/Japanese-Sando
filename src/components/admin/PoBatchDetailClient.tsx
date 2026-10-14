@@ -417,11 +417,18 @@ function StockTab({
   const adaPerubahan = dirtyStock || dirtyBundles || dirtyRasa;
 
   return (
-    <>
-      {/* Steven 14-10-2026: "bundle jangan di samping sana, intinya untuk menu
-          dan bundle itu satu itu layout yang sama aja" — jadi Bundle kembali
-          DI BAWAH kartu menu, satu kolom, seperti sebelumnya. Kolom kanan
-         Dicoba sekali tapi bikin area menu terasa sempit. */}
+    /* Steven 14-10-2026 (pertama: "bundle jangan di samping sana", kedua:
+       "jangan atas bawah, itu sampingnya kan masih kosong").
+
+       Dua koreksi itu sebenarnya satu hal yang sama: jangan sampai ada ruang
+       kosong. Versi kolom kanan terlalu sempit karena kartu menunya hanya
+       menempati 1/3 lebar kolom (grid 3 kolom, padahal kategorinya cuma
+       satu). Versi atas-bawah menyisakan setengah halaman kosong di kanan.
+
+       Solusinya: Bundle di samping, tapi kartu menu memakai FLEX-GROW
+       (bukan grid kolom tetap) sehingga 1 kategori melebar penuh, 2 membagi
+       dua, 3 membagi tiga — selalu memenuhi lebar yang tersedia. */
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
       <section className="card p-5">
         <h2 className="text-lg font-extrabold text-cocoa-900">{labels.stok.title}</h2>
         <p className="mt-1 text-[13px] text-cocoa-500">{labels.stok.subtitle}</p>
@@ -431,16 +438,12 @@ function StockTab({
           masih tidak ada seperti konssep yang menu & stock sebelumnya yang di
           Menu bar utama".
 
-          Sebelumnya di sini ada tabel angka (JENIS MENU / STOK AWAL / TERJUAL /
-          SISA) DAN pratinjau menu sebagai blok terpisah di bawahnya. Sekarang
-          keduanya digabung jadi SATU panel kartu per kategori — persis seperti
-          grid kategori di `/admin/menu`: ada gambarnya, jumlah rasa, badge
-          status visibility, dan input stok di dalam kartu yang sama. */}
-        <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          Sekarang kartu-kartunya memakai `flex-1 basis-[19rem]` supaya ikut
+          melebar: kalau kategorinya cuma satu, kartunya memenuhi seluruh
+          lebar kolom dan tidak ada rongga di sebelahnya. */}
+        <ul className="mt-4 flex flex-wrap gap-4">
           {menu.length === 0 ? (
-            <li className="col-span-full px-1 py-6 text-sm text-cocoa-400">
-              {labels.stok.empty}
-            </li>
+            <li className="w-full px-1 py-6 text-sm text-cocoa-400">{labels.stok.empty}</li>
           ) : (
             menu.map((category) => (
               <MenuStockCard
@@ -465,34 +468,33 @@ function StockTab({
         </ul>
 
         <p className="mt-2.5 text-[12px] text-cocoa-500">{labels.stok.initialHint}</p>
+      </section>
 
-        {/* ---------- Bundle (di bawah menu, satu kolom) ---------- */}
-        <div className="mt-6 border-t border-cocoa-200 pt-6">
-          <h3 className="text-base font-extrabold text-cocoa-900">
-            {labels.stok.bundlesTitle}
-          </h3>
-          <p className="mt-1 text-[13px] text-cocoa-500">{labels.stok.bundlesSubtitle}</p>
+      {/* ---------- Bundle (di samping kanan, ikut nempel) ---------- */}
+      <aside className="card p-5 lg:sticky lg:top-24">
+        <h3 className="text-base font-extrabold text-cocoa-900">{labels.stok.bundlesTitle}</h3>
+        <p className="mt-1 text-[12px] text-cocoa-500">{labels.stok.bundlesSubtitle}</p>
 
-          {initial.bundles.length === 0 ? (
-            <p className="mt-4 text-sm text-cocoa-400">{labels.stok.bundlesEmpty}</p>
-          ) : (
-            <>
-              {!semuaBundleAktif ? null : (
-                <p className="mt-3 rounded-xl bg-honey-300/20 px-3.5 py-2.5 text-[13px] font-semibold text-honey-500">
-                  {labels.stok.bundlesAllHint}
-                </p>
-              )}
-              <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
-                {initial.bundles.map((b) => {
-                  const on = picked[b.bundle_id] != null;
-                  return (
-                    <li
-                      key={b.bundle_id}
-                      className={`rounded-2xl border-2 p-3.5 transition ${
-                        on ? "border-cocoa-900 bg-cream-50" : "border-cocoa-200 bg-white"
-                      }`}
-                    >
-                      <button
+        {initial.bundles.length === 0 ? (
+          <p className="mt-4 text-sm text-cocoa-400">{labels.stok.bundlesEmpty}</p>
+        ) : (
+          <>
+            {!semuaBundleAktif ? null : (
+              <p className="mt-3 rounded-xl bg-honey-300/20 px-3.5 py-2.5 text-[12px] font-semibold text-honey-500">
+                {labels.stok.bundlesAllHint}
+              </p>
+            )}
+            <ul className="mt-4 space-y-2.5">
+              {initial.bundles.map((b) => {
+                const on = picked[b.bundle_id] != null;
+                return (
+                  <li
+                    key={b.bundle_id}
+                    className={`rounded-2xl border-2 p-3 transition ${
+                      on ? "border-cocoa-900 bg-cream-50" : "border-cocoa-200 bg-white"
+                    }`}
+                  >
+                    <button
                         type="button"
                         onClick={() => toggleBundle(b.bundle_id)}
                         aria-pressed={on}
@@ -543,15 +545,14 @@ function StockTab({
               </ul>
             </>
           )}
-        </div>
-      </section>
+      </aside>
 
       {/* Steven 14-10-2026: "yang simpan stok & bundle jangan di ujung kanan
           bawah bgt susah lihat". Tombolnya jadi pill mengambang di TENGAH
           bawah layar dan nempel (sticky), jadi selalu kelihatan tanpa harus
           menggulir sampai paling bawah. */}
       {adaPerubahan ? (
-        <div className="sticky bottom-3 z-10 mt-4 flex justify-center">
+        <div className="sticky bottom-3 z-10 mt-4 flex justify-center lg:col-span-2">
           <div className="flex items-center gap-3 rounded-full border border-cocoa-200 bg-white/95 py-2 pr-2 pl-4 shadow-lg backdrop-blur">
             <span className="text-[12px] font-bold text-cocoa-600">
               {labels.stok.unsavedHint}
@@ -572,7 +573,7 @@ function StockTab({
           </div>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -680,7 +681,7 @@ function MenuStockCard({
           : "bg-matcha-50 text-matcha-700";
 
   return (
-    <li className="card flex flex-col overflow-hidden">
+    <li className="card flex flex-1 basis-[19rem] flex-col overflow-hidden">
       {/* Kepala: gambar + nama + jumlah rasa + badge status */}
       <div className="flex items-start gap-3.5 p-4">
         <span

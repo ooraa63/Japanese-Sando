@@ -4,6 +4,37 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Bundle di samping, kartu menu ikut melebar (flex-grow)
+
+Steven 14-10-2026, koreksi ketiga untuk masalah yang sama.
+
+Dua perintah sebelumnya terdengar bertentangan tapi sebenarnya satu hal:
+- "bundle jangan di samping sana" (versi kolom kanan terlalu sempit)
+- "jangan atas bawah, itu sampingnya kan masih kosong" (versi susun ke bawah
+  menyisakan setengah halaman kosong di kanan)
+
+Akar masalahnya sama: **ada ruang kosong**. Versi kolom kanan benar layoutnya,
+tapi kartu menunya cuma memenuhi 1/3 lebar kolom karena `xl:grid-cols-3`
+dengan kategorinya hanya satu — jadi di DALAM kolom kiri pun masih rongga.
+
+**Perbaikan:** kartu menu tidak lagi pakai grid kolom tetap, tapi
+`flex flex-wrap` + tiap kartu `flex-1 basis-[19rem]`. Consequences:
+- 1 kategori → kartunya melebar penuh
+- 2 kategori → membagi rata
+- 3+ → membungkus otomatis
+
+Bundle tetap di kolom kanan (`22rem`, sticky) karena hanya sedikit isinya dan
+hanya 1-2 paket.
+
+**Pelajaran:** untuk daftar kartu yang jumlah itsnya tidak pasti, pakai
+`flex-1 basis-*` BUKAN `grid-cols-N`. Grid dengan N kolom tetap selalu menyisakan
+N-1 sel kosong kalau isinya lebih sedikit dari N — dan itulah yang bikin Steven
+tiga kali beerotasi layout.
+
+**Verifikasi:** `tsc` bersih · `eslint --max-warnings=0` bersih · `build` sukses.
+
+---
+
 ## 2026-10-14 — Bundle balik ke bawah, label "Stock", tombol simpan mengambang
 
 Steven 14-10-2026 lewat screenshot ketiga (setelah versi kolom kanan). Tiga
