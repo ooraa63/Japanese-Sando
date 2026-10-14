@@ -6,7 +6,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Bell,
   ChevronRight,
   LogIn,
   Menu,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
+import { NotificationBell } from "@/components/customer/NotificationBell";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
 import {
   ACCOUNT_FEATURE_ENABLED,
@@ -155,17 +155,13 @@ export function SiteHeader({
             "mini" supaya muat di top bar HP tanpa membuat nama toko tergeser. */}
         <LanguageToggle variant="mini" />
 
-        {/* Belum ada fitur notifikasi, jadi lonceng ini diarahkan ke /track
-            (lacak pesanan pakai kode + nomor telepon) — bukan tombol mati.
-            Titik oranye di pojok DIHAPUS: tidak ada data notifikasi sungguhan
-            di database, jadi badge itu cuma karangan. */}
-        <Link
-          href="/track"
-          className="grid size-10 shrink-0 place-items-center rounded-xl text-cocoa-700 transition active:bg-cocoa-100"
-          aria-label={t.nav.track}
-        >
-          <Bell className="size-5" />
-        </Link>
+        {/* Steven 14-10-2026: lonceng ini dulu cuma tautan ke /track dengan
+            komentar "belum ada fitur notifikasi". Sekarang benar-benar jalan:
+            `NotificationBell` memantau status pesanan tiap 15 detik, jadi
+            saat status berubah (siap / ditolak / diantar) atau ada pengumuman
+            dari admin, notifikasinya muncul di sini dengan badge jumlah belum
+            dibaca. */}
+        <NotificationBell />
 
         {/* Chip avatar / "Masuk" disembunyikan sementara — fitur Account
             dimatikan (lihat `ACCOUNT_FEATURE_ENABLED`). */}
@@ -245,6 +241,9 @@ export function SiteHeader({
 
         <div className="flex items-center gap-2">
           <LanguageToggle />
+          {/* Lonceng notifikasi juga di desktop (sebelumnya cuma mobile),
+              supaya pembeli di laptop juga tahu pesanan sudah siap. */}
+          <NotificationBell />
           {/* Sama seperti di mobile: chip avatar / "Masuk" ikut disembunyikan
               selama fitur Account dimatikan. */}
           {ACCOUNT_FEATURE_ENABLED ? (

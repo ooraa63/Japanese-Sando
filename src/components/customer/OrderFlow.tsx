@@ -36,7 +36,6 @@ import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
 import { AddressPicker } from "@/components/customer/AddressPicker";
-import { CartDrawer } from "@/components/customer/CartDrawer";
 import { QrisPaymentModal } from "@/components/customer/QrisPaymentModal";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
 import {
@@ -63,6 +62,19 @@ const LOGGED_IN_STEPS = ["date", "menu", "payment", "review"] as const;
 const NO_PO_FULL_STEPS = ["identity", "menu", "payment", "review"] as const;
 const NO_PO_LOGGED_IN_STEPS = ["menu", "payment", "review"] as const;
 type Step = (typeof FULL_STEPS)[number];
+
+/**
+ * Lebar kolom harga di langkah konfirmasi.
+ *
+ * Steven 14-10-2026 (gambar bill): semua nominal harus rata di tepi kanan
+ * yang SAMA — dari item, subtotal, ongkir, sampai total. Kalau price-nya cuma
+ * `shrink-0` di dalam `justify-between`, tepi kanannya ikut berubah-ubah
+ * sesuai panjang teks ("Rp 36.000" lebih lebar dari "Rp 8.000").
+ *
+ * Karena itu semua harga memakai kelas yang sama: lebar tetap + rata kanan +
+ * angka tabular. Satu kelas = satu kolom = struk yang rapi.
+ */
+const PRICE_COL = "w-28 shrink-0 text-right tabular";
 /** Step list untuk user yang sudah login + profile lengkap — skip identity.
  *  Guest (= tanpa profile) tetap melewati identity dulu.
  *  `hasPo` = ada batch yang sedang dibuka, jadi langkah tanggal ditampilkan. */
@@ -327,7 +339,6 @@ export function OrderFlow({
   }, []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
   const [soldCounts, setSoldCounts] = useState<Record<number, number>>({});
   /** Payload untuk QrisPaymentModal — diset saat user submit dengan
    *  paymentMethod=qris_midtrans. Modal akan generate QR via Midtrans. */
@@ -358,6 +369,8 @@ export function OrderFlow({
      "Diantar" harus membuka popup lokasi, karena titik dan jam ambil
      ditentukan admin dan pembeli perlu tahu sebelum konfirmasi. */
   const [locationPopup, setLocationPopup] = useState<DeliveryZone | null>(null);
+  // Popup PEMILIHAN toko untuk metode "Ambil di toko" (Steven 14-10-2026).
+  const [pickupPickerOpen, setPickupPickerOpen] = useState(false);
 
   // Mengganti tanggal membuang batch lama seketika, supaya selama RPC
   // berjalan tidak ada satu frame pun yang memakai stok batch yang salah.
@@ -594,6 +607,37 @@ export function OrderFlow({
   //
   // "Pesan Kurir" = pembeli sendiri yang memesan armada (GoSend/Grab),
   // jadi ongkir ditanggung pembeli dan tidak ada ongkir yang kita tagih.
+  /* Steven 14-10-2026 (gambar 3): "sbnrnya maksud saya pop up bukan begitu,
+       tapi misal saat mereka pilih ambil ditoko ada baru pilihan popup untuk
+       memilih mau ambilnya di toko mana".
+
+       Popup yang dulu muncul cuma DETAIL toko yang otomatis terpilih — jadi
+       pembeli tidak pernah bisa memilih. Sekarang: klik "Ambil di toko" ->
+       muncul popup DAFTAR toko, pembeli yang memilih. Kalau admin belum
+       menandai titik pengambilan sama sekali, popup menjelaskan itu (tidak
+       diam-diam crashes atau selecting "pickup" palsu).
+
+       Titik pengambilan ini bersumber dari `delivery_zones` yang kind-nya
+       'pickup' — datanya sudah ada, ditata dari admin "Ambil & Kirim", jadi
+       tidak perlu tabel toko baru untuk sekarang. Nanti kalau daftar toko
+       tumbuh jadi datastore sendiri, tinggal ganti sumber `pickupZones`. */
+  const onPickupClick = () => {
+    updateDraft({ deliveryMethod: "pickup", address: "", addressNote: "", lat: null, lng: null });
+    // Kalau cuma ada satu titik pengambilan, langsung dipakai supaya pembeli
+    // tidak perlu popup untuk pilihan yang tidak ada artinya. Kalau ada
+    // beberapa, popup pilihannya yang muncul.
+    const zones = deliveryZones.filter((z) => z.kind === "pickup");
+    if (zones.length === 1) {
+      updateDraft({ deliveryZone: zones[0].id });
+      setPickupPickerOpen(false);
+      return;
+    }
+    setPickupPickerOpen(true);
+  };
+
+  const pickupZones = deliveryZones.filter((z) => z.kind === "pickup");
+  const chosenPickup = pickupZones.find((z) => z.id === draft.deliveryZone) ?? null;
+
   const currentZone = deliveryZones.find((z) => z.id === draft.deliveryZone);
   const rawDeliveryFee =
     draft.deliveryMethod === "delivery" && currentZone ? currentZone.fee : 0;
@@ -759,6 +803,23 @@ export function OrderFlow({
     if (draft.deliveryMethod === "delivery" && draft.address.trim().length < 5) {
       toast.warning(t.order.payment.addressError);
       return false;
+    }
+    /* Steven 14-10-2026: sekarang toko dipilih lewat popup. Kalau pembeli
+       menutup popup tanpa memilih, `deliveryZone` masih nilai lama
+       ("pickup" bawaan) yang TIDAK ada di tabel — `create_order` akan
+       menolaknya dengan error yang membingungkan. Jadi:tahan di sini
+       dengan pesan yang jelas, dan buka lagi popupnya. */
+    if (draft.deliveryMethod === "pickup") {
+      const validPickup = pickupZones.some((z) => z.id === draft.deliveryZone);
+      if (!validPickup) {
+        toast.warning(
+          pickupZones.length > 0
+            ? t.order.payment.pickupChooseTitle
+            : t.order.payment.pickupEmpty
+        );
+        if (pickupZones.length > 0) setPickupPickerOpen(true);
+        return false;
+      }
     }
     // Bukti transfer TIDAK wajib saat submit — pembeli boleh transfer
     // dulu, baru upload bukti di langkah review, atau kirim via WA
@@ -998,15 +1059,12 @@ export function OrderFlow({
   // mundur ini harus ada di SETIAP langkah, bukan cuma di payment & review.
   const prevStep: Step | null = stepIndex > 0 ? steps[stepIndex - 1] : null;
 
-  // Steven 13-10-2026: panel keranjang HANYA di langkah "Pilih Rasa".
-  //
-  // Di langkah identitas isinya pasti kosong, jadi tidak useful. Di langkah
-  // Pembayaran dan Konfirmasi juga dihapus — di situ pembeli sudah memilih
-  // metode pembayaran, lokasi, lalu mengonfirmasi; isi keranjang yang
-  // ditunjukkan di sisi kanan hanya mengulang apa yang sudah tertulis di
-  // kartu "Periksa pesananmu" (nama, telepon, pembayaran, pengiriman).
-  // Menghemat ruang vertikal, yang di layar HP dipakai untuk form.
-  const showCartPanel = step === "menu";
+  // Steven 13-10-2026 -> 14-10-2026: panel keranjang di sisi kanan SUDAH
+  // DIHAPUS (gambar 4: "keranjangnya dihilangkan aja, karena terlalu bawah
+  // juga orang gaChamp"), begitu juga sticky bar bawah dan drawernya. Yang
+  // masih hidup cuma keranjang di memori CartProvider — pembeli tetap bisa
+  // menambah/mengurangi rasa seperti biasa lewat kartu Flavor, dan menekan
+  // "Lanjut" lewat StepNav di bawah daftar rasa.
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -1106,11 +1164,7 @@ export function OrderFlow({
           })}
         </ol>
       </div>
-<div
-        className={
-          showCartPanel ? "grid gap-6 lg:grid-cols-[1fr_20rem] lg:items-start" : "grid gap-6"
-        }
-      >
+<div className="grid gap-6">
         <div className="min-w-0">
           {/* ============ LANGKAH 1: TANGGAL AMBIL ============ */}
           {step === "date" ? (
@@ -1315,10 +1369,22 @@ export function OrderFlow({
 
           {/* ============ LANGKAH 2: PILIH RASA ============ */}
           {step === "menu" ? (
-            /* pb-28 memberi ruang untuk CartStickyBar yang position-nya
-               `sticky bottom-0`. Tanpa padding ini, kartu Flavor baris
-               terakhir ketutup bar keranjang (bug yang Steven laporkan). */
-            <section className="pb-28">
+            /* Steven 14-10-2026 (gambar 4): "itu keranjangnya dihilangkan aja,
+               karena terlalu bawah juga orang gaChamp".
+
+               Yang dihapus: panel ringkasan di kanan (aside), sticky bar
+               bawah, dan drawer. Ketiganya hanya memberi informasi yang sama
+               dengan kartu Flavor (tombolnya sudah
+               menunjukkan jumlah), tapi posisinya memaksa pembeli
+               menggulir ke bawah halaman.
+
+               KONSEKUENSI PENTING: dulu tombol "Lanjut" hidup DI DALAM
+               drawer itu. Kalau drawer dihapus tanpa pamit, pembeli tidak
+               punya cara advance ke pembayaran. Jadi di bawah ini StepNav
+               dikembalikan ke langkah menu, dengan tombol Lanjut yang
+               disabled saat keranjang masih kosong — supaya tidak ada jalan
+               buntu. */
+            <section>
               <div className="card mb-6 p-6 sm:p-8">
                 <StepHeading
                   icon={<ShoppingBag className="size-5" />}
@@ -1341,22 +1407,23 @@ export function OrderFlow({
                 />
               )}
 
-              {/* Sticky bottom cart bar (gaya GoFood) — tap untuk buka
-                  drawer dengan rincian + tombol 'Lanjut'. Step-nav di
-                  step disabled (hidden) karena tombol 'Lanjut' pindah ke
-                  dalam drawer. */}
-              <CartStickyBar
-                totalItems={totalItems}
-                subtotal={subtotal}
-                storeName={settings?.store_name ?? ""}
-                deliveryLabel={deliveryLabel}
-                onOpenCart={() => setCartOpen(true)}
-              />
+              {/* Ganti sticky bottom cart bar + drawer jadi navigasi langkah biasa.
 
-              {/* Tombol back ke step identitas tetap ada tapi dipindah
-                  ke posisi tersembunyi (di mobile kelihatan lewat panah
-                  kembali header step), atau cukup dengan link di header
-                  step heading. */}
+                 -"Lanjut" dulu hidup di dalam drawer keranjang; karena
+                  drawer dihapus (Steven 14-10-2026), tombolnya dikembalikan
+                  ke alur langkah biasa. Disabled kalau keranjang masih kosong
+                  supaya pembeli tidak bisa advance tanpa memilih rasa. */}
+              {/* Langkah SEBELUM "menu" diambil dari daftar langkah yang aktif
+                  (prevStep), bukan ditulis manual: untuk profil lengkap +
+                  batch PO sebelumnya "date", untuk tamu "identity", dan kalau
+                  tidak ada PO tidak ada tombol back. */}
+              <StepNav
+                onBack={prevStep ? () => goTo(prevStep) : null}
+                onNext={handleNext}
+                nextLabel={t.common.next}
+                nextIcon={<ArrowRight className="size-4" />}
+                disabled={totalItems === 0}
+              />
             </section>
           ) : null}
 
@@ -1401,22 +1468,7 @@ export function OrderFlow({
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <ChoiceCard
                   selected={draft.deliveryMethod === "pickup"}
-                  onClick={() => {
-                    // Pilih lokasi pickup default: zona pickup pertama yang
-                    // aktif, fallback ke "pickup" kalau admin belum set.
-                    const firstPickup = deliveryZones.find(
-                      (z) => z.kind === "pickup"
-                    );
-                    updateDraft({
-                      deliveryMethod: "pickup",
-                      deliveryZone: firstPickup?.id ?? "pickup",
-                      address: "",
-                      addressNote: "",
-                      lat: null,
-                      lng: null,
-                    });
-                    if (firstPickup) setLocationPopup(firstPickup);
-                  }}
+                  onClick={onPickupClick}
                   icon={<Store className="size-5" />}
                   title={t.order.payment.pickup}
                   desc={t.order.payment.pickupDesc}
@@ -1499,40 +1551,37 @@ export function OrderFlow({
                 </div>
               ) : null}
 
-              {/* Titik pengambilan (hanya muncul setelah pilih 'Ambil di
-                  toko'). Dikelola admin di menu "Ambil & Kirim"
-                  (/admin/pickup-delivery). Catatan di bawah dipakai untuk
-                  jam ambil — "ada catatan juga jadi tau ambil jam berapa". */}
-              {draft.deliveryMethod === "pickup" &&
-              deliveryZones.filter((z) => z.kind === "pickup").length > 0 ? (
-                <div className="mt-4">
-                  <p className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
-                    {lang === "en" ? "Pickup location" : "Lokasi pengambilan"}
-                  </p>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                    {deliveryZones
-                      .filter((z) => z.kind === "pickup")
-                      .map((z) => {
-                        const zName =
-                          lang === "en" ? z.name_en : z.name_id;
-                        const zNote =
-                          (lang === "en" ? z.note_en : z.note_id) ?? "";
-                        return (
-                          <ChoiceCard
-                            key={z.id}
-                            selected={draft.deliveryZone === z.id}
-                            onClick={() => {
-                              updateDraft({ deliveryZone: z.id });
-                              setLocationPopup(z);
-                            }}
-                            icon={<Store className="size-5" />}
-                            title={zName}
-                            desc={lang === "en" ? "Free" : "Gratis"}
-                            note={zNote}
-                          />
-                        );
-                      })}
+              {/* Toko pilihan (metode "Ambil di toko"). Steven 14-10-2026:
+                  grid kartu toko yang panjang DIHAPUS dan diganti ringkasan
+                  satu baris + tombol "Ganti toko". Alasannya: grid itu bikin
+                  halaman panjang, dan tombol "Lihat lokasi" di bawahnya
+                  membuka popup DETAIL — bukan popup pilihan. Sekarang ada
+                  satu cara saja memilih, lewat popup, dan tempat ini hanya
+                  menampilkan hasil pilihannya. */}
+              {draft.deliveryMethod === "pickup" && pickupZones.length > 0 ? (
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-matcha-300 bg-matcha-50 p-4">
+                  <Store className="size-5 shrink-0 text-matcha-700" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold tracking-wide text-matcha-700 uppercase">
+                      {t.order.payment.pickupSelectedStore}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-bold text-cocoa-800">
+                      {chosenPickup
+                        ? lang === "en"
+                          ? chosenPickup.name_en
+                          : chosenPickup.name_id
+                        : lang === "en"
+                          ? "Not selected yet"
+                          : "Belum dipilih"}
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setPickupPickerOpen(true)}
+                    className="shrink-0 rounded-xl border border-cocoa-200 bg-white px-3.5 py-2.5 text-sm font-bold text-cocoa-700 transition hover:bg-cocoa-50"
+                  >
+                    {t.order.payment.pickupChangeStore}
+                  </button>
                 </div>
               ) : null}
 
@@ -1701,12 +1750,35 @@ export function OrderFlow({
                     {formatPickupDate(poBatch.pickupDate, lang)}
                   </ReviewRow>
                 ) : null}
-                <ReviewRow
-                  label={t.order.review.itemsLabel}
-                  onEdit={() => goTo("menu")}
-                  editLabel={t.order.review.editItems}
-                >
-                  <ul className="space-y-2.5">
+                {/* ---------- Blok item: struk ---------- */}
+                {/* Steven 14-10-2026 (gambar 5): "costnya buat ke kanan aja,
+                    agak kanan dan semua harus sejajar sampai sub total,
+                    n=buat dia kyk bnrn seperti gambar bill".
+
+                    Penyebab misalignment-nya: blok item tadinya hidup DI DALAM
+                    `ReviewRow`, dan kolom konten `ReviewRow` selalu menyempit
+                    oleh tombol "Ubah" di kanan. Jadi harga item berhenti lebih
+                    kiri daripada Subtotal/Total yang ada di blok bill bawahnya.
+
+                    Perbaikannya: item jadi blok penuh sendiri dengan kolom
+                    harga berukuran TETAP (`PRICE_COL`) — dan nilai yang sama
+                    dipakai subtotal, ongkir, dan total. Satu ukuran = satu tepi
+                    kanan = kelihatan seperti struk beneran. */}
+                <div className="border-t border-cocoa-100 py-3.5 first:border-t-0">
+                  <div className="flex items-start justify-between gap-4">
+                    <p className="text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                      {t.order.review.itemsLabel}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => goTo("menu")}
+                      className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold text-matcha-600 transition hover:bg-matcha-50"
+                    >
+                      {t.order.review.editItems}
+                    </button>
+                  </div>
+
+                  <ul className="mt-2 space-y-2.5">
                     {groups.map((g) => (
                       <li key={g.category?.id ?? `solo-${g.lines[0]?.flavor.id}`}>
                         {g.category ? (
@@ -1722,7 +1794,7 @@ export function OrderFlow({
                             <span className="min-w-0">
                               {l.qty}× {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
                             </span>
-                            <span className="shrink-0 tabular text-cocoa-500">
+                            <span className={`${PRICE_COL} text-cocoa-500`}>
                               {formatIDR(l.flavor.price * l.qty, lang)}
                             </span>
                           </div>
@@ -1731,7 +1803,7 @@ export function OrderFlow({
                           <span>
                             {g.qty} {t.common.qty.toLowerCase()}
                           </span>
-                          <span className="shrink-0 tabular">{formatIDR(g.total, lang)}</span>
+                          <span className={PRICE_COL}>{formatIDR(g.total, lang)}</span>
                         </div>
                       </li>
                     ))}
@@ -1742,12 +1814,12 @@ export function OrderFlow({
                           <p className="text-[10px] font-bold tracking-wide text-berry-600 uppercase">
                             {t.menu.bundleLabel}
                           </p>
-                          <div className="flex justify-between gap-4">
+                          <div className="flex items-baseline justify-between gap-4">
                             <span className="min-w-0">
                               <span className="font-bold text-cocoa-800">{bundleName}</span>
                               <span className="ml-1.5 text-cocoa-400">× {bg.count}</span>
                             </span>
-                            <span className="tabular text-cocoa-500">
+                            <span className={`${PRICE_COL} text-cocoa-500`}>
                               {formatIDR(bg.bundle.price * bg.count, lang)}
                             </span>
                           </div>
@@ -1758,7 +1830,7 @@ export function OrderFlow({
                       );
                     })}
                   </ul>
-                </ReviewRow>
+                </div>
               </div>
 
               {/* ---------- Bill: subtotal + total bayar ---------- */}
@@ -1773,7 +1845,7 @@ export function OrderFlow({
               <div className="mt-6 rounded-2xl border border-cocoa-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex items-baseline justify-between gap-4 border-b border-dashed border-cocoa-300 pb-2">
                   <span className="text-sm text-cocoa-600">{t.common.subtotal}</span>
-                  <span className="tabular text-sm font-semibold text-cocoa-800">
+                  <span className={`${PRICE_COL} text-sm font-semibold text-cocoa-800`}>
                     {formatIDR(subtotal, lang)}
                   </span>
                 </div>
@@ -1783,7 +1855,7 @@ export function OrderFlow({
                     <span className="text-sm font-bold text-matcha-600">
                       {t.order.review.saving}
                     </span>
-                    <span className="tabular text-sm font-bold text-matcha-600">
+                    <span className={`${PRICE_COL} text-sm font-bold text-matcha-600`}>
                       −{formatIDR(saving, lang)}
                     </span>
                   </div>
@@ -1793,7 +1865,7 @@ export function OrderFlow({
                   <>
                     <div className="mt-2 flex items-baseline justify-between gap-4 text-sm text-cocoa-600">
                       <span>{t.order.review.deliveryFee}</span>
-                      <span className="tabular">
+                      <span className={PRICE_COL}>
                         {deliveryFee === 0
                           ? t.order.review.freeShipping
                           : formatIDR(deliveryFee, lang)}
@@ -1814,7 +1886,9 @@ export function OrderFlow({
                   <span className="text-base font-extrabold text-cocoa-900">
                     {t.order.review.totalLabel}
                   </span>
-                  <span className="font-display text-xl font-extrabold text-cocoa-900 tabular">
+                  <span
+                    className={`${PRICE_COL} font-display text-xl font-extrabold text-cocoa-900`}
+                  >
                     {formatIDR(total, lang)}
                   </span>
                 </div>
@@ -1904,114 +1978,24 @@ export function OrderFlow({
           ) : null}
         </div>
 
-        {/* ---------- Ringkasan_order (sidebar) ---------- */}
-        {/* Sembunyi di langkah identitas: saat itu keranjang masih kosong dan
-            belum ada apa pun yang bisa ditambah, jadi panelnya cuma memenuhi
-            ruang kosong. Baris "Lanjut" tetap ada di dalam form identitas. */}
-        {showCartPanel ? (
-        <aside className="lg:sticky lg:top-24">
-          <div className="card overflow-hidden">
-            <div className="flex items-center justify-between gap-2 border-b border-cocoa-100 bg-cocoa-50 px-4 py-3">
-              <h2 className="text-sm font-bold text-cocoa-800">{t.order.menu.cartTitle}</h2>
-              <button
-                type="button"
-                onClick={() => setCartOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full bg-cocoa-200/70 px-2.5 py-0.5 text-xs font-bold text-cocoa-700 transition hover:bg-matcha-100 hover:text-matcha-700"
-              >
-                {totalItems} {t.common.qty.toLowerCase()}
-                <span aria-hidden>›</span>
-              </button>
-            </div>
-
-            {cartLines.length === 0 ? (
-              <p className="px-4 py-8 text-center text-[13px] text-cocoa-400">
-                {t.order.menu.cartEmpty}
-              </p>
-            ) : (
-              <ul className="divide-y divide-cocoa-100">
-                {groups.slice(0, 3).map((g) => (
-                  <li key={g.category?.id ?? `solo-${g.lines[0]?.flavor.id}`} className="px-4 py-3">
-                    {g.category ? (
-                      <p className="mb-1 text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
-                        {lang === "en" ? g.category.name_en : g.category.name_id}
-                      </p>
-                    ) : null}
-                    {g.lines.slice(0, 3).map((l) => (
-                      <div key={l.flavor.id} className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-[13px] font-bold text-cocoa-800">
-                            {lang === "en" ? l.flavor.name_en : l.flavor.name_id}
-                          </p>
-                          <p className="text-[11px] text-cocoa-400 tabular">
-                            {l.qty} × {formatIDR(l.flavor.price, lang)}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    {g.lines.length > 3 ? (
-                      <p className="mt-1 text-[11px] text-cocoa-500">
-                        +{g.lines.length - 3} {t.menu.flavors}…
-                      </p>
-                    ) : null}
-                  </li>
-                ))}
-                {groups.length > 3 ? (
-                  <li className="px-4 py-2 text-center text-[11px] text-cocoa-500">
-                    +{groups.length - 3}…
-                  </li>
-                ) : null}
-              </ul>
-            )}
-
-            <div className="space-y-2 border-t border-cocoa-100 bg-cocoa-50 px-4 py-3.5 text-sm">
-              <div className="flex justify-between text-cocoa-600">
-                <span>{t.common.subtotal}</span>
-                <span className="tabular">{formatIDR(subtotal, lang)}</span>
-              </div>
-
-              {draft.deliveryMethod === "delivery" ? (
-                <>
-                  <div className="flex justify-between text-cocoa-600">
-                    <span>{t.order.review.deliveryFee}</span>
-                    <span className="tabular">
-                      {deliveryFee === 0
-                        ? t.order.review.freeShipping
-                        : formatIDR(deliveryFee, lang)}
-                    </span>
-                  </div>
-                  <ShippingDiscountRows
-                    shipping={shipping}
-                    subtotal={subtotal}
-                    t={t}
-                    lang={lang}
-                  />
-                </>
-              ) : null}
-              <div className="flex justify-between border-t border-cocoa-200 pt-2 text-base font-extrabold text-cocoa-900">
-                <span>{t.common.total}</span>
-                <span className="tabular">{formatIDR(total, lang)}</span>
-              </div>
-            </div>
-
-            {/* min_order rule dihapus (migration-31 settings), gak dipake lagi */}
-          </div>
-
-        </aside>
-        ) : null}
       </div>
 
-      <CartDrawer
-        categories={visibleCategories}
-        open={cartOpen && step === "menu"}
-        onClose={() => setCartOpen(false)}
-        onContinue={handleNext}
-        continueDisabled={totalItems === 0}
-      />
 
       <LocationPopup
         zone={locationPopup}
         storeAddress={settings.address ?? null}
         onClose={() => setLocationPopup(null)}
+      />
+
+      <PickupStorePicker
+        open={pickupPickerOpen}
+        zones={pickupZones}
+        selectedId={draft.deliveryZone}
+        onPick={(z) => {
+          updateDraft({ deliveryZone: z.id });
+          setPickupPickerOpen(false);
+        }}
+        onClose={() => setPickupPickerOpen(false)}
       />
 
       {qrisPayload ? (
@@ -2049,6 +2033,114 @@ function StepHeading({
       <div className="min-w-0">
         <h1 className="text-xl leading-tight font-extrabold text-cocoa-900">{title}</h1>
         <p className="mt-1 text-[13px] text-cocoa-500">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Popup PEMILIHAN toko untuk metode "Ambil di toko".
+ *
+ * Steven 14-10-2026 (gambar 3): "sbnrnya maksud saya pop up bukan begitu,
+ * tapi misal saat mereka pilih ambil ditoko ada baru pilihan popup untuk
+ * memilih mau ambilnya di toko mana".
+ *
+ * Bedanya dengan `LocationPopup`: yang ini MEMILIH (satu klik langsung
+ * menutup dan memakai toko itu), sedangkan `LocationPopup` cuma MEMBACA
+ * detail dari toko yang sudah terpilih.
+ *
+ * Sumber datanya `delivery_zones` dengan `kind = 'pickup'`, jadi tidak ada
+ * tabel toko baru: admin sudah mobilizing titik ini dari menu "Ambil &
+ * Kirim". Kalau nanti daftar toko tumbuh jadi datastore sendiri, cukup ganti
+ * isi prop `zones`.
+ */
+function PickupStorePicker({
+  open,
+  zones,
+  selectedId,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  zones: DeliveryZone[];
+  selectedId: string;
+  onPick: (zone: DeliveryZone) => void;
+  onClose: () => void;
+}) {
+  const { t, lang } = useI18n();
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-cocoa-950/50 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t.order.payment.pickupChooseTitle}
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="border-b border-cocoa-100 px-5 py-4">
+          <h2 className="flex items-center gap-2 text-base font-extrabold text-cocoa-900">
+            <Store className="size-5 text-matcha-600" />
+            {t.order.payment.pickupChooseTitle}
+          </h2>
+          <p className="mt-0.5 text-[13px] text-cocoa-500">
+            {t.order.payment.pickupChooseHint}
+          </p>
+        </div>
+
+        {zones.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-cocoa-400">
+            {t.order.payment.pickupEmpty}
+          </p>
+        ) : (
+          <ul className="max-h-[60vh] divide-y divide-cocoa-100 overflow-y-auto">
+            {zones.map((z) => {
+              const name = lang === "en" ? z.name_en : z.name_id;
+              const note = (lang === "en" ? z.note_en : z.note_id) ?? "";
+              const on = selectedId === z.id;
+              return (
+                <li key={z.id}>
+                  <button
+                    type="button"
+                    onClick={() => onPick(z)}
+                    className={`flex w-full items-center gap-3 px-5 py-4 text-left transition ${
+                      on ? "bg-matcha-50" : "hover:bg-cocoa-50"
+                    }`}
+                  >
+                    <span
+                      className={`grid size-9 shrink-0 place-items-center rounded-xl ${
+                        on ? "bg-matcha-500 text-white" : "bg-cocoa-100 text-cocoa-600"
+                      }`}
+                    >
+                      <Store className="size-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-cocoa-900">
+                        {name}
+                      </span>
+                      {note ? (
+                        <span className="mt-0.5 block text-[12px] leading-relaxed text-cocoa-500">
+                          {note}
+                        </span>
+                      ) : null}
+                    </span>
+                    {on ? <Check className="size-5 shrink-0 text-matcha-600" /> : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="border-t border-cocoa-100 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-primary w-full"
+          >
+            {t.order.payment.cancel}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -2187,12 +2279,23 @@ function ChoiceCard({
   desc?: string;
   note?: string;
 }) {
+  /* Steven 14-10-2026 (screenshot kartu QRIS): "yang QRIS coba dirapikan
+     lagi buat lebih center dari jarak atas ke bawah".
+
+     Penyebabnya BUKAN isi kartu QRIS — kartu itu memang cuma berisi ikon +
+     judul. Masalahnya grid metode pembayaran menyamakan tinggi semua kartu,
+     sedangkan kartu "Transfer bank" lebih tinggi karena punya deskripsi +
+     catatan. Efeknya isi QRIS nempel di atas dan menyisakan rongga kosong
+     di bawah.
+
+     Perbaikannya `justify-center` pada wrapper button: kartu tetap setinggi
+     kartu tertinggi, tapi isinya jadi rata tengah. */
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition ${
+      className={`flex flex-col items-start justify-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
         selected
           ? "border-matcha-500 bg-matcha-50"
           : "border-cocoa-200 bg-white hover:border-cocoa-300 hover:bg-cocoa-50/50"
@@ -2320,53 +2423,6 @@ function ReviewRow({
           {editLabel}
         </button>
       ) : null}
-    </div>
-  );
-}
-/**
- * Sticky bottom cart bar — muncul di bawah step menu saat keranjang
- * tidak kosong. Selaras dengan pola GoFood: ringkasan item + total +
- * tombol lanjut (yang membuka CartDrawer, di dalamnya ada tombol
- * 'Lanjut' final). Tap seluruh bar untuk membuka drawer.
- */
-function CartStickyBar({
-  totalItems,
-  subtotal,
-  storeName,
-  deliveryLabel,
-  onOpenCart,
-}: {
-  totalItems: number;
-  subtotal: number;
-  storeName: string;
-  deliveryLabel: string;
-  onOpenCart: () => void;
-}) {
-  const { t, lang } = useI18n();
-  if (totalItems <= 0) return null;
-  return (
-    <div className="sticky bottom-0 z-30 -mx-4 mt-6 border-t border-cocoa-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] backdrop-blur sm:-mx-6 sm:px-6">
-      <button
-        type="button"
-        onClick={onOpenCart}
-        className="flex w-full items-center gap-3 rounded-2xl bg-cocoa-800 px-4 py-3 text-left text-cream-50 transition hover:bg-cocoa-900 active:scale-[0.99]"
-      >
-        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-matcha-500">
-          <ShoppingBag className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-base leading-tight font-extrabold tabular">
-            {totalItems} {t.common.qty}
-          </p>
-          <p className="mt-0.5 truncate text-[12px] text-cream-200">
-            {storeName} · {deliveryLabel}
-          </p>
-        </div>
-        <span className="text-lg leading-none font-extrabold tabular">
-          {formatIDR(subtotal, lang)}
-        </span>
-        <ArrowRight className="size-5 shrink-0 text-cream-200" />
-      </button>
     </div>
   );
 }

@@ -15,8 +15,23 @@ import {
 } from "lucide-react";
 import type { SalesSummary, SalesTransaction } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { formatFullDateTime, formatIDR, paymentLabel, statusLabel } from "@/lib/utils";
+import { formatDateTimeParts, formatIDR, paymentLabel, statusLabel } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+
+/**
+ * Template grid kolom tabel "Daftar transaksi".
+ *
+ * Dipakai PERSIS oleh header dan setiap baris data. Semua kolom lebar tetap —
+ * tidak ada `auto` — supaya tepi kanan tiap kolom sama persis di semua baris.
+ * Sisa ruang (1fr) diberikan ke kolom PELANGGAN.
+ *
+ * Nilai ini HARUS ditulis sebagai string class literal yang lengkap. Kalau
+ * dirangkai saat runtime (`lg:${TX_COLS}`), scanner Tailwind tidak pernah
+ * melihat class utuhnya sehingga tidak tergenerate dan tabelnya diam-diam
+ * kehilangan kolom.
+ */
+const TX_COLS =
+  "lg:grid-cols-[104px_150px_minmax(0,1fr)_minmax(0,220px)_112px_210px]";
 
 /**
  * Bagian "Daftar transaksi" + filter untuk halaman Mutasi.
@@ -183,35 +198,58 @@ export function SalesTransactionsSection({
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-cocoa-200 bg-cream-50">
-          {/* Template lebar kolom ini dipakai header DAN setiap baris data —
-              harus selalu sama, kalau tidak kolom tidak sejajar.
+          {/* ---------- Template kolom tabel transaksi ----------
+              Steven 14-10-2026 (gambar Mutasi): "di tabelnya masih ga rapi
+              banget ga sejajar semua spacingnya hancur".
 
-              ITEM dikunci maksimal 220px, sisa ruang diberikan ke PELANGGAN
-              supaya teks item pendek tidak menyisakan jarak kosong raksasa. */}
-          <div className="hidden border-b border-cocoa-200 bg-cream-100/70 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-cocoa-500 lg:grid lg:grid-cols-[130px_140px_minmax(0,1fr)_minmax(0,220px)_110px_minmax(150px,auto)] lg:gap-3">
+              Penyebabnya ada dua, keduanya soal grid:
+              1. Header dan tiap baris itu DUA `grid` terpisah, dan kolom
+                 terakhir pakai `minmax(150px, auto)`. Lebar `auto` dihitung
+                 sendiri-sendiri: header cuma berisi teks "BAYAR" (tipis),
+                 sedangkan baris berisi badge status + label pembayaran yang
+                 `whitespace-nowrap` (lebar). Selisihnya diserap kolom
+                 PELANGGAN yang `1fr` — jadi tepi kanan TOTAL/BAYAR bergeser
+                 antara header dan baris.
+              2. Kolom TANGGAL dan KODE tidak punya `whitespace-nowrap`, dan
+                 tanggalnya satu string panjang — jadi jadi tiga baris.
+
+              Perbaikannya: SEMUA kolom lebar tetap (tidak ada `auto` lagi),
+              template-nya dipindah ke satu konstanta supaya header dan baris
+              MUSTAHIL berbeda, tanggal dipecah dua baris pendek, dan
+              kode/kolom numerik dikunci nowrap.
+
+              PENTING: nilai konstantanya adalah string class LITERAL yang
+              lengkap (termasuk prefix `lg:`). Kalau ditulis `lg:${TX_COLS}`,
+              scanner Tailwind tidak akan pernah melihat class itu sebagai
+              teks utuh, jadi diam-diam tidak tergenerate sama sekali dan
+              seluruh kolom jadi menumpuk — persis jebakan "kelas Tailwind
+              tak dikenal = no-op senyap" di MEMORY/gotchas. */}
+          <div
+            className={`hidden border-b border-cocoa-200 bg-cream-100/70 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-cocoa-500 lg:grid ${TX_COLS} lg:gap-3`}
+          >
             <div>{t.admin.sales.colDate}</div>
             <div>{t.admin.sales.colCode}</div>
             <div>{t.admin.sales.colCustomer}</div>
             <div>{t.admin.sales.colItems}</div>
             <div className="text-right">{t.admin.sales.colTotal}</div>
-            <div className="flex items-center gap-2 whitespace-nowrap">
-              {t.admin.sales.colPayment}
-            </div>
+            <div className="whitespace-nowrap">{t.admin.sales.colPayment}</div>
           </div>
           <ul className="divide-y divide-cocoa-200">
             {transactions.map((tr) => {
               const isExpanded = expanded.has(tr.id);
+              const parts = formatDateTimeParts(tr.created_at, lang);
               return (
                 <li key={tr.id} className="text-sm">
                   <button
                     type="button"
                     onClick={() => toggleExpanded(tr.id)}
-                    className="grid w-full grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3.5 text-left transition hover:bg-cocoa-100/40 lg:grid-cols-[130px_140px_minmax(0,1fr)_minmax(0,220px)_110px_minmax(150px,auto)] lg:items-center lg:gap-3"
+                    className={`grid w-full grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3.5 text-left transition hover:bg-cocoa-100/40 ${TX_COLS} lg:items-center lg:gap-3`}
                   >
-                    <div className="font-mono text-[13px] text-cocoa-600">
-                      {formatFullDateTime(tr.created_at, lang)}
+                    <div className="whitespace-nowrap font-mono text-[13px] text-cocoa-600">
+                      <span className="block">{parts.date}</span>
+                      <span className="block text-cocoa-400">{parts.time}</span>
                     </div>
-                    <div className="font-mono text-[13px] font-bold text-cocoa-900">
+                    <div className="whitespace-nowrap font-mono text-[13px] font-bold text-cocoa-900">
                       {tr.order_code}
                     </div>
                     <div className="truncate text-[14px] text-cocoa-800">{tr.customer_name}</div>
@@ -224,7 +262,7 @@ export function SalesTransactionsSection({
                             .join(", ") +
                           (tr.items.length > 2 ? ` +${tr.items.length - 2}` : "")}
                     </div>
-                    <div className="text-right font-bold text-cocoa-900 tabular">
+                    <div className="whitespace-nowrap text-right font-bold text-cocoa-900 tabular">
                       {formatIDR(tr.total_price, lang)}
                     </div>
                     <div className="flex items-center gap-2 whitespace-nowrap">

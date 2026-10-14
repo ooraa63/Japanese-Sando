@@ -121,7 +121,7 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
             <ul className="mt-4 space-y-3.5 text-sm text-cream-200/75">
               <li>
                 <Link
-                  href="/contact#faq"
+                  href="/profile-menu/contact#faq"
                   className="inline-flex items-start gap-2.5 transition hover:text-cream-50"
                 >
                   <HelpCircle className="mt-0.5 size-4 shrink-0 text-matcha-300" />
@@ -130,7 +130,7 @@ export function SiteFooter({ settings }: { settings: StoreSettings | null }) {
               </li>
               <li>
                 <Link
-                  href="/contact"
+                  href="/profile-menu/contact"
                   className="inline-flex items-start gap-2.5 transition hover:text-cream-50"
                 >
                   <MessageCircle className="mt-0.5 size-4 shrink-0 text-matcha-300" />

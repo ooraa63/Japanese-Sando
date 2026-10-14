@@ -318,6 +318,15 @@ export const id: Dict = {
       viewLocation: "Lihat lokasi",
       locationPopup: "Detail lokasi",
       locationEmpty: "Detail lokasi untuk titik ini belum diisi penjual.",
+      // Steven 14-10-2026 (gambar 3): "sbnrnya maksud saya pop up bukan
+      // begitu tapi misal saat mereka pilih ambil ditoko ada baru pilihan
+      // popup untuk memilih mau ambilnya di toko mana". Jadi memilih
+      // "Ambil di toko" sekarang membuka popup PEMILIHAN toko.
+      pickupChooseTitle: "Pilih toko",
+      pickupChooseHint: "Pilih toko tempat kamu mengambil pesanan.",
+      pickupChangeStore: "Ganti toko",
+      pickupSelectedStore: "Toko pilihan",
+      pickupEmpty: "Belum ada toko yang bisa dipilih untuk pengambilan.",
       deliveryZoneTitle: "Antar ke zona mana?",
       address: "Alamat pengiriman",
       addressPlaceholder: "Jalan, nomor, kelurahan, kota",
@@ -1111,6 +1120,25 @@ export const id: Dict = {
       deleted: "Bagian dihapus.",
       confirmDelete: "Hapus bagian ini?",
       errorTitleRequired: "Judulnya wajib diisi.",
+    },
+    announcements: {
+      title: "Pengumuman",
+      subtitle:
+        "Promo atau pemberitahuan yang muncul di lonceng notifikasi pembeli. Langsung tampil setelah disimpan.",
+      new: "Tambah pengumuman",
+      empty: "Belum ada pengumuman.",
+      titleLabel: "Judul",
+      bodyLabel: "Isi",
+      imageLabel: "URL gambar",
+      ctaLabelLabel: "Teks tombol",
+      ctaHrefLabel: "URL tujuan tombol",
+      sortOrderLabel: "Urutan tampil",
+      activeLabel: "Tampil untuk pembeli",
+      saved: "Pengumuman disimpan.",
+      deleted: "Pengumuman dihapus.",
+      confirmDelete: "Hapus pengumuman ini?",
+      errorTitleRequired: "Judulnya wajib diisi.",
+      optional: "opsional",
     },
     menu: {
       title: "Menu",

@@ -811,8 +811,8 @@ export async function saveFaqAction(
 
   // `/faq` dan `/contact` dua-duanya membaca isi yang sama, jadi keduanya
   // harus disegarkan.
-  revalidatePath("/faq");
-  revalidatePath("/contact");
+  revalidatePath("/profile-menu/faq");
+  revalidatePath("/profile-menu/contact");
   revalidatePath("/admin/faq");
   return { ok: true };
 }
@@ -822,8 +822,8 @@ export async function deleteFaqAction(id: number): Promise<ActionResult> {
   const { error } = await supabase.rpc("admin_delete_faq", { p_id: id });
   if (error) return { ok: false, error: humanize(error.message) };
 
-  revalidatePath("/faq");
-  revalidatePath("/contact");
+  revalidatePath("/profile-menu/faq");
+  revalidatePath("/profile-menu/contact");
   revalidatePath("/admin/faq");
   return { ok: true };
 }
@@ -865,7 +865,7 @@ export async function saveTermsAction(
   const { error } = await supabase.rpc("admin_save_terms", { p_payload: payload });
   if (error) return { ok: false, error: humanize(error.message) };
 
-  revalidatePath("/syarat-ketentuan");
+  revalidatePath("/profile-menu/syarat-ketentuan");
   revalidatePath("/admin/terms");
   return { ok: true };
 }
@@ -875,7 +875,7 @@ export async function deleteTermsAction(id: number): Promise<ActionResult> {
   const { error } = await supabase.rpc("admin_delete_terms", { p_id: id });
   if (error) return { ok: false, error: humanize(error.message) };
 
-  revalidatePath("/syarat-ketentuan");
+  revalidatePath("/profile-menu/syarat-ketentuan");
   revalidatePath("/admin/terms");
   return { ok: true };
 }
@@ -1156,6 +1156,76 @@ export async function savePoBatchBundlesAction(
   revalidatePath(`/admin/po/${batchId}`);
   revalidatePath("/order");
   revalidatePath("/");
+  return { ok: true };
+}
+
+/* =============================================================================
+ *  PENGUMUMAN (popup promo di web pembeli)
+ *  Steven 14-10-2026: "di admin bisa set pemberitahuan, seperti mungkin ada
+ *  promo atau apa langsung muncul untuk semua".
+ *
+ *  Tabel + RPC-nya sudah ada sejak migration-13, tapi belum pernah dipakai,
+ *  jadi dashboard ini yang pertama kali mengelolanya lewat UI.
+ * ========================================================================== */
+
+/** Bar pengumuman versi admin: termasuk yang disembunyikan dari pembeli. */
+export interface AdminAnnouncement {
+  id: number;
+  title: string;
+  body_md: string;
+  image_url: string | null;
+  cta_label: string | null;
+  cta_href: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export async function listAnnouncementsAction(): Promise<
+  ActionResult<AdminAnnouncement[]>
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error || !data) return { ok: false, error: "not_authorized" };
+
+  const { data: rows, error: sErr } = await supabase.rpc(
+    "admin_list_announcements"
+  );
+  if (sErr) return { ok: false, error: humanize(sErr.message) };
+
+  // `admin_list_announcements` mengembalikan jsonb ARRAY langsung (bukan
+  // objek `{ items }` seperti RPC FAQ/terms), jadi bentuknya dibungkus di
+  // array supaya tetap aman kalau server membalas null.
+  const payload = (rows ?? []) as AdminAnnouncement[];
+  return { ok: true, data: Array.isArray(payload) ? payload : [] };
+}
+
+export async function saveAnnouncementAction(
+  payload: Record<string, unknown>
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_save_announcement", {
+    p_payload: payload,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  // Popup pengumuman dibaca pembeli dari beranda, jadi root ikut disegarkan.
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/announcements");
+  return { ok: true };
+}
+
+export async function deleteAnnouncementAction(
+  id: number
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_delete_announcement", {
+    p_id: id,
+  });
+  if (error) return { ok: false, error: humanize(error.message) };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/announcements");
   return { ok: true };
 }
 

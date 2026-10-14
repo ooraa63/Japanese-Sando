@@ -1,0 +1,79 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { getI18nDict, getLang } from "@/lib/i18n-server";
+import { getSettings, getFaq } from "@/lib/data";
+import { FaqList } from "@/components/customer/FaqList";
+import { SiteHeader } from "@/components/customer/SiteHeader";
+import { SiteFooter } from "@/components/customer/SiteFooter";
+import { DEFAULT_STORE_NAME } from "@/lib/brand";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const dicts = await getI18nDict();
+  return { title: dicts.faqPage.title, description: dicts.faqPage.subtitle };
+}
+
+/**
+ * Halaman FAQ penuh.
+ *
+ * Bar menu Profil "FAQ" diarahkan ke sini lewat kolom
+ * `profile_menu_items.href` (lihat migration-45). Before-nya bar itu hanya
+ * membuka popup statis; sekarang pembeli mendapat halaman yang bisa dicari dan
+ * dibaca per pertanyaan.
+ *
+ * Isi diambil dari tabel `faq_items` lewat RPC `public_faq` (migration-46),
+ * jadi penjual bisa menambah / mengubah / menyembunyikan pertanyaan dari
+ * dashboard. Section FAQ di `/contact` membaca sumber yang sama, jadi keduanya
+ * tidak pernah berbeda isi.
+ */
+export default async function FaqPage() {
+  const [settings, dicts, lang, faq] = await Promise.all([
+    getSettings(),
+    getI18nDict(),
+    getLang(),
+    getFaq(),
+  ]);
+  const fp = dicts.faqPage;
+
+  const entries = faq.map((f) => ({
+    q: lang === "en" ? f.question_en || f.question_id : f.question_id,
+    a: lang === "en" ? f.answer_en || f.answer_id : f.answer_id,
+  }));
+
+  return (
+    <div className="flex min-h-dvh w-full flex-col">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
+        <SiteHeader
+          storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
+          logoUrl={settings?.logo_url ?? null}
+          brandLine={settings?.brand_line ?? ""}
+        />
+
+        <main className="flex-1 px-4 pt-5 pb-16">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-cocoa-500 transition hover:text-cocoa-900"
+          >
+            <ArrowLeft className="size-4" />
+            {fp.back}
+          </Link>
+
+          <h1 className="font-display mt-3 text-2xl font-extrabold text-cocoa-900">
+            {fp.title}
+          </h1>
+          <p className="mt-1 text-sm text-cocoa-500">{fp.subtitle}</p>
+
+          <div className="mt-5">
+            <FaqList
+              items={entries}
+              searchPlaceholder={fp.search}
+              emptyText={fp.empty}
+            />
+          </div>
+        </main>
+      </div>
+
+      <SiteFooter settings={settings} />
+    </div>
+  );
+}

@@ -11,7 +11,6 @@ import {
   ImagePlus,
   LayoutGrid,
   Loader2,
-  Package,
   Pencil,
   Plus,
   Search,
@@ -969,6 +968,13 @@ function CategoriesView(props: {
 
   return (
     <>
+      {/* Steven 14-10-2026 (gambar 7): "tambahkan jenis makanan buat ke kiri
+          aja, karena kirinya kosong banget dan cari jenis makanan yang di
+          kanan, sejajar dengan tombol tambah jenis makanan".
+
+          Sebelumnya tombol tambah ada di kanan dan kotak cari berdiri sendiri
+          di baris bawah rata kiri — jadi separuh baris kosong. Sekarang
+          keduanya satu baris: tombol di kiri, cari di kanan. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {activeCategory ? (
           <button
@@ -980,30 +986,38 @@ function CategoriesView(props: {
             {t.admin.menu.backToCategories}
           </button>
         ) : (
-          <span />
+          <button
+            type="button"
+            onClick={openNewCategory}
+            className="btn-primary shrink-0"
+          >
+            <Plus className="size-4" />
+            {t.admin.menu.addCategory}
+          </button>
         )}
-        <button
-          type="button"
-          onClick={activeCategory ? openNewFlavor : openNewCategory}
-          className="btn-primary shrink-0"
-        >
-          <Plus className="size-4" />
-          {activeCategory ? t.admin.menu.addFlavor : t.admin.menu.addCategory}
-        </button>
-      </div>
 
-      {!activeCategory ? (
-        <div className="relative sm:max-w-sm">
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-300" />
-          <input
-            className="input !py-2.5 pl-10"
-            placeholder={t.admin.menu.searchCategory}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            type="search"
-          />
-        </div>
-      ) : null}
+        {activeCategory ? (
+          <button
+            type="button"
+            onClick={openNewFlavor}
+            className="btn-primary shrink-0"
+          >
+            <Plus className="size-4" />
+            {t.admin.menu.addFlavor}
+          </button>
+        ) : (
+          <div className="relative w-full sm:w-auto sm:max-w-sm">
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-cocoa-300" />
+            <input
+              className="input !py-2.5 pl-10"
+              placeholder={t.admin.menu.searchCategory}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              type="search"
+            />
+          </div>
+        )}
+      </div>
 
       {!activeCategory ? (
         sortedCategories.length === 0 ? (
@@ -1026,8 +1040,10 @@ function CategoriesView(props: {
               {sortedCategories.map((c) => {
                 const name = lang === "en" ? c.name_en : c.name_id;
                 const count = c.flavor_count ?? 0;
-                const low =
-                  c.stock_enabled && c.stock > 0 && c.stock <= 5;
+                /* Steven 14-10-2026: "untuk visual sisa stocknya di delete aja
+                   karena stock hanya bisa di set di yang batch po nnti".
+                   Jadi badge "N pcs tersisa" DIHAPUS dari kartu jenis makanan.
+                   Stok tetap dikelola di halaman detail batch PO. */
                 return (
                   <li key={c.id} className="card overflow-hidden">
                     <button
@@ -1075,20 +1091,6 @@ function CategoriesView(props: {
                         <span className="mt-0.5 block text-xs text-cocoa-400">
                           {count} {t.menu.flavors}
                         </span>
-                        {c.stock_enabled ? (
-                          <span
-                            className={`mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                              c.stock <= 0
-                                ? "bg-berry-500/10 text-berry-600"
-                                : low
-                                    ? "bg-honey-300/20 text-honey-500"
-                                    : "bg-matcha-50 text-matcha-700"
-                            }`}
-                          >
-                            <Package className="size-3" />
-                            {c.stock} {t.admin.dash.pcsLeft}
-                          </span>
-                        ) : null}
                       </span>
 
                       <ArrowLeft className="size-4 shrink-0 rotate-180 text-cocoa-300 transition group-hover:translate-x-0.5" />

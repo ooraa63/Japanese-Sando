@@ -67,14 +67,14 @@ export function ShopInfo({
 
           <div className="ml-auto flex items-center gap-2">
             <Link
-              href="/contact#faq"
+              href="/profile-menu/contact#faq"
               className="inline-flex items-center gap-1.5 rounded-xl bg-cocoa-800/70 px-3 py-1.5 text-xs font-bold text-cream-50 transition hover:bg-cocoa-800/90"
             >
               <HelpCircle className="size-3.5 shrink-0" />
               <span className="hidden sm:inline">FAQ</span>
             </Link>
             <Link
-              href="/contact"
+              href="/profile-menu/contact"
               className="inline-flex items-center gap-1.5 rounded-xl bg-matcha-500/95 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-matcha-500 sm:text-sm"
             >
               <MessageCircle className="size-3.5 shrink-0" />

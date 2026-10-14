@@ -7,11 +7,10 @@ import {
   CalendarRange,
   ClipboardList,
   ExternalLink,
-  FileText,
-  HelpCircle,
   LayoutDashboard,
   List,
   LogOut,
+  Megaphone,
   Menu,
   Settings,
   Store,
@@ -35,9 +34,22 @@ const NAV = [
   { href: "/admin/menu", key: "menu" as const, icon: UtensilsCrossed, exact: false },
   { href: "/admin/customers", key: "customers" as const, icon: Users, exact: false },
   { href: "/admin/pickup-delivery", key: "pickupDelivery" as const, icon: Store, exact: false },
+  // Steven 14-10-2026: pengumuman/promo yang muncul di lonceng notifikasi
+  // pembeli. Taruh setelah "Ambil & Kirim" dan sebelum "Menu Profil" karena
+  // ini juga soal komunikasi ke pembeli.
+  { href: "/admin/announcements", key: "announcements" as const, icon: Megaphone, exact: false },
+  /* Steven 14-10-2026 (gambar 1): "faq syarat ketentuan, dll masih di side
+     bar utama, yang saya mau dia ada di dalam yang profile menu".
+
+     Jadi `/admin/faq` dan `/admin/terms` DIHAPUS dari sidebar. Halaman
+     editornya sendiri tidak hilang — masih bisa dibuka lewat tombol
+     "Kelola isi halaman" di `/admin/profile-menu` (lihat PAGE_EDITOR di
+     ProfileMenuClient.tsx), dan juga lewat URL langsung.
+
+     Menu Profil jadi satu-satunya tempat yang memuat halaman-halaman info,
+     sesuai permintaan Steven: bar info -> halaman pembeli, Manage page ->
+     editor admin. */
   { href: "/admin/profile-menu", key: "profileMenu" as const, icon: List, exact: false },
-  { href: "/admin/faq", key: "faq" as const, icon: HelpCircle, exact: false },
-  { href: "/admin/terms", key: "terms" as const, icon: FileText, exact: false },
   { href: "/admin/settings", key: "settings" as const, icon: Settings, exact: false },
 ];
 
@@ -64,6 +76,7 @@ export function AdminShell({
     settings: string;
     sales: string;
     pickupDelivery: string;
+    announcements: string;
     profileMenu: string;
     faq: string;
     terms: string;

@@ -34,6 +34,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         settings: dicts.admin.nav.settings,
         sales: dicts.admin.nav.sales,
         pickupDelivery: dicts.admin.nav.pickupDelivery,
+        announcements: dicts.admin.announcements.title,
         profileMenu: dicts.admin.settings.profileMenuTitle,
         faq: dicts.admin.faq.title,
         terms: dicts.admin.terms.title,

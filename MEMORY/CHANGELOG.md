@@ -4,6 +4,141 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — 8 perbaikan dari screenshot Steven (gambar 1-8)
+
+Steven mengirim 8 screenshot (`D:\Gambar error\Gambar 1-8.png`) + 8 keluhan.
+Empat keputusan yang mengubah arah kerja ditanyakan lewat kuis dan dijawab
+Steven lebih dulu: halaman mana yang pindah, perlakuan URL lama, popup pilih
+toko (toko baru menyusul), dan cara notifikasi dikirim (polling 15 detik).
+
+### 1. Halaman info pindah ke /profile-menu/*
+
+`/contact`, `/faq`, `/jam-buka`, `/syarat-ketentuan` dipindah ke
+`src/app/profile-menu/<slug>/`. URL lama **tidak dihapus** — diganti halaman
+redirect (307) supaya link yang sudah dibagikan di WhatsApp / hasil pencarian
+Google tidak mati.
+
+- `src/app/{contact,faq,jam-buka,syarat-ketentuan}/page.tsx` — jadi redirect.
+- Tautan internal (footer, ShopInfo, `revalidatePath`) diarahkan langsung ke
+  URL baru, bukan mengandalkan redirect — satu hop lebih murah dan tidak
+  pecah kalau CDN menambah hop.
+- **Data**: `profile_menu_items.href` untuk `contact`, `faq`, `hours`, `terms`
+  di-update ke URL baru. Ini WAJIB: `href` itu satu-satunya jalan pembeli
+  ke halaman-halaman tersebut dari ProfileSheet / MobileBottomNav. Sebelum ini,
+  kalau `href` kosong, halaman `/faq` dsb. benar-benar tidak punya pintu masuk
+  dari UI. Script: `scripts/fix-profile-menu-hrefs.mjs` (cek + `--apply`).
+- Sidebar admin: `/admin/faq` dan `/admin/terms` **dihapus** (gambar 1). Editor
+  keduanya masih hidup — bisa dibuka dari tombol "Kelola isi halaman" di
+  `/admin/profile-menu` (`PAGE_EDITOR` di `ProfileMenuClient.tsx`).
+
+### 2. Kartu QRIS center vertikal
+
+Penyebabnya bukan isi kartu: grid metode pembayaran menyamakan tinggi semua
+kartu, dan kartu "Transfer bank" lebih tinggi karena punya deskripsi + catatan.
+Kartu QRIS jadi kelihatan nempel di atas. Fix: `justify-center` di wrapper
+`ChoiceCard` (`OrderFlow.tsx`).
+
+### 3. Popup PILIH toko (bukan popup detail)
+
+Dulu klik "Ambil di toko" langsung membuka popup **detail** toko pertama —
+pembeli tidak pernah bisa memilih. Sekarang: klik "Ambil di toko" ->
+popup **pemilih toko** (`PickupStorePicker`). Grid kartu toko yang panjang di
+bawahnya diganti ringkasan "Toko pilihan" + tombol "Ganti toko".
+
+- Sumber data: `delivery_zones` dengan `kind='pickup'` — sudah ada, ditata dari
+  admin "Ambil & Kirim". **Tidak ada tabel toko baru** (Steven: "popup pilih
+  toko dulu, toko baru menyusul"). Kalau nanti daftar toko jadi datastore
+  sendiri, tinggal ganti isi prop `zones`.
+- Cuma 1 titik pickup -> langsung dipakai, tanpa popup (memilih satu dari satu
+  tidak ada artinya).
+- **Guard baru di `validatePayment()`**: kalau metode pickup tapi tidak ada
+  titik valid terpilih, pesanan DITAHAN dengan pesan jelas dan popup dibuka
+  lagi. Tanpa ini pembeli bisa menutup popup tanpa memilih, `deliveryZone`
+  tetap nilai bawaan yang tidak ada di tabel, dan `create_order` menolaknya
+  dengan error yang membingungkan.
+
+### 4. Keranjang dihapus
+
+Dihapus: `<aside>` ringkasan di kanan, sticky bottom bar, dan `CartDrawer.tsx`
+seluruh file. Yang tersisa hanya keranjang di memori `CartProvider`.
+
+**Konsekuensi yang harus ditangani:** dulu tombol "Lanjut" hidup DI DALAM
+drawer. Kalau drawer dihapus apa adanya, pembeli tidak punya cara advance ke
+pembayaran. Jadi `StepNav` dikembalikan ke langkah "menu" (tombol back memakai
+`prevStep` yang sudah ada, tombol Lanjut disabled saat keranjang kosong).
+
+### 5. Bill: semua harga satu kolom
+
+Blok item tadinya hidup di dalam `ReviewRow`, yang kolom kontennya selalu
+menyempit oleh tombol "Ubah" di kanan — jadi harga item berhenti lebih kiri
+daripada Subtotal/Total. Fix: item jadi blok penuh sendiri + konstanta
+`PRICE_COL = "w-28 shrink-0 text-right tabular"` yang dipakai item, subtotal,
+ongkir, dan total. Satu ukuran = satu tepi kanan.
+
+### 6. Tabel Mutasi
+
+Ternyata TIGA sebab, semuanya soal grid:
+1. Header dan tiap baris = dua `grid` terpisah, kolom terakhir
+   `minmax(150px, auto)` — lebar `auto` dihitung sendiri-sendiri, dan
+   selisihnya diserap kolom PELANGGAN yang `1fr`, jadi tepi kanan TOTAL/BAYAR
+   bergeser antar baris.
+2. Kolom TANGGAL & KODE tanpa `whitespace-nowrap`, tanggalnya satu string
+   panjang -> jadi tiga baris.
+3. Template kolom diulang dua kali (header + baris) -> gampang berbeda.
+
+Fix: semua kolom lebar tetap, template dipindah ke konstanta `TX_COLS` yang
+dipakai header DAN baris, tanggal dipecah dua baris lewat helper baru
+`formatDateTimeParts()` di `utils.ts`, kolom numerik dikunci nowrap.
+
+### 7. Halaman Menu admin
+
+Tombol "Tambah jenis makanan" pindah ke kiri, kotak cari ke kanan, satu baris
+sejajar (sebelumnya tombol di kanan dan cari berdiri sendiri di baris bawah
+rata kiri, jadi separuh baris kosong). Badge "N pcs tersisa" di kartu jenis
+makanan **dihapus** — stok hanya bisa diset di batch PO.
+
+### 8. Notifikasi (polling 15 detik)
+
+Dua sumber, **tanpa tabel baru**:
+
+1. **Status pesanan.** Kode + telepon diambil dari riwayat lokal
+   (`js_order_history_v1`, sudah menyimpan keduanya), lalu `track_order(code,
+   phone)` dipoll tiap 15 detik untuk 5 pesanan terbaru. Status berubah ->
+   notifikasi baru. Baseline "status terakhir yang dilihat" disimpan di
+   `js_seen_order_status_v1`; pesanan yang statusnya belum pernah disentuh cuma
+   dicatat baseline-nya (bukan jadi notifikasi), supaya pembeli tidak langsung
+   dikira punya notifikasi baru tiap buka halaman.
+2. **Pengumuman admin.** Tabel `announcements` + `public_list_announcements()`
+   sudah ada sejak migration-13 tapi **nol pemakai** — di sini dinyalakan.
+
+File baru: `src/lib/notifications.ts`, `src/components/customer/NotificationBell.tsx`.
+Lonceng di `SiteHeader` diganti dari tautan `/track` jadi lonceng sungguhan, dan
+sekarang juga tampil di **desktop** (sebelumnya cuma mobile).
+Halaman admin pengumuman: `/admin/announcements` (pakai 4 RPC yang sudah ada:
+`admin_list_announcements`, `admin_save_announcement`,
+`admin_delete_announcement`).
+
+Notifikasi disimpan di localStorage, bukan tabel `notifications` — supaya
+konsisten dengan keputusan Steven "beda HP beda history": tidak ada akun yang
+perlu ditautkan.
+
+**Verifikasi:** `tsc` bersih · `eslint --max-warnings=0` bersih ·
+`npm run build` sukses · 4 halaman baru balas HTTP 200 di dev server · URL lama
+balas 307 · `profile_menu_items.href` terverifikasi 4/4 di database produksi.
+
+**Belum:** semua perubahan tampilan belum dicek Steven secara visual (butuh
+login admin / Device reviewer). Belum ada commit untuk 8 poin ini — menunggu
+perintah Steven.
+
+**Catatan teknis untuk sesi berikutnya:**
+- jangan pernah merangkai class Tailwind secara dinamis (`lg:${VAR}`) — scanner
+  tidak melihat class utuhnya dan tabel diam-diam kehilangan kolom. Tulis string
+  class LITERAL lengkap di konstanta.
+- setelah memindahkan file route, `.next/dev/types` bisa menyimpan info lama
+  (MEMORY/gotchas #3).
+
+---
+
 ## 2026-10-14 — Kartu menu di tab Stok dipipihkan jadi petak
 
 Steven 14-10-2026 lewat screenshot `D:\eror.png`: *"untuk yang menu untuk stok,
@@ -1356,7 +1491,7 @@ unik** dan overlay **tidak** muncul (tidak salah-positive). `koordinatTampil:
 
 ---
 
-## 2026-10-12 - Midtrans: cek akun production, 结果 belum aktif (tetap sandbox)
+## 2026-10-12 - Midtrans: cek akun production, hasil belum aktif (tetap sandbox)
 
 **Scope:** docs/investigasi — Steven minta lanjut ke production karena
 business registration (Step 2) sudah selesai. Diperiksa langsung, production

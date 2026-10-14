@@ -60,6 +60,35 @@ export function formatFullDateTime(iso: string, lang: Language = "id"): string {
   }).format(d);
 }
 
+/**
+ * Tanggal dan jam dipisah dua bagian, buat kolom tabel yang sempit.
+ *
+ * Steven 14-10-2026 (tabel Mutasi): tanggal dalam satu string panjang
+ * ("Kamis, 8 Oktober 2026 pukul 11.13") nggak muat di kolom sempit, jadi
+ * pecah jadi tiga baris dan bikin baris tabel terlihat hancur. Dipisah jadi
+ * dua baris pendek + `whitespace-nowrap`, satu baris tabel jadi rapi.
+ */
+export function formatDateTimeParts(
+  iso: string,
+  lang: Language = "id"
+): { date: string; time: string } {
+  const d = new Date(iso);
+  const locale = lang === "en" ? "en-GB" : "id-ID";
+  const date = new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(d);
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  }).format(d);
+  return { date, time };
+}
+
 export function formatTime(iso: string, lang: Language = "id"): string {
   const d = new Date(iso);
   return new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "id-ID", {
