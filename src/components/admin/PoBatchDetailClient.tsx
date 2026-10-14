@@ -93,10 +93,12 @@ export interface PoDetailLabels {
     bundlesPriceHint: string;
     /** Judul blok centang rasa per kategori. */
     rasaTitle: string;
-    /** "{n} dari total" ketika Steven sudah menyaring. */
+    /** "{n} dipilih" ketika Steven sudah menyaring. */
     rasaCount: string;
-    /** Kalau belum ada yang dicentang = semua rasa tampil. */
+    /** Kalau semua rasa tercentang = semua tampil. */
     rasaAllHint: string;
+    rasaSelectAll: string;
+    rasaClearAll: string;
     soldHere: string;
     soldOutHere: string;
     outsideBatch: string;
@@ -298,12 +300,36 @@ function StockTab({
   });
 
   // Rasa yang ditampilkan di batch ini (migration-53).
-  // `semua_rasa_aktif` = Steven belum pernah memilih -> semua tampil (mode lama).
-  const semuaRasaAktif = initial.semua_rasa_aktif;
+  // `initial.semua_rasa_aktif` = Steven belum pernah memilih -> semua tampil.
+  //
+  // BUG yang diperbaiki 14-10-2026: kalau `rasaOn` cuma diisi dari baris
+  // `dipakai`, sementara kotak centangnya membaca `semuaRasaAktif ? true : ...`,
+  // maka semua kotak TERLIHAT tercentang dan diklik pun tidak ada efeknya
+  // sampai Steven menyimpan. Sekarang draft lokal diisi PENUH saat
+  // `semua_rasa_aktif` true, jadi centang/uncheck langsung terasa.
   const [rasaOn, setRasaOn] = useState<Set<number>>(
-    () => new Set(initial.flavors.filter((f) => f.dipakai).map((f) => f.flavor_id))
+    () =>
+      new Set(
+        (initial.semua_rasa_aktif
+          ? initial.flavors
+          : initial.flavors.filter((f) => f.dipakai)
+        ).map((f) => f.flavor_id)
+      )
   );
   const [dirtyRasa, setDirtyRasa] = useState(false);
+
+  // Pilih semua / kosongkan per kategori (dipakai tombol kecil di tiap kartu).
+  function setSemuaRasaKategori(categoryId: number, on: boolean) {
+    setDirtyRasa(true);
+    setRasaOn((prev) => {
+      const next = new Set(prev);
+      for (const r of rasaByKategori.get(categoryId) ?? []) {
+        if (on) next.add(r.flavor_id);
+        else next.delete(r.flavor_id);
+      }
+      return next;
+    });
+  }
 
   function toggleRasa(id: number) {
     setDirtyRasa(true);
@@ -327,17 +353,17 @@ function StockTab({
     [initial.stok]
   );
 
-  // Rasa aktif per kategori, buat checkbox di tiap kartu.
-  const rasaByKategori = useMemo(() => {
-    const map = new Map<number, PoBatchFlavorRow[]>();
-    for (const f of initial.flavors) {
-      const key = f.category_id ?? -1;
-      const list = map.get(key);
-      if (list) list.push(f);
-      else map.set(key, [f]);
-    }
-    return map;
-  }, [initial.flavors]);
+  // Rasa aktif per kategori, buat checkbox di tiap kartu. Sengaja TIDAK
+  // di-memo: React Compiler menolak memo yang isinya ikut dibaca di dalam
+  // callback `setRasaOn` (lihat `setSemuaRasaKategori` di bawah), dan daftar
+  // rasa ini kecil saja sehingga dihitung ulang tiap render tidak mahal.
+  const rasaByKategori = new Map<number, PoBatchFlavorRow[]>();
+  for (const f of initial.flavors) {
+    const key = f.category_id ?? -1;
+    const list = rasaByKategori.get(key);
+    if (list) list.push(f);
+    else rasaByKategori.set(key, [f]);
+  }
 
   function toggleBundle(id: number) {
     setDirtyBundles(true);
@@ -389,11 +415,15 @@ function StockTab({
   const adaPerubahan = dirtyStock || dirtyBundles || dirtyRasa;
 
   return (
-    <section className="card p-5">
-      <h2 className="text-lg font-extrabold text-cocoa-900">{labels.stok.title}</h2>
-      <p className="mt-1 text-[13px] text-cocoa-500">{labels.stok.subtitle}</p>
+    /* Steven 14-10-2026: "untuk bundle letak di kanannya aja biar ga makan
+       tempat". Jadi blok Bundle dipindah dari bawah ke kolom kanan, menu tetap
+       di kiri. Di layar sempit (HP) kolomnya tetap menumpuk ke bawah. */
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <section className="card p-5">
+        <h2 className="text-lg font-extrabold text-cocoa-900">{labels.stok.title}</h2>
+        <p className="mt-1 text-[13px] text-cocoa-500">{labels.stok.subtitle}</p>
 
-      {/* ---------- Menu & Stok ----------
+        {/* ---------- Menu & Stok ----------
           Steven 14-10-2026 (EROR 2): "yg stok ... belum ada perubahan, lihat
           masih tidak ada seperti konssep yang menu & stock sebelumnya yang di
           Menu bar utama".
@@ -403,47 +433,48 @@ function StockTab({
           keduanya digabung jadi SATU panel kartu per kategori — persis seperti
           grid kategori di `/admin/menu`: ada gambarnya, jumlah rasa, badge
           status visibility, dan input stok di dalam kartu yang sama. */}
-      <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {menu.length === 0 ? (
-          <li className="col-span-full px-1 py-6 text-sm text-cocoa-400">{labels.stok.empty}</li>
-        ) : (
-          menu.map((category) => (
-            <MenuStockCard
-              key={category.id}
-              category={category}
-              terjual={terjualBy.get(category.id) ?? 0}
-              sisa={stock[category.id] ?? 0}
-              inBatchIds={inBatchIds}
-              labels={labels}
-              // Rasa yang boleh ditampilkan di batch ini (migration-53).
-              // Kalau `semuaRasaAktif` true, Steven belum memilih apa pun
-              // sehingga semua rasa dianggap tampil.
-              rasaRows={rasaByKategori.get(category.id) ?? []}
-              semuaRasaAktif={semuaRasaAktif}
-              rasaOn={rasaOn}
-              onToggleRasa={toggleRasa}
-              onSisa={(v) => {
-                setDirtyStock(true);
-                setStock((prev) => ({ ...prev, [category.id]: v }));
-              }}
-            />
-          ))
-        )}
-      </ul>
+        <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {menu.length === 0 ? (
+            <li className="col-span-full px-1 py-6 text-sm text-cocoa-400">
+              {labels.stok.empty}
+            </li>
+          ) : (
+            menu.map((category) => (
+              <MenuStockCard
+                key={category.id}
+                category={category}
+                terjual={terjualBy.get(category.id) ?? 0}
+                sisa={stock[category.id] ?? 0}
+                inBatchIds={inBatchIds}
+                labels={labels}
+                // Rasa yang boleh ditampilkan di batch ini (migration-53).
+                rasaRows={rasaByKategori.get(category.id) ?? []}
+                rasaOn={rasaOn}
+                onToggleRasa={toggleRasa}
+                onSetSemuaRasa={(on) => setSemuaRasaKategori(category.id, on)}
+                onSisa={(v) => {
+                  setDirtyStock(true);
+                  setStock((prev) => ({ ...prev, [category.id]: v }));
+                }}
+              />
+            ))
+          )}
+        </ul>
 
-      <p className="mt-2.5 text-[12px] text-cocoa-500">{labels.stok.initialHint}</p>
+        <p className="mt-2.5 text-[12px] text-cocoa-500">{labels.stok.initialHint}</p>
+      </section>
 
-      {/* ---------- Bundle ---------- */}
-      <div className="mt-7 border-t border-cocoa-200 pt-6">
+      {/* ---------- Bundle (kolom kanan) ---------- */}
+      <aside className="card p-5 lg:sticky lg:top-24">
         <h3 className="text-base font-extrabold text-cocoa-900">{labels.stok.bundlesTitle}</h3>
-        <p className="mt-1 text-[13px] text-cocoa-500">{labels.stok.bundlesSubtitle}</p>
+        <p className="mt-1 text-[12px] text-cocoa-500">{labels.stok.bundlesSubtitle}</p>
 
         {initial.bundles.length === 0 ? (
           <p className="mt-4 text-sm text-cocoa-400">{labels.stok.bundlesEmpty}</p>
         ) : (
           <>
             {!semuaBundleAktif ? null : (
-              <p className="mt-3 rounded-xl bg-honey-300/20 px-3.5 py-2.5 text-[13px] font-semibold text-honey-500">
+              <p className="mt-3 rounded-xl bg-honey-300/20 px-3.5 py-2.5 text-[12px] font-semibold text-honey-500">
                 {labels.stok.bundlesAllHint}
               </p>
             )}
@@ -453,7 +484,7 @@ function StockTab({
                 return (
                   <li
                     key={b.bundle_id}
-                    className={`flex flex-wrap items-center gap-3 rounded-2xl border-2 p-3.5 transition ${
+                    className={`rounded-2xl border-2 p-3 transition ${
                       on ? "border-cocoa-900 bg-cream-50" : "border-cocoa-200 bg-white"
                     }`}
                   >
@@ -461,23 +492,28 @@ function StockTab({
                       type="button"
                       onClick={() => toggleBundle(b.bundle_id)}
                       aria-pressed={on}
-                      className={`grid size-6 shrink-0 place-items-center rounded-md border transition ${
-                        on ? "border-cocoa-900 bg-cocoa-900 text-cream-50" : "border-cocoa-300"
-                      }`}
-                      aria-label={b.nama}
+                      className="flex w-full items-center gap-2.5 text-left"
                     >
-                      {on ? <Check className="size-4" /> : null}
+                      <span
+                        className={`grid size-5 shrink-0 place-items-center rounded-md border transition ${
+                          on ? "border-cocoa-900 bg-cocoa-900 text-cream-50" : "border-cocoa-300"
+                        }`}
+                        aria-hidden
+                      >
+                        {on ? <Check className="size-3.5" /> : null}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-cocoa-900">
+                          {b.nama}
+                        </span>
+                        <span className="block text-[11px] text-cocoa-500">
+                          {b.required_qty} pcs · {formatIDR(b.harga_bawaan, lang)}
+                        </span>
+                      </span>
                     </button>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-cocoa-900">{b.nama}</p>
-                      <p className="text-[12px] text-cocoa-500">
-                        {b.required_qty} pcs · {formatIDR(b.harga_bawaan, lang)}
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <label className="block text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
+                    <div className="mt-2 pl-7">
+                      <label className="block text-[10px] font-bold tracking-wide text-cocoa-500 uppercase">
                         {labels.stok.bundlesPrice}
                       </label>
                       <input
@@ -489,9 +525,9 @@ function StockTab({
                         aria-label={`${b.nama} — ${labels.stok.bundlesPrice}`}
                         value={picked[b.bundle_id] ?? ""}
                         onChange={(e) => setBundlePrice(b.bundle_id, e.target.value)}
-                        className="input tabular mt-0.5 w-32 text-right disabled:opacity-50"
+                        className="input tabular mt-0.5 w-full text-right text-[13px] disabled:opacity-50"
                       />
-                      <p className="mt-0.5 text-[11px] text-cocoa-400">
+                      <p className="mt-0.5 text-[10px] text-cocoa-400">
                         {labels.stok.bundlesPriceHint}
                       </p>
                     </div>
@@ -501,17 +537,17 @@ function StockTab({
             </ul>
           </>
         )}
-      </div>
+      </aside>
 
       {adaPerubahan ? (
-        <div className="sticky bottom-4 mt-5 flex justify-end">
+        <div className="sticky bottom-4 flex justify-end lg:col-span-2">
           <button type="button" onClick={simpan} disabled={pending} className="btn-primary shadow-lg">
             {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             {pending ? labels.stok.saving : labels.stok.save}
           </button>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -541,9 +577,9 @@ function MenuStockCard({
   inBatchIds,
   labels,
   rasaRows,
-  semuaRasaAktif,
   rasaOn,
   onToggleRasa,
+  onSetSemuaRasa,
   onSisa,
 }: {
   category: Category;
@@ -552,14 +588,21 @@ function MenuStockCard({
   inBatchIds: Set<number>;
   labels: PoDetailLabels;
   rasaRows: PoBatchFlavorRow[];
-  semuaRasaAktif: boolean;
   rasaOn: Set<number>;
   onToggleRasa: (flavorId: number) => void;
+  onSetSemuaRasa: (on: boolean) => void;
   onSisa: (value: number) => void;
 }) {
   const { lang, t } = useI18n();
   const flavors = (category.flavors ?? []).filter((f) => f.is_active);
   const name = lang === "en" ? category.name_en : category.name_id;
+
+  // Berapa rasa yang tercentang di draft lokal kategori ini.
+  const jumlahRasaOn = rasaRows.reduce(
+    (n, r) => (rasaOn.has(r.flavor_id) ? n + 1 : n),
+    0
+  );
+  const semuaTercentang = rasaRows.length > 0 && jumlahRasaOn === rasaRows.length;
 
   // Kategori "diatur di batch ini" kalau punya baris di `po_batch_stock`.
   const inBatch = inBatchIds.has(category.id);
@@ -658,20 +701,38 @@ function MenuStockCard({
         <p className="px-4 pb-3 text-[13px] text-cocoa-400">—</p>
       ) : (
         <div className="px-4 pb-3.5">
-          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
               {labels.stok.rasaTitle}
             </span>
-            <span className="text-[11px] text-cocoa-400">
-              {semuaRasaAktif
-                ? labels.stok.rasaAllHint
-                : labels.stok.rasaCount.replace("{n}", String(rasaRows.filter((r) => rasaOn.has(r.flavor_id)).length))}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-cocoa-400">
+                {semuaTercentang
+                  ? labels.stok.rasaAllHint
+                  : labels.stok.rasaCount.replace("{n}", String(jumlahRasaOn))}
+              </span>
+              <button
+                type="button"
+                onClick={() => onSetSemuaRasa(true)}
+                className="text-[11px] font-bold text-cocoa-500 underline-offset-2 hover:underline"
+              >
+                {labels.stok.rasaSelectAll}
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetSemuaRasa(false)}
+                className="text-[11px] font-bold text-cocoa-500 underline-offset-2 hover:underline"
+              >
+                {labels.stok.rasaClearAll}
+              </button>
+            </div>
           </div>
 
           <ul className="flex flex-wrap gap-1.5">
             {rasaRows.map((r) => {
-              const on = semuaRasaAktif ? true : rasaOn.has(r.flavor_id);
+              // Baca draft lokal, BUKAN `semuaRasaAktif` — kalau baca yang
+              // itu, uncheck tidak akan kelihatan sampai disimpan.
+              const on = rasaOn.has(r.flavor_id);
               return (
                 <li key={r.flavor_id}>
                   <label

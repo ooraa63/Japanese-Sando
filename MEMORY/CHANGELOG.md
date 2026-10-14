@@ -4,6 +4,58 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 - Fix: checkbox rasa tidak bisa di-uncheck + Bundle ke kolom kanan
+
+Steven 14-10-2026 lewat screenshot `D:\eror.png`.
+
+### Bug: centang tidak bisa dilepas
+
+**Penyebabnya hal yang sangat sepele:** `checked` pada checkbox membaca
+
+```tsx
+const on = semuaRasaAktif ? true : rasaOn.has(r.flavor_id);
+```
+
+`semuaRasaAktif` diambil dari `initial.semua_rasa_aktif` — data server yang
+hanya berubah setelah Steven menekan Simpan. Jadi selama belum disimpan, semua
+kotak **selalu** tercentang dan diklik pun kelihatan tidak berefek. Steven
+mengira checkbox-nya rusak, padahal tidak.
+
+**Perbaikan:** draft lokal `rasaOn` sekarang diisi **penuh** saat
+`semua_rasa_aktif` true (bukan cuma baris `dipakai`), dan `checked` membaca
+draft lokal itu saja. Label "semua tampil" / "{n} dipilih" juga dihitung dari
+draft lokal supaya ikut berubah seketika. Ditambah tombol kecil **"Pilih
+semua" / "Kosongkan"** per kategori, karena tanpa itu menghapus 5 rasa satu
+satu terasa merepotkan.
+
+**Pelajaran:** jangan pernah pakai data server sebagai sumber kebenaran untuk
+state kontrol yang bisa diedit sebelum disimpan. Sumbernya harus state lokal.
+
+### Bundle pindah ke kolom kanan
+
+`StockTab` jadi `lg:grid-cols-[minmax(0,1fr)_20rem]`:
+- Kiri — kartu Menu & Stok ( grid `sm:2` / `xl:3`, jadi di layar sempit
+  otomatis jadi 2 kolom, bukan 1 seperti sebelumnya yang bikin banyak ruang
+  kosong).
+- Kanan — panel Bundle, `lg:sticky lg:top-24` jadi ikut menggulir.
+- Tombol Simpan jadi `lg:col-span-2`.
+
+Di HP tetap menumpuk ke bawah seperti biasa.
+
+### Catatan teknis
+
+`rasaByKategori` **tidak** dipakai `useMemo` lagi. React Compiler error
+"Existing memoization could not be preserved" karena nilainya dibaca di dalam
+callback `setRasaOn`. Daftarnya cuma puluhan baris, dihitung ulang tiap render
+tidak mahal.
+
+**Verifikasi:** `tsc` bersih · `eslint --max-warnings=0` bersih · `build` sukses.
+Catatan: verifikasi visual TIDAK dilakukan — halaman `/admin/po/[id]` butuh
+sesi login dan sesi browser tidak boleh diisi kredensial oleh AI, jadi Steven
+yang cek tampilannya.
+
+---
+
 ## 2026-10-14 - Migration-53: pilih rasa mana yang tampil di satu batch PO
 
 **Permintaan Steven:** "untuk yang menu pastikan kita bisa set rasa itu rasa

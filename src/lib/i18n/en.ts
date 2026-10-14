@@ -828,6 +828,8 @@ export const en = {
           rasaTitle: "Flavors shown",
           rasaCount: "{n} selected",
           rasaAllHint: "all shown",
+          rasaSelectAll: "Select all",
+          rasaClearAll: "Clear",
           soldHere: "Sold in this batch",
           soldOutHere: "Sold out",
           outsideBatch: "Outside this batch",

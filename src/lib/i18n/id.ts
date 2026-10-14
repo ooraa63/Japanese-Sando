@@ -841,6 +841,8 @@ export const id: Dict = {
           rasaTitle: "Rasa yang tampil",
           rasaCount: "{n} dipilih",
           rasaAllHint: "semua tampil",
+          rasaSelectAll: "Pilih semua",
+          rasaClearAll: "Kosongkan",
           soldHere: "Dijual di batch ini",
           soldOutHere: "Sisa habis",
           outsideBatch: "Di luar batch ini",
