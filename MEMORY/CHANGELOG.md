@@ -4,6 +4,111 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-14 — Bundle dua mode: Combo (isi terkunci) vs Beli pilih rasa sendiri
+
+Steven 14-10-2026: *"kadang kalau misal ada bundle combo: strawberry dan choco
+matcha, maka langsung itu yang terpilih tapi ada juga saya mau buat misal, beli 2
+lebih gratis dan mereka bisa pilih rasanya sendiri"*.
+
+Sebelumnya cuma ada perilaku kedua. Tidak ada cara untuk membuat paket yang isinya
+sudah ditentukan.
+
+**Baru: `bundles.is_fixed`** (migration-54).
+
+| Mode | Isi paket | Perilaku pembeli |
+|---|---|---|
+| `is_fixed = true` (Combo) | `flavor_ids` = isi paket | Tidak memilih apa-apa; chip readonly |
+| `is_fixed = false` (default) | `flavor_ids` = daftar yang boleh dipilih | Memilih `required_qty` rasa sendiri |
+
+Kolom default `false`, jadi tidak ada bundle lama yang ikut berubah perilaku.
+
+Pada mode combo jumlah slot di form admin jadi hanya-baca dan mengikuti jumlah
+rasa yang dicentang, jadi admin tidak mungkin menyimpan paket yang tidak bisa
+dibeli. `admin_save_bundle` juga menolak dengan `invalid_bundle_fixed` kalau
+`is_fixed = true` tapi jumlah rasa != `required_qty`.
+
+### Temuan penting: create_order yang dipakai aplikasi bukan yang dikira
+
+Permanent lama (18 parameter) ternyata **tidak pernah dipanggil**. Aplikasi
+memakai overload 20 parameter (punya `p_po_batch_id` + `p_pickup_date`):
+
+- `src/components/customer/OrderFlow.tsx` — cabang transfer
+- `src/app/account/qris-actions.ts` — cabang QRIS Midtrans
+
+Karena itu dua aturan yangalach ada di overload yang salah:
+
+1. **Validasi `bundle_flavors` (migration-45) tidak pernah berjalan.** Artinya
+   pembatasan "pembeli hanya boleh memilih rasa yang Seller listing" tadinya
+   **hanya dipaksa di UI**. Request langsung ke PostgREST bisa mengirim rasa
+   apa saja untuk bundle yang sudah dibatasi-seller. migration-55 memindahkannya
+   ke overload yang hidup.
+2. migration-54 sempat menimpa overload 18 yang salah sasaran; migration-55
+   mengoreksinya ke overload 20.
+
+### migration-55
+
+- Override `create_order` 20 parameter, diambil **utuh dari database** lewat
+  `pg_get_functiondef` (bukan diketik ulang, jadi mustahil menyimpang dari versi
+  yang benar-benar jalan), lalu ditambahkan validasi `bundle_flavors` per slot
+  dan validasi mode combo (tiap rasa di isi paket harus muncul tepat 1x di
+  slots — tanpa ini `[strawberry, strawberry]` lolos untuk paket strawberry +
+  choco).
+- **DROP overload 18 parameter yang mati.** Selain bagus secara rapi, ini juga
+  menghapus ambiguitas: selama dua overload ada, pemanggilan `create_order`
+  langsung dari SQL ikut error "function is not unique".
+
+### Tes
+
+`scripts/test-bundle-modes.js` — 8/8 OK, seluruhnya di dalam transaksi yang
+di-ROLLBACK, jadi tidak ada pesanan/stok yang tersentuh:
+
+```
+combo: slots sesuai isi paket diterima            OK
+combo: duplikat [x, x] ditolak                    OK
+combo: rasa di luar isi paket ditolak             OK
+combo: jumlah slot kurang dari required_qty ditolak OK
+pilih-sendiri: duplikat [x, x] tetap boleh        OK
+pilih-sendiri: rasa di luar daftar ditolak        OK
+simpan: combo jumlah rasa != jumlah slot ditolak   OK
+simpan: combo jumlah rasa yang cocok diterima      OK
+```
+
+`scripts/check-create-order-live.js` dipakai sebagai jaring pengaman: memastikan
+`po_batch_flavors`, pemotongan stok, `qris_midtrans`, dan `insufficient_stock`
+masih ada setelah override.
+
+### Tooling baru
+
+`dry-run-migration.js` (validasi SQL di transaksi yang dibatalkan),
+`run-migration.js`, `check-bundle-slots.js`, `set-bundle-mode.js`,
+`test-bundle-modes.js`, `check-create-order-live.js`.
+
+### BELUM diverifikasi
+
+Tampilan popup mode combo **belum diuji di browser** — Browser timeout berulang
+selama sesi ini. Yang sudah pasti: tsc/eslint/build hijau, backend 8/8, dan
+`is_fixed` default `false` jadi perilaku produksi tidak berubah sampai ada bundle
+yang disetel ke mode combo.
+
+### Catatan: pekerjaan lain yang ditemukan di working tree
+
+Saat mulai menambah fitur ini, ada perubahan **belum di-commit** di
+`OrderFlow.tsx` + i18n untuk fitur "tidak ada batch PO = tidak ada pesanan"
+(panel `noBatch`, stok batch jadi satu-satunya sumber). Komentarnya mengklaim
+`create_order` sudah raise `no_active_batch`, tapi **fungsi live tidak punya itu
+sama sekali** — bagian backend-nya belum pernah ditulis, dan tidak ada file
+migrasi untuk itu.
+
+Perubahan itu **sengaja tidak ikut di-commit** di sini karena:
+(1) itu fitur terpisah yang belum diminta Steven di sesi ini,
+(2) sekarang ada 0 batch PO aktif, jadi ikut ter-deploy akan menolak semua
+pesanan sampai batch baru dibuka,
+(3) setengah jadi — panelnya ada, pengaman backend-nya tidak.
+
+Patch-nya tersimpan di `%TEMP%\no-batch-wip.patch` (35 KB) kalau mau dilanjutkan.
+
+---
+
 ## 2026-10-14 — Pre-order tidak ke-reset lagi saat pindah halaman
 
 Steven 14-10-2026: *"Kalau misal di pre-order udh sampai step 3 atau 4

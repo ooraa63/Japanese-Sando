@@ -99,7 +99,16 @@ export function OrderBundleModal({
     // `slots` di keranjang bertipe `(number | null)[]` (slot kosong masih
     // mungkin tersisa kalau produk dihapus). Slot null tidak bisa dipakai
     // sebagai pilihan, jadi dibuang saat diisi di sini.
-    setSlots(editingEntry ? editingEntry.slots.filter((x): x is number => x !== null) : []);
+    setSlots(
+      bundle.is_fixed
+        ? // (migration-54) Mode combo: isinya sudah ditentukan penjual, jadi
+          // slot langsung terisi dari `flavor_ids` dan pembeli tidak memilih.
+          // `flavor_ids` diurutkan supaya urutan tampilan stabil.
+          [...(bundle.flavor_ids ?? [])].sort((a, b) => a - b)
+        : editingEntry
+          ? editingEntry.slots.filter((x): x is number => x !== null)
+          : []
+    );
     setNote(editingEntry?.note ?? "");
   }, [open, bundle, editingEntry]);
 
@@ -151,6 +160,21 @@ export function OrderBundleModal({
       stockOverride
     );
   }, [categories, cart.quantities, cart.bundles, slots, editingEntry, stockOverride]);
+
+  // (migration-54) Mode COMBO: isi paket sudah ditentukan penjual sepenuhnya.
+  // Pembeli tidak memilih apa-apa — slot otomatis terisi dari `flavor_ids`,
+  // dan yang ditampilkan hanya chip readonly.
+  const isFixed = Boolean(bundle?.is_fixed);
+  // Rasa yang benar-benar terisi di mode combo (dipakai untuk chip & label).
+  // DIATAS guard `if (!bundle) return null` karena useMemo adalah hook —
+  // memanggilnya setelah early return bikin urutan hook berubah antar render.
+  const fixedContents = useMemo(
+    () =>
+      slots
+        .map((id) => allowedFlavors.find((f) => f.id === id))
+        .filter((f): f is Flavor & { categoryName: string } => Boolean(f)),
+    [slots, allowedFlavors]
+  );
 
   if (!bundle) return null;
 
@@ -273,9 +297,11 @@ export function OrderBundleModal({
           ) : null}
           <p className="mt-1.5 text-[12px] font-bold text-matcha-700">
             <Sparkles className="mr-1 inline size-3" />
-            {t.menu.bundlePickFlavors
-              .replace("{n}", String(requiredQty))
-              .replace("{name}", "")}
+            {isFixed
+              ? t.menu.bundleFixedContents
+              : t.menu.bundlePickFlavors
+                  .replace("{n}", String(requiredQty))
+                  .replace("{name}", "")}
           </p>
           <div className="mt-1.5">
             <PriceTag
@@ -289,7 +315,14 @@ export function OrderBundleModal({
       </div>
 
       {/* Catatan scope */}
-      {isCurated ? (
+      {isFixed ? (
+        // (migration-54) Mode combo: isi paket sudah ditentukan penjual, jadi
+        // tidak ada yang perlu dipilih di sini.
+        <div className="mb-4 flex items-center gap-2 rounded-xl bg-honey-50 px-3 py-2 text-[12px] font-semibold text-cocoa-700">
+          <Check className="size-3.5 shrink-0 text-honey-600" />
+          <span>{t.menu.bundleFixedNotice}</span>
+        </div>
+      ) : isCurated ? (
         <div className="mb-4 flex items-center gap-2 rounded-xl bg-cocoa-50 px-3 py-2 text-[12px] text-cocoa-600">
           <AlertTriangle className="size-3.5 shrink-0 text-cocoa-400" />
           <span>{t.menu.bundleCuratedPick}</span>
@@ -301,8 +334,37 @@ export function OrderBundleModal({
         </div>
       )}
 
-      {/* Slot yang sudah dipilih (chip kecil) */}
-      {slots.length > 0 ? (
+      {/* (migration-54) Mode combo: daftar isi paket sebagai chip readonly.
+          Slot sudah terisi otomatis, jadi pembeli tinggal konfirmasi. */}
+      {isFixed ? (
+        fixedContents.length === 0 ? (
+          <p className="rounded-2xl bg-cocoa-50 p-8 text-center text-sm text-cocoa-500">
+            {t.menu.bundleFixedUnavailable}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {fixedContents.map((f, idx) => (
+              <li
+                key={`${f.id}-${idx}`}
+                className="flex items-center gap-3 rounded-2xl border border-cocoa-200 bg-cream-50 px-4 py-3"
+              >
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-cocoa-800 text-[12px] font-bold text-cream-50 tabular">
+                  {idx + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-cocoa-900">
+                    {lang === "en" ? f.name_en : f.name_id}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+
+      {/* Slot yang sudah dipilih (chip kecil). Di mode combo chip versi yang lebih
+          informatif sudah tampil di atas, jadi ini dilewati. */}
+      {!isFixed && slots.length > 0 ? (
         <div className="mb-3 flex flex-wrap gap-1.5">
           {slots.map((flavorId, idx) => {
             const f = allowedFlavors.find((x) => x.id === flavorId);
@@ -322,8 +384,9 @@ export function OrderBundleModal({
         </div>
       ) : null}
 
-      {/* Grid flavor cards (gaya Sando Sandwich picker) */}
-      {allowedFlavors.length === 0 ? (
+      {/* Grid flavor cards (gaya Sando Sandwich picker). Mode combo tidak punya
+          picker sama sekali — pembelinya tidak memilih apa-apa. */}
+      {isFixed ? null : allowedFlavors.length === 0 ? (
         <p className="rounded-2xl bg-cocoa-50 p-8 text-center text-sm text-cocoa-500">
           {t.menu.empty}
         </p>

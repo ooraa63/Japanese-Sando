@@ -59,6 +59,9 @@ function humanize(error: string | undefined): string {
     "invalid_payload",
     "invalid_stock",
     "slug_taken",
+    // migration-54: mode combo (isi paket terkunci) — jumlah rasa yang
+    // dicentang harus sama dengan jumlah slot.
+    "invalid_bundle_fixed",
   ];
   return known.includes(code) ? code : "generic";
 }

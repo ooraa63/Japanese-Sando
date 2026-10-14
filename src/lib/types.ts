@@ -256,6 +256,16 @@ export interface Bundle {
    * tidak lagi terkunci ke `category_id` tertentu.
    */
   flavor_ids?: number[];
+  /**
+   * `true` = bundle COMBO: isi paket sudah ditentukan penjual, pembeli tidak
+   * memilih apa-apa dan `flavor_ids` adalah isi paket itu sendiri.
+   * `false` (default) = pembeli memilih `required_qty` rasa sendiri dari
+   * `flavor_ids`, atau dari semua rasa kalau `flavor_ids` kosong.
+   *
+   * migration-54. Di mode `true`, `flavor_ids.length` wajib sama dengan
+   * `required_qty` — divalidasi server di `admin_save_bundle`.
+   */
+  is_fixed?: boolean;
   sort_order: number;
 }
 

@@ -32,7 +32,7 @@ function loadEnv() {
   await c.connect();
 
   const { rows } = await c.query(`
-    select b.id, b.name_id, b.required_qty, b.is_active, b.price,
+    select b.id, b.name_id, b.required_qty, b.is_active, b.price, b.is_fixed,
            coalesce(
              (select array_agg(bf.flavor_id order by bf.flavor_id)
                 from bundle_flavors bf where bf.bundle_id = b.id),
@@ -47,12 +47,16 @@ function loadEnv() {
   for (const b of rows) {
     const locked = b.locked_flavors || [];
     console.log(`#${b.id} ${b.name_id}${b.is_active ? "" : "  (NONAKTIF)"}`);
-    console.log(`   WAJIB pilih : ${b.required_qty} rasa`);
+    console.log(`   Mode            : ${b.is_fixed ? "COMBO (isi terkunci)" : "pilih sendiri"}`);
+    console.log(`   WAJIB pilih     : ${b.required_qty} rasa`);
     console.log(
-      `   Rasa dikunci: ${
+      `   Rasa di daftar  : ${
         locked.length ? locked.join(", ") : "tidak ada -> semua rasa bebas"
       }`
     );
+    if (b.is_fixed && locked.length !== b.required_qty) {
+      console.log("   ⚠ tidak konsisten: isi terkunci harus sama dengan WAJIB pilih");
+    }
     console.log("");
   }
 

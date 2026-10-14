@@ -129,6 +129,8 @@ export interface PublicMenuResult {
      * pernah dikirim field ini (mis. data lama di cache) tetap aman.
      */
     flavor_ids?: number[];
+    /** migration-54 — true = isi paket terkunci (bundle combo). */
+    is_fixed?: boolean;
     sort_order: number;
   }>;
 }

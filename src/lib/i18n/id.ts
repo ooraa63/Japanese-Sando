@@ -198,6 +198,11 @@ export const id: Dict = {
     // Isi bundle boleh dibatasi penjual lewat daftar rasa (migration-45).
     // Kalau tidak ada daftar, semua rasa bebas dipilih.
     bundleCuratedPick: "Rasa di paket ini sudah ditentukan penjual.",
+    // (migration-54) Bundle COMBO: isi paket terkunci, pembeli tidak memilih.
+    bundleFixedContents: "Isi paket sudah ditentukan",
+    bundleFixedNotice: "Isi paket ini sudah ditentukan penjual.",
+    bundleFixedUnavailable:
+      "Isi paket belum bisa dimuat. Coba muat ulang halamannya.",
     bundleNoteLabel: "Catatan untuk paket ini",
     bundleNoteHint: "Opsional. Berlaku untuk semua slot di paket ini.",
     // Dipakai saat pembeli menekan bundle yang sudah di keranjang untuk
@@ -256,7 +261,7 @@ export const id: Dict = {
     date: {
       title: "Kapan mau ambil?",
       subtitle: "Pilih tanggal yang tersedia. Stok di langkah berikutnya mengikuti tanggal ini.",
-      empty: "Belum ada jadwal ambil yang dibuka. Sementara ini kamu bisa langsung pilih rasa saja.",
+      empty: "Belum ada jadwal ambil yang dibuka.",
       chooseFirst: "Pilih tanggal ambil dulu ya.",
       loading: "Sebentar, stok tanggal itu sedang disiapkan.",
       unavailable: "Jadwal untuk tanggal itu sudah berubah. Pilih tanggal lain ya.",
@@ -422,6 +427,15 @@ export const id: Dict = {
       title: "Pre-order sedang tutup",
       desc: "Kami sedang tidak menerima pesanan. Silakan kembali nanti atau hubungi kami di WhatsApp.",
     },
+    // Migration-55 (Steven 14-10-2026).-before ini, kalau admin belum membuka
+    // batch, pembeli TETAP bisa pesan: langkah tanggal dihilangkan dan stok
+    // diambil dari `categories.stock`. Akibatnya pembeli melihat "20 pcs
+    // tersisa" lalu order-nya diterima, padahal tidak ada batch sama sekali.
+    // Sekarang tidak ada batch = tidak ada pesanan.
+    noBatch: {
+      title: "Belum ada batch PO",
+      desc: "Pre-order untuk periode ini belum dibuka, jadi kami belum menerima pesanan. Silakan kembali nanti atau hubungi kami di WhatsApp.",
+    },
   },
   success: {
     title: "Pre-order kamu diterima!",
@@ -571,6 +585,9 @@ export const id: Dict = {
     insufficient_stock: "Stok salah satu rasa sudah tidak cukup.",
     below_min_order: "Pesananmu belum memenuhi minimal.",
     preorder_closed: "Pre-order sedang tutup.",
+    // Migration-55: backend menolak order yang tidak punya batch PO aktif.
+    no_active_batch:
+      "Pre-order belum dibuka untuk saat ini. Silakan kembali nanti.",
     settings_missing: "Toko belum diatur. Silakan hubungi penjual.",
     not_authorized: "Kamu tidak punya izin untuk itu.",
     status_unchanged: "Statusnya sudah seperti itu.",
@@ -782,7 +799,7 @@ export const id: Dict = {
       addBatch: "Tambah batch",
       empty: "Belum ada batch PO.",
       emptyHint:
-        "Sampai ada batch yang dibuka, pembeli masih bisa pesan seperti biasa dan stok diambil dari pengaturan menu.",
+        "Sampai ada batch yang dibuka, pembeli tidak bisa memesan. Stok tiap batch diatur di halaman detailnya.",
       newBatch: "Batch baru",
       editBatch: "Ubah batch",
       label: "Nama batch",
@@ -1170,6 +1187,24 @@ export const id: Dict = {
         "Yang dicentang: pembeli hanya boleh memilih rasa di atas.",
       bundleFlavorsHintAll:
         "Tidak ada rasa yang dicentang — pembeli bebas memilih semua rasa.",
+      // (migration-54) Pemilih mode paket: combo (isi terkunci) vs pilih sendiri.
+      bundleModeLabel: "Tipe paket",
+      bundleModeChoose: "Beli pilih rasa sendiri",
+      bundleModeChooseDesc:
+        "Pembeli yang memilih rasa. Cocok untuk promo seperti beli 2 lebih gratis.",
+      bundleModeFixed: "Combo (isi sudah ditentukan)",
+      bundleModeFixedDesc:
+        "Isi paket sudah kamu tentukan. Pembeli tidak memilih apa-apa.",
+      bundleFixedContents: "Isi paket",
+      bundleFixedEmpty:
+        "Belum ada rasa yang dicentang. Pilih minimal satu rasa.",
+      bundleFixedHint:
+        "Isi paket ini sudah ditentukan. Pembeli tidak bisa menukarnya.",
+      bundleFixedCount: "Jumlah isi paket",
+      bundleFixedCountHint:
+        "Otomatis mengikuti jumlah rasa yang dicentang.",
+      bundleFixedMismatch:
+        "Jumlah rasa yang dicentang harus sama dengan jumlah isi paket.",
       bundleSaved: "Bundle tersimpan.",
       bundleDeleted: "Bundle dihapus.",
       bundleDeactivated: "Bundle ini masih dipakai pesanan aktif, jadi disembunyikan dari website.",

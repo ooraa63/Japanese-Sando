@@ -193,6 +193,11 @@ export const en = {
     // The seller can restrict a bundle to a chosen flavor list
     // (migration-45). With no list, every flavor stays available.
     bundleCuratedPick: "The flavors in this pack are picked by the seller.",
+    // (migration-54) COMBO bundle: contents locked, the buyer picks nothing.
+    bundleFixedContents: "Pack contents are set",
+    bundleFixedNotice: "The contents of this pack are set by the seller.",
+    bundleFixedUnavailable:
+      "Pack contents could not be loaded. Try reloading the page.",
     bundleNoteLabel: "Note for this bundle",
     bundleNoteHint: "Optional. Applies to every slot in this bundle.",
     // Shown when the buyer taps a bundle already in the cart to change
@@ -251,7 +256,7 @@ export const en = {
     date: {
       title: "When will you collect?",
       subtitle: "Pick an available date. Stock in the next step follows this date.",
-      empty: "No pickup schedule is open yet. For now you can go straight to choosing flavors.",
+      empty: "No pickup schedule is open yet.",
       chooseFirst: "Please pick a pickup date first.",
       loading: "One moment, we are preparing the stock for that date.",
       unavailable: "The schedule for that date changed. Please pick another date.",
@@ -411,6 +416,12 @@ export const en = {
       title: "Pre-order is closed",
       desc: "We are not accepting orders right now. Please check back later or message us on WhatsApp.",
     },
+    // Migration-55: before this, having no open batch still let buyers order
+    // using the legacy `categories.stock` fallback. Now no batch = no orders.
+    noBatch: {
+      title: "No PO batch open yet",
+      desc: "Pre-order for this period has not opened yet, so we are not accepting orders. Please check back later or message us on WhatsApp.",
+    },
   },
   success: {
     title: "Pre-order received!",
@@ -559,6 +570,8 @@ export const en = {
     insufficient_stock: "Not enough stock left for one of the flavors.",
     below_min_order: "Your order does not meet the minimum yet.",
     preorder_closed: "Pre-order is closed right now.",
+    // Migration-55: backend rejects orders without an active PO batch.
+    no_active_batch: "Pre-order is not open yet. Please come back later.",
     settings_missing: "The store is not set up yet. Please contact the seller.",
     not_authorized: "You are not allowed to do that.",
     status_unchanged: "The status is already like that.",
@@ -769,7 +782,7 @@ export const en = {
       addBatch: "Add batch",
       empty: "No PO batches yet.",
       emptyHint:
-        "Until a batch is open, buyers can still order as before and stock comes from the menu settings.",
+        "Until a batch is open, buyers cannot order. Each batch's stock is set on its detail page.",
       newBatch: "New batch",
       editBatch: "Edit batch",
       label: "Batch name",
@@ -1153,6 +1166,22 @@ export const en = {
       bundleFlavorsHint: "Checked: buyers can only pick the flavors above.",
       bundleFlavorsHintAll:
         "None picked — buyers can choose from every flavor.",
+      // (migration-54) Pack type picker: combo (locked) vs pick-your-own.
+      bundleModeLabel: "Pack type",
+      bundleModeChoose: "Buy, pick your own flavors",
+      bundleModeChooseDesc:
+        "The buyer picks the flavors. Fits promos like buy 2 more free.",
+      bundleModeFixed: "Combo (contents already set)",
+      bundleModeFixedDesc:
+        "You decide the contents. The buyer picks nothing.",
+      bundleFixedContents: "Pack contents",
+      bundleFixedEmpty: "No flavor checked yet. Pick at least one.",
+      bundleFixedHint:
+        "These contents are set. Buyers cannot swap them.",
+      bundleFixedCount: "Number of contents",
+      bundleFixedCountHint: "Follows the number of checked flavors automatically.",
+      bundleFixedMismatch:
+        "The number of checked flavors must match the number of pack contents.",
       bundleSaved: "Bundle saved.",
       bundleDeleted: "Bundle deleted.",
       bundleDeactivated: "This bundle is still used by active orders, so it was hidden from the website.",

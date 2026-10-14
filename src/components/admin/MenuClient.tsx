@@ -77,6 +77,7 @@ function toBundleDraft(b: Bundle): BundleDraft {
     sort_order: String(b.sort_order),
     category_id_str: b.category_id == null ? "" : String(b.category_id),
     flavor_ids: b.flavor_ids ?? [],
+    is_fixed: b.is_fixed ?? false,
   };
 }
 
@@ -550,11 +551,16 @@ export function MenuClient({
         // lewat `flavor_ids`; daftar kosong = semua rasa boleh dipakai.
         category_id: null,
         flavor_ids: editingBundle.flavor_ids,
+        is_fixed: Boolean(editingBundle.is_fixed),
       });
 
       if (!res.ok) {
         toast.error(
-          res.error === "slug_taken" ? t.admin.menu.slugTaken : t.errors.generic
+          res.error === "slug_taken"
+            ? t.admin.menu.slugTaken
+            : res.error === "invalid_bundle_fixed"
+              ? t.admin.menu.bundleFixedMismatch
+              : t.errors.generic
         );
         return;
       }
@@ -572,6 +578,7 @@ export function MenuClient({
           price,
           category_id: null,
           flavor_ids: editingBundle.flavor_ids,
+          is_fixed: Boolean(editingBundle.is_fixed),
           sort_order: Number(editingBundle.sort_order) || 0,
         };
         const exists = prev.some((b) => b.id === id);
@@ -1790,7 +1797,15 @@ function BundleForm({
     const next = new Set(bundle.flavor_ids);
     if (next.has(id)) next.delete(id);
     else next.add(id);
-    setBundle({ ...bundle, flavor_ids: [...next].sort((a, b) => a - b) });
+    const flavor_ids = [...next].sort((a, b) => a - b);
+    setBundle({
+      ...bundle,
+      flavor_ids,
+      // Mode combo: isi paket = daftar rasa yang dicentang, jadi jumlah slot
+      // harus selalu sama dengannya. Disinkronkan di sini supaya admin tidak
+      // pernah bisa menyimpan paket yang tidak bisa dibeli.
+      required_qty: bundle.is_fixed ? Math.max(1, flavor_ids.length) : bundle.required_qty,
+    });
   }
 
   return (
@@ -1875,12 +1890,15 @@ function BundleForm({
         </div>
         <div>
           <label htmlFor="b-qty" className="label">
-            {t.admin.menu.bundleSlots}
+            {bundle.is_fixed ? t.admin.menu.bundleFixedCount : t.admin.menu.bundleSlots}
           </label>
           <input
             id="b-qty"
             inputMode="numeric"
             className="input tabular"
+            // (migration-54) Mode combo: jumlah slot = jumlah rasa yang
+            // dicentang, jadi field ini hanya menampilkan, bukan mengetik.
+            readOnly={bundle.is_fixed}
             value={bundle.required_qty}
             onChange={(e) =>
               setBundle({
@@ -1892,12 +1910,70 @@ function BundleForm({
               })
             }
           />
+          {bundle.is_fixed ? (
+            <p className="mt-1 text-[11px] text-cocoa-400">
+              {t.admin.menu.bundleFixedCountHint}
+            </p>
+          ) : null}
         </div>
+      </div>
+
+      {/* (migration-54) Dua mode paket. Steven: "bundle combo strawberry dan
+          choco matcha, maka langsung itu yang terpilih" vs "beli 2 lebih gratis
+          dan mereka bisa pilih rasanya sendiri". */}
+      <div className="rounded-xl border border-cocoa-200 bg-cocoa-50/40 p-3">
+        <p className="mb-2 text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
+          {t.admin.menu.bundleModeLabel}
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              { key: false, title: t.admin.menu.bundleModeChoose, desc: t.admin.menu.bundleModeChooseDesc },
+              { key: true, title: t.admin.menu.bundleModeFixed, desc: t.admin.menu.bundleModeFixedDesc },
+            ] as const
+          ).map((opt) => {
+            const active = Boolean(bundle.is_fixed) === opt.key;
+            return (
+              <button
+                key={String(opt.key)}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setBundle({
+                    ...bundle,
+                    is_fixed: opt.key,
+                    // Beralih ke mode combo: jumlah slot otomatis ikut jumlah
+                    // rasa yang dicentang, karena di mode ini daftar rasa
+                    // ADALAH isi paket dan keduanya harus sama.
+                    required_qty: opt.key ? Math.max(1, bundle.flavor_ids.length) : bundle.required_qty,
+                  })
+                }
+                className={`rounded-lg border p-3 text-left transition ${
+                  active
+                    ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
+                    : "border-cocoa-200 bg-white hover:border-cocoa-300"
+                }`}
+              >
+                <p className="text-[13px] font-bold">{opt.title}</p>
+                <p className={`mt-0.5 text-[11px] ${active ? "text-cream-200" : "text-cocoa-500"}`}>
+                  {opt.desc}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+        {bundle.is_fixed && bundle.flavor_ids.length !== bundle.required_qty ? (
+          <p className="mt-2 text-[11px] font-semibold text-berry-600">
+            {t.admin.menu.bundleFixedMismatch}
+          </p>
+        ) : null}
       </div>
 
       <div>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="label">{t.admin.menu.bundleFlavors}</span>
+          <span className="label">
+            {bundle.is_fixed ? t.admin.menu.bundleFixedContents : t.admin.menu.bundleFlavors}
+          </span>
           <div className="flex gap-3">
             <button
               type="button"
@@ -1906,6 +1982,9 @@ function BundleForm({
                 setBundle({
                   ...bundle,
                   flavor_ids: activeFlavors.map((f) => f.id),
+                  required_qty: bundle.is_fixed
+                    ? Math.max(1, activeFlavors.length)
+                    : bundle.required_qty,
                 })
               }
             >
@@ -1914,7 +1993,15 @@ function BundleForm({
             <button
               type="button"
               className="text-[11px] font-semibold text-cocoa-600 underline underline-offset-2 hover:text-cocoa-900"
-              onClick={() => setBundle({ ...bundle, flavor_ids: [] })}
+              onClick={() =>
+                setBundle({
+                  ...bundle,
+                  flavor_ids: [],
+                  // Mode combo tidak boleh kosong: daftar rasa adalah isi
+                  // paket, jadi minimal satu rasa wajib dicentang.
+                  required_qty: bundle.is_fixed ? 1 : bundle.required_qty,
+                })
+              }
             >
               {t.admin.menu.bundleFlavorsClear}
             </button>
@@ -1957,9 +2044,13 @@ function BundleForm({
         )}
 
         <p className="mt-1 text-[11px] text-cocoa-400">
-          {bundle.flavor_ids.length === 0
-            ? t.admin.menu.bundleFlavorsHintAll
-            : t.admin.menu.bundleFlavorsHint}
+          {bundle.is_fixed
+            ? bundle.flavor_ids.length === 0
+              ? t.admin.menu.bundleFixedEmpty
+              : t.admin.menu.bundleFixedHint
+            : bundle.flavor_ids.length === 0
+              ? t.admin.menu.bundleFlavorsHintAll
+              : t.admin.menu.bundleFlavorsHint}
         </p>
       </div>
 
