@@ -1288,11 +1288,12 @@ export async function setReviewVisibilityAction(
 }
 
 /**
- * Hapus ulasan permanen, INCLUDING foto di storage.
+ * Hapus ulasan permanen, termasuk SEMUA fotonya di storage.
  *
  * Urutannya penting: RPC dulu (hapus baris), baru file. Kalau file dihapus
  * lebih dulu dan RPC-nya gagal, pembeli kehilangan foto tanpa alasan. Setelah
- * baris hilang, `photo_path` dikembalikan RPC supaya file bisa dibersihkan.
+ * baris hilang, RPC mengembalikan daftar `photo_paths` (JSON array) supaya
+ * semua file bisa dibersihkan sekaligus.
  *
  * Kegagalan hapus file TIDAK membatalkan aksi: baris ulasan sudah hilang,
  * jadi dari sisi pembeli produknya sudah bersih. File sisa hanya memakan
@@ -1307,12 +1308,15 @@ export async function deleteAdminReviewAction(
   });
   if (error) return { ok: false, error: humanize(error.message) };
 
-  const hasil = (data ?? {}) as { photo_path?: string | null };
-  if (hasil.photo_path) {
+  const hasil = (data ?? {}) as { photo_paths?: unknown };
+  const paths = Array.isArray(hasil.photo_paths)
+    ? (hasil.photo_paths as unknown[]).filter(
+        (p): p is string => typeof p === "string" && p.length > 0
+      )
+    : [];
+  if (paths.length > 0) {
     try {
-      await supabase.storage
-        .from(REVIEW_PHOTO_BUCKET)
-        .remove([hasil.photo_path]);
+      await supabase.storage.from(REVIEW_PHOTO_BUCKET).remove(paths);
     } catch {
       // Bucket penuh atau policy berubah. Ulasannya tetap sudah terhapus.
     }

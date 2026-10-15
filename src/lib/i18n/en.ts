@@ -243,17 +243,18 @@ export const en = {
     ratingRequired: "Please pick a rating.",
     commentRequired: "Please add a short comment.",
     errorGeneric: "Couldn't send your review. Please try again.",
-    // Migration-58: optional photo on a review.
+    // Migration-58: up to 3 photos on a review.
     photoLabel: "Add a photo",
     photoOptional: "(optional)",
     photoPick: "Choose a photo",
-    photoHint: "JPG/PNG/WebP, up to 5 MB. One photo only.",
+    photoHint: "JPG/PNG/WebP, up to 5 MB. Max 3 photos.",
     photoReplace: "Replace",
     photoRemove: "Remove",
     photoUploaded: "Photo uploaded.",
     photoUploadFailed: "Couldn't upload the photo. Please try again.",
     photoFormatError: "Photo must be JPG, PNG, or WebP.",
     photoTooLarge: "Photo must be under 5 MB.",
+    photoTooMany: "Max 3 photos per review.",
     // Migration-58: sort tabs on the homepage.
     sort: {
       label: "Sort:",
@@ -1162,7 +1163,7 @@ export const en = {
       showDone: "Review is visible on the homepage again.",
       delete: "Delete permanently",
       deleteConfirm:
-        "Delete this review forever? The review and its photo cannot be restored.",
+        "Delete this review forever? The review and all its photos cannot be restored.",
       deleteDone: "Review deleted.",
       withPhoto: "Has photo",
       noPhoto: "No photo",

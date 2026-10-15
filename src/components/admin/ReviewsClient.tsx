@@ -9,7 +9,7 @@ import {
   listAdminReviewsAction,
   setReviewVisibilityAction,
 } from "@/app/admin/actions";
-import { reviewPhotoUrl } from "@/lib/reviews";
+import { reviewPhotoUrls } from "@/lib/reviews";
 import { formatDateTime } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/components/ui/Toast";
@@ -25,7 +25,8 @@ import type { AdminReview } from "@/lib/types";
  * Dua aksi, bukan satu, dan itu pilihan yang disengaja:
  *   - Sembunyikan: `is_visible = false`, bisa dibalik. Ini aksi PERTAMA KALI
  *     karena ada ulasan yang review-nya tidak cocok, tapi ulasannya jujur.
- *   - Hapus permanen: baris + foto ikut hilang, tidak bisa dikembalikan.
+ *   - Hapus permanen: baris + semua fotonya ikut hilang, tidak bisa
+ *     dikembalikan.
  *
  * Kolom `is_visible` sudah ada sejak migration-21 tapi tidak pernah dipakai;
  * halaman ini yang pertama memakainya.
@@ -155,7 +156,7 @@ export function ReviewsClient({
       ) : (
         <ul className="space-y-3">
           {tampil.map((r) => {
-            const foto = reviewPhotoUrl(r.photo_path);
+            const foto = reviewPhotoUrls(r.photo_paths);
             const sedang = busyId === r.id;
             return (
               <li
@@ -168,22 +169,34 @@ export function ReviewsClient({
                 }`}
               >
                 <div className="flex gap-3">
-                  {foto ? (
-                    <a
-                      href={foto}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="relative size-20 shrink-0 overflow-hidden rounded-xl border border-cocoa-200"
+                  {/* Maksimal 3 foto. Admin butuh melihat semuanya supaya
+                      bisa menilai ulasan mana yang perlu disembunyikan, jadi
+                      grid kecil di samping, bukan hanya foto pertama. */}
+                  {foto.length > 0 ? (
+                    <div
+                      className={`grid shrink-0 gap-1 ${
+                        foto.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                      }`}
                     >
-                      <Image
-                        src={foto}
-                        alt={t.admin.reviews.withPhoto}
-                        fill
-                        sizes="80px"
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </a>
+                      {foto.map((u) => (
+                        <a
+                          key={u}
+                          href={u}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative size-20 overflow-hidden rounded-xl border border-cocoa-200"
+                        >
+                          <Image
+                            src={u}
+                            alt={t.admin.reviews.withPhoto}
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </a>
+                      ))}
+                    </div>
                   ) : null}
 
                   <div className="min-w-0 flex-1">
@@ -218,8 +231,8 @@ export function ReviewsClient({
                           : t.admin.reviews.hidden}
                       </span>
                       <span className="text-[10px] text-cocoa-400">
-                        {r.photo_path
-                          ? t.admin.reviews.withPhoto
+                        {foto.length > 0
+                          ? `${t.admin.reviews.withPhoto} (${foto.length})`
                           : t.admin.reviews.noPhoto}
                       </span>
                     </div>

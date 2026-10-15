@@ -2,7 +2,7 @@ import Image from "next/image";
 import { Star } from "lucide-react";
 import { listReviewsAction } from "@/app/review-actions";
 import { formatDateTime } from "@/lib/utils";
-import { reviewPhotoUrl } from "@/lib/reviews";
+import { reviewPhotoUrls } from "@/lib/reviews";
 import type { Language, ReviewSort } from "@/lib/types";
 import { ReviewSortTabs } from "@/components/customer/ReviewSortTabs";
 
@@ -13,14 +13,16 @@ import { ReviewSortTabs } from "@/components/customer/ReviewSortTabs";
  * Migration-58:
  * - urutan ulasan dari `sort` (query string homepage), lewat tab
  *   `ReviewSortTabs` yang melakukan navigasi ke `?sort=...`;
- * - ulasan boleh punya satu foto. Datanya `photo_path` (path di bucket
- *   publik), URL-nya dibuat di sini saat render.
+ * - ulasan boleh punya sampai 3 foto. Datanya ada di tabel anak
+ *   `order_review_photos`, dan dirangkum jadi satu kolom JSON `photo_paths`
+ *   oleh `list_reviews`. Yang disimpan adalah PATH di bucket publik, URL-nya
+ *   dibuat di sini saat render.
  *
  * Foto ditampilkan sebagai tautan ke ukuran penuh, bukan lightbox. Alasannya
- * lightbox butuh client component + state + handler keyboard; untuk satu foto
- * per ulasan, tautan ke file aslinya cukup dan tetap jalan tanpa JavaScript.
- * Kalau nanti lightbox benar-benar diperlukan, itu perubahan kecil di satu
- * tempat.
+ * lightbox butuh client component + state + handler keyboard; untuk maksimal tiga
+ * foto per ulasan, tautan ke file aslinya cukup dan tetap jalan tanpa
+ * JavaScript. Kalau nanti lightbox benar-benar diperlukan, itu perubahan kecil
+ * di satu tempat.
  */
 export async function ReviewsSection({
   lang,
@@ -92,7 +94,7 @@ export async function ReviewsSection({
           {/* Reviews grid */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data.reviews.slice(0, 6).map((r) => {
-              const foto = reviewPhotoUrl(r.photo_path);
+              const foto = reviewPhotoUrls(r.photo_paths);
               return (
                 <article
                   key={r.id}
@@ -112,29 +114,40 @@ export async function ReviewsSection({
                   </div>
 
                   {/* Foto opsional: rating + komentar tetap terbaca walau
-                      tidak ada foto sama sekali. */}
-                  {foto ? (
-                    <a
-                      href={foto}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group relative block overflow-hidden rounded-xl border border-cocoa-200"
+                      tidak ada foto sama sekali. Satu foto pakai lebar penuh,
+                      dua atau tiga foto dibagi rata supaya kartu tidak jadi
+                      terlalu tinggi. */}
+                  {foto.length > 0 ? (
+                    <div
+                      className={`grid gap-1.5 ${
+                        foto.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                      }`}
                     >
-                      <div className="relative aspect-[4/3] w-full bg-cocoa-50">
-                        <Image
-                          src={foto}
-                          alt={
-                            lang === "en"
-                              ? `Photo from ${r.customer_name}`
-                              : `Foto dari ${r.customer_name}`
-                          }
-                          fill
-                          sizes="(max-width: 640px) 100vw, 340px"
-                          className="object-cover transition group-hover:opacity-90"
-                          unoptimized
-                        />
-                      </div>
-                    </a>
+                      {foto.map((u) => (
+                        <a
+                          key={u}
+                          href={u}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group relative block overflow-hidden rounded-xl border border-cocoa-200"
+                        >
+                          <div className="relative aspect-[4/3] w-full bg-cocoa-50">
+                            <Image
+                              src={u}
+                              alt={
+                                lang === "en"
+                                  ? `Photo from ${r.customer_name}`
+                                  : `Foto dari ${r.customer_name}`
+                              }
+                              fill
+                              sizes="(max-width: 640px) 100vw, 340px"
+                              className="object-cover transition group-hover:opacity-90"
+                              unoptimized
+                            />
+                          </div>
+                        </a>
+                      ))}
+                    </div>
                   ) : null}
 
                   <p className="line-clamp-4 text-sm text-cocoa-700">

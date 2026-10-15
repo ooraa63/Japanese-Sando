@@ -25,9 +25,9 @@ export function ReviewModal({
   const [open, setOpen] = useState(initialOpen);
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState("");
-  // Migration-58: path foto di bucket review-photos (bukan URL). null = tanpa
-  // foto. Path-nya baru dikirim ke database kalau pembeli menekan submit.
-  const [photoPath, setPhotoPath] = useState<string | null>(null);
+  // Migration-58: sampai 3 path foto di bucket review-photos (bukan URL),
+  // urut sesuai urutan tampil di beranda. null berarti belum ada foto.
+  const [photoPaths, setPhotoPaths] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -55,7 +55,7 @@ export function ReviewModal({
       return;
     }
     setSubmitting(true);
-    const res = await submitReviewAction(orderCode, rating, comment, photoPath);
+    const res = await submitReviewAction(orderCode, rating, comment, photoPaths);
     setSubmitting(false);
     if (res.ok) {
       setDone(true);
@@ -67,7 +67,9 @@ export function ReviewModal({
             ? t.reviews.notDelivered
             : res.error === "invalid_photo_path"
               ? t.reviews.photoFormatError
-              : t.reviews.errorGeneric
+              : res.error === "too_many_photos"
+                ? t.reviews.photoTooMany
+                : t.reviews.errorGeneric
       );
     }
   }
@@ -156,8 +158,8 @@ export function ReviewModal({
               </span>
             </label>
 
-            {/* Migration-58: foto opsional, satu per ulasan. */}
-            <ReviewPhotoUploader path={photoPath} onChange={setPhotoPath} />
+            {/* Migration-58: foto opsional, sampai 3. */}
+            <ReviewPhotoUploader paths={photoPaths} onChange={setPhotoPaths} />
 
             {error ? (
               <p className="rounded-lg bg-berry-500/10 p-2.5 text-center text-xs font-semibold text-berry-600">

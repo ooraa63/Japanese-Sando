@@ -2,34 +2,38 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { CloudUpload, Loader2, Trash2, X } from "lucide-react";
+import { CloudUpload, Loader2, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/components/ui/Toast";
-import { REVIEW_PHOTO_BUCKET, reviewPhotoUrl } from "@/lib/reviews";
+import {
+  REVIEW_PHOTO_BUCKET,
+  REVIEW_PHOTO_MAX,
+  reviewPhotoUrls,
+} from "@/lib/reviews";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 
 /**
- * Unggah satu foto untuk ulasan (migration-58).
+ * Unggah foto untuk ulasan (migration-58) — sampai 3 foto, semuanya opsional.
  *
  * Bedanya dari `ProofUploader`:
  * - bucket `review-photos` (publik), bukan `payment-proofs` (privat), jadi
- *   tampilannya pakai URL langsung dan tidak perlu signed URL;
- * - path-nya dikembalikan ke pemanggil, yang meneruskannya ke `submit_review`.
- *   `submit_review` menolak path di luar folder `reviews/`.
+ *   tampilannya pakai URL langsung tanpa signed URL;
+ * - menyimpan DAFTAR path (`string[]`), bukan satu path. Urutannya adalah
+ *   urutan tampil di beranda, jadi indeks di array = posisi di daftar.
  *
- * Foto bersifat OPSIONAL. Hapus/Ganti hanya untuk correcting kesalahan —
- * kalau pembeli batal mengunggah, tombol Remove mengembalikan `null` supaya
- * tidak ada file sia-sia yang tertinggal di bucket.
+ * Menghapus satu foto langsung menghapus filenya di bucket supaya tidak
+ * tertinggal file yatim. Kegagalan hapus file tidak memblokir pembeli: foto
+ * sudah lepas dari form, dan file sisa bisa dibereskan admin.
  */
 export function ReviewPhotoUploader({
-  path,
+  paths,
   onChange,
 }: {
-  path: string | null;
-  onChange: (path: string | null) => void;
+  paths: string[];
+  onChange: (paths: string[]) => void;
 }) {
   const { t } = useI18n();
   const toast = useToast();
@@ -38,7 +42,8 @@ export function ReviewPhotoUploader({
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const preview = reviewPhotoUrl(path);
+  const urls = reviewPhotoUrls(paths);
+  const penuh = paths.length >= REVIEW_PHOTO_MAX;
 
   async function upload(file: File) {
     setError(null);
@@ -49,6 +54,10 @@ export function ReviewPhotoUploader({
     }
     if (file.size > MAX_BYTES) {
       setError(t.reviews.photoTooLarge);
+      return;
+    }
+    if (paths.length >= REVIEW_PHOTO_MAX) {
+      setError(t.reviews.photoTooMany);
       return;
     }
 
@@ -64,7 +73,7 @@ export function ReviewPhotoUploader({
         .upload(objectPath, file, { contentType: file.type, upsert: false });
 
       if (upErr) throw upErr;
-      onChange(objectPath);
+      onChange([...paths, objectPath]);
       toast.success(t.reviews.photoUploaded);
     } catch {
       setError(t.reviews.photoUploadFailed);
@@ -79,20 +88,16 @@ export function ReviewPhotoUploader({
     if (file) void upload(file);
   }
 
-  async function remove() {
-    const target = path;
-    onChange(null);
-    setError(null);
+  async function removeAt(index: number) {
+    const target = paths[index];
     if (!target) return;
-    // File yang sudah terlanjur terunggah tidak boleh dibiarkan jadi sampah di
-    // bucket. Kegagalan di sini tidak memblokir pembeli — foto sudah lepas dari
-    // form; yang penting langkahnya tidak terkunci. File sisa bisa dibersihkan
-    // admin lewat halaman ulasan.
+    onChange(paths.filter((_, i) => i !== index));
+    setError(null);
     try {
       const supabase = createClient();
       await supabase.storage.from(REVIEW_PHOTO_BUCKET).remove([target]);
     } catch {
-      /* file sisa akan cleaned up admin; jangan gagalkan aksi pembeli */
+      /* file sisa akan dibereskan admin; jangan gagalkan aksi pembeli */
     }
   }
 
@@ -113,37 +118,50 @@ export function ReviewPhotoUploader({
         </span>
       </span>
 
-      {preview ? (
-        <div className="relative overflow-hidden rounded-xl border border-matcha-300 bg-matcha-50">
-          <div className="relative aspect-[4/3] w-full">
-            <Image
-              src={preview}
-              alt={t.reviews.photoLabel}
-              fill
-              sizes="(max-width: 640px) 100vw, 420px"
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-          <div className="flex justify-end border-t border-matcha-200 bg-white px-2 py-1.5">
+      {urls.length > 0 ? (
+        <div className="grid grid-cols-3 gap-2">
+          {urls.map((src, i) => (
+            <div
+              key={paths[i]}
+              className="group relative overflow-hidden rounded-xl border border-matcha-300 bg-matcha-50"
+            >
+              <div className="relative aspect-square w-full">
+                <Image
+                  src={src}
+                  alt={`${t.reviews.photoLabel} ${i + 1}`}
+                  fill
+                  sizes="120px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void removeAt(i)}
+                aria-label={t.reviews.photoRemove}
+                className="absolute top-1 right-1 grid size-7 place-items-center rounded-lg bg-white/90 text-berry-500 shadow-sm transition hover:bg-white"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+          ))}
+
+          {!penuh ? (
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="rounded-lg border border-cocoa-200 px-2.5 py-1 text-xs font-bold text-cocoa-600 transition hover:bg-cocoa-50"
+              className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-cocoa-200 text-cocoa-400 transition hover:border-matcha-400 hover:text-matcha-600"
             >
-              {t.reviews.photoReplace}
+              <Plus className="size-5" />
+              <span className="text-[10px] font-bold">
+                {paths.length}/{REVIEW_PHOTO_MAX}
+              </span>
             </button>
-            <button
-              type="button"
-              onClick={() => void remove()}
-              className="ml-1.5 rounded-lg border border-berry-500/30 px-2.5 py-1 text-xs font-bold text-berry-500 transition hover:bg-berry-500/10"
-            >
-              <Trash2 className="mr-1 inline size-3" />
-              {t.reviews.photoRemove}
-            </button>
-          </div>
+          ) : null}
         </div>
-      ) : (
+      ) : null}
+
+      {!penuh ? (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -175,7 +193,7 @@ export function ReviewPhotoUploader({
           </span>
           <span className="text-[11px] text-cocoa-400">{t.reviews.photoHint}</span>
         </button>
-      )}
+      ) : null}
 
       {error ? (
         <p className="mt-1.5 flex items-start gap-1 text-xs font-semibold text-berry-500">

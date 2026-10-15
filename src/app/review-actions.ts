@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseReviewSort } from "@/lib/reviews";
+import { REVIEW_PHOTO_MAX, parseReviewSort } from "@/lib/reviews";
 import type {
   OrderReview,
   ReviewListResult,
@@ -25,6 +25,7 @@ function humanize(error: string | undefined): string {
     "order_not_delivered",
     "already_reviewed",
     "invalid_photo_path",
+    "too_many_photos",
   ];
   return known.includes(error.trim()) ? error.trim() : "generic";
 }
@@ -33,16 +34,16 @@ function humanize(error: string | undefined): string {
  * Kirim review untuk pesanan yang sudah delivered. Idempoten: kalau order
  * sudah pernah di-review, return error 'already_reviewed'.
  *
- * `photoPath` opsional (migration-58). Kalau diisi, harus path di bucket
- * `review-photos` pada folder `reviews/` — aturan yang sama diverifikasi ulang
- * di dalam `submit_review`, jadi pemeriksaan di sini cuma untuk umpan balik
- * yang lebih cepat, bukan penjaga.
+ * `photoPaths` opsional (migration-58), maksimal 3 path di bucket
+ * `review-photos` pada folder `reviews/`. Aturan yang sama diverifikasi ulang di
+ * dalam `submit_review`, jadi pemeriksaan di sini cuma untuk umpan balik yang
+ * lebih cepat, bukan penjaga.
  */
 export async function submitReviewAction(
   orderCode: string,
   rating: number,
   comment: string,
-  photoPath: string | null = null
+  photoPaths: string[] = []
 ): Promise<ReviewActionResult<OrderReview>> {
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
     return { ok: false, error: "invalid_rating" };
@@ -52,9 +53,12 @@ export async function submitReviewAction(
   if (trimmedComment.length > 1000) {
     return { ok: false, error: "comment_too_long" };
   }
+  if (photoPaths.length > REVIEW_PHOTO_MAX) {
+    return { ok: false, error: "too_many_photos" };
+  }
   // Samakan dengan validasi di submit_review supaya error yang muncul sama
   // dengan yang akan ditolak database.
-  if (photoPath && !photoPath.startsWith("reviews/")) {
+  if (photoPaths.some((p) => !p.startsWith("reviews/"))) {
     return { ok: false, error: "invalid_photo_path" };
   }
 
@@ -63,7 +67,7 @@ export async function submitReviewAction(
     p_order_code: orderCode.trim(),
     p_rating: rating,
     p_comment: trimmedComment,
-    p_photo_path: photoPath,
+    p_photo_paths: photoPaths,
   });
 
   if (error) return { ok: false, error: humanize(error.message) };

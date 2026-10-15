@@ -248,17 +248,18 @@ export const id: Dict = {
     ratingRequired: "Pilih rating dulu.",
     commentRequired: "Tulis komentar singkat dulu.",
     errorGeneric: "Gagal mengirim ulasan. Coba lagi.",
-    // Migration-58: foto opsional pada ulasan.
+    // Migration-58: maksimal 3 foto pada ulasan.
     photoLabel: "Tambah foto",
     photoOptional: "(opsional)",
     photoPick: "Pilih foto",
-    photoHint: "JPG/PNG/WebP, maksimal 5 MB. Satu foto saja.",
+    photoHint: "JPG/PNG/WebP, maksimal 5 MB. Maksimal 3 foto.",
     photoReplace: "Ganti",
     photoRemove: "Hapus",
     photoUploaded: "Foto sudah diunggah.",
     photoUploadFailed: "Gagal mengunggah foto. Coba lagi.",
     photoFormatError: "Format foto harus JPG, PNG, atau WebP.",
     photoTooLarge: "Ukuran foto maksimal 5 MB.",
+    photoTooMany: "Maksimal 3 foto per ulasan.",
     // Migration-58: tab pengurutan di beranda.
     sort: {
       label: "Urutkan:",
@@ -1181,7 +1182,7 @@ export const id: Dict = {
       showDone: "Ulasan tampil lagi di beranda.",
       delete: "Hapus permanen",
       deleteConfirm:
-        "Hapus ulasan ini selamanya? Ulasannya dan fotonya tidak bisa dikembalikan.",
+        "Hapus ulasan ini selamanya? Ulasannya dan semua fotonya tidak bisa dikembalikan.",
       deleteDone: "Ulasan dihapus.",
       withPhoto: "Ada foto",
       noPhoto: "Tanpa foto",

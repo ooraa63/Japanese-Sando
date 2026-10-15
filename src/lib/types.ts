@@ -491,12 +491,15 @@ export interface OrderReview {
   created_at: string;
   order_code?: string;
   /**
-   * Migration-58: path objek foto di bucket `review-photos`, BUKAN URL.
-   * `null` = ulasan tanpa foto. Bucket-nya publik, jadi URL-nya dibuat saat
-   * render lewat `getPublicUrl` — bukan disimpan di database supaya bucket
-   * bisa dipindah tanpa mengubah data.
+   * Migration-58: sampai 3 foto per ulasan, sebagai PATH objek di bucket
+   * `review-photos` (bukan URL), urut dari position 1.
+   *
+   * Disimpan sebagai path supaya bucket bisa dipindah tanpa mengubah data, dan
+   * supaya file bisa dihapus bareng-bareng saat ulasan dihapus. `[]` atau
+   * `null` = tanpa foto. Bucket-nya publik, jadi URL dibuat saat render lewat
+   * `reviewPhotoUrls()` — tidak perlu signed URL yang harus di-refresh.
    */
-  photo_path?: string | null;
+  photo_paths?: string[] | null;
 }
 
 /**

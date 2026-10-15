@@ -9,6 +9,7 @@
 --    2. "lalu tambahkan jgua saat memberi ulasan kita bisa tambahkan foto"
 --    3. "Untuk admin buat bisa mengatur ulasan itu, jadi kalau ada orang yang
 --        asal memberi ulasan bisa kita delete atau gimana gitu lah"
+--    4. Jumlah foto: "boleh sampai 3 foto"
 --
 --  Yang sudah ada sebelum migration ini (tabelnya sejak migration-21):
 --
@@ -29,9 +30,20 @@
 --
 -- ---------------------------------------------------------------- 1. FOTO
 --
---  Satu foto per ulasan, opsional. Kolomnya `photo_path` yang berisi PATH
---  objek di bucket, bukan URL, supaya bucket bisa diganti tanpa memindahkan
---  data dan supaya file-nya bisa dihapus bersama barisnya.
+--  TIGA foto per ulasan, opsional. Disimpan di tabel anak
+--  `order_review_photos`, bukan kolom di `order_reviews`.
+--
+--  Kenapa tabel anak, bukan tiga kolom `photo_path_1/2/3` atau satu kolom
+--  `text[]`:
+--    - "sampai 3" itu batas TAMPIL, bukan batas skema. Kalau nanti Steven
+--      mau lebih dari tiga, menambah kolom butuh ALTER TABLE lagi;
+--    - setiap foto bisa punya `position` eksplisit, jadi urutan tampilnya
+--      tidak bergantung pada urutan fisik baris;
+--    - `on delete cascade` membuat foto ikut hilang saat ulasannya dihapus,
+--      tanpa perlu kode pembersih tambahan.
+--
+--  Disimpan sebagai PATH objek, bukan URL, supaya bucket bisa diganti tanpa
+--  memindahkan data.
 --
 --  Bucket `review-photos` dibuat PUBLIK, berbeda dari `payment-proofs` yang
 --  privat: foto ulasan memang meant to be dilihat orang, jadi tidak perlu
@@ -58,18 +70,19 @@
 --
 --  Dua aksi, bukan satu, karena Steven menulis "delete atau gimana gitu lah":
 --  menyembunyikan bisa dibalik kalau ternyata ulasan itu tidak bermasalah,
---  menghapus tidak. Foto di storage TIDAK dihapus dari SQL (SQL tidak punya
---  akses Storage API) -- `admin_delete_review` mengembalikan `photo_path`-nya
---  supaya server action bisa menghapus filenya lewat Storage API, yang
---  diizinkan oleh policy `review_photos_admin_delete`.
+--  menghapus tidak.
+--
+--  Foto di storage TIDAK dihapus dari SQL (SQL tidak punya akses Storage API)
+--  -- `admin_delete_review` mengembalikan `photo_paths`-nya supaya server action
+--  bisa menghapus filenya lewat Storage API, yang diizinkan oleh policy
+--  `review_photos_admin_delete`.
 --
 -- ---------------------------------------------------------------- CATATAN GRANT
 --
 --  `drop function` menghapus ACL-nya, jadi grant ke empat role diulang setelah
---  tiap `create` (gotcha #24). Tanpa itu, versi `list_reviews` yang baru akan
---  `permission denied` untuk anon dan pembeli melihat bagian ulasan kosong.
+--  `create` (gotcha #24).
 --
--- ------------------------------------------------ KENAPA OVERLOAD LAMA DILETAKAN
+--  ------------------------------------------------ KENAPA OVERLOAD LAMA DILETAKAN
 --
 --  Overload 3-arg `submit_review` dan 2-arg `list_reviews` TIDAK dihapus, hanya
 --  diubah jadi pembungkus tipis yang memanggil versi baru.
@@ -79,45 +92,51 @@
 --  menghapus keduanya, ada jeda antara "migration di-apply" dan "kode baru
 --  sampai di Vercel" ketika fitur ulasan di situs yang sedang hidup akan
 --  error `function ... does not exist`. Dengan pembungkus, kedua versi hidup
---  bersamaan, jadi migration boleh di-apply duluan ATAU kode baru lebih dulu
---  -- keduanya aman.
+--  bersamaan, jadi migration boleh di-apply duluan ATAU kode baru lebih dulu.
 --
---  PostgREST memilih overload berdasarkan JUMLAH ARGUMEN secara persis, jadi
---  tidak ada ambiguitas: 3 argumen selalu masuk ke pembungkus, 4 argumen
---  selalu masuk ke fungsi utama.
---
--- ============================================================ 1. KOLOM FOTO
+--  Parameter baru TIDAK diberi `default`: kalau diberi, pemanggilan
+--  3-argumen jadi ambigu antara fungsi utama dan pembungkus, dan PostgreSQL
+--  menolak dengan "function ... is not unique".
 
-alter table public.order_reviews
-  add column if not exists photo_path text;
+-- ==================================================== 1. TABEL ANAK FOTO
 
-comment on column public.order_reviews.photo_path is
-  'Path objek foto di bucket review-photos (bukan URL). NULL = tanpa foto.';
+create table if not exists public.order_review_photos (
+  id        bigserial primary key,
+  review_id bigint  not null references public.order_reviews(id) on delete cascade,
+  path      text    not null,
+  position  smallint not null check (position between 1 and 3),
+  created_at timestamptz not null default now(),
+  unique (review_id, position)
+);
 
-create index if not exists order_reviews_rating_created_idx
-  on public.order_reviews (rating desc, created_at desc);
+comment on table public.order_review_photos is
+  'Foto ulasan (maks 3 per ulasan). Dihapus otomatis saat ulasannya dihapus.';
+
+create index if not exists order_review_photos_review_idx
+  on public.order_review_photos (review_id, position);
+
+-- Batas 3 foto ditegakkan di dalam `submit_review` (lihat bagian 2), bukan
+-- lewat trigger, supaya pembeli yang memanggil RPC itu sendiri tidak bisa
+-- menyisipkan lebih dari tiga foto.
 
 -- ============================================================ 2. SUBMIT_REVIEW
 
---  `p_photo_path` SENGAJA TIDAK diberi default. Kalau diberi `default null`,
---  pemanggilan 3-argumen jadi ambigu antara fungsi ini dan pembungkus
---  signature lama di bawahnya, dan PostgreSQL menolak dengan
---  "function public.submit_review(text, smallint, text) is not unique".
---  Tanpa default, jumlah argumen menentukan fungsi secara tegas: 3 -> pembungkus,
---  4 -> fungsi ini.
 create or replace function public.submit_review(
-  p_order_code text,
-  p_rating     smallint,
-  p_comment    text,
-  p_photo_path text
+  p_order_code  text,
+  p_rating      smallint,
+  p_comment     text,
+  p_photo_paths text[]
 ) returns jsonb
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  v_order  public.orders%rowtype;
-  v_review public.order_reviews%rowtype;
+  v_order   public.orders%rowtype;
+  v_review  public.order_reviews%rowtype;
+  v_path    text;
+  v_pos     smallint := 1;
+  v_paths   text[] := coalesce(p_photo_paths, array[]::text[]);
 BEGIN
   if p_order_code is null or btrim(p_order_code) = '' then
     raise exception 'order_not_found' using errcode = 'P0001';
@@ -132,17 +151,21 @@ BEGIN
     raise exception 'comment_too_long' using errcode = 'P0001';
   end if;
 
-  -- Path foto HARUS di dalam folder `reviews/`. Tanpa cek ini, pembeli bisa
+  -- Setiap path HARUS di dalam folder `reviews/`. Tanpa cek ini, pembeli bisa
   -- mengisi kolom apa saja -- termasuk path milik bucket lain -- dan nama file
   -- yang dikendalikan pembeli akan tersimpan di database kita.
-  if p_photo_path is not null then
-    if btrim(p_photo_path) = ''
-       or p_photo_path like '..%'
-       or p_photo_path not like 'reviews/%'
-       or length(p_photo_path) > 200 then
+  if array_length(v_paths, 1) > 3 then
+    raise exception 'too_many_photos' using errcode = 'P0001';
+  end if;
+  foreach v_path in array v_paths loop
+    if v_path is null
+       or btrim(v_path) = ''
+       or v_path like '..%'
+       or v_path not like 'reviews/%'
+       or length(v_path) > 200 then
       raise exception 'invalid_photo_path' using errcode = 'P0001';
     end if;
-  end if;
+  end loop;
 
   select * into v_order
   from public.orders
@@ -162,15 +185,20 @@ BEGIN
     raise exception 'already_reviewed' using errcode = 'P0001';
   end if;
 
-  insert into public.order_reviews (order_id, customer_name, rating, comment, photo_path)
+  insert into public.order_reviews (order_id, customer_name, rating, comment)
   values (
     v_order.id,
     coalesce(nullif(btrim(v_order.customer_name), ''), 'Anonim'),
     p_rating,
-    btrim(p_comment),
-    p_photo_path
+    btrim(p_comment)
   )
   returning * into v_review;
+
+  foreach v_path in array v_paths loop
+    insert into public.order_review_photos (review_id, path, position)
+    values (v_review.id, v_path, v_pos);
+    v_pos := v_pos + 1;
+  end loop;
 
   return jsonb_build_object(
     'id',            v_review.id,
@@ -178,21 +206,25 @@ BEGIN
     'customer_name', v_review.customer_name,
     'rating',        v_review.rating,
     'comment',       v_review.comment,
-    'photo_path',    v_review.photo_path,
+    'photo_paths',   coalesce(
+      (select jsonb_agg(path order by position)
+       from public.order_review_photos
+       where review_id = v_review.id),
+      '[]'::jsonb
+    ),
     'created_at',    v_review.created_at
   );
 END;
 $$;
 
-comment on function public.submit_review(text, smallint, text, text)
+comment on function public.submit_review(text, smallint, text, text[])
   is 'Submit review untuk pesanan berstatus delivered. 1 review per pesanan. '
-  'Foto opsional; kalau diisi harus path di folder reviews/.';
+  'Sampai 3 foto opsional; setiap path harus di folder reviews/.';
 
-grant execute on function public.submit_review(text, smallint, text, text)
+grant execute on function public.submit_review(text, smallint, text, text[])
   to postgres, anon, authenticated, service_role;
 
 -- Pembungkus: signature LAMA yang masih dipanggil kode yang sedang live.
--- Foto NULL. Selain itu identik dengan versi 4-argumen.
 create or replace function public.submit_review(
   p_order_code text,
   p_rating     smallint,
@@ -202,7 +234,7 @@ language sql
 security definer
 set search_path = public
 as $$
-  select public.submit_review(p_order_code, p_rating, p_comment, null::text);
+  select public.submit_review(p_order_code, p_rating, p_comment, null::text[]);
 $$;
 
 comment on function public.submit_review(text, smallint, text)
@@ -214,8 +246,6 @@ grant execute on function public.submit_review(text, smallint, text)
 
 -- ============================================================== 3. LIST_REVIEWS
 
--- Sama seperti submit_review 4-arg: TIDAK ada default, supaya jumlah argumen
--- menentukan fungsi secara tegas (2 -> pembungkus, 3 -> fungsi ini).
 create or replace function public.list_reviews(
   p_limit  integer,
   p_offset integer,
@@ -233,11 +263,19 @@ as $$
       case when p_sort in ('highest', 'lowest', 'photo')
            then p_sort else 'newest' end           as urut
   ),
+  foto as (
+    select review_id,
+           jsonb_agg(path order by position) as paths
+    from public.order_review_photos
+    group by review_id
+  ),
   visible as (
-    select r.id, r.customer_name, r.rating, r.comment, r.photo_path,
-           r.created_at, o.order_code
+    select r.id, r.customer_name, r.rating, r.comment, r.created_at,
+           o.order_code,
+           coalesce(f.paths, '[]'::jsonb) as photo_paths
     from public.order_reviews r
     join public.orders o on o.id = r.order_id
+    left join foto f on f.review_id = r.id
     where r.is_visible = true
   ),
   numbered as (
@@ -251,7 +289,7 @@ as $$
              order by
                case when p.urut = 'highest' then v.rating end desc,
                case when p.urut = 'lowest'  then v.rating end asc,
-               case when p.urut = 'photo'   then (v.photo_path is not null) end desc,
+               case when p.urut = 'photo'   then (v.photo_paths <> '[]'::jsonb) end desc,
                v.created_at desc,
                v.id desc
            ) as rn
@@ -281,7 +319,7 @@ as $$
           'customer_name', customer_name,
           'rating', rating,
           'comment', comment,
-          'photo_path', photo_path,
+          'photo_paths', photo_paths,
           'created_at', created_at,
           'order_code', order_code
         ) order by rn
@@ -297,7 +335,7 @@ grant execute on function public.list_reviews(integer, integer, text)
   to postgres, anon, authenticated, service_role;
 
 -- Pembungkus: signature LAMA yang masih dipanggil kode yang sedang live.
--- Urutan bawaan = 'newest', sama seperti sebelumnya migration ini.
+-- Urutan bawaan = 'newest', sama seperti sebelum migration ini.
 create or replace function public.list_reviews(
   p_limit  integer default 12,
   p_offset integer default 0
@@ -343,13 +381,18 @@ as $$
             'customer_name', r.customer_name,
             'rating',        r.rating,
             'comment',       r.comment,
-            'photo_path',    r.photo_path,
+            'photo_paths',   coalesce(f.paths, '[]'::jsonb),
             'is_visible',    r.is_visible,
             'created_at',    r.created_at
           ) order by r.created_at desc, r.id desc
         )
         from public.order_reviews r
         join public.orders o on o.id = r.order_id
+        left join (
+          select review_id, jsonb_agg(path order by position) as paths
+          from public.order_review_photos
+          group by review_id
+        ) f on f.review_id = r.id
       ), '[]'::jsonb)
     )
   end;
@@ -400,51 +443,51 @@ security definer
 set search_path = public
 as $$
 declare
-  v_path text;
+  v_paths jsonb;
 BEGIN
   if not public.is_admin() then
     raise exception 'not_authorized' using errcode = '42501';
   end if;
 
-  select photo_path into v_path
-  from public.order_reviews
-  where id = p_review_id;
+  select coalesce(jsonb_agg(path order by position), '[]'::jsonb)
+  into v_paths
+  from public.order_review_photos
+  where review_id = p_review_id;
 
-  if not found then
+  if not exists (select 1 from public.order_reviews where id = p_review_id) then
     raise exception 'review_not_found' using errcode = 'P0001';
   end if;
 
+  -- Baris di `order_review_photos` ikut hilang lewat ON DELETE CASCADE.
+  -- File-nya sendiri TIDAK dihapus dari sini: SQL tidak punya akses Storage
+  -- API, jadi `photo_paths` dikembalikan supaya server action bisa
+  -- membersihkannya (policy `review_photos_admin_delete`).
   delete from public.order_reviews where id = p_review_id;
 
-  -- File-nya sengaja TIDAK dihapus dari sini: SQL tidak punya akses Storage
-  -- API. `photo_path` dikembalikan supaya server action bisa menghapus
-  -- filenya lewat Storage API (policy `review_photos_admin_delete`
-  -- mengizinkan sesi admin).
   return jsonb_build_object(
     'id',            p_review_id,
-    'photo_path',    v_path,
-    'photo_pending', v_path is not null
+    'photo_paths',   v_paths,
+    'photo_pending', v_paths <> '[]'::jsonb
   );
 END;
 $$;
 
 comment on function public.admin_delete_review(bigint)
-  is 'Hapus ulasan permanen. Kembalikan photo_path supaya server action bisa '
-  'menghapus file di bucket review-photos.';
+  is 'Hapus ulasan permanen (foto ikut terhapus dari tabel). Kembalikan '
+  'photo_paths supaya server action bisa menghapus file di bucket.';
 
--- CATATAN PENTING SOAL GRANT
+-- CATATAN SOAL GRANT
 --
--- Database ini punya DEFAULT ACL di schema public:
---   postgres=X, anon=X, authenticated=X, service_role=X untuk tipe 'f'
--- Jadi SETIAP fungsi baru otomatis dapat EXECUTE dari anon, Listing grant di
--- bawah TIDAK bisa mencegah itu -- `has_function_privilege('anon', ...)`
--- tetap true, sama seperti untuk semua fungsi admin_* yang sudah ada
--- (dicek: admin_delete_faq juga true untuk anon).
+-- Database ini punya DEFAULT ACL di schema public: postgres=X, anon=X,
+-- authenticated=X, service_role=X untuk tipe 'f'. Jadi SETIAP fungsi baru
+-- otomatis dapat EXECUTE dari anon, jadi grant di bawah tidak bisa
+-- mencegah itu -- `has_function_privilege('anon', ...)` tetap true, sama
+-- seperti untuk semua fungsi admin_* yang sudah ada.
 --
 -- Jadi perlindungan NYATA ada di dalam fungsi: setiap RPC admin memanggil
--- `public.is_admin()` lebih dulu dan raise `not_authorized` kalau gagal.
--- `admin_list_reviews` tidak bisa pakai raise karena dia `language sql`,
--- jadi dia mengembalikan NULL kalau bukan admin. Jangan andalkan grant.
+-- `public.is_admin()` lebih dulu. `admin_list_reviews` tidak bisa pakai
+-- raise karena dia `language sql`, jadi dia mengembalikan NULL kalau bukan
+-- admin. Jangan andalkan grant.
 grant execute on function public.admin_list_reviews()
   to postgres, authenticated, service_role;
 grant execute on function public.admin_set_review_visible(bigint, boolean)

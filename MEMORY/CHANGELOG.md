@@ -12,6 +12,7 @@ Steven 15-10-2026, tiga permintaan:
 2. *"lalu tambahkan jgua saat memberi ulasan kita bisa tambahkan foto"*
 3. *"Untuk admin buat bisa mengatur ulasan itu, jadi kalau ada orang yang asal
    memberi ulasan bisa kita delete atau gimana gitu lah"*
+4. Jumlah foto: *"boleh sampai 3 foto"* (setelah desain awal sempat satu foto)
 
 Yang sudah ada sebelum ini: tabel `order_reviews` + `submit_review`,
 `has_review`, `list_reviews` (semua migration-21). Menariknya kolom
@@ -39,10 +40,28 @@ daftarnya hanya berubah di browser dan tautannya tidak bisa dibagikan.
 Komponen `ReviewSortTabs` (client) memakai `router.push(..., { scroll: false })`
 supaya menekan tab tidak membuat halaman melompat ke atas.
 
-### 2. Foto
+### 2. Foto — maksimal 3, tabel anak `order_review_photos`
 
-Satu foto per ulasan, opsional. Disimpan sebagai `photo_path` (PATH objek,
-bukan URL) supaya bucket bisa diganti tanpa memindahkan data.
+Sampai tiga foto per ulasan, semuanya opsional. Disimpan di tabel anak, bukan
+kolom di `order_reviews` dan bukan satu kolom `text[]`:
+
+```
+order_review_photos(id, review_id -> order_reviews(id) on delete cascade,
+                    path, position smallint check 1..3,
+                    unique(review_id, position))
+```
+
+Alasan memilih tabel anak:
+
+- "sampai 3" itu batas **tampil**, bukan batas skema. Kalau nanti Steven mau lebih
+  dari tiga, menambah kolom butuh ALTER TABLE lagi.
+- `position` eksplisit, jadi urutan tampil tidak bergantung pada urutan fisik
+  baris.
+- `ON DELETE CASCADE` membuat foto ikut hilang saat ulasannya dihapus, tanpa
+  kode pembersih tambahan.
+
+Disimpan sebagai **PATH objek, bukan URL**, supaya bucket bisa diganti tanpa
+memindahkan data.
 
 Bucket baru `review-photos`, **publik** — berbeda dari `payment-proofs` yang
 privat. Foto ulasan memang meant to be dilihat orang, jadi tidak perlu signed
@@ -50,8 +69,13 @@ URL yang harus di-refresh tiap 30 menit. Policy storage mengikuti pola yang
 sudah dipakai bukti transfer: anon boleh insert HANYA di folder `reviews/`.
 
 `submit_review` memvalidasi path-nya juga di dalam database (harus `reviews/%`,
-tolak `..`), karena nama file-nya dikendalikan pembeli dan akan tersimpan di
-sisi kita.
+tolak `..`, tolak >200 karakter), karena nama file-nya dikendalikan pembeli dan
+akan tersimpan di sisi kita. Batas 3 ditegakkan di dalam fungsi yang sama
+(`array_length > 3` -> `too_many_photos`), bukan hanya di UI — pemanggil RPC
+langsung tidak bisa menyisipkan lebih dari tiga.
+
+`list_reviews` merangkum foto jadi satu kolom JSON `photo_paths` (array, urut
+`position`) lewat CTE, jadi frontend tidak perlu query kedua.
 
 ### 3. Admin
 
@@ -59,17 +83,17 @@ Halaman baru `/admin/reviews` (nav "Ulasan" di sidebar). Dua aksi, bukan satu,
 dan itu pilihan yang disengaja karena Steven menulis "delete atau gimana":
 
 - **Sembunyikan** (`is_visible = false`) — bisa dibalik. Aksi pertama kali.
-- **Hapus permanen** — baris + foto ikut hilang, tidak bisa dikembalikan.
+- **Hapus permanen** — baris + semua fotonya ikut hilang, tidak bisa dikembalikan.
 
 Dua-duanya lewat RPC `admin_*` dengan `is_admin()` di dalam, bukan select
 langsung, jadi aturan "hanya admin" ditegakkan di database.
 
 Foto dihapus setelah baris hilang (bukan sebelum): kalau file dihapus dulu lalu
 RPC-nya gagal, pembeli kehilangan foto tanpa alasan. `admin_delete_review`
-mengembalikan `photo_path`-nya supaya server action bisa membersihkannya lewat
-Storage API.
+mengembalikan `photo_paths`-nya (JSON array, semua foto) supaya server action
+bisa membersihkannya lewat Storage API.
 
-### Dua jebakan yang tertangkap sebelum menyentuh produksi
+### Tiga jebakan yang tertangkap sebelum menyentuh produksi
 
 **Overload RPC.** `CREATE OR REPLACE` dengan jumlah argumen berbeda itu
 MEMBUAT overload baru, bukan mengganti. Kalau overload lama di-`drop`, ada jeda
@@ -89,14 +113,17 @@ ditangkap oleh dry-run dan tes rollback.
 
 ### Verifikasi
 
-`scripts/test-migration-58.mjs` (`BEGIN ... ROLLBACK`): **54 OK, 0 GAGAL** —
-kolom foto ada, keempat overload hidup, grant untuk anon/authenticated,
-bucket + 3 policy storage, keempat urutan benar-benar berbeda, nilai ngawur
-jatuh ke `newest`, `submit_review` menerima/ditolak path sesuai aturan, ketiga
-RPC admin diuji DUA KALI (tanpa sesi admin → ditolak; dengan sesi admin yang
-disimulasikan lewat GUC `request.jwt.claim.sub` → jalan), ulasan tersembunyi
-hilang dari daftar publik dan bisa dikembalikan, dan setelah rollback semuanya
-kembali persis.
+`scripts/test-migration-58.mjs` (`BEGIN ... ROLLBACK`): **79 OK, 0 GAGAL** —
+tabel anak + constraint CHECK/UNIQUE-nya, keempat overload hidup, grant untuk
+anon/authenticated, bucket + 3 policy storage, keempat urutan benar-benar
+berbeda, nilai ngawur jatuh ke `newest`, paging dua halaman tidak mengulang
+baris, `submit_review` menerima 1/2/3 foto dan menolak 4 (`too_many_photos`)
+serta path nakal (`invalid_photo_path`), ketiga RPC admin diuji DUA KALI (tanpa
+sesi admin → ditolak; dengan sesi admin yang disimulasikan lewat GUC
+`request.jwt.claim.sub` → jalan), foto ikut hilang saat ulasannya dihapus
+(cascade) dan semua path-nya dikembalikan, ulasan tersembunyi hilang dari
+daftar publik dan bisa dikembalikan, dan setelah rollback semuanya kembali
+persis.
 
 `npx tsc --noEmit` 0, `npx eslint src --max-warnings=0` 0, `npm run build`
 sukses (`/admin/reviews` muncul di daftar route).
