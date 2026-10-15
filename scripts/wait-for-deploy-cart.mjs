@@ -1,80 +1,139 @@
-// Tunggu deploy perubahan keranjang + tombol WA sampai benar-benar landed.
+// Tunggu sampai build BARU (528dc3a, keranjang) benar-benar live.
 //
-// Gotcha #26: penanda harus kondisi yang HANYA bisa terjadi di build baru,
-// DAN harus dicek kondisinya dulu sebelum deploy (kalau tidak, penanda yang
-// sudah true sebelum deploy tidak membuktikan apa-apa).
+// Gotcha #26: verifikasi deploy TIDAK boleh cuma cek HTTP 200, karena
+// homepage akan tetap 200 baik di build lama maupun baru. Yang dicari
+// adalah marker yang HANYA ada di build baru.
 //
-// Yang dipakai di sini: posisi tombol WhatsApp di /order.
+// Gotcha #118: jangan pakai `wait-for-deploy-reviews.mjs` untuk ini. Marker
+// ulasan (`photoTooMany`, "Bintang tertinggi", ...) sudah live sejak
+// migration-58, jadi skrip itu akan langsung bilang "SIAP" padahal build
+// keranjang belum naik sama sekali. False positive adalah skrip verifikasi
+// yang paling mahal.
 //
-//   Build LAMA: WhatsAppFab tidak menyembunyikan diri di /order, jadi tombolnya
-//               dirender dengan kelas `bottom-[84px] z-40`.
-//   Build BARU: WhatsAppFab menyembunyikan diri di /order; WA dirender
-//               OrderFlow sendiri dengan `bottom-4 z-40` (untuk langkah tanpa
-//               bar keranjang) atau di dalam CartStickyBar (langkah menu).
+// Marker yang dipakai (semua dari 528dc3a):
+//   - "emptyInOrder"    key i18n baru; tidak ada di build lama
+//   - "Lihat keranjang" teks dock baru
+//   - "data-cart-dock"  atribut penanda dock, ada di beranda DAN /order
+//   - "data-cart-rail"  panel samping desktop di langkah "Pilih Rasa"
 //
-// Jadi syarat "sudah live": `bottom-[84px] z-40` HILANG dan `bottom-4 z-40`
-// MUNCUL. Keduanya dicek, bukan hanya salah satu.
-import https from "node:https";
+// Skrip ini READ-ONLY: hanya GET halaman produksi dan file statiknya.
+import process from "node:process";
 
-const URL = "https://japanese-sando.vercel.app/order";
-const LAMA = "bottom-[84px] z-40";
-const BARU = "bottom-4 z-40";
-const MAX_MS = 15 * 60 * 1000;
-const INTERVAL = 15000;
+const BASE = process.env.JS_DEPLOY_URL || "https://japanese-sando.vercel.app";
+const MAKS_CHUNK = 70;
 
-const started = Date.now();
-let attempt = 0;
+// [nama marker, harus muncul]
+//
+// SEMUA marker di sini adalah kunci i18n atau atribut BARU yang tidak pernah
+// ada sebelum commit 528dc3a. Keberadaannya saja sudah cukup membuktikan
+// build baru - tidak perlu penanda "build lama yang harus hilang".
+//
+// DUA marker yang sempat dipakai dan SALAH:
+//   - `emptyLabel` -> ternyata milik `MenuBrowser`, masih ada di kode sekarang.
+//     Bukan penanda build lama.
+//   - `data-cart-rail` -> hanya dirender di `/order` pada langkah "Pilih Rasa"
+//     DAN hanya kalau keranjang berisi (dibaca dari localStorage). Halaman
+//     beranda tidak pernah punya itu, jadi marker ini mustahil ditemukan di
+//     sini.
+const MARKER = [
+  ["emptyInOrder", true],
+  ["emptyOnHome", true],
+  ["bundleSlots", true],
+  ["data-cart-dock", true],
+  ["data-cart-sheet", true],
+];
 
-function fetchOnce() {
-  return new Promise((resolve) => {
-    const req = https.get(
-      URL,
-      { headers: { "Cache-Control": "no-cache", "User-Agent": "deploy-check-cart" } },
-      (r) => {
-        let body = "";
-        r.on("data", (d) => (body += d));
-        r.on("end", () => resolve({ status: r.statusCode, body }));
-      }
-    );
-    req.on("error", (e) => resolve({ status: 0, body: "", error: e.message }));
-    req.setTimeout(20000, () => {
-      req.destroy();
-      resolve({ status: 0, body: "", error: "timeout" });
-    });
+async function ambil(url) {
+  const res = await fetch(url, {
+    headers: { "cache-control": "no-cache", pragma: "no-cache" },
   });
+  if (!res.ok) throw new Error("HTTP " + res.status + " untuk " + url);
+  return res.text();
 }
 
-async function loop() {
-  for (;;) {
-    attempt++;
-    const { status, body, error } = await fetchOnce();
-    const detik = Math.round((Date.now() - started) / 1000);
+async function cekSekali() {
+  const html = await ambil(BASE + "/?_=" + Date.now());
 
-    const masihLama = body.includes(LAMA);
-    const sudahBaru = body.includes(BARU);
-
-    console.log(
-      `[${String(detik).padStart(4)}s] percobaan ${String(attempt).padStart(2)} | ` +
-        `HTTP ${status || "-"} | panjang ${String(body.length).padStart(6)} | ` +
-        `kelas lama: ${masihLama ? "MASIH ADA" : "sudah hilang"} | ` +
-        `kelas baru: ${sudahBaru ? "MUNCUL" : "belum"}` +
-        (error ? ` | ${error}` : "")
-    );
-
-    if (status === 200 && !masihLama && sudahBaru) {
-      console.log(`\nDEPLOY SUDAH LIVE setelah ${detik} detik.`);
-      console.log("Tombol WA di /order pindah dari bottom-[84px] ke bottom-4,");
-      console.log("sesuai build baru yang menyembunyikan WhatsAppFab di /order.");
-      process.exit(0);
-    }
-
-    if (Date.now() - started > MAX_MS) {
-      console.log(`\nBELUM LIVE setelah ${Math.round(MAX_MS / 1000)} detik.`);
-      process.exit(1);
-    }
-
-    await new Promise((r) => setTimeout(r, INTERVAL));
+  const aset = new Set();
+  for (const m of html.matchAll(/\/_next\/static\/[A-Za-z0-9_\-./[\]@%]+?\.(?:js|css)/g)) {
+    aset.add(m[0]);
   }
+  const daftar = [...aset].slice(0, MAKS_CHUNK);
+
+  const status = new Map(MARKER.map(([n]) => [n, false]));
+  let assetError = 0;
+
+  await Promise.all(
+    daftar.map(async (a) => {
+      try {
+        const t = await ambil(BASE + a);
+        for (const [nama] of MARKER) {
+          if (t.includes(nama)) status.set(nama, true);
+        }
+      } catch {
+        assetError++;
+      }
+    }),
+  );
+
+  // Marker juga boleh sudah ada di HTML server-rendered.
+  for (const [nama] of MARKER) {
+    if (html.includes(nama)) status.set(nama, true);
+  }
+
+  return { status, jumlahAset: daftar.length, assetError };
 }
 
-loop();
+let percobaan = 0;
+const MAKS = 40; // sekitar 6 menit dengan jeda 9 detik
+
+while (percobaan < MAKS) {
+  percobaan++;
+  let hasil = null;
+  try {
+    hasil = await cekSekali();
+  } catch (e) {
+    console.log("percobaan " + percobaan + ": gagal ambil halaman - " + String(e.message || e));
+    await new Promise((r) => setTimeout(r, 9000));
+    continue;
+  }
+
+  // JANGAN destructure `hasil.status.entries()` untuk Expectations: yang keluar
+  // dari `entries()` adalah PASANGAN (nama -> nilai), jadi `harusnya` di sini
+  // sebenarnya nilai yang sedang dibaca, bukan nilai yang diharapkan. Dengan
+  // begitu `nilai !== nilai` selalu false, `gagal` selalu kosong, dan skrip
+  // melapor "SIUP" padahal semua marker baru justru belum ada. Ekspektasi
+  // harus dibaca dari `MARKER`, bukan dari map hasil.
+  const gagal = MARKER.filter(
+    ([nama, harusnya]) => hasil.status.get(nama) !== harusnya,
+  );
+
+  console.log(
+    "percobaan " + String(percobaan).padStart(2) + "/" + MAKS +
+      "  aset=" + hasil.jumlahAset +
+      (hasil.assetError ? "  (asset gagal: " + hasil.assetError + ")" : "") +
+      "  " + [...hasil.status.entries()].map(([n, v]) => (v ? "+" : "-") + n).join(" "),
+  );
+
+  if (gagal.length === 0) {
+    console.log("");
+    console.log("SIAP: build keranjang sudah live.");
+    for (const [nama, harusnya] of MARKER) {
+      console.log("  " + (harusnya ? "ada    " : "tidak ada ") + nama);
+    }
+    process.exit(0);
+  }
+
+  if (percobaan === 1) {
+    console.log("");
+    console.log("Belum ada marker build keranjang. Yang belum terpenuhi:");
+    for (const [nama] of gagal) console.log("  kurang " + nama);
+    console.log("");
+  }
+
+  await new Promise((r) => setTimeout(r, 9000));
+}
+
+console.log("");
+console.log("BELUM LIVE setelah " + MAKS + " percobaan. Tidak ada yang diubah.");
+process.exit(1);

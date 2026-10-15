@@ -82,6 +82,28 @@ Dua jebakan yang ketahuan saat_verify:
   membolehkan nama dua baris, kolom harga `w-20` → `w-16`, dan stepper
   `size-7` → `size-6`.
 
+**Status: SUDAH LIVE.** Commit `528dc3a` sudah dipush. Tidak ada migration
+database untuk fitur ini, jadi cukup deploy.
+
+Verifikasi deploy memakai `scripts/wait-for-deploy-cart.mjs` dengan marker yang
+HANYA ada di build baru: `emptyInOrder`, `emptyOnHome`, `bundleSlots`,
+`data-cart-dock`, `data-cart-sheet`. Di produksi alurnya sudah diputar sungguhan:
+mengetuk dock TIDAK pindah halaman, sheet berisi isi pesanan, dan tombol
+"Lanjut" di dalam sheet itu membawa ke `/order`.
+
+Tiga marker sempat dipakai dan SALAH, semuanya ketahuan saat verifikasi:
+
+1. `wait-for-deploy-cart.mjs` versi pertama destructure `Map.entries()` lalu
+   membandingkan nilainya dengan dirinya sendiri, jadi `gagal` selalu kosong dan
+   skrip langsung bilang "SIUP" padahal semua marker baru justru belum ada.
+2. `emptyLabel` dipakai sebagai penanda "build lama harus hilang", ternyata itu
+   prop `MenuBrowser` yang masih ada di kode sekarang.
+3. `data-cart-rail` dianggap ada di beranda, padahal hanya dirender di `/order`
+   pada langkah "Pilih Rasa" DAN hanya kalau keranjang berisi.
+
+Gotcha #125 menjelaskan pola yang sama di ketiganya: harness yang salah,
+bukan layanannya.
+
 ---
 
 ## 2026-10-15 — Ulasan: sortir bintang, foto, dan halaman kelola di admin

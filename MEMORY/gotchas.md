@@ -2253,3 +2253,40 @@ Catatan kecil: `/json/new` di Chrome versi baru hanya menerima PUT. GET
 dibalas teks `Using unsafe HTTP verb GET...` yang bukan JSON, jadi
 `res.json()` meledak dengan pesan yang sama sekali tidak menyesatkan.
 
+### #125 - Destructure `Map.entries()` untuk ekspektasi = selalu LOLOS
+
+`wait-for-deploy-cart.mjs` versi pertama melaporkan "build sudah live"
+padahal semua marker baru justru BELUM ADA. Penyebabnya satu baris:
+
+```js
+// SALAH: yang keluar dari entries() adalah PASANGAN (nama -> nilai),
+bukan (nama, nilai_yang_diharapkan).
+const gagal = [...hasil.status.entries()].filter(
+  ([nama, harusnya]) => hasil.status.get(nama) !== harusnya,
+);
+
+// BENAR: ekspektasi diambil dari daftar marker.
+const gagal = MARKER.filter(
+  ([nama, harusnya]) => hasil.status.get(nama) !== harusnya,
+);
+```
+
+Dengan versi yang salah, `harusnya` berisi nilai yang SEDANG dibaca, jadi
+perbandingannya jadi `nilai !== nilai` - selalu false, `gagal` selalu kosong,
+dan skrip langsung melapor "SIUP". Bug yang sama kelasnya dengan #121:
+harness yang salah, bukan layanannya.
+
+Tanda yang perlu diwaspadai: skrip verifikasi yang langsung bilang sudah
+live pada percobaan PERTAMA setelah deploy sebaiknya dicurigai dulu.
+
+Dua marker lain yang sempat salah di sesi yang sama:
+
+- `emptyLabel` dipakai sebagai penanda "build lama harus hilang", ternyata
+  itu prop `MenuBrowser` yang masih ada di kode sekarang. Penanda build lama
+  harus diverifikasi dengan `grep` di source, bukan ditebak dari ingatan soal
+  kode yang dihapus.
+- `data-cart-rail` dianggap ada di beranda, padahal hanya dirender di
+  `/order` pada langkah "Pilih Rasa" dan hanya kalau keranjang berisi
+  (dibaca dari localStorage). Marker harus dicari di halaman yang benar,
+  bukan halaman yang paling gampang diambil.
+
