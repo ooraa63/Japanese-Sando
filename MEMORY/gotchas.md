@@ -2132,3 +2132,44 @@ dengan urutan paging, tidak ada dua tempat yang bisa berbeda.
 Catatan: dry-run (`scripts/dry-run-migration.js`) menangkap error ini sebelum
 sana menyentuh produksi. Jalankan selalu, jangan langsung apply.
 
+
+### #121 - GAGAL di skrip verifikasi belum tentu bagian yang diuji salah
+
+Dua kali dalam satu sesi, harness-nya yang rusak sementara bagian yang
+diuji sudah benar:
+
+1. `verify-live-reviews.mjs` (run pertama): satu helper dipakai untuk dua
+   ekspektasi yang BERLAWAN -- kasus "harus diterima" dan "harus ditolak".
+   Setiap pemanggilnya otomatis menandai GAGAL, termasuk saat database
+   menolak dengan `too_many_photos` seperti seharusnya. Hasil: 6 GAGAL
+   palsu di layanan yang sebenarnya benar.
+2. `check-live-reviews-page.mjs`: membandingkan HTML dua halaman secara
+   byte. Padahal `/?sort=highest` memang berbeda dari `/?sort=newest` --
+   tab aktifnya bergeser (`aria-pressed`), walau isi daftarnya sama
+   karena hanya ada satu ulasan.
+
+Pelajaran: sebelum "memperbaiki" bagian yang diuji, cek dulu apakah
+ekspektasi harness-nya sendiri masuk akal. Dua kasus dengan ekspektasi
+berlawanan harus tetap dua fungsi terpisah, bukan satu fungsi dengan
+parameter boolean.
+
+Siaut yang menyesatkan: urutan atribut di dalam HTML tidak dijamin. Yang
+live ternyata `aria-pressed` ditulis lebih dulu, lalu `data-review-sort`.
+Baca kedua atribut dari tag yang sama secara terpisah, jangan pakai satu
+regex yang mengandaikan urutan atribut tertentu.
+
+### #122 - Verifikasi deploy: jangan cocokkan HTML secara byte per byte
+
+Lanjutan gotcha #26, untuk kasus di mana halaman yang diuji memang
+dipengaruhi query string.
+
+Script `check-live-reviews-page.mjs` mengira `/?sort=highest` dan
+`/?sort=newest` itu bug karena HTML-nya tidak identik. Justru itulah
+buktinya fitur bekerja: tab aktif pindah dari `newest` ke `highest`,
+dan penanda itu ada di HTML server-rendered, bukan hasil JS setelah
+hidrasi -- itu justru alasan `sort` disimpan di query string.
+
+Jadi untuk halaman yang dirender server-side dari parameter, yang diuji
+adalah STATE yang berubah (atribut `aria-pressed`, `data-*`, kelas
+aktif), bukan string dari keseluruhan halaman.
+

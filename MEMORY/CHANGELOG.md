@@ -128,7 +128,22 @@ persis.
 `npx tsc --noEmit` 0, `npx eslint src --max-warnings=0` 0, `npm run build`
 sukses (`/admin/reviews` muncul di daftar route).
 
-Belum di-apply ke produksi, belum di-push — menunggu persetujuan Steven.
+**Status: SUDAH LIVE.** Migration di-apply lebih dulu, baru kode di-push
+(urutan yang dipilih Steven), lalu diverifikasi di produksi dengan
+`scripts/verify-live-reviews.mjs`: **38 OK, 0 GAGAL** — overload lama masih
+hidup, bucket + 3 policy aktif, `submit_review` menerima 1 dan 3 foto serta
+menolak 4 foto dan path nakal, data lama utuh (1 ulasan, 7 order).
+
+### Jebakan di skrip verifikasi sendiri
+
+Run pertama `verify-live-reviews.mjs` melaporkan **6 GAGAL yang SALAH**. Bukan
+bug database: helper-nya menyatukan kasus "harus diterima" dan "harus ditolak"
+dalam satu fungsi, jadi setiap pemanggilnya menandai GAGAL apa pun hasilnya —
+termasuk saat database menolak dengan `too_many_photos` seperti seharusnya.
+Dipecah jadi dua helper terpisah (`harusDiterima` / `harusDitolak`) lalu 38 OK.
+
+Pelajarannya sama seperti gotcha #26: kalau verifikasi melaporkan GAGAL, cek
+ dulu apakah **layanan yang diuji** yang salah, atau ** harnes-nya**.
 
 ---
 
