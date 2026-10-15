@@ -29,7 +29,9 @@ import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { formatIDR } from "@/lib/utils";
 import { useCart } from "@/components/customer/CartProvider";
+import { CartDock } from "@/components/customer/CartDock";
 import { OrderBundleModal } from "@/components/customer/OrderBundleModal";
+import { flatFlavors } from "@/lib/cart";
 import { useSoldCounts } from "@/lib/useSoldCounts";
 
 interface QuickAddValue {
@@ -56,14 +58,18 @@ export function useQuickAdd(): QuickAddValue | null {
 
 export function QuickAddProvider({
   categories,
+  whatsapp,
   children,
 }: {
   categories: Category[];
+  /** Nomor WhatsApp toko; diteruskan ke dock keranjang di beranda. */
+  whatsapp?: string | null;
   children: React.ReactNode;
 }) {
   const [flavor, setFlavor] = useState<Flavor | null>(null);
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const soldCounts = useSoldCounts();
+  const { t } = useI18n();
 
   const openFlavor = useCallback((f: Flavor) => setFlavor(f), []);
   const openBundle = useCallback((b: Bundle) => setBundle(b), []);
@@ -75,6 +81,17 @@ export function QuickAddProvider({
     [openFlavor, openBundle]
   );
 
+  // Steven 15-10-2026: "Pada home, tambahkan keranjang juga jadi ketika mereka
+  // klik masukkan ke keranjang yang di home, mereka juga bisa lihat ada apa aja."
+  //
+  // Dipasang DI DALAM provider (bukan di `page.tsx`) supaya langsung berakses
+  // ke `categories` yang sudah ada di tangan, dan supaya tidak terpasang dua
+  // kali kalau nanti beranda memakai provider ini lagi di tempat lain.
+  //
+  // Tidak ada `onCheckout`: beranda belum punya alur langkah, jadi tombol di
+  // dalam sheet dibawa ke `/order` (lihat `CartDock`).
+  const flavors = useMemo(() => flatFlavors(categories), [categories]);
+
   return (
     <QuickAddContext.Provider value={value}>
       {children}
@@ -85,6 +102,11 @@ export function QuickAddProvider({
         soldCounts={soldCounts}
         open={bundle != null}
         onClose={closeBundle}
+      />
+      <CartDock
+        flavors={flavors}
+        whatsapp={whatsapp}
+        emptyText={t.cart.emptyOnHome}
       />
     </QuickAddContext.Provider>
   );

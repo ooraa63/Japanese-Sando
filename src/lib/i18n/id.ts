@@ -58,6 +58,13 @@ export const id: Dict = {
     /* Steven 14-10-2026: popup tambah cepat dari kartu di beranda. */
     quickAdd: "Tambah ke keranjang",
     alreadyInCart: "Sudah di keranjang: {n}",
+    /* Steven 15-10-2026: dock + sheet, dipakai di beranda dan /order. */
+    view: "Lihat keranjang",
+    removeItem: "Hapus item",
+    bundleSlots: "Diisi: {flavors}",
+    goToOrder: "Lanjut pesan",
+    emptyOnHome: "Keranjang masih kosong. Ketuk kartu makanan untuk menambahkan.",
+    emptyInOrder: "Keranjang masih kosong. Ketuk + pada rasa yang mau dipesan.",
   },
   nav: {
     home: "Beranda",

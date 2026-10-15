@@ -2132,44 +2132,124 @@ dengan urutan paging, tidak ada dua tempat yang bisa berbeda.
 Catatan: dry-run (`scripts/dry-run-migration.js`) menangkap error ini sebelum
 sana menyentuh produksi. Jalankan selalu, jangan langsung apply.
 
-
-### #121 - GAGAL di skrip verifikasi belum tentu bagian yang diuji salah
-
-Dua kali dalam satu sesi, harness-nya yang rusak sementara bagian yang
-diuji sudah benar:
-
-1. `verify-live-reviews.mjs` (run pertama): satu helper dipakai untuk dua
-   ekspektasi yang BERLAWAN -- kasus "harus diterima" dan "harus ditolak".
-   Setiap pemanggilnya otomatis menandai GAGAL, termasuk saat database
-   menolak dengan `too_many_photos` seperti seharusnya. Hasil: 6 GAGAL
-   palsu di layanan yang sebenarnya benar.
-2. `check-live-reviews-page.mjs`: membandingkan HTML dua halaman secara
-   byte. Padahal `/?sort=highest` memang berbeda dari `/?sort=newest` --
-   tab aktifnya bergeser (`aria-pressed`), walau isi daftarnya sama
-   karena hanya ada satu ulasan.
-
-Pelajaran: sebelum "memperbaiki" bagian yang diuji, cek dulu apakah
-ekspektasi harness-nya sendiri masuk akal. Dua kasus dengan ekspektasi
-berlawanan harus tetap dua fungsi terpisah, bukan satu fungsi dengan
-parameter boolean.
-
-Siaut yang menyesatkan: urutan atribut di dalam HTML tidak dijamin. Yang
-live ternyata `aria-pressed` ditulis lebih dulu, lalu `data-review-sort`.
-Baca kedua atribut dari tag yang sama secara terpisah, jangan pakai satu
-regex yang mengandaikan urutan atribut tertentu.
-
-### #122 - Verifikasi deploy: jangan cocokkan HTML secara byte per byte
-
-Lanjutan gotcha #26, untuk kasus di mana halaman yang diuji memang
-dipengaruhi query string.
-
-Script `check-live-reviews-page.mjs` mengira `/?sort=highest` dan
-`/?sort=newest` itu bug karena HTML-nya tidak identik. Justru itulah
-buktinya fitur bekerja: tab aktif pindah dari `newest` ke `highest`,
-dan penanda itu ada di HTML server-rendered, bukan hasil JS setelah
-hidrasi -- itu justru alasan `sort` disimpan di query string.
-
-Jadi untuk halaman yang dirender server-side dari parameter, yang diuji
-adalah STATE yang berubah (atribut `aria-pressed`, `data-*`, kelas
-aktif), bukan string dari keseluruhan halaman.
-
+
+
+### #121 - GAGAL di skrip verifikasi belum tentu bagian yang diuji salah
+
+
+
+Dua kali dalam satu sesi, harness-nya yang rusak sementara bagian yang
+
+diuji sudah benar:
+
+
+
+1. `verify-live-reviews.mjs` (run pertama): satu helper dipakai untuk dua
+
+   ekspektasi yang BERLAWAN -- kasus "harus diterima" dan "harus ditolak".
+
+   Setiap pemanggilnya otomatis menandai GAGAL, termasuk saat database
+
+   menolak dengan `too_many_photos` seperti seharusnya. Hasil: 6 GAGAL
+
+   palsu di layanan yang sebenarnya benar.
+
+2. `check-live-reviews-page.mjs`: membandingkan HTML dua halaman secara
+
+   byte. Padahal `/?sort=highest` memang berbeda dari `/?sort=newest` --
+
+   tab aktifnya bergeser (`aria-pressed`), walau isi daftarnya sama
+
+   karena hanya ada satu ulasan.
+
+
+
+Pelajaran: sebelum "memperbaiki" bagian yang diuji, cek dulu apakah
+
+ekspektasi harness-nya sendiri masuk akal. Dua kasus dengan ekspektasi
+
+berlawanan harus tetap dua fungsi terpisah, bukan satu fungsi dengan
+
+parameter boolean.
+
+
+
+Siaut yang menyesatkan: urutan atribut di dalam HTML tidak dijamin. Yang
+
+live ternyata `aria-pressed` ditulis lebih dulu, lalu `data-review-sort`.
+
+Baca kedua atribut dari tag yang sama secara terpisah, jangan pakai satu
+
+regex yang mengandaikan urutan atribut tertentu.
+
+
+
+### #122 - Verifikasi deploy: jangan cocokkan HTML secara byte per byte
+
+
+
+Lanjutan gotcha #26, untuk kasus di mana halaman yang diuji memang
+
+dipengaruhi query string.
+
+
+
+Script `check-live-reviews-page.mjs` mengira `/?sort=highest` dan
+
+`/?sort=newest` itu bug karena HTML-nya tidak identik. Justru itulah
+
+buktinya fitur bekerja: tab aktif pindah dari `newest` ke `highest`,
+
+dan penanda itu ada di HTML server-rendered, bukan hasil JS setelah
+
+hidrasi -- itu justru alasan `sort` disimpan di query string.
+
+
+
+Jadi untuk halaman yang dirender server-side dari parameter, yang diuji
+
+adalah STATE yang berubah (atribut `aria-pressed`, `data-*`, kelas
+
+aktif), bukan string dari keseluruhan halaman.
+
+
+
+### #123 - `absolute` di dalam `fixed`: containing block-nya cuma fixed
+
+`position: fixed` MELEWATI leluhur yang punya `transform`, `filter`, atau
+`backdrop-filter` - tapi `position: fixed` sendiri menjadi containing block
+untuk anak-anaknya yang `absolute`.
+
+Jadi tombol WhatsApp yang harus melayang DI ATAS bar keranjang harus ditulis
+DALAM div `fixed` bar itu. Dicatat di luar, `absolute bottom-full` akan
+mencari leluhur yang positioned di halaman ini - dan karena tidak ada,
+`bottom-full` jatuh ke viewport, hasilnya tombolnya menimpa bar keranjang
+justru. Terverifikasi lewat screenshot browser.
+
+Pasangannya: dua elemen `fixed` yang saling menindih. Yang di atas harus
+benar-benar lebih tinggi `z-index`.
+
+### #124 - StrictMode menghapus sessionStorage saat effect di-dev
+
+Screenshot halaman `/order` selalu tertahan di langkah pertama, padahal
+`sessionStorage.js_order_step` sudah diisi `menu`. Dua sebab yang perlu
+diketahui kalau debugging dengan `scripts/shot-cdp.mjs`:
+
+1. **React StrictMode di dev** menjalankan effect `mount -> unmount ->
+   mount`. `OrderFlow` punya efek yang menghapus `js_order_step` saat
+   komponen dilepas (permintaan Steven 14-10-2026), jadi di dev nilainya
+   HILANG LAGI sebelum sempat dibaca. Di build produksi efek itu tidak
+   dijalankan dua kali, jadi tidak terjadi.
+2. **`Page.reload` memicu efek itu juga.** Kalau storage diisi lalu halaman
+   di-reload, cleanup efek halaman lama menyala saat halaman lama
+   dibuang.
+
+Solusi yang dipakai: jalankan `next start` (produksi) untuk verifikasi
+visual, dan isi storage lewat `Page.addScriptToEvaluateOnNewDocument`
+supaya nilainya terpasang di awal dokumen SEBELUM React mount. Navigation
+harus `Page.navigate`, bukan `Page.reload`.
+
+Catatan kecil: `/json/new` di Chrome versi baru hanya menerima PUT. GET
+dibalas teks `Using unsafe HTTP verb GET...` yang bukan JSON, jadi
+`res.json()` meledak dengan pesan yang sama sekali tidak menyesatkan.
+

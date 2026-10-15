@@ -60,6 +60,13 @@ export const en = {
     /* Steven 14-10-2026: quick add popup from the cards on the home page. */
     quickAdd: "Add to cart",
     alreadyInCart: "Already in cart: {n}",
+    /* Steven 15-10-2026: dock + sheet, dipakai di beranda dan /order. */
+    view: "View cart",
+    removeItem: "Remove item",
+    bundleSlots: "Filled with: {flavors}",
+    goToOrder: "Continue",
+    emptyOnHome: "Your cart is empty. Tap a food card to add something.",
+    emptyInOrder: "Your cart is empty. Tap + on a flavour you want.",
   },
   nav: {
     home: "Home",

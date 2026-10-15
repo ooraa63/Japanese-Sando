@@ -4,6 +4,86 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-15 — Keranjang: lihat isi dulu sebelum lanjut, rail desktop, dock di beranda
+
+Steven 15-10-2026, dua screenshot dan tiga permintaan:
+
+1. *"Untuk bagian bawah keranjang itu, setelah di click jangan langsung next
+   tpi ada keranjang dulu seperti dulu ada pesanan apa aja baru lanjut"*
+2. *"Untuk UI di desktop yang itu masih jeleg bgt cari ux yang agak berbeda
+   untuk desktop yang keren"*
+3. *"Pada home, tambahkan keranjang juga jadi ketika mereka klik masukkan ke
+   keranjang yang di home, mereka juga bisa lihat ada apa aja"*
+
+Sebelum ini: `CartStickyBar` menempel di dasar layar dan langsung memanggil
+`onNext` — jadi mengetuk bar itu berarti melompat ke pembayaran tanpa pernah
+melihat apa isi pesanan. Di desktop bar itu `md:hidden`, jadi orang laptop
+harus menggulir ke bawah daftar rasa hanya untuk melihat keranjangnya.
+
+### 1. Dock tidak lagi melompat, tapi membuka keranjang
+
+`CartStickyBar` dihapus. Digantikan tiga komponen baru yang dipisah according
+per tanggung jawab:
+
+| Komponen | Tugas |
+|---|---|
+| `CartContents` | isi keranjang: daftar item, stepper, catatan, subtotal, tombol lanjut. Satu implementasi, dipakai dua tempat. |
+| `CartSheet` | wadah: sheet di bawah di mobile, drawer kanan di desktop. |
+| `CartDock` | pemicunya: bar penuh di mobile, kartu kecil melayang di desktop. Mengetuknya membuka sheet, bukan melompat ke langkah berikutnya. |
+
+Tombol "Lanjut" sekarang ada DI DALAM keranjang. Karena itu `StepNav` di
+bawah daftar rasa tidak lagi punya tombol lanjut — hanya "Kembali". Dua tombol
+lanjut di satu layar cuma membingungkan.
+
+### 2. Bentuk berbeda per layar
+
+Steven minta UX desktop yang "agak berbeda", dan itu dibuat
+benar-benar berbeda bentuk, bukan cuma lebih lebar:
+
+- **Mobile**: dock full-width di bawah layar + sheet dari bawah. Sama seperti
+  sebelumnya, jari mendarat di tempat yang sama.
+- **Desktop (`lg` ke atas)**: **rail** di kolom kanan halaman `/order` yang
+  menempel saat digulir (`lg:sticky`), plus sheet jadi **drawer kanan**
+  setinggi layar, bukan sheet. Sheet penuh di layar 1440px terlihat aneh;
+  drawer samping terlihat seperti aplikasi kasir dan selalu kelihatan isinya.
+
+Empat langkah form (tanggal, identitas, pembayaran, konfirmasi) juga dikunci
+`max-w-2xl` dan dipusatkan. Sebelumnya kartu form ikut melar sampai 1024px —
+kolom "Nama / Telepon" jadi sangat jauh dan terbaca seperti tidak disengaja.
+
+### 3. Beranda punya keranjang
+
+`CartDock` dipasang di dalam `QuickAddProvider`, jadi langsung berakses ke
+`categories` dan tidak perlu dipasang dua kali. Kalau `onCheckout` kosong,
+tombol "Lanjut" di dalam sheet membawa ke `/order` — beranda belum punya alur
+langkah.
+
+### Dua-duanya tidak berdua di pojok yang sama
+
+- `WhatsAppFab` menyembunyikan diri kalau keranjang berisi, lalu tombol WA
+  pindah ke dalam dock. Dua tombol melayang di pojok yang sama saling menutupi.
+- Dock naik 68px di halaman yang punya nav bawah, supaya tidak menimpa
+  `MobileBottomNav`. Syaratnya sama persis dengan kondisi `hidden` di sana —
+  ditulis ulang di `CartDock` dan `WhatsAppFab`, bukan diimpor, supaya tidak
+  ada kopelasi; kalau daftarnya berubah, ubah di dua tempat.
+
+### Verifikasi
+
+`npx tsc --noEmit` 0, `npx eslint src --max-warnings=0` 0, `npm run build`
+sukses. Diverifikasi lewat browser (mobile: dock → sheet berisi isi →
+"Lanjut" di dalam, tanpa pindah halaman) dan lewat screenshot produksi pada
+lebar 1440px (`scripts/shot-cdp.mjs`) untuk rail dan drawer.
+
+Dua jebakan yang ketahuan saat_verify:
+
+- Tombol WA harus DI DALAM div `fixed` dock. Di luar, `absolute` mencari
+  leluhur yang positioned di halaman dan hasilnya menimpa dock.
+- Nama rasa sempat terpotong jadi "Cooko..." di rail 22rem. Diperbaiki dengan
+  membolehkan nama dua baris, kolom harga `w-20` → `w-16`, dan stepper
+  `size-7` → `size-6`.
+
+---
+
 ## 2026-10-15 — Ulasan: sortir bintang, foto, dan halaman kelola di admin
 
 Steven 15-10-2026, tiga permintaan:

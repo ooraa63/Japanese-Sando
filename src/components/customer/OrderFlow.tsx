@@ -36,6 +36,8 @@ import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
 import { WhatsAppLink } from "@/components/customer/WhatsAppLink";
+import { CartContents } from "@/components/customer/CartContents";
+import { CartDock } from "@/components/customer/CartDock";
 import { AddressPicker } from "@/components/customer/AddressPicker";
 import { QrisPaymentModal } from "@/components/customer/QrisPaymentModal";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
@@ -1086,7 +1088,7 @@ export function OrderFlow({
           </Link>
           {/* Panel ini `early return`, jadi tombol WA harus ikut di sini —
               `WhatsAppFab` menyembunyikan dirinya di `/order` (dipakai
-              `CartStickyBar` di langkah menu). Tanpa ini pembeli tidak punya
+              dock keranjang di langkah menu). Tanpa ini pembeli tidak punya
               jalan chat sama sekali saat toko tutup. */}
           {settings.whatsapp?.trim() ? <WhatsAppLink whatsapp={settings.whatsapp} compact /> : null}
         </div>
@@ -1248,7 +1250,17 @@ export function OrderFlow({
         <div className="min-w-0">
           {/* ============ LANGKAH 1: TANGGAL AMBIL ============ */}
           {step === "date" ? (
-            <section className="card p-6 sm:p-8">
+            /* Steven 15-10-2026: "UI di desktop yang itu masih jelek bgt".
+               Empat langkah ini (tanggal, identitas, pembayaran, konfirmasi)
+               isinya form satu kolom, sedangkan container di bawahnya melebar
+sampai `max-w-5xl` (1024px). Akibatnya kartu form ikut melar
+di laptop — kolom "Nama / Telepon" jadi sangat jauh dan
+terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sama
+               seperti langkah konfirmasi yang sudah dikunci sebelumnya.
+
+               Kalau nanti nanti langkah form punya dua kolom sungguhan,
+               batangnya bisa dilepas lagi di sini saja. */
+            <section className="card mx-auto max-w-2xl p-6 sm:p-8">
               <StepHeading
                 icon={<CalendarDays className="size-5" />}
                 title={t.order.date.title}
@@ -1311,7 +1323,7 @@ export function OrderFlow({
 
           {/* ============ LANGKAH 2: IDENTITAS ============ */}
           {step === "identity" ? (
-            <section className="card p-6 sm:p-8">
+            <section className="card mx-auto max-w-2xl p-6 sm:p-8">
               <StepHeading
                 icon={<User className="size-5" />}
                 title={t.order.identity.title}
@@ -1469,21 +1481,37 @@ export function OrderFlow({
                bukan drawernya, tapi BAR BAWAH-nya — "yang ada di bawah itu yang
                kita klik itu nanti untuk lanjut". Makanya drawer TIDAK dihidupkan
                lagi (ia cuma informasi yang sudah ada di kartu Flavor), tapi
-               `CartStickyBar` dikembalikan sebagai tombol lanjut yang selalu
+               dock keranjang dikembalikan sebagai pemicu yang selalu
                terlihat di bawah layar.
 
                Steven 14-10-2026 (screenshot ke-2): "di desktop gada keranjang
                jadi orang gabis lihat pesanannya jika pakai laptop".
-               Sebelumnya bar ini `md:hidden`, dengan alasan "di desktop nav
-               bawah tidak ada, jadi StepNav saja yang menyediakan Lanjut".
-               Tapi StepNav-nya ada di AKHIR daftar - artinya orang laptop harus
-               menggulir sampai bawah halaman hanya untuk melihat isi
-               keranjangnya. Sekarang bar tampil di SEMUA lebar layar.
+               Balasan yang sekarang: keranjang di desktop TIDAK lagi berupa
+               bar yang menempel di bawah layar, tapi PANEL SAMPING yang ikut
+               bergulir. Itu bentuk yang "berbeda" yang Steven minta - bukan
+               sekadar bar yang melebar.
 
-               Karena bar sudah ada di mana-mana, `StepNav` di bawahnya tidak
-               lagi punya tombol "Lanjut" - hanya "Kembali". Dua tombol lanjut
-               di satu layar hanya membingungkan. */
-            <section className="pb-28">
+               Steven 15-10-2026: "Untuk bagian bawah keranjang itu, setelah
+               di click jangan langsung next tapi ada keranjang dulu seperti
+               dulu ada pesanan apa aja baru lanjut." Jadi dock TIDAK lagi
+               memanggil `handleNext`. Ia hanya membuka `CartSheet`, dan tombol
+               "Lanjut" ada di dalam sheet itu.
+
+               Pembagian per layar:
+               - `lg` ke bawah: `CartDock` full-width di bawah layar,
+                 seperti bar sebelumnya.
+               - `lg` ke atas: `CartRail` di kolom kanan, menempel di atas
+                 (`lg:sticky`) supaya selalu terlihat walau daftar rasa
+                 panjang. Dock disembunyikan supaya tidak ada dua pemicu
+                 keranjang di satu layar.
+
+               Karena keranjang sudah punya tombol "Lanjut" sendiri,
+               `StepNav` di bawah daftar rasa tidak lagi punya tombol lanjut,
+               hanya "Kembali". Dua tombol lanjut di satu layar hanya
+               membingungkan. */
+            <section className="pb-28 lg:pb-0">
+              <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8">
+              <div className="min-w-0">
               <div className="card mb-6 p-6 sm:p-8">
                 <StepHeading
                   icon={<ShoppingBag className="size-5" />}
@@ -1506,30 +1534,63 @@ export function OrderFlow({
                 />
               )}
 
-              {/* Bar bawah keranjang = tombol lanjut, dengan WhatsApp
-                  melayang DI ATASNYA. Tampil di semua lebar layar. */}
-              <CartStickyBar
-                totalItems={totalItems}
-                subtotal={subtotal}
-                nextLabel={t.common.next}
-                emptyLabel={t.order.menu.cartEmpty}
-                whatsapp={settings.whatsapp}
-                onNext={handleNext}
-              />
-
               {/* Cuma "Kembali". Tombol "Lanjut" sekarang milik
-                  `CartStickyBar`, jadi tidak ada dua di satu layar.
+                  keranjang (rail di desktop, sheet di mobile), jadi tidak
+                  ada dua di satu layar.
 
-                  Langkah SEBELUM "menu" diambil dari daftar langkah yang aktif
-                  (prevStep), bukan ditulis manual: untuk profil lengkap +
-                  batch PO sebelumnya "date", untuk tamu "identity". */}
+                  Langkah SEBELUM "menu" diambil dari daftar langkah yang
+                  aktif (prevStep), bukan ditulis manual: untuk profil lengkap
+                  + batch PO sebelumnya "date", untuk tamu "identity". */}
               <StepNav onBack={prevStep ? () => goTo(prevStep) : null} />
+              </div>
+
+              {/* ---------- KERANJANG DI DESKTOP ----------
+                  Panel kanan yang menempel. Tampil hanya di `lg` ke atas,
+                  karena di bawah itu `CartDock` yang memegang peran. */}
+              <aside data-cart-rail className="hidden lg:block lg:sticky lg:top-6">
+                <div className="card flex max-h-[calc(100dvh-3rem)] flex-col overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 border-b border-cocoa-100 px-4 py-3">
+                    <h3 className="font-display text-base font-extrabold text-cocoa-900">
+                      {t.cart.title}
+                    </h3>
+                    <span className="rounded-full bg-cocoa-100 px-2 py-0.5 text-[11px] font-extrabold text-cocoa-600 tabular">
+                      {totalItems} {totalItems === 1 ? t.common.itemOne : t.common.itemMany}
+                    </span>
+                  </div>
+                  <CartContents
+                    flavors={flavors}
+                    emptyText={t.cart.emptyInOrder}
+                    onCheckout={handleNext}
+                    checkoutLabel={t.common.next}
+                    checkoutIcon={<ArrowRight className="size-4" />}
+                  />
+                </div>
+
+                {settings.whatsapp?.trim() ? (
+                  <div className="mt-3 flex justify-center">
+                    <WhatsAppLink whatsapp={settings.whatsapp} compact />
+                  </div>
+                ) : null}
+              </aside>
+              </div>
+
+              {/* ---------- KERANJANG DI MOBILE ----------
+                  Membuka sheet berisi daftar pesanan. Tombol "Lanjut" ada
+                  di dalam sheet itu, bukan di dock. */}
+              <div className="lg:hidden">
+                <CartDock
+                  flavors={flavors}
+                  emptyText={t.cart.emptyInOrder}
+                  onCheckout={handleNext}
+                  whatsapp={settings.whatsapp}
+                />
+              </div>
             </section>
           ) : null}
 
           {/* ============ LANGKAH 3: PEMBAYARAN ============ */}
           {step === "payment" ? (
-            <section className="card p-6 sm:p-8">
+            <section className="card mx-auto max-w-2xl p-6 sm:p-8">
               <StepHeading
                 icon={<Wallet className="size-5" />}
                 title={t.order.payment.title}
@@ -2082,7 +2143,7 @@ export function OrderFlow({
 
       {/* Tombol WhatsApp untuk langkah yang TIDAK punya bar keranjang
           (tanggal, identitas, pembayaran, konfirmasi). Di langkah "Pilih
-          Rasa" tombolnya sudah ada di dalam `CartStickyBar` — dua-duanya
+          Rasa" tombolnya sudah ada di dalam dock keranjang — dua-duanya
           tidak dirender sekaligus supaya tidak ada dua link WA yang sama
           di layar.
 
@@ -2357,7 +2418,7 @@ function StepNav({
   onBack: (() => void) | null;
   /**
    * Boleh dikosongkan. Di langkah "Pilih Rasa" tombol lanjut pindah ke
-   * `CartStickyBar` yang menempel di bawah layar, jadi bar ini hanya
+   * dock keranjang yang menempel di bawah layar, jadi tombol ini hanya
    * menyediakan tombol "Kembali".
    */
   onNext?: () => void;
@@ -2382,108 +2443,6 @@ function StepNav({
           {nextIcon}
         </button>
       ) : null}
-    </div>
-  );
-}
-
-/**
- * Sticky bar keranjang di bawah layar — selalu terlihat, tidak ikut ter-scroll.
- *
- * Steven 14-10-2026 (screenshot `Eror 1.png`): *"itu keranjangnya kok hilang di
- * bagian PO ... yang ada di bawah itu yang kita klik itu nanti untuk lanjut"*.
- * Bar seperti ini pernah ada lalu dihapus di commit `ac8508c`, dan saat itu
- * tombol "Lanjut" dipindah ke StepNav di akhir daftar — yang memaksa pembeli
- * menggulir sampai bawah halaman untuk lanjut.
- *
- * Yang dikembalikan di sini BUKAN drawer (CartDrawer sudah dihapus, tidak
- * ada gunanya menghidupkan lagi 350 baris hanya untuk melihat isi keranjang —
- * kartu Flavor sudah menampilkan jumlahnya sendiri). Bar ini langsung
- * menjalankan "lanjut" ke langkah pembayaran.
- *
- * Struktur: pembungkus `<div>` berisi tombol lanjut, dan link WhatsApp
- * positioned ABSOLUT DI ATAS bar itu (`bottom-full`). Bukan `<button>` yang
- * membungkus `<a>`, karena HTML tidak valid punya link di dalam tombol.
- *
- * Kenapa WA di ATAS, bukan di samping (Steven 14-10-2026: "itu Wa buat di
- * atas bar yang keranjang aja jangan disamping"): di samping, tombol WA
- * memakan lebar bar dan jadi terlihat seperti bagian dari keranjang, padahal
- * ia bukan. Di atas, bar tetap milik keranjang saja.
- *
- * Kenapa bar TIDAK `md:hidden` lagi (Steven 14-10-2026: "di desktop gada
- * keranjang jadi orang gabis lihat pesanannya jika pakai laptop"): versi
- * sebelumnya menyembunyikan bar di desktop dengan alasan "StepNav saja yang
- * menyediakan Lanjut". Tapi StepNav-nya ada di AKHIR daftar, jadi orang laptop
- * harus menggulir ke bawah halaman hanya untuk melihat isi keranjang — dan di
- * laptop tidak ada nav bawah yang menggesah. Sekarang tombolnya dibuat rata
- * kanan dan dibatasi `sm:max-w-md` supaya tidak membentang full-width di
- * layar lebar.
- *
- * Padding bar ikut jadi `md:px-6` supaya tepi kanan tombol lanjut sejajar
- * dengan ikon WhatsApp (`md:right-6`). Kalau tidak, di desktop keduanya
- * berdiri di jarak berbeda dari tepi layar dan terlihat tidak sengaja.
- *
- * `z-30` dengan sengaja: di bawah nav bawah (z-40) dan di bawah modal (z-50).
- * Bar ini hanya muncul di langkah "Pilih Rasa".
- */
-function CartStickyBar({
-  totalItems,
-  subtotal,
-  nextLabel,
-  emptyLabel,
-  whatsapp,
-  onNext,
-}: {
-  totalItems: number;
-  subtotal: number;
-  nextLabel: string;
-  emptyLabel: string;
-  whatsapp: string | null;
-  onNext: () => void;
-}) {
-  const { t, lang } = useI18n();
-  const ada = totalItems > 0;
-
-  return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-cocoa-200 bg-cream-50/95 px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] backdrop-blur md:px-6">
-      {/* WhatsApp melayang di atas bar, rata kanan. */}
-      {whatsapp && whatsapp.trim() ? (
-        <div className="absolute bottom-full right-3 mb-2.5 md:right-6">
-          <WhatsAppLink whatsapp={whatsapp} compact />
-        </div>
-      ) : null}
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!ada}
-          className="flex w-full min-w-0 items-center gap-3 rounded-2xl bg-cocoa-800 px-4 py-3 text-left text-cream-50 shadow-lg transition enabled:hover:bg-cocoa-900 enabled:active:scale-[0.99] disabled:opacity-55 sm:max-w-md"
-        >
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-matcha-500">
-            <ShoppingBag className="size-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-base leading-tight font-extrabold tabular">
-              {ada
-                ? `${totalItems} ${totalItems === 1 ? t.common.itemOne : t.common.itemMany}`
-                : emptyLabel}
-            </span>
-            {ada ? (
-              <span className="mt-0.5 block truncate text-[12px] font-semibold text-cream-200">
-                {nextLabel}
-              </span>
-            ) : null}
-          </span>
-          {ada ? (
-            <>
-              <span className="shrink-0 text-base leading-none font-extrabold tabular">
-                {formatIDR(subtotal, lang)}
-              </span>
-              <ArrowRight className="size-5 shrink-0 text-cream-200" />
-            </>
-          ) : null}
-        </button>
-      </div>
     </div>
   );
 }

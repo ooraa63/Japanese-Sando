@@ -5,7 +5,7 @@
  *
  * Dipakai di tiga tempat:
  *  1. `WhatsAppFab` — tombol mengambang untuk halaman selain `/order`.
- *  2. `CartStickyBar` — di dalam bar keranjang, di sisi kanan (Steven
+ *  2. `CartDock` — di dalam bar keranjang, di sisi kanan (Steven
  *     14-10-2026: "untuk fitur WA itu terlalu tinggi buat di kanan bawah";
  *     kalau bar keranjang sudah menempati dasar layar, satu-satunya cara
  *     WA tetap "di kanan bawah" TANPA menimpa isi keranjang adalah masuk

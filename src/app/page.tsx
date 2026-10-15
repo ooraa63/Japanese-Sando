@@ -76,7 +76,7 @@ export default async function HomePage({
 
        `categories` ikut diteruskan karena popup paket (`OrderBundleModal`)
        butuh daftar rasa untuk dipilih pembelinya. */
-    <QuickAddProvider categories={categories}>
+    <QuickAddProvider categories={categories} whatsapp={settings?.whatsapp}>
       <SiteHeader
         storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
         logoUrl={settings?.logo_url ?? null}

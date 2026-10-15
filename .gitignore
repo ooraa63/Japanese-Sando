@@ -39,6 +39,7 @@ yarn-error.log*
 
 # artefak verifikasi lokal (screenshot, script CDP, profil headless)
 .tmp-*
+.shots/
 
 # typescript
 *.tsbuildinfo
