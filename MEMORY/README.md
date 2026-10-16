@@ -8,6 +8,7 @@ melakukan perubahan apa pun.
 
 | File | Fungsi |
 |---|---|
+| **`START-HERE.md`** | **Pintu masuk. Dokument handoff: project ini apa, stack + versi, di mana GitHub / Supabase / Vercel, alur kerja wajib, aturan berinteraksi dengan Steven. Kalau kamu AI baru, ini yang pertama harus dibaca.** |
 | `README.md` (file ini) | Rangkuman project, arsitektur, dan cara kerja. |
 | `CHANGELOG.md` | Log kronologis setiap update / perubahan. Tambahkan entri baru di atas. |
 | `decisions.md` | Keputusan teknis yang sudah diambil (arsitektur, library, pola) beserta alasannya. |
@@ -15,11 +16,12 @@ melakukan perubahan apa pun.
 
 ## Cara pakai untuk AI session baru
 
-1. **Baca `README.md` dulu** — pahami apa project ini, struktur folder, dan stack.
-2. **Baca `CHANGELOG.md`** — lihat update terakhir supaya tidak mengulang kerja.
-3. **Baca `gotchas.md`** — hindari jebakan yang sudah pernah ditemukan.
-4. **Baca `decisions.md`** (kalau ada perubahan arsitektur) — pahami kenapa keputusan itu diambil.
-5. Setelah selesai kerja, **tambah entri baru di `CHANGELOG.md`** di bagian paling atas.
+1. **Baca `START-HERE.md` dulu** — project, infrastruktur, aturan kerja.
+2. **Baca `README.md`** — pahami struktur folder dan stack.
+3. **Baca `CHANGELOG.md`** — lihat update terakhir supaya tidak mengulang kerja.
+4. **Baca `gotchas.md`** — hindari jebakan yang sudah pernah ditemukan.
+5. **Baca `decisions.md`** (kalau ada perubahan arsitektur) — pahami kenapa keputusan itu diambil.
+6. Setelah selesai kerja, **tambah entri baru di `CHANGELOG.md`** di bagian paling atas.
 
 ## Konvensi penulisan CHANGELOG.md
 

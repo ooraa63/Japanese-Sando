@@ -10,8 +10,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Project memory
 
-Sebelum mulai kerja, **baca folder `MEMORY/` di root project**:
+Sebelum mulai kerja, **baca `MEMORY/START-HERE.md` duluan** — itu dokumen
+handoff berisi project ini apa, stack + versi yang wajib diketahui, lokasi
+GitHub / Supabase / Vercel, alur kerja wajib, dan aturan berinteraksi dengan
+Steven. Setelah itu baca folder `MEMORY/` di root project:
 
+- `MEMORY/START-HERE.md` — pintu masuk. Baca yang ini lebih dulu.
 - `MEMORY/README.md` — rangkuman project, struktur, dan cara kerja.
 - `MEMORY/CHANGELOG.md` — log perubahan terbaru (entry di atas = paling baru).
 - `MEMORY/gotchas.md` — jebakan yang sering bikin AI session salah.
