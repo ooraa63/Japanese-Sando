@@ -165,6 +165,22 @@ Verifikasi visual di `http://localhost:3100` lewat `scripts/shot-cdp.mjs`
 Belum diverifikasi: editor admin `/admin/menu` (butuh login), dan satu
 pemesanan sungguhan sampai pesanan masuk database.
 
+### 7. Deploy
+
+Commit `e96101e` (25 berkas) lalu `7711750` (perbaikan marker verifikasi).
+`scripts/wait-for-deploy-bundle-choices.mjs` → **SIUP**, kelima marker ada di
+produksi. Bukti visual di produksi: `.shots/live-pilihan.png`, popup mode
+pilihan dengan Pilihan 1 = Caramel Cheese dan Pilihan 2 = Choco Matcha,
+penghitung 2/2, tombol Konfirmasi aktif.
+
+Satu jebakan baru yang ketahuan saat menyiapkan deploy ini: marker
+`invalid_bundle_slots` **tidak pernah bisa ditemukan**, karena kodenya ada di
+`src/app/admin/actions.ts` yang hanya masuk ke chunk admin, sedangkan
+halaman publik tidak pernah memuat chunk itu. Skrip akan menggantung
+"BELUM LIVE" padahal deploy-nya sudah naik. Semua marker sekarang
+divalidasi lebih dulu ke build lokal dengan `JS_DEPLOY_URL`, sebelum dipakai
+menilai produksi.
+
 ---
 
 ## 2026-10-15 — Keranjang: lihat isi dulu sebelum lanjut, rail desktop, dock di beranda

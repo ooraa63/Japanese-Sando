@@ -2370,3 +2370,25 @@ pg.types.setTypeParser(20, (v) => Number(v));
 Hal serupa berlaku untuk `bigint[]`: `array_agg` mengembalikan
 `["447","448"]`, bukan `[447, 448]`. Kalau dibandingkan dengan angka, pakai
 `::int` di SQL-nya.
+### #130 - Marker deploy dari kode admin tidak akan pernah ditemukan di halaman publik
+
+`wait-for-deploy-bundle-choices.mjs` pertama memakai `invalid_bundle_slots`
+sebagai penanda build baru. Kode itu ada di `src/app/admin/actions.ts`, yang
+hanya masuk ke chunk ADMIN. Halaman publik `/` dan `/order` tidak pernah
+memuat chunk itu, jadi penandanya tidak akan ditemukan -- skrip akan
+menggantung "BELUM LIVE" sampai batas percobaan habis, padahal deploy-nya
+sudah naik dan tidak ada yang salah.
+
+Tanda-tandanya: harness yang tidak pernah keluar "SIUP" sama sekali
+sepanjang percobaan, bukan sebagian. Beda dengan build yang memang belum
+naik, yang biasanya memenuhi beberapa marker.
+
+Aturan: sebelum dipakai menilai produksi, jalankan harness yang sama ke
+build LOKAL lebih dulu.
+
+    JS_DEPLOY_URL=http://localhost:3100 node scripts/wait-for-deploy-cart.mjs
+
+Kalau ada marker yang tidak ditemukan di build lokal, berarti marker itu
+salah pilih -- bukan berarti build-nya belum naik. Kalau tidak dicek, satu
+marker salah akan membuat verifikasi jadi tidak berguna: yang benar reported
+tidak ada, yang salah tidak pernah dilaporkan.
