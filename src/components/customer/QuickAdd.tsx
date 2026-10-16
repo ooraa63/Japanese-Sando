@@ -29,7 +29,7 @@ import type { Bundle, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { formatIDR } from "@/lib/utils";
 import { useCart } from "@/components/customer/CartProvider";
-import { CartDock } from "@/components/customer/CartDock";
+import { CartHeaderButton } from "@/components/customer/CartHeaderButton";
 import { OrderBundleModal } from "@/components/customer/OrderBundleModal";
 import { flatFlavors } from "@/lib/cart";
 import { useSoldCounts } from "@/lib/useSoldCounts";
@@ -41,6 +41,13 @@ interface QuickAddValue {
   openBundle: (bundle: Bundle) => void;
   /** Kunci keranjang boleh dibuka dari beranda (selalu true saat provider ada). */
   enabled: boolean;
+  /**
+   * Daftar rasa untuk merakit isi keranjang (nama, harga, foto).
+   *
+   * Tombol troli di header membutuhkannya: yang tersimpan di localStorage hanya
+   * id rasa, jadi tanpa katalog halaman tidak bisa menampilkan apa isi keranjang.
+   */
+  flavors: Flavor[];
 }
 
 const QuickAddContext = createContext<QuickAddValue | null>(null);
@@ -58,39 +65,28 @@ export function useQuickAdd(): QuickAddValue | null {
 
 export function QuickAddProvider({
   categories,
-  whatsapp,
   children,
 }: {
   categories: Category[];
-  /** Nomor WhatsApp toko; diteruskan ke dock keranjang di beranda. */
-  whatsapp?: string | null;
   children: React.ReactNode;
 }) {
   const [flavor, setFlavor] = useState<Flavor | null>(null);
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const soldCounts = useSoldCounts();
-  const { t } = useI18n();
 
   const openFlavor = useCallback((f: Flavor) => setFlavor(f), []);
   const openBundle = useCallback((b: Bundle) => setBundle(b), []);
   const closeFlavor = useCallback(() => setFlavor(null), []);
   const closeBundle = useCallback(() => setBundle(null), []);
 
-  const value = useMemo<QuickAddValue>(
-    () => ({ openFlavor, openBundle, enabled: true }),
-    [openFlavor, openBundle]
-  );
-
-  // Steven 15-10-2026: "Pada home, tambahkan keranjang juga jadi ketika mereka
-  // klik masukkan ke keranjang yang di home, mereka juga bisa lihat ada apa aja."
-  //
-  // Dipasang DI DALAM provider (bukan di `page.tsx`) supaya langsung berakses
-  // ke `categories` yang sudah ada di tangan, dan supaya tidak terpasang dua
-  // kali kalau nanti beranda memakai provider ini lagi di tempat lain.
-  //
-  // Tidak ada `onCheckout`: beranda belum punya alur langkah, jadi tombol di
-  // dalam sheet dibawa ke `/order` (lihat `CartDock`).
+  // Steven 15-10-2026: "Pada home, tambahkan keranjang juga..." Daftar rasa ini
+  // yang dipakai tombol troli di header untuk merakit isi keranjang.
   const flavors = useMemo(() => flatFlavors(categories), [categories]);
+
+  const value = useMemo<QuickAddValue>(
+    () => ({ openFlavor, openBundle, enabled: true, flavors }),
+    [openFlavor, openBundle, flavors]
+  );
 
   return (
     <QuickAddContext.Provider value={value}>
@@ -103,13 +99,21 @@ export function QuickAddProvider({
         open={bundle != null}
         onClose={closeBundle}
       />
-      <CartDock
-        flavors={flavors}
-        whatsapp={whatsapp}
-        emptyText={t.cart.emptyOnHome}
-      />
     </QuickAddContext.Provider>
   );
+}
+
+/**
+ * Tombol troli keranjang untuk dipasang di header beranda.
+ *
+ * Sengaja memakai `useQuickAdd()` (bukan menerima `flavors` sebagai prop)
+ * supaya `page.tsx` tidak perlu memanggil `flatFlavors` sendiri dan daftar
+ * rasa tetap punya satu sumber kebenaran.
+ */
+export function HomeCartButton() {
+  const ctx = useQuickAdd();
+  if (!ctx) return null;
+  return <CartHeaderButton flavors={ctx.flavors} />;
 }
 
 /**

@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/customer/SiteHeader";
 import { SiteFooter } from "@/components/customer/SiteFooter";
 import { ShopInfo } from "@/components/customer/ShopInfo";
 import { AppHome } from "@/components/customer/AppHome";
+import { HomeCartButton } from "@/components/customer/QuickAdd";
 import { waLink } from "@/lib/utils";
 import { OrderNowLink } from "@/components/customer/OrderNowLink";
 import { ReviewsSection } from "@/components/customer/ReviewsSection";
@@ -76,11 +77,12 @@ export default async function HomePage({
 
        `categories` ikut diteruskan karena popup paket (`OrderBundleModal`)
        butuh daftar rasa untuk dipilih pembelinya. */
-    <QuickAddProvider categories={categories} whatsapp={settings?.whatsapp}>
+    <QuickAddProvider categories={categories}>
       <SiteHeader
         storeName={settings?.store_name ?? DEFAULT_STORE_NAME}
         logoUrl={settings?.logo_url ?? null}
         brandLine={settings?.brand_line ?? ""}
+        cartButton={<HomeCartButton />}
       />
 
       <main id="main">

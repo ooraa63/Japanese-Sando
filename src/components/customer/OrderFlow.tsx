@@ -35,7 +35,6 @@ import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
 import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
-import { WhatsAppLink } from "@/components/customer/WhatsAppLink";
 import { CartContents } from "@/components/customer/CartContents";
 import { CartDock } from "@/components/customer/CartDock";
 import { AddressPicker } from "@/components/customer/AddressPicker";
@@ -418,7 +417,6 @@ export function OrderFlow({
      ditentukan admin dan pembeli perlu tahu sebelum konfirmasi. */
   const [locationPopup, setLocationPopup] = useState<DeliveryZone | null>(null);
   // Popup PEMILIHAN toko untuk metode "Ambil di toko" (Steven 14-10-2026).
-  const [pickupPickerOpen, setPickupPickerOpen] = useState(false);
 
   // Mengganti tanggal membuang batch lama seketika, supaya selama RPC
   // berjalan tidak ada satu frame pun yang memakai stok batch yang salah.
@@ -691,20 +689,17 @@ export function OrderFlow({
        tumbuh jadi datastore sendiri, tinggal ganti sumber `pickupZones`. */
   const onPickupClick = () => {
     updateDraft({ deliveryMethod: "pickup", address: "", addressNote: "", lat: null, lng: null });
-    // Kalau cuma ada satu titik pengambilan, langsung dipakai supaya pembeli
-    // tidak perlu popup untuk pilihan yang tidak ada artinya. Kalau ada
-    // beberapa, popup pilihannya yang muncul.
+    /* Satu titik pengambilan tidak perlu DIPILIH: langsung dipakai supaya
+       pembeli tidak melihat daftar pilihan yang tidak ada artinya. Dua titik
+       atau lebih = pembeli yang memilih, lewat kartu yang muncul di bawah tiga
+       tombol metode. */
     const zones = deliveryZones.filter((z) => z.kind === "pickup");
     if (zones.length === 1) {
       updateDraft({ deliveryZone: zones[0].id });
-      setPickupPickerOpen(false);
-      return;
     }
-    setPickupPickerOpen(true);
   };
 
   const pickupZones = deliveryZones.filter((z) => z.kind === "pickup");
-  const chosenPickup = pickupZones.find((z) => z.id === draft.deliveryZone) ?? null;
 
   const currentZone = deliveryZones.find((z) => z.id === draft.deliveryZone);
   const rawDeliveryFee =
@@ -732,8 +727,6 @@ export function OrderFlow({
       : draft.deliveryMethod === "courier"
         ? t.order.payment.courier
         : t.order.payment.pickup;
-
-  const pickupNote = lang === "en" ? settings.pickup_note_en : settings.pickup_note_id;
 
   const stepIndex = steps.indexOf(step);
 
@@ -844,11 +837,13 @@ export function OrderFlow({
       toast.warning(t.order.payment.addressError);
       return false;
     }
-    /* Steven 14-10-2026: sekarang toko dipilih lewat popup. Kalau pembeli
-       menutup popup tanpa memilih, `deliveryZone` masih nilai lama
-       ("pickup" bawaan) yang TIDAK ada di tabel — `create_order` akan
-       menolaknya dengan error yang membingungkan. Jadi:tahan di sini
-       dengan pesan yang jelas, dan buka lagi popupnya. */
+    /* Steven 16-10-2026: toko diambil lewat kartu yang muncul DI BAWAH
+       tombol "Ambil di toko", jadi pembeli tidak perlu popup terpisah. Kalau
+       dia lanjut tanpa memilih, `deliveryZone` masih nilai bawaan ("pickup")
+       yang tidak ada di tabel `delivery_zones` — `create_order` menolaknya
+       dengan error yang membingungkan. Jadi tahan di sini dengan pesan jelas.
+       Kartu pilihannya sudah terlihat di layar, jadi tidak perlu membuka
+       apa pun lagi. */
     if (draft.deliveryMethod === "pickup") {
       const validPickup = pickupZones.some((z) => z.id === draft.deliveryZone);
       if (!validPickup) {
@@ -857,7 +852,6 @@ export function OrderFlow({
             ? t.order.payment.pickupChooseTitle
             : t.order.payment.pickupEmpty
         );
-        if (pickupZones.length > 0) setPickupPickerOpen(true);
         return false;
       }
     }
@@ -1086,11 +1080,8 @@ export function OrderFlow({
           <Link href="/" className="btn-primary">
             {t.success.home}
           </Link>
-          {/* Panel ini `early return`, jadi tombol WA harus ikut di sini —
-              `WhatsAppFab` menyembunyikan dirinya di `/order` (dipakai
-              dock keranjang di langkah menu). Tanpa ini pembeli tidak punya
-              jalan chat sama sekali saat toko tutup. */}
-          {settings.whatsapp?.trim() ? <WhatsAppLink whatsapp={settings.whatsapp} compact /> : null}
+          {/* Tombol WA tidak perlu dirender manual: `WhatsAppFab` sudah
+              muncul di pojok kanan bawah, termasuk di `/order`. */}
         </div>
       </div>
     );
@@ -1120,9 +1111,8 @@ export function OrderFlow({
           <Link href="/" className="btn-primary">
             {t.success.home}
           </Link>
-          {/* Sama seperti panel `closed` di atas: ini `early return`, jadi WA
-              harus ikut dirender — `WhatsAppFab` tidak muncul di `/order`. */}
-          {settings.whatsapp?.trim() ? <WhatsAppLink whatsapp={settings.whatsapp} compact /> : null}
+          {/* Sama seperti panel `closed` di atas: `WhatsAppFab` yang
+              menanganinya, jadi tidak perlu tombol manual di sini. */}
         </div>
       </div>
     );
@@ -1547,8 +1537,19 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
               {/* ---------- KERANJANG DI DESKTOP ----------
                   Panel kanan yang menempel. Tampil hanya di `lg` ke atas,
                   karena di bawah itu `CartDock` yang memegang peran. */}
-              <aside data-cart-rail className="hidden lg:block lg:sticky lg:top-6">
-                <div className="card flex max-h-[calc(100dvh-3rem)] flex-col overflow-hidden">
+              {/* Steven 16-10-2026 (gambar 4): "saat scroll Your cart jadi
+                  agak terpotong". Penyebabnya rail ini `sticky top-6` (24px)
+                  padahal header situs `sticky top-0 h-16` (64px) — begitu
+                  digulir, kepala rail tenggelam di bawah header dan judul
+                  "Your cart" hilang. Rail sekarang menempel di 76px, yaitu
+                  tinggi header + jarak 12px.
+                  `max-h` dikurangi sampai 9rem supaya bagian bawah rail
+                  berhenti sebelum tombol WhatsApp di pojok kanan bawah. */}
+              <aside
+                data-cart-rail
+                className="hidden lg:sticky lg:top-[4.75rem] lg:block"
+              >
+                <div className="card flex max-h-[calc(100dvh-9rem)] flex-col overflow-hidden">
                   <div className="flex items-center justify-between gap-3 border-b border-cocoa-100 px-4 py-3">
                     <h3 className="font-display text-base font-extrabold text-cocoa-900">
                       {t.cart.title}
@@ -1565,12 +1566,6 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                     checkoutIcon={<ArrowRight className="size-4" />}
                   />
                 </div>
-
-                {settings.whatsapp?.trim() ? (
-                  <div className="mt-3 flex justify-center">
-                    <WhatsAppLink whatsapp={settings.whatsapp} compact />
-                  </div>
-                ) : null}
               </aside>
               </div>
 
@@ -1582,7 +1577,6 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                   flavors={flavors}
                   emptyText={t.cart.emptyInOrder}
                   onCheckout={handleNext}
-                  whatsapp={settings.whatsapp}
                 />
               </div>
             </section>
@@ -1633,7 +1627,6 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                   icon={<Store className="size-5" />}
                   title={t.order.payment.pickup}
                   desc={t.order.payment.pickupDesc}
-                  note={pickupNote}
                 />
                 <ChoiceCard
                   selected={draft.deliveryMethod === "delivery"}
@@ -1712,38 +1705,42 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                 </div>
               ) : null}
 
-              {/* Toko pilihan (metode "Ambil di toko"). Steven 14-10-2026:
-                  grid kartu toko yang panjang DIHAPUS dan diganti ringkasan
-                  satu baris + tombol "Ganti toko". Alasannya: grid itu bikin
-                  halaman panjang, dan tombol "Lihat lokasi" di bawahnya
-                  membuka popup DETAIL — bukan popup pilihan. Sekarang ada
-                  satu cara saja memilih, lewat popup, dan tempat ini hanya
-                  menampilkan hasil pilihannya. */}
-              {draft.deliveryMethod === "pickup" && pickupZones.length > 0 ? (
-                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-matcha-300 bg-matcha-50 p-4">
-                  <Store className="size-5 shrink-0 text-matcha-700" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold tracking-wide text-matcha-700 uppercase">
-                      {t.order.payment.pickupSelectedStore}
+              {/* Toko pengambilan. Steven 16-10-2026 (gambar 5): kotak hijau
+                  "Toko pilihan / Belum dipilih / Ganti toko" DIHAPUS. Sekarang
+                  pilihannya muncul sebagai kartu di bawah, sama persis dengan
+                  zona pengantaran di atas — jadi pembeli memilih TOKO-nya sendiri
+                  tepat setelah menekan "Ambil di toko", bukan lewat popup lain.
+
+                  Sumber data tetap `delivery_zones` dengan kind 'pickup'
+                  (Rumah Sushi, UVERS), jadi tidak ada tabel toko baru. */}
+              {draft.deliveryMethod === "pickup" ? (
+                pickupZones.length === 0 ? (
+                  <p className="mt-4 rounded-2xl bg-honey-50 px-4 py-3 text-[13px] font-semibold text-honey-500">
+                    {t.order.payment.pickupEmpty}
+                  </p>
+                ) : (
+                  <div className="mt-4" data-pickup-store-list>
+                    <p className="text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
+                      {t.order.payment.pickupChooseTitle}
                     </p>
-                    <p className="mt-0.5 truncate text-sm font-bold text-cocoa-800">
-                      {chosenPickup
-                        ? lang === "en"
-                          ? chosenPickup.name_en
-                          : chosenPickup.name_id
-                        : lang === "en"
-                          ? "Not selected yet"
-                          : "Belum dipilih"}
-                    </p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                      {pickupZones.map((z) => {
+                        const zName = lang === "en" ? z.name_en : z.name_id;
+                        const zNote = (lang === "en" ? z.note_en : z.note_id) ?? "";
+                        return (
+                          <ChoiceCard
+                            key={z.id}
+                            selected={draft.deliveryZone === z.id}
+                            onClick={() => updateDraft({ deliveryZone: z.id })}
+                            icon={<Store className="size-5" />}
+                            title={zName}
+                            note={zNote}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPickupPickerOpen(true)}
-                    className="shrink-0 rounded-xl border border-cocoa-200 bg-white px-3.5 py-2.5 text-sm font-bold text-cocoa-700 transition hover:bg-cocoa-50"
-                  >
-                    {t.order.payment.pickupChangeStore}
-                  </button>
-                </div>
+                )
               ) : null}
 
               {/* Alamat ketik manual — hanya untuk zona yang requires_address.
@@ -2141,37 +2138,17 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
 
       </div>
 
-      {/* Tombol WhatsApp untuk langkah yang TIDAK punya bar keranjang
-          (tanggal, identitas, pembayaran, konfirmasi). Di langkah "Pilih
-          Rasa" tombolnya sudah ada di dalam dock keranjang — dua-duanya
-          tidak dirender sekaligus supaya tidak ada dua link WA yang sama
-          di layar.
-
-          `bottom-4` aman di sini karena `MobileBottomNav` menyembunyikan
-          dirinya di `/order` dan bar keranjang hanya ada di langkah menu. */}
-      {step !== "menu" && settings.whatsapp?.trim() ? (
-        <WhatsAppLink
-          whatsapp={settings.whatsapp}
-          compact
-          className="fixed right-4 bottom-4 z-40 grid size-14 place-items-center rounded-2xl bg-[#25D366] text-white shadow-lg shadow-black/25 transition hover:bg-[#1EBE5A] active:scale-95 md:right-6 md:bottom-6"
-        />
-      ) : null}
+      {/* Tombol WhatsApp TIDAK lagi dirender di halaman ini. Sejak
+          16-10-2026 hanya ada satu tombol WA untuk semua halaman pembeli:
+          `WhatsAppFab` di pojok kanan bawah (termasuk di `/order`, yang
+          dulu menyembunyikannya). Dulu ada empat tempat sekaligus — dua panel
+          `early return`, rail keranjang, dan dock keranjang — sehingga
+          posisinya berbeda-beda tiap langkah. */}
 
       <LocationPopup
         zone={locationPopup}
         storeAddress={settings.address ?? null}
         onClose={() => setLocationPopup(null)}
-      />
-
-      <PickupStorePicker
-        open={pickupPickerOpen}
-        zones={pickupZones}
-        selectedId={draft.deliveryZone}
-        onPick={(z) => {
-          updateDraft({ deliveryZone: z.id });
-          setPickupPickerOpen(false);
-        }}
-        onClose={() => setPickupPickerOpen(false)}
       />
 
       {qrisPayload ? (
@@ -2209,114 +2186,6 @@ function StepHeading({
       <div className="min-w-0">
         <h1 className="text-xl leading-tight font-extrabold text-cocoa-900">{title}</h1>
         <p className="mt-1 text-[13px] text-cocoa-500">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Popup PEMILIHAN toko untuk metode "Ambil di toko".
- *
- * Steven 14-10-2026 (gambar 3): "sbnrnya maksud saya pop up bukan begitu,
- * tapi misal saat mereka pilih ambil ditoko ada baru pilihan popup untuk
- * memilih mau ambilnya di toko mana".
- *
- * Bedanya dengan `LocationPopup`: yang ini MEMILIH (satu klik langsung
- * menutup dan memakai toko itu), sedangkan `LocationPopup` cuma MEMBACA
- * detail dari toko yang sudah terpilih.
- *
- * Sumber datanya `delivery_zones` dengan `kind = 'pickup'`, jadi tidak ada
- * tabel toko baru: admin sudah mobilizing titik ini dari menu "Ambil &
- * Kirim". Kalau nanti daftar toko tumbuh jadi datastore sendiri, cukup ganti
- * isi prop `zones`.
- */
-function PickupStorePicker({
-  open,
-  zones,
-  selectedId,
-  onPick,
-  onClose,
-}: {
-  open: boolean;
-  zones: DeliveryZone[];
-  selectedId: string;
-  onPick: (zone: DeliveryZone) => void;
-  onClose: () => void;
-}) {
-  const { t, lang } = useI18n();
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-cocoa-950/50 p-4 sm:items-center"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.order.payment.pickupChooseTitle}
-    >
-      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <div className="border-b border-cocoa-100 px-5 py-4">
-          <h2 className="flex items-center gap-2 text-base font-extrabold text-cocoa-900">
-            <Store className="size-5 text-matcha-600" />
-            {t.order.payment.pickupChooseTitle}
-          </h2>
-          <p className="mt-0.5 text-[13px] text-cocoa-500">
-            {t.order.payment.pickupChooseHint}
-          </p>
-        </div>
-
-        {zones.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-cocoa-400">
-            {t.order.payment.pickupEmpty}
-          </p>
-        ) : (
-          <ul className="max-h-[60vh] divide-y divide-cocoa-100 overflow-y-auto">
-            {zones.map((z) => {
-              const name = lang === "en" ? z.name_en : z.name_id;
-              const note = (lang === "en" ? z.note_en : z.note_id) ?? "";
-              const on = selectedId === z.id;
-              return (
-                <li key={z.id}>
-                  <button
-                    type="button"
-                    onClick={() => onPick(z)}
-                    className={`flex w-full items-center gap-3 px-5 py-4 text-left transition ${
-                      on ? "bg-matcha-50" : "hover:bg-cocoa-50"
-                    }`}
-                  >
-                    <span
-                      className={`grid size-9 shrink-0 place-items-center rounded-xl ${
-                        on ? "bg-matcha-500 text-white" : "bg-cocoa-100 text-cocoa-600"
-                      }`}
-                    >
-                      <Store className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-cocoa-900">
-                        {name}
-                      </span>
-                      {note ? (
-                        <span className="mt-0.5 block text-[12px] leading-relaxed text-cocoa-500">
-                          {note}
-                        </span>
-                      ) : null}
-                    </span>
-                    {on ? <Check className="size-5 shrink-0 text-matcha-600" /> : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        <div className="border-t border-cocoa-100 px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-primary w-full"
-          >
-            {t.order.payment.cancel}
-          </button>
-        </div>
       </div>
     </div>
   );

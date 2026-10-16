@@ -2391,4 +2391,46 @@ build LOKAL lebih dulu.
 Kalau ada marker yang tidak ditemukan di build lokal, berarti marker itu
 salah pilih -- bukan berarti build-nya belum naik. Kalau tidak dicek, satu
 marker salah akan membuat verifikasi jadi tidak berguna: yang benar reported
-tidak ada, yang salah tidak pernah dilaporkan.
+tidak ada, yang salah tidak pernah dilaporkan.### #131 - Kelas Tailwind yang berisi interpolasi template TIDAK pernah jadi CSS
+
+Tailwind memindai **teks sumber**, bukan hasil evaluasi JavaScript. Jadi kelas
+yang dirakit dari template literal tidak ditemukan, dan tidak ada CSS yang
+dibuat untuknya.
+
+    // SALAH. Tailwind hanya melihat teks mentahnya:
+    //   bottom-[calc(${DOCK_KERANJANG}px+env(safe-area-inset-bottom))]
+    // Dia tidak tahu hasil evaluasinya, jadi tidak ada CSS yang dibuat.
+    // Akibatnya `bottom` = auto.
+    const posisi = `bottom-[calc(${DOCK_KERANJANG}px+env(safe-area-inset-bottom))]`;
+
+    // BENAR. Nama kelas utuh ada di teks sumber, apa pun nilainya saat runtime.
+    const DOCK_KERANJANG = "bottom-[calc(88px+env(safe-area-inset-bottom))]";
+
+Gejalanya menipu: elemen `fixed` tetap `fixed` dan `right-*` tetap jalan, hanya
+`bottom` yang hilang. Tombol `fixed` tanpa `top`/`bottom` jatuh ke posisi
+statisnya, yaitu **akhir halaman** -- jadi kelihatan "melayang di tengah konten"
+padahal CSS-nya sudah `fixed`. Markup dan screenshot penuh keduanya tidak
+membocorkan penyebabnya.
+
+Cara memastikan: jangan menilai dari screenshot. `shot-cdp.mjs` memakai
+`captureBeyondViewport: true`, jadi elemen `fixed` dirender relatif terhadap
+viewport yang diperbesar dan posisinya meaningless di gambar. Baca
+`getBoundingClientRect()`-nya:
+
+    node scripts/ukur.mjs http://localhost:3100/order 1440 900 ukur @seed.json
+
+Untuk `fixed bottom-6` di viewport 900, `top` harus `900 - 24 - 56 = 820`. Kalau
+`top` sama dengan tinggi dokumen, berarti kelas `bottom` tidak terpasang.
+
+### #132 - `sticky` di halaman dengan header `sticky` bisa tenggelam
+
+Header `sticky top-0 h-16` yang memakan 64px tidak otomatis menyisakan ruang
+untuk elemen `sticky` lain di halaman yang sama. `sticky top-6` (24px) berarti
+elemen itu berhenti 24px dari atas viewport -- **40px di belakang header**, dan
+kepalanya tidak terlihat.
+
+Gejalanya cuma muncul saat menggulir, jadi lolos di screenshot halaman yang
+belum digulir. Verifikasi harus dilakukan dalam keadaan tergulir, dan `.shots/`
+screenshot penuh tidak cukup: yang perlu dilihat adalah perbandingan
+`getBoundingClientRect().top` kepala elemen terhadap
+`getBoundingClientRect().bottom` header.

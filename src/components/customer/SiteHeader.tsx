@@ -2,6 +2,7 @@
 import { DEFAULT_STORE_NAME } from "@/lib/brand";
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,10 +28,19 @@ export function SiteHeader({
   storeName = DEFAULT_STORE_NAME,
   logoUrl = null,
   brandLine = "",
+  cartButton = null,
 }: {
   storeName?: string;
   logoUrl?: string | null;
   brandLine?: string;
+  /**
+   * Tombol keranjang untuk header, mis. `HomeCartButton`.
+   *
+   * Steven 16-10-2026: di beranda keranjang pindah dari bar melayang di bawah
+   * layar menjadi ikon troli kecil di header, sebelah lonceng notifikasi.
+   * Halaman lain tidak mengirim apa pun, jadi header mereka tetap seperti dulu.
+   */
+  cartButton?: ReactNode;
 }) {
   const { t, lang } = useI18n();
   const { profile, loading, openAuthModal } = useCustomerAuth();
@@ -163,6 +173,9 @@ export function SiteHeader({
             dibaca. */}
         <NotificationBell />
 
+        {/* Ikon troli keranjang (hanya beranda). Kosong = tidak ada isi. */}
+        {cartButton}
+
         {/* Chip avatar / "Masuk" disembunyikan sementara — fitur Account
             dimatikan (lihat `ACCOUNT_FEATURE_ENABLED`). */}
         {ACCOUNT_FEATURE_ENABLED ? (
@@ -244,6 +257,9 @@ export function SiteHeader({
           {/* Lonceng notifikasi juga di desktop (sebelumnya cuma mobile),
               supaya pembeli di laptop juga tahu pesanan sudah siap. */}
           <NotificationBell />
+          {/* Sama seperti di mobile: ikon troli ikut disembunyikan kalau
+              beranda tidak mengirim satu pun. */}
+          {cartButton}
           {/* Sama seperti di mobile: chip avatar / "Masuk" ikut disembunyikan
               selama fitur Account dimatikan. */}
           {ACCOUNT_FEATURE_ENABLED ? (

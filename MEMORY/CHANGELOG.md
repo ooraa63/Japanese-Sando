@@ -4,6 +4,145 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-16 — Tujuh perbaikan dari screenshot Steven
+
+Steven mengirim enam screenshot (folder `D:\Gambar error`) untuk tujuh
+permintaan. Semuanya bisa ditelusuri ke kode — tidak perlu menebak.
+
+| # | Permintaan | Status |
+|---|---|---|
+| 1 | Cart di beranda jangan bar besar, bikin seperti logo troli di kanan atas | selesai |
+| 2 | Paket terkunci tetap harus ada gambarnya | selesai |
+| 3 | Tombol WhatsApp selalu di ujung kanan bawah | selesai |
+| 4 | "Your cart" terpotong saat scroll | selesai |
+| 5 | "Selected store" dihapus; pilihan toko muncul setelah "Collect in Store" diklik | selesai |
+| 6 | "Masih ada error" | selesai (migration-60) |
+| 7 | Bundle bisa ditambahkan pada setiap PO | **sudah ada** sejak migration-52 |
+
+### 1. Cart beranda jadi ikon troli kecil di header
+
+Selama ini beranda memakai `CartDock` — bar gelap SELURUH lebar yang menutupi
+kartu produk dan judul "Value bundles" (gambar 1). Sekarang:
+
+- `src/components/customer/CartHeaderButton.tsx` (baru): tombol seukuran ikon
+  biasa di sebelah lonceng notifikasi, membuka `CartSheet`.
+- `SiteHeader` menerima prop opsional `cartButton`. Hanya beranda yang
+  mengirimnya, jadi header halaman lain tidak berubah sama sekali.
+- `QuickAddValue` sekarang membawa `flavors`, dan `HomeCartButton` membacanya dari
+  context — `page.tsx` tidak perlu memanggil `flatFlavors` sendiri.
+- `QuickAddProvider` tidak lagi menerima `whatsapp` dan tidak lagi merender
+  `CartDock`.
+- `CartDock` tetap dipakai di `/order` (mobile) saja.
+
+Knock-on yang diinginkan: pojok kanan bawah jadi kosong, sehingga tombol WA bisa
+benar-benar nempel di sana (butuh 3).
+
+### 2. Paket terkunci (combo/fixed) menampilkan foto rasa
+
+`OrderBundleModal.tsx`: tiap baris isi paket dapat thumbnail 56px seperti di
+keranjang, dan nomor urut pindah ke kanan. Fallback `ShoppingBag` kalau rasa
+tanpa foto (mengikuti `CartContents`).
+
+### 3. WhatsApp satu tempat: pojok kanan bawah
+
+Dulu ada EMPAT tombol WA di `/order`: dua panel `early return`, rail keranjang,
+dock keranjang, dan blok mengambang. Semuanya dihapus; sekarang hanya
+`WhatsAppFab` di root layout.
+
+- `WhatsAppFab` tidak lagi menyembunyikan diri di `/order`.
+- Tidak lagi disembunyikan saat keranjang berisi (blok `if totalItems > 0` yang
+  tertinggal dua kali di file itu ikut hilang).
+- Posisi vertikal: `88px` di atas dock keranjang (`/order` + keranjang ada),
+  `68px` di atas nav bawah (halaman lain), `24px` dari tepi (desktop).
+- `CartDock` kehilangan prop `whatsapp` dan blok WA-nya.
+- `WhatsAppLink` sekarang meneruskan atribut tambahan (`data-wa-fab`).
+
+### 4. "Your cart" tidak lagi terpotong saat scroll
+
+Rail keranjang desktop memakai `lg:sticky lg:top-6` (24px), padahal header situs
+`sticky top-0 h-16` (64px). Begitu digulir, kepala rail — judul "Your cart" plus
+jumlah item — tenggelam di bawah header.
+
+Diubah ke `lg:top-[4.75rem]` (76px = tinggi header + 12px) dan
+`max-h-[calc(100dvh-9rem)]` supaya bagian bawah rail berhenti sebelum tombol
+WhatsApp. Lihat gotcha #132.
+
+### 5. Pilihan toko muncul setelah "Ambil di toko" diklik
+
+Steven: *"Yang collect in store, setelah itu bawahnya ada selected store itu
+dihapus ... saya mau ketika klik Collect In Store, maka nanti baru muncul Store
+yang mereka pilih di situ."*
+
+- Kotak hijau "Toko pilihan / Belum dipilih / Ganti toko" **dihapus**.
+- Catatan statis di dalam kartu "Ambil di toko" (`pickupNote`) ikut dilepas —
+  nama toko kini tampil sebagai pilihan, bukan teks mati.
+- Grid kartu toko (`data-pickup-store-list`) muncul tepat di bawah tiga kartu
+  metode, sama persis dengan grid zona pengantaran. Sumber data tetap
+  `delivery_zones` dengan `kind='pickup'` (Rumah Sushi, UVERS).
+- Komponen `PickupStorePicker` beserta state `pickupPickerOpen` **dihapus
+  seluruhnya**. Validasi tetap menahan dengan pesan jelas, tanpa membuka apa pun.
+
+### 6. Error `orders_delivery_zone_check` (gambar 6) — migration-60
+
+Toast di gambar 6:
+
+    new row for relation "orders" violates check constraint "orders_delivery_zone_check"
+
+Akar masalahnya (lihat `supabase/migration-60.sql`):
+
+| Lapisan | Bustanya |
+|---|---|
+| migration-12 | constraint daftar tetap: `pickup, vihara, uvers, other` |
+| migration-32/33 | zona pindah ke TABEL `delivery_zones`, id bebas diisi admin |
+| migration-57 | ditambah `courier`, tetap daftar tetap |
+
+Zona aktif di produksi: `antar`, `uvers`, `vihara`, `pickup-rumah` (Rumah
+Sushi), `pickup-uvers` (UVERS). Tiga di antaranya tidak ada di daftar tetap, jadi
+**setiap zona baru yang ditambahkan admin langsung tidak bisa dipakai**.
+
+Perbaikannya constraint-nya **dihapus**, bukan diperlebar. `create_order` sudah
+memvalidasi dengan benar (zona harus ada di `delivery_zones` dan `is_active`,
+kecuali `pickup` dan `courier`) lewat error `invalid_zone`.
+
+`scripts/test-migration-60.mjs`: **8 OK / 0 GAGAL** — reproduksi error Steven,
+bukti perbaikannya, dan bukti `create_order` tetap menolak zona ngawur.
+
+### 7. Bundle per PO — sudah ada
+
+`po_batch_bundles` + `admin_save_po_batch_bundles` dibuat di migration-52, dan
+UI-nya sudah ada di `PoBatchDetailClient` (panel kanan tab Stok, state `picked`,
+`dirtyBundles`). Verifikasi produksi: batch 13 punya 1 paket, batch 22 punya 3
+paket. Tidak ada perubahan kode.
+
+### Verifikasi visual
+
+Build produksi lokal (`next build` + `next start -p 3100`), `scripts/shot-cdp.mjs`
+dan `scripts/ukur.mjs`:
+
+| Yang dicek | Hasil |
+|---|---|
+| Beranda 498px, keranjang berisi | dock besar hilang; ikon troli 40x40 di header; WA `bottom` 68px |
+| `/order` 1440px, keranjang berisi | WA `bottom` 88px (naik di atas dock) |
+| `/order` 1440px, keranjang kosong | WA `bottom` 24px |
+| Rail tergulir | judul "Keranjangmu" `top` 345px, header `bottom` 65px → tidak tertutup |
+| Klik "Ambil di toko" | `data-pickup-store-list` muncul, 606x207px, isi Rumah Sushi + UVERS |
+| Paket terkunci | 2 thumbnail, keduanya `complete=true`, `naturalWidth=1024` |
+
+### Skrip baru
+
+- `scripts/ukur.mjs` — baca `getBoundingClientRect()` lewat DevTools Protocol.
+  Dibuat karena `shot-cdp.mjs` memakai `captureBeyondViewport: true`, jadi elemen
+  `fixed` terlihat melayang di tengah gambar dan posisinya tidak bisa dinilai dari
+  screenshot. Lihat gotcha #131.
+- `scripts/_patch.mjs` — patch file sumber tanpa merusak akhir baris (project
+  campur CRLF/LF). Setiap `cari` harus cocok PERSIS satu kali, kalau tidak
+  script berhenti tanpa menulis apa pun.
+- `scripts/patch-item*.mjs` — patch yang sudah dijalankan, disimpan sebagai
+  catatan reproducible.
+- `scripts/cek-*.mjs` — survei read-only (tabel `delivery_zones`, constraint
+  `orders`, `create_order` terpasang, bundle per batch).
+
+---
 ## 2026-10-15 — Paket dengan pilihan terpisah (mode ketiga)
 
 Steven 15-10-2026: *"misal ada paket 2, saya bisa menentukan pilihan 1 antara

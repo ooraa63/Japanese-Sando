@@ -1316,3 +1316,64 @@ produk sendiri.
 - **D83** - **Aksi ubah status pesanan hanya menawarkan langkah BERIKUTNYA**
   (pending → accepted → ready → delivered), bukan semua tombol sekaligus.
   Menolak hanya muncul saat masih pending.
+
+---
+
+## D49 - Validasi zona pengiriman milik `create_order`, bukan CHECK constraint
+
+**Keputusan:** Constraint `orders_delivery_zone_check` (daftar tetap
+`pickup, vihara, uvers, other, courier` dari migration-12) **dihapus** di
+migration-60. Validasi zona tetap satu tempat: blok `invalid_zone` di
+`create_order`, yang mensyaratkan zona ada di `delivery_zones` dan `is_active`,
+dengan pengecualian `pickup` dan `courier`.
+
+**Alasan:** Sumber zona sudah pindah dari jsonb ke TABEL `delivery_zones`
+(migration-32/33), jadi id-nya bebas diisi admin dari menu "Ambil & Kirim".
+Steven 16-10-2026 melaporkan pesanan gagal dengan
+`violates check constraint "orders_delivery_zone_check"` setelah memilih
+"Rumah Sushi". Di produksi ada lima zona aktif — `antar`, `uvers`, `vihara`,
+`pickup-rumah`, `pickup-uvers` — dan tiga di antaranya tidak ada di daftar
+tetap.
+
+Memperlebar daftar tetap hanya menunda masalah: setiap zona baru yang
+ditambahkan admin akan butuh migration lagi. Karena `create_order` sudah
+menolak zona yang tidak dikenal dengan pesan yang jelas, daftar tetap di level
+tabel tidak menambah keamanan apa pun — hanya menambah satu tempat yang bisa
+basi.
+
+**Konsekuensi:**
+- Menambah titik pengambilan atau zona pengantaran di admin **tidak lagi
+  butuh migration**. Ini yang membuat fitur "Ambil di toko" bisa dipakai
+  serius.
+- Kalau nanti muncul kebutuhan validasi zona di luar `create_order` (misal
+  impor CSV langsung ke tabel), validasi itu harus ditambahkan sebagai trigger,
+  bukan dengan menghidupkan kembali daftar tetap.
+- `orders_delivery_method_check` ('pickup','delivery','courier') **tidak**
+  disentuh. Tiga nilai itu memang tertulis tetap di `create_order` dan tidak
+  bisa ditambah dari mana pun, jadi daftar tetap di sana masih jujur.
+
+## D50 - Satu tombol WhatsApp, di pojok kanan bawah, untuk semua halaman
+
+**Keputusan:** Ada tepat SATU tombol WhatsApp di area pembeli: `WhatsAppFab` di
+root layout, `fixed` di pojok kanan bawah, termasuk di `/order`. Semua tempat
+lain dihapus — rail keranjang, dock keranjang, dua panel `early return`, dan
+blok mengambang di `OrderFlow`.
+
+**Alasan:** Steven 16-10-2026: "itu whatsappnya tetap harus di ujung kanan
+bawah". Sebelumnya ada empat tombol dengan posisi berbeda tergantung langkah,
+dan yang di rail keranjang ikut naik-turun bersama panel sehingga terlihat
+melayang di tengah layar.
+
+Konsekuensi tidak langsung yang diinginkan: keranjang beranda pindah dari dock
+bar besar ke ikon kecil di header, karena dock itulah yang menempati pojok kanan
+bawah.
+
+**Konsekuensi teknis:**
+- Posisi vertikal `WhatsAppFab` ditentukan dari route + isi keranjang: naik di
+  atas dock keranjang (`/order` + keranjang berisi), naik di atas nav bawah
+  (halaman lain), menempel 24px dari tepi di desktop.
+- Nama kelas Tailwind untuk posisi itu **wajib ditulis literal**. Kalau
+  dirakit dari template literal, Tailwind tidak memindainya dan tombol jatuh ke
+  akhir halaman. Lihat gotcha #131.
+- Jangan diverifikasi dari screenshot penuh (`captureBeyondViewport`), tapi dari
+  `getBoundingClientRect()` lewat `scripts/ukur.mjs`.

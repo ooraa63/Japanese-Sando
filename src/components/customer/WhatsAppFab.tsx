@@ -1,39 +1,44 @@
 "use client";
 
 /**
- * Tombol WhatsApp mengambang di kanan bawah yang NEMPEL saat halaman digulir.
+ * Tombol WhatsApp mengambang yang SELALU nempel di ujung kanan bawah.
  *
- * Steven 14-10-2026: "saya sekalian mau tambahkan ini fitur kayak tombol
- * untuk bs chat lgsng ke whatsaapp yang selalu ngikut ketika scroll letak di
- * kanan bawah aja".
+ * Steven 16-10-2026 (gambar 3): "itu whatsappnya tetap harus di ujung kanan
+ * bawah". Sebelumnya di `/order` tombolnya diletakkan di dalam rail keranjang
+ * kolom kanan, jadi ikutnaik-turun bersama panel dan terlihat melayang di
+ * tengah layar. Sekarang satu-satu tempat untuk semua halaman: pojok kanan
+ * bawah layar, tidak pernah bergerak.
  *
- * Tiga keputusan yang diambil di sini:
+ * Empat keputusan yang diambil di sini:
  *
  * 1. **Sembunyi di `/admin`.** Tombol ini untuk pembeli; kalau muncul di
- *    dashboard, dia menutupi sidebar sepenuhnya. Dicek lewat
- *    `usePathname()` supaya tidak perlu taruh komponen ini di setiap halaman
- *    satu per satu — cukup di root layout.
+ *    dashboard, dia menutupi sidebar sepenuhnya. Dicek lewat `usePathname()`
+ *    supaya tidak perlu taruh komponen ini di setiap halaman satu per satu.
  *
  * 2. **Tidak dirender kalau nomor WhatsApp kosong.** `store_settings.whatsapp`
  *    boleh kosong, dan tombol yang membuka `wa.me/` tanpa nomor hanya
- *    menghasilkan halaman WhatsApp kosong — lebih buruk daripada tidak ada
- *    tombol sama sekali.
+ *    menghasilkan halaman WhatsApp kosong.
  *
- * 3. **Disembunyikan di `/order`.** Halaman itu punya `CartDock` yang
- *    menempel di dasar layar, jadi tombol mengambang di sana akan
- *    menimpanya. Di `/order` tombol WA dirender sendiri oleh `OrderFlow`:
- *    di dalam rail keranjang (desktop) atau melayang di atas dock (mobile).
- *    Lihat `WhatsAppLink`.
+ * 3. **Hanya disembunyikan di halaman tanpa transaksi** (`/admin`, `/login`,
+ *    `/register`). Dulu `/order` ikut disembunyikan karena dianggap sudah ada
+ *    tombolnya di rail keranjang — justru itu yang dikeluhkan Steven. Sekarang
+ *    semua tombol WA lain di `/order` dihapus, jadi di sini tidak ada dobel.
  *
- * 4. **Disembunyikan juga saat keranjang berisi.** Di halaman selain
- *    `/order`, keranjang sekarang ikut tampil sebagai dock melayang, jadi
- *    WA pindah ke dalam dock itu. Dua tombol di pojok yang sama saling
- *    menutupi dan hanya membingungkan.
+ * 4. **Naik kalau ada dock keranjang.** Di `/order` langkah "Pilih Rasa" untuk
+ *    HP, `CartDock` menempel penuh di dasar layar. Tombol WA di pojok yang sama
+ *    harus naik di atasnya, kalau tidak yang menutupi dock justru tombol WA.
  */
 
 import { usePathname } from "next/navigation";
 import { WhatsAppLink } from "@/components/customer/WhatsAppLink";
 import { useCart } from "@/components/customer/CartProvider";
+
+/* Tinggi `MobileBottomNav` + jarak aman. PENTING: nilai px ditulis LANGSUNG
+   di dalam nama kelas, bukan disisipkan lewat template literal. Tailwind
+   memindai teks sumber, jadi kelas yang berisi ${...} tidak pernah jadi CSS. */
+const NAV_BAWAH = "bottom-[calc(68px+env(safe-area-inset-bottom))]";
+/* Tinggi `CartDock` di `/order` (HP) + jarak aman, juga ditulis literal. */
+const DOCK_KERANJANG = "bottom-[calc(88px+env(safe-area-inset-bottom))]";
 
 export function WhatsAppFab({ whatsapp }: { whatsapp?: string | null }) {
   const pathname = usePathname();
@@ -48,35 +53,30 @@ export function WhatsAppFab({ whatsapp }: { whatsapp?: string | null }) {
     !pathnameAwal.startsWith("/register") &&
     !pathnameAwal.startsWith("/order");
 
+  /* Dock keranjang hanya ada di `/order` (dan hanya di bawah `lg`), jadi cukup
+     dicek dari route + isi keranjang. Di desktop dock-nya disembunyikan, tapi
+     `lg:bottom-6` menimpanya anyway karena posisinya di pojok yang sama. */
+  const adaDockKeranjang = pathnameAwal.startsWith("/order") && totalItems > 0;
+
   if (!whatsapp || !whatsapp.trim()) return null;
-  if (pathname && (pathname === "/admin" || pathname.startsWith("/admin/"))) return null;
-  if (pathname && pathname.startsWith("/order")) return null;
+  if (pathnameAwal.startsWith("/admin")) return null;
+  if (pathnameAwal.startsWith("/login")) return null;
+  if (pathnameAwal.startsWith("/register")) return null;
 
-  /* Kalau keranjang sudah berisi, tombol WA ikut pindah ke dalam
-     `CartDock` yang melayang tepat di atas nav. Dua tombol melayang
-     di pojok yang sama hanya saling menutupi dan membingungkan.
-
-     Pembacaannya langsung dari store keranjang, jadi tidak perlu prop
-     dari layout dan tidak bisa basi saat isi keranjang berubah. */
-  if (totalItems > 0) return null;
-
-  /* Kalau keranjang sudah berisi, tombol WA ikut pindah ke dalam
-     `CartDock` (yang melayang tepat di atas nav). Dua tombol melayang
-     di pojok yang sama hanya saling menutupi dan membingungkan.
-
-     Pembacaannya langsung dari store keranjang, jadi tidak perlu prop
-     dari layout dan tidak bisa basi ketika isi keranjang berubah. */
-  if (totalItems > 0) return null;
+  /* Posisi vertikal. Urutannya dari yang paling tinggi (paling banyak hal yang
+     perlu dilewati) ke yang paling rendah. */
+  const posisi = adaDockKeranjang
+    ? DOCK_KERANJANG
+    : adaNavBawah
+      ? NAV_BAWAH
+      : "bottom-4 md:bottom-6";
 
   return (
     <WhatsAppLink
       whatsapp={whatsapp}
       compact
-      className={`fixed right-4 z-40 grid size-14 place-items-center rounded-2xl bg-[#25D366] text-white shadow-lg shadow-black/25 transition hover:bg-[#1EBE5A] active:scale-95 md:right-6 md:bottom-6 ${
-        adaNavBawah
-          ? "bottom-[calc(68px+env(safe-area-inset-bottom))]"
-          : "bottom-4"
-      }`}
+      data-wa-fab
+      className={`fixed right-4 z-40 grid size-14 place-items-center rounded-2xl bg-[#25D366] text-white shadow-lg shadow-black/25 transition hover:bg-[#1EBE5A] active:scale-95 md:right-6 ${posisi}`}
     />
   );
 }

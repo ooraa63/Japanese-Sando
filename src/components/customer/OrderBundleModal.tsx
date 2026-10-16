@@ -12,6 +12,7 @@ import {
   Heart,
   MessageSquare,
   PackageX,
+  ShoppingBag,
 } from "lucide-react";
 import type { Bundle, BundleChoiceSlot, Category, Flavor } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -455,21 +456,45 @@ export function OrderBundleModal({
           </p>
         ) : (
           <ul className="space-y-2">
-            {fixedContents.map((f, idx) => (
+            {fixedContents.map((f, idx) => {
+              const namaRasa = lang === "en" ? f.name_en : f.name_id;
+              return (
               <li
                 key={`${f.id}-${idx}`}
-                className="flex items-center gap-3 rounded-2xl border border-cocoa-200 bg-cream-50 px-4 py-3"
+                className="flex items-center gap-3 rounded-2xl border border-cocoa-200 bg-cream-50 p-3"
               >
+                {/* Steven 16-10-2026 (gambar 2): walaupun paketnya sudah
+                    dikunci penjual, pembeli tetap harus MELIHAT makanannya,
+                    jadi tiap baris memakai foto rasa seperti di keranjang. */}
+                <span className="relative size-14 shrink-0 overflow-hidden rounded-xl bg-cocoa-100">
+                  {f.image_url ? (
+                    <Image
+                      src={f.image_url}
+                      alt={namaRasa}
+                      fill
+                      sizes="56px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="grid size-full place-items-center text-cocoa-400">
+                      <ShoppingBag className="size-4" />
+                    </span>
+                  )}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm leading-snug font-bold text-cocoa-900">
+                    {namaRasa}
+                  </span>
+                </span>
+
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-cocoa-800 text-[12px] font-bold text-cream-50 tabular">
                   {idx + 1}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold text-cocoa-900">
-                    {lang === "en" ? f.name_en : f.name_id}
-                  </span>
-                </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )
       ) : null}

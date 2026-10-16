@@ -1,0 +1,74 @@
+-- =============================================================================
+--  MIGRASI 60 --
+--  Lepas constraint `orders_delivery_zone_check` yang sudah usang
+-- =============================================================================
+--
+--  Steven 16-10-2026 (gambar 6):
+--
+--    "pada gambar 6, lihat itu masih ada error"
+--
+--  Toast yang muncul di layar:
+--
+--    Something went wrong. Please try again.
+--    new row for relation "orders" violates check constraint
+--    "orders_delivery_zone_check"
+--
+--  PENYEBAB
+--
+--    Tiga hal yang terjadi berurutan:
+--
+--    1. migration-12 membuat constraint dengan daftar tetap:
+--         delivery_zone in ('pickup','vihara','uvers','other')
+--
+--    2. migration-32/33 memindahkan sumber zona dari jsonb
+--       `store_settings.delivery_zones` ke TABEL `delivery_zones`, yang
+--       id-nya bebas diisi admin dari menu "Ambil & Kirim". Di produksi sekarang
+--       isinya:
+--         antar          (delivery)
+--         overs          (delivery)
+--         vihara         (delivery)
+--         pickup-rumah   (pickup, "Rumah Sushi")
+--         pickup-uvers   (pickup, "UVERS")
+--
+--    3. migration-57 menambahkan 'courier' ke daftar constraint, tapi daftar
+--       tetap itu praktis hanya jadi solusi sementara -- setiap zona yang
+--       ditambahkan admin SETELAH itu langsung tidak bisa dipakai.
+--
+--  Jadi begitu pembeli memilih "Rumah Sushi" atau "UVERS" pada langkah
+--  "Ambil di toko", frontend mengirim `delivery_zone = 'pickup-rumah'`, dan
+--  tabel menolaknya. Error itu muncul sebagai toast generik karena kode
+--  PostgREST tidak mengembalikan nama constraint ke UI.
+--
+--  KENAPA DILEPAS, BUKAN DIPERLEBAR
+--
+--    Memperlebar daftar tetap hanya menunda masalah: setiap zona baru yang
+--    ditambahkan admin akan butuh migration lagi.
+--
+--    Yang sebenarnya memvalidasi zona sudah ada di `create_order` (lihat blok
+--    `invalid_zone`):
+--
+--      if not exists (
+--           select 1 from public.delivery_zones
+--            where id = p_delivery_zone and is_active = true
+--      )
+--      and p_delivery_zone <> 'pickup'
+--      and p_delivery_method <> 'courier' then
+--        raise exception 'invalid_zone' using errcode = '22023';
+--      end if;
+--
+--    Artinya:
+--      - zona harus ADA di tabel `delivery_zones`, dan
+--      - harus AKTIF, dan
+--      - 'pickup' (bawaan lama) dan 'courier' dikecualikan.
+--
+--    Tidak ada jalur lain untuk memasukkan baris ke `orders` (tabelnya RLS,
+--    hanya `create_order` yang menulis), jadi menghapus constraint level tabel
+--    tidak membuka celah baru, hanya menghapus daftar yang sudah basi.
+--
+--  Catatan: `orders_delivery_method_check` ('pickup','delivery','courier')
+--  TIDAK disentuh. Tiga nilai itu memang bertulis tetap di `create_order` dan
+--  tidak bisa ditambah admin dari mana pun.
+-- =============================================================================
+
+alter table public.orders
+  drop constraint if exists orders_delivery_zone_check;
