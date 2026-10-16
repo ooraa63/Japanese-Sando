@@ -13,12 +13,18 @@
 // Destructure `entries()` memberi pasangan (nama -> nilai), jadi membandingkannya
 // dengan dirinya sendiri selalu false dan `gagal` selalu kosong.
 //
-// Marker (semua kunci/atribut baru di commit ini):
-//   - data-bundle-choice     atribut penanda satu blok pilihan di popup pembeli
-//   - bundleChoiceTitle      kunci i18n baru, sisi pembeli
+// Marker (semua kunci/atribut BARU di commit ini):
+//   - data-bundle-choice      atribut penanda satu blok pilihan di popup pembeli
+//   - bundleChoiceTitle       kunci i18n baru, sisi pembeli
 //   - bundleChoiceLabelDefault kunci i18n baru (label cadangan "Pilihan {n}")
-//   - bundleModeChoice       kunci i18n baru, sisi admin
-//   - invalid_bundle_slots   kode error baru dari admin_save_bundle
+//   - bundleModeChoice        kunci i18n baru, sisi admin
+//   - Pilihan (tiap kelompok rasa sendiri) teks tombol mode, sisi admin
+//
+// Yang TIDAK dipakai: `invalid_bundle_slots`. Kode error itu hidup di
+// `src/app/admin/actions.ts`, yang hanya masuk ke chunk admin. Halaman publik
+// tidak pernah memuat chunk itu, jadi marker tersebut tidak akan pernah
+// ditemukan dan skrip akan menggantung "BELUM LIVE" padahal deploy-nya
+// sudah naik. Diverifikasi terhadap build lokal dengan JS_DEPLOY_URL.
 //
 // Aset diambil dari GABUNGAN / dan /order: `MenuBrowser` (popup paket) ada di
 // beranda, `OrderBundleModal` dipakai di /order. Kalau hanya satu halaman,
@@ -37,7 +43,7 @@ const MARKER = [
   ["bundleChoiceTitle", true],
   ["bundleChoiceLabelDefault", true],
   ["bundleModeChoice", true],
-  ["invalid_bundle_slots", true],
+  ["Pilihan (tiap kelompok rasa sendiri)", true],
 ];
 
 async function ambil(url) {
