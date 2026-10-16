@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { FAQ_FALLBACK, normalizeFaq, type FaqEntry } from "@/lib/faq";
 import { normalizeTerms, type TermSection } from "@/lib/terms";
 import type {
+  BundleChoiceSlot,
   Category,
   CustomerOrderSummary,
   CustomerProfile,
@@ -131,6 +132,11 @@ export interface PublicMenuResult {
     flavor_ids?: number[];
     /** migration-54 — true = isi paket terkunci (bundle combo). */
     is_fixed?: boolean;
+    /**
+     * migration-59 — daftar pilihan paket. Kosong = paket memakai aturan lama
+     * (whitelist rata `flavor_ids`, atau `is_fixed`).
+     */
+    slots?: BundleChoiceSlot[];
     sort_order: number;
   }>;
 }
@@ -182,6 +188,22 @@ export const getPublicMenu = cache(async (): Promise<PublicMenuResult> => {
   });
 
   return { categories: slimCategories, bundles };
+});
+
+/**
+ * Penanda kapabilitas dari database (migration-59).
+ *
+ * Dipakai editor paket admin. Tanpa ini, mode "pilihan" akan tetap tampil
+ * walaupun migration-nya belum terpasang — dan `admin_save_bundle` versi lama
+ * akan MENGABAIKAN kunci `slots`, jadi admin menyimpan paket tanpa pilihan
+ * tanpa sadar apa-apa. RPC yang belum ada menghasilkan error, yang kita
+ * artikan sebagai "fitur tidak tersedia".
+ */
+export const getBundleFeatures = cache(async (): Promise<{ choices: boolean }> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("bundle_features");
+  if (error) return { choices: false };
+  return { choices: (data as { choices?: boolean } | null)?.choices === true };
 });
 
 /** Ambil semua rasa termasuk yang nonaktif (khusus dashboard). */

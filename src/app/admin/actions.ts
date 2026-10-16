@@ -65,6 +65,9 @@ function humanize(error: string | undefined): string {
     // migration-54: mode combo (isi paket terkunci) — jumlah rasa yang
     // dicentang harus sama dengan jumlah slot.
     "invalid_bundle_fixed",
+    // migration-59: mode pilihan — ada pilihan tanpa rasa, atau rasa yang
+    // dicantumkan tidak ada di daftar.
+    "invalid_bundle_slots",
   ];
   return known.includes(code) ? code : "generic";
 }

@@ -4,6 +4,169 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-15 — Paket dengan pilihan terpisah (mode ketiga)
+
+Steven 15-10-2026: *"misal ada paket 2, saya bisa menentukan pilihan 1 antara
+apa aja lalu pilihan 2 apa aja begitu"*, dengan contoh paket Rp20.000 yang
+memiliki **Pilihan 1** = {Egg Mayo, Chicken Curry Katsu} dan **Pilihan 2** =
+{5 rasa manis}.
+
+Tiga keputusan semantik yang sudah dikonfirmasi Steven:
+
+1. Tiap pilihan mengambil **tepat satu** rasa.
+2. Harga paket **satu harga**, di-set admin, tidak ikut menyesuaikan pilihan.
+3. Rasa yang sama **boleh** dipakai di dua pilihan berbeda.
+
+### Yang ternyata sudah ada, dan yang baru
+
+Survei produksi (`scripts/survey-bundle*.mjs`) membuktikan dua dari tiga
+permintaan Steven sudah ada sejak migration sebelumnya:
+
+| Permintaan | Status | Bukti |
+|---|---|---|
+| Paket lebih murah, bebas pilih rasa | **sudah ada** | migration-45, `bundle_flavors` |
+| Paket terkunci, isi ditentukan penjual | **sudah ada** | migration-54, `bundles.is_fixed` |
+| Beberapa pilihan, tiap pilihan daftar sendiri | **baru di sini** | migration-59 |
+
+Jadi migration-59 **tidak** menulis ulang mode lama. Yang ditambahkan cuma mode
+ketiga.
+
+### 1. `supabase/migration-59.sql`
+
+Dua tabel baru, tanpa kolom baru di `bundles`:
+
+```sql
+bundle_slots(bundle_id, slot_index, label_id, label_en)
+bundle_slot_flavors(bundle_slot_id, flavor_id)
+```
+
+Satu baris `bundle_slots` = satu "pilihan". `slot_index` mulai dari 1 dan
+sama dengan posisi `p_bundles[].slots[i-1]` di `create_order`, jadi **bentuk
+payload order tidak berubah** — hanya isinya yang jadi terikat ke pilihan.
+
+Tiga mode paket ditentukan oleh isi tabel, tidak ada boolean baru sehingga
+tidak bisa meleset antara yang tampil dan yang tersimpan:
+
+| Mode | Kenali dari |
+|---|---|
+| PILIHAN (baru) | ada baris `bundle_slots` |
+| TERKUNCI | tidak ada slot + `is_fixed` |
+| BIASA | tidak ada slot + bukan `is_fixed` |
+
+`bundles.required_qty` di mode PILIHAN selalu disinkronkan jadi jumlah pilihan,
+setiap kali paket disimpan.
+
+RPC yang diganti (body-nya diambil dari `pg_proc` oleh
+`scripts/gen-migration-59.mjs`, bukan diketik ulang):
+
+- **`admin_save_bundle`** — menerima kunci `slots`. Validasi dilakukan
+  **sebelum** baris lama dihapus, jadi paket yang gagal disimpan tidak ikut
+  kehilangan konfigasinya. Menolak: pilihan tanpa rasa, rasa yang tidak ada,
+  lebih dari 10 pilihan — semuanya `invalid_bundle_slots`. Memaksa
+  `is_fixed = false` saat slot ada, supaya paket yang tersimpan selalu bisa
+  dibeli.
+- **`create_order`** — slot ke-i hanya boleh memakai rasa dari daftar pilihan
+  ke-i. Kalau paket punya grup slot, whitelist rata `bundle_flavors`
+  **dilewati** (`elsif`); tanpanya paket yang sisa whitelist lamanya akan
+  menolak rasa dari pilihan kedua.
+- **`admin_list_bundles` + `public_menu`** — mengirim `slots` per paket.
+- **`bundle_slot_groups(bigint)`** — helper baru, satu definisi bentuk JSON.
+- **`bundle_features()`** — penanda kapabilitas, lihat bagian 4.
+
+### 2. `scripts/gen-migration-59.mjs`
+
+Empat fungsi yang diganti masing-masing beratus baris. Menyalin ulang manual dari body live
+adalah tempat salah ketik, jadi file ini membacanya dari `pg_proc` dan
+menempelkan hasil tempurannya. Setiap penggantian **wajib cocok tepat sekali**;
+kalau tidak, script berhenti dengan pesan.
+
+Dua jebakan yang ditemukan oleh script ini:
+
+- `pg_get_function_identity_arguments` membuang nilai default. Header
+  `create or replace` harus pakai `pg_get_function_arguments`, kalau tidak
+  PostgreSQL menolak dengan *"cannot remove parameter defaults from existing
+  function"*.
+- `$` di dalam SQL replacement string `String.replace` dibaca sebagai pola
+  (`$&`, `$'`, `` $` ``, `$1`). Regex SQL seperti `'^[0-9]+$'` punya `$'`
+  yang berarti "sisanya setelah kecocokan", dan sisa body lama ikut tersisip
+  ke migration. Semua penggantian sekarang dipasang sebagai **fungsi**.
+
+### 3. Sisi frontend
+
+- `Bundle.slots?: BundleChoiceSlot[]` di `src/lib/types.ts`.
+- `MenuClient` — mode paket jadi tiga tombol. Mode "pilihan" membuka
+  `BundleChoicesEditor`: daftar pilihan, tiap pilihan punya nama (id/en) dan
+  daftar rasa sendiri, plus tombol tambah/hapus. Jumlah slot jadi read-only
+  dan mengikuti jumlah pilihan.
+- `OrderBundleModal` — satu blok per pilihan, masing-masing dengan grid rasa
+  milik pilihan itu. Mengklik kartu = **mengganti** rasa pilihan tersebut,
+  bukan menambah. Status picked disimpan terpisah dari `slots` supaya pembeli
+  boleh mengisi pilihan kedua lebih dulu.
+- `invalid_bundle_slots` masuk daftar error yang diterjemahkan di
+  `src/app/admin/actions.ts`.
+
+### 4. Penanda kapabilitas `bundle_features()`
+
+Tanpa ini, editor admin akan menampilkan mode "pilihan" walaupun migration-nya
+belum terpasang — dan `admin_save_bundle` versi lama **diam-diam mengabaikan**
+kunci `slots` yang tidak dikenal. Steven akan menyimpan paket tanpa pilihan
+tanpa sadar apa-apa. `getBundleFeatures()` di `src/lib/data.ts` memanggil RPC
+itu; error (RPC belum ada) dibaca sebagai "fitur tidak tersedia" dan mode
+pilihan disembunyikan.
+
+### 5. Pengujian
+
+`scripts/test-migration-59.mjs` — **74 OK, 0 GAGAL** saat database belum punya
+migration, dan **66 OK, 0 GAGAL** setelah terpasang. Seluruhnya di dalam
+`BEGIN … ROLLBACK` dengan `SAVEPOINT` untuk setiap error yang diharapkan.
+
+Skripnya sadar kondisi: kalau migration-nya sudah terpasang, asersi "tabel
+belum ada" dilewati (memang sudah ada) dan pemeriksaan setelah ROLLBACK
+dibandingkan dengan **kondisi awal**, bukan dengan ketiadaan tabel. Yang
+diuji adalah "tidak ada yang berubah", bukan "harus hilang". Tanpa ini,
+laporan test kedua selalu menunjukkan kegagalan palsu padahal fungsinya
+justru benar.
+
+`scripts/check-bundle-choices-off.mjs` — 5 OK, 0 GAGAL: membuktikan jalur
+pembeli tetap memakai mode lama selama `public_menu()` tidak mengirim `slots`,
+jadi deploy tanpa migration tidak merusak apa pun.
+
+### 6. Dipasang ke produksi
+
+Steven menyetujui pemasangan. `node scripts/run-migration.js
+supabase/migration-59.sql` sukses, lalu `scripts/verify-live-bundle-choices.mjs`
+→ **17 OK, 0 GAGAL**: skema, 5 RPC, bentuk `slots` di `public_menu()` dan
+`admin_list_bundles()`, sumber `create_order`, dan "Sando 2" tetap mode biasa
+(`is_fixed=false`, `required_qty=2`, nol baris slot).
+
+Data uji dibuat dengan `scripts/siapkan-data-uji-paket-pilihan.mjs`:
+
+- **batch 22** "Tes paket pilihan" — aktif s.d. 17-10-2026, jadi menutup
+  sendiri besok dan `/order` kembali terkunci. Batch 13 sudah tutup 14-10.
+- **paket 51** "Uji Pilihan" Rp32.000, Pilihan 1 = {Cookies & Cream, Caramel
+  Cheese}, Pilihan 2 = {Choco Matcha, Creme Brulee, Strawberry Cheese}. Steven
+  memilih tidak menambah Egg Mayo / Chicken Curry Katsu dulu, jadi lima rasa
+  yang sudah ada dipakai untuk membuktikan pemisahan pilihannya.
+
+Dibersihkan dengan `scripts/bersihkan-paket-pilihan.mjs` (menutup batch,
+menyembunyikan paket uji).
+
+Verifikasi visual di `http://localhost:3100` lewat `scripts/shot-cdp.mjs`
+(Chrome headless + CDP, build produksi 1440px):
+
+- `.shots/m59-pilihan.png` — popup mode pilihan: dua blok terpisah, tiap
+  blok hanya menampilkan rasa dari daftarnya sendiri.
+- `.shots/m59-pilihan-terisi.png` — satu rasa per pilihan, penghitung 2/2,
+  tombol Konfirmasi aktif.
+- `.shots/m59-pilihan-ganti.png` — klik rasa kedua di Pilihan 1 **mengganti**
+  pilihan itu, bukan menambah: chip berpindah ke Caramel Cheese, hanya satu
+  kartu tercentang, penghitung tetap 2/2.
+
+Belum diverifikasi: editor admin `/admin/menu` (butuh login), dan satu
+pemesanan sungguhan sampai pesanan masuk database.
+
+---
+
 ## 2026-10-15 — Keranjang: lihat isi dulu sebelum lanjut, rail desktop, dock di beranda
 
 Steven 15-10-2026, dua screenshot dan tiga permintaan:

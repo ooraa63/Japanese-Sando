@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getAllFlavors, getSettings } from "@/lib/data";
+import { getAllFlavors, getBundleFeatures, getSettings } from "@/lib/data";
 import { getBundlesAction, getCategoriesAction } from "@/app/admin/actions";
 import { MenuClient } from "@/components/admin/MenuClient";
 import type { StoreSettings } from "@/lib/types";
@@ -11,11 +11,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AdminMenuPage() {
-  const [flavors, settings, categoriesRes, bundlesRes] = await Promise.all([
+  const [flavors, settings, categoriesRes, bundlesRes, features] = await Promise.all([
     getAllFlavors(),
     getSettings(),
     getCategoriesAction(),
     getBundlesAction(),
+    getBundleFeatures(),
   ]);
 
   return (
@@ -24,6 +25,7 @@ export default async function AdminMenuPage() {
       initialCategories={categoriesRes.data ?? []}
       initialBundles={bundlesRes.data ?? []}
       initialSettings={settings as StoreSettings | null}
+      canBundleChoices={features.choices}
     />
   );
 }

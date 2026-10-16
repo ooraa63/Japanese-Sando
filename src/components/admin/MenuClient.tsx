@@ -19,7 +19,7 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import type { Bundle, Category, Flavor, StoreSettings } from "@/lib/types";
+import type { Bundle, BundleChoiceSlot, Category, Flavor, StoreSettings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatIDR } from "@/lib/utils";
@@ -59,14 +59,39 @@ function toFlavorDraft(f: Flavor): FlavorDraft {
  * `flavor_ids` = daftar rasa yang dipilih PENJUAL untuk isi bundle ini.
  * Kosong = semua rasa aktif boleh dipakai, jadi bundle tidak terkunci ke
  * kategori tertentu (migration-45, tabel `bundle_flavors`).
+ *
+ * `slots` = daftar PILIHAN (migration-59). Kalau tidak kosong, paket memakai
+ * mode pilihan: tiap pilihan punya daftar rasa sendiri dan pembeli ambil satu
+ * rasa per pilihan. Daftar `flavor_ids` lalu tidak dipakai sama sekali untuk
+ * paket ini.
  */
-interface BundleDraft extends Omit<Bundle, "price" | "sort_order"> {
+interface BundleDraft extends Omit<Bundle, "price" | "sort_order" | "slots"> {
   price: string;
   /** Harga coret — string / kosong = tidak ada harga coret. */
   compare_price_str: string;
   sort_order: string;
   category_id_str: string; // <select> butuh string
   flavor_ids: number[];
+  /** Selalu array, supaya tidak perlu cek null di mana-mana. */
+  slots: BundleChoiceDraft[];
+}
+
+/** Batas pilihan per paket. Sama dengan batas yang ditegakkan RPC. */
+const MAKS_PILIHAN = 10;
+
+/**
+ * Bentuk pilihan yang siap disimpan. `index` sengaja tidak dikirim — server
+ * assigns dari posisi array, jadi urutan di layar inilah yang jadi urutan
+ * di database.
+ */
+type BundleChoiceDraft = Omit<BundleChoiceSlot, "index">;
+
+function keDraftChoice(slots: BundleChoiceSlot[] | undefined): BundleChoiceDraft[] {
+  return (slots ?? []).map((s) => ({
+    label_id: s.label_id ?? "",
+    label_en: s.label_en ?? "",
+    flavor_ids: [...(s.flavor_ids ?? [])],
+  }));
 }
 
 function toBundleDraft(b: Bundle): BundleDraft {
@@ -78,6 +103,7 @@ function toBundleDraft(b: Bundle): BundleDraft {
     category_id_str: b.category_id == null ? "" : String(b.category_id),
     flavor_ids: b.flavor_ids ?? [],
     is_fixed: b.is_fixed ?? false,
+    slots: keDraftChoice(b.slots),
   };
 }
 
@@ -96,10 +122,17 @@ export function MenuClient({
   initialFlavors,
   initialCategories,
   initialBundles,
+  canBundleChoices = false,
 }: {
   initialFlavors: Flavor[];
   initialCategories: Category[];
   initialBundles?: Bundle[];
+  /**
+   * migration-59 sudah terpasang di database? Kalau tidak, mode "pilihan"
+   * disembunyikan — `admin_save_bundle` versi lama akan mengabaikan kunci
+   * `slots`, jadi Steven akan menyimpan paket tanpa pilihan tanpa sadar.
+   */
+  canBundleChoices?: boolean;
   /** Tidak dipakai langsung di klien — dipertahankan untuk kompatibilitas pemanggil. */
   initialSettings?: StoreSettings | null;
 }) {
@@ -505,6 +538,7 @@ export function MenuClient({
       is_active: true,
       is_featured: false,
       flavor_ids: [],
+      slots: [],
       sort_order: String(nextOrder),
     });
   }
@@ -532,6 +566,18 @@ export function MenuClient({
       toast.warning(t.admin.menu.comparePriceHint);
       return;
     }
+    // Mode pilihan: setiap pilihan wajib punya minimal satu rasa, kalau tidak
+    // pembeli tidak akan pernah bisa menyelesaikan paketnya. Dicek di sini
+    // supaya pesan errornya tidak perlu dikirim ke server dulu.
+    const pilihan = editingBundle.slots;
+    if (pilihan.length > MAKS_PILIHAN) {
+      toast.warning(t.admin.menu.bundleChoiceMax);
+      return;
+    }
+    if (pilihan.some((s) => s.flavor_ids.length === 0)) {
+      toast.warning(t.admin.menu.bundleChoiceMismatch);
+      return;
+    }
 
     startSaving(async () => {
       const res = await saveBundleAction({
@@ -552,6 +598,11 @@ export function MenuClient({
         category_id: null,
         flavor_ids: editingBundle.flavor_ids,
         is_fixed: Boolean(editingBundle.is_fixed),
+        // migration-59: `slots` hanya ikut kalau paketnya mode pilihan. Kalau
+        // tidak, kuncinya TIDAK dikirim sama sekali supaya `admin_save_bundle`
+        // tidak menyentuh `bundle_slots` yang sudah ada. Array kosong berarti
+        // sengaja kembali ke mode biasa.
+        ...(pilihan.length > 0 ? { slots: pilihan } : {}),
       });
 
       if (!res.ok) {
@@ -560,7 +611,9 @@ export function MenuClient({
             ? t.admin.menu.slugTaken
             : res.error === "invalid_bundle_fixed"
               ? t.admin.menu.bundleFixedMismatch
-              : t.errors.generic
+              : res.error === "invalid_bundle_slots"
+                ? t.admin.menu.bundleChoiceMismatch
+                : t.errors.generic
         );
         return;
       }
@@ -579,6 +632,7 @@ export function MenuClient({
           category_id: null,
           flavor_ids: editingBundle.flavor_ids,
           is_fixed: Boolean(editingBundle.is_fixed),
+          slots: pilihan.map((s, i) => ({ ...s, index: i + 1 })),
           sort_order: Number(editingBundle.sort_order) || 0,
         };
         const exists = prev.some((b) => b.id === id);
@@ -884,6 +938,7 @@ export function MenuClient({
             setBundle={setEditingBundle}
             categories={categories}
             flavors={flavors}
+            canBundleChoices={canBundleChoices}
             t={t}
           />
         ) : null}
@@ -1446,8 +1501,14 @@ function BundlesView(props: {
                     <p className="mt-0.5 text-sm font-bold text-cocoa-600 tabular">
                       {formatIDR(b.price, lang)}
                     </p>
+                    {/* Ringkasan isi paket. migration-59: kalau paketnya mode pilihan,
+                        yang ditampilkan jumlah pilihan, bukan jumlah rasa. */}
                     <p className="mt-0.5 text-[11px] font-bold text-matcha-700">
-                      {b.required_qty}× {t.menu.flavors}
+                      {modeOf(b) === "choice"
+                        ? `${(b.slots ?? []).length} ${t.admin.menu.bundleChoicesTitle.toLowerCase()}`
+                        : b.is_fixed
+                          ? t.admin.menu.bundleFixedContents
+                          : `${b.required_qty}× ${t.menu.flavors}`}
                     </p>
                     {catName ? (
                       <p className="mt-0.5 truncate text-[10px] text-cocoa-400">
@@ -1775,7 +1836,51 @@ function FlavorForm({
   );
 }
 
-function BundleForm({
+/**
+ * Tiga mode paket (Steven 15-10-2026).
+ *
+ *   choose  pembeli bebas pilih `required_qty` rasa dari satu daftar rata.
+ *           Ini mode migration-45, paket hemat biasa.
+ *   fixed   isi paket sudah ditentukan penjual (migration-54), pembeli tidak
+ *           memilih apa-apa.
+ *   choice  migration-59: beberapa pilihan, tiap pilihan punya daftar rasa
+ *           sendiri. Pembeli ambil satu rasa per pilihan.
+ *
+ * Mode TIDAK disimpan sebagai boolean terpisah. `choice` aktif tepat ketika
+ * `slots` tidak kosong — sama seperti di database, jadi tidak bisa meleset
+ * antara apa yang tampil dan apa yang tersimpan.
+ */
+type BundleMode = "choose" | "fixed" | "choice";
+
+/**
+ * Mode paket, dibaca dari bentuk yang sama persis di `Bundle` dan
+ * `BundleDraft`, jadi tidak perlu bikin draft cuma untuk menanyakannya.
+ */
+function modeOf(b: {
+  slots?: BundleChoiceSlot[] | BundleChoiceDraft[];
+  is_fixed?: boolean;
+}): BundleMode {
+  if ((b.slots?.length ?? 0) > 0) return "choice";
+  return b.is_fixed ? "fixed" : "choose";
+}
+
+/** Daftar rasa baru untuk satu pilihan. Kosong = admin yang memilih. */
+function pilihanBaru(nomor: number): BundleChoiceDraft {
+  return {
+    label_id: `Pilihan ${nomor}`,
+    label_en: `Choice ${nomor}`,
+    flavor_ids: [],
+  };
+}
+
+/**
+ * Editor kelompok pilihan (migration-59).
+ *
+ * Tiap baris = satu pilihan, isinya daftar rasa yang boleh dipilih untuk
+ * pilihan itu. Urutan baris menentukan `slot_index` di database dan urutan
+ * yang dilihat pembeli, jadi menukar urutan berarti menukar isi slot.
+ */
+function BundleChoicesEditor({
   bundle,
   setBundle,
   categories,
@@ -1788,10 +1893,187 @@ function BundleForm({
   flavors: Flavor[];
   t: ReturnType<typeof useI18n>["t"];
 }) {
+  const aktif = flavors.filter((f) => f.is_active);
+
+  /** Ganti daftar pilihan lalu samakan jumlah slot-nya dalam satu langkah. */
+  const setSlots = (slots: BundleChoiceDraft[]) =>
+    setBundle({
+      ...bundle,
+      slots,
+      // Jumlah slot selalu mengikuti jumlah pilihan. Server juga memaksa
+      // ini, tapi menyinkronkan di sini supaya field "jumlah slot" langsung
+      // benar tanpa harus menunggu reload.
+      required_qty: Math.max(1, slots.length),
+    });
+
+  const ubahPilihan = (i: number, ubah: Partial<BundleChoiceDraft>) =>
+    setSlots(bundle.slots.map((s, k) => (k === i ? { ...s, ...ubah } : s)));
+
+  const toggleRasa = (i: number, rasaId: number) => {
+    const sekarang = bundle.slots[i].flavor_ids;
+    const ada = sekarang.includes(rasaId);
+    ubahPilihan(i, {
+      flavor_ids: ada
+        ? sekarang.filter((x) => x !== rasaId)
+        : [...sekarang, rasaId].sort((a, b) => a - b),
+    });
+  };
+
+  return (
+    <div className="rounded-xl border border-cocoa-200 bg-cocoa-50/40 p-3">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <span className="label">{t.admin.menu.bundleChoicesTitle}</span>
+        <button
+          type="button"
+          disabled={bundle.slots.length >= MAKS_PILIHAN}
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-cocoa-700 underline underline-offset-2 hover:text-cocoa-900 disabled:cursor-not-allowed disabled:text-cocoa-300 disabled:no-underline"
+          onClick={() => setSlots([...bundle.slots, pilihanBaru(bundle.slots.length + 1)])}
+        >
+          <Plus className="size-3" />
+          {t.admin.menu.bundleChoiceAdd}
+        </button>
+      </div>
+
+      {bundle.slots.length === 0 ? (
+        <p className="text-[11px] text-cocoa-400">{t.admin.menu.bundleChoiceEmpty}</p>
+      ) : (
+        <ul className="space-y-3">
+          {bundle.slots.map((s, i) => {
+            const dipilih = new Set(s.flavor_ids);
+            const nomor = i + 1;
+            return (
+              <li
+                key={nomor}
+                className="rounded-lg border border-cocoa-200 bg-white p-3"
+              >
+                <div className="flex items-end gap-2">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-cocoa-800 text-[11px] font-bold text-cream-50 tabular">
+                    {nomor}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <label htmlFor={`b-choice-${nomor}`} className="label">
+                      {t.admin.menu.bundleChoiceLabel}
+                    </label>
+                    <input
+                      id={`b-choice-${nomor}`}
+                      className="input"
+                      maxLength={40}
+                      value={s.label_id}
+                      placeholder={t.admin.menu.bundleChoiceLabelDefault.replace("{n}", String(nomor))}
+                      onChange={(e) => ubahPilihan(i, { label_id: e.target.value })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={t.admin.menu.bundleChoiceRemove}
+                    title={t.admin.menu.bundleChoiceRemove}
+                    disabled={bundle.slots.length <= 1}
+                    className="grid size-9 shrink-0 place-items-center rounded-lg border border-cocoa-200 text-cocoa-500 transition hover:border-berry-300 hover:text-berry-600 disabled:cursor-not-allowed disabled:opacity-40"
+                    onClick={() => setSlots(bundle.slots.filter((_, k) => k !== i))}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+
+                <div className="mt-2">
+                  <label htmlFor={`b-choice-en-${nomor}`} className="label">
+                    {t.admin.menu.bundleChoiceLabelEn}
+                  </label>
+                  <input
+                    id={`b-choice-en-${nomor}`}
+                    className="input"
+                    maxLength={40}
+                    value={s.label_en}
+                    placeholder={t.admin.menu.bundleChoiceLabelDefault.replace("{n}", String(nomor))}
+                    onChange={(e) => ubahPilihan(i, { label_en: e.target.value })}
+                  />
+                </div>
+
+                <p className="mt-3 mb-1.5 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                  {t.admin.menu.bundleChoiceFlavors}
+                </p>
+                {aktif.length === 0 || s.flavor_ids.length === 0 ? (
+                  <p className="text-[11px] text-cocoa-400">
+                    {aktif.length === 0
+                      ? t.admin.menu.bundleFlavorsEmpty
+                      : t.admin.menu.bundleChoiceFlavorsEmpty}
+                  </p>
+                ) : (
+                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg bg-cocoa-50/60 p-2">
+                    {categories.map((c) => {
+                      const dalam = aktif.filter((f) => f.category_id === c.id);
+                      if (dalam.length === 0) return null;
+                      return (
+                        <div key={c.id}>
+                          <p className="mb-1 text-[10px] font-bold tracking-wide text-cocoa-400 uppercase">
+                            {c.name_id}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {dalam.map((f) => (
+                              <button
+                                key={f.id}
+                                type="button"
+                                aria-pressed={dipilih.has(f.id)}
+                                onClick={() => toggleRasa(i, f.id)}
+                                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                                  dipilih.has(f.id)
+                                    ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
+                                    : "border-cocoa-200 bg-white text-cocoa-600 hover:border-cocoa-300"
+                                }`}
+                              >
+                                {f.name_id}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <p className="mt-2 text-[11px] text-cocoa-400">
+        {t.admin.menu.bundleChoiceHint}
+      </p>
+      {bundle.slots.some((s) => s.flavor_ids.length === 0) ? (
+        <p className="mt-1 text-[11px] font-semibold text-berry-600">
+          {t.admin.menu.bundleChoiceMismatch}
+        </p>
+      ) : null}
+      {bundle.slots.length >= MAKS_PILIHAN ? (
+        <p className="mt-1 text-[11px] font-semibold text-berry-600">
+          {t.admin.menu.bundleChoiceMax}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function BundleForm({
+  bundle,
+  setBundle,
+  categories,
+  flavors,
+  canBundleChoices,
+  t,
+}: {
+  bundle: BundleDraft;
+  setBundle: (next: BundleDraft | null) => void;
+  categories: Category[];
+  flavors: Flavor[];
+  /** migration-59 sudah terpasang? Kalau tidak, mode "pilihan" disembunyikan. */
+  canBundleChoices: boolean;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
   // Isi bundle = pilihan PENJUAL. Daftar kosong = semua rasa aktif boleh
   // dipakai, jadi bundle tidak lagi terkunci ke kategori tertentu.
   const picked = new Set(bundle.flavor_ids);
   const activeFlavors = flavors.filter((f) => f.is_active);
+  const mode = modeOf(bundle);
 
   function toggleFlavor(id: number) {
     const next = new Set(bundle.flavor_ids);
@@ -1805,6 +2087,34 @@ function BundleForm({
       // harus selalu sama dengannya. Disinkronkan di sini supaya admin tidak
       // pernah bisa menyimpan paket yang tidak bisa dibeli.
       required_qty: bundle.is_fixed ? Math.max(1, flavor_ids.length) : bundle.required_qty,
+    });
+  }
+
+  /** Pindah mode paket, termasuk tiga hal yang mengikutinya. */
+  function setMode(next: BundleMode) {
+    if (next === mode) return;
+    if (next === "choice") {
+      // Mulai dari dua pilihan kosong supaya perbedaannya jelas kelihatan:
+      // pembeli mengambil satu rasa dari tiap kelompok.
+      const jumlah = 2;
+      setBundle({
+        ...bundle,
+        is_fixed: false,
+        slots: Array.from({ length: jumlah }, (_, i) => pilihanBaru(i + 1)),
+        required_qty: jumlah,
+      });
+      return;
+    }
+    // Kembali ke mode lama: pilihan dibuang, tapi whitelist rata yang sudah
+    // disimpan UTUH. Jadi Steven bisa ganti mode tanpa kehilangan pekerjaan.
+    setBundle({
+      ...bundle,
+      is_fixed: next === "fixed",
+      slots: [],
+      required_qty:
+        next === "fixed"
+          ? Math.max(1, bundle.flavor_ids.length)
+          : Math.max(1, bundle.required_qty),
     });
   }
 
@@ -1890,15 +2200,17 @@ function BundleForm({
         </div>
         <div>
           <label htmlFor="b-qty" className="label">
-            {bundle.is_fixed ? t.admin.menu.bundleFixedCount : t.admin.menu.bundleSlots}
+            {mode === "fixed" ? t.admin.menu.bundleFixedCount : t.admin.menu.bundleSlots}
           </label>
           <input
             id="b-qty"
             inputMode="numeric"
             className="input tabular"
             // (migration-54) Mode combo: jumlah slot = jumlah rasa yang
-            // dicentang, jadi field ini hanya menampilkan, bukan mengetik.
-            readOnly={bundle.is_fixed}
+            // dicentang. (migration-59) Mode pilihan: jumlah slot = jumlah
+            // pilihan. Dua-duanya hanya menampilkan, bukan mengetik, jadi
+            // angka yang tampil tidak mungkin berbeda dengan yang tersimpan.
+            readOnly={mode !== "choose"}
             value={bundle.required_qty}
             onChange={(e) =>
               setBundle({
@@ -1910,44 +2222,47 @@ function BundleForm({
               })
             }
           />
-          {bundle.is_fixed ? (
+          {mode === "fixed" ? (
             <p className="mt-1 text-[11px] text-cocoa-400">
               {t.admin.menu.bundleFixedCountHint}
+            </p>
+          ) : mode === "choice" ? (
+            <p className="mt-1 text-[11px] text-cocoa-400">
+              {t.admin.menu.bundleChoiceCountHint}
             </p>
           ) : null}
         </div>
       </div>
 
-      {/* (migration-54) Dua mode paket. Steven: "bundle combo strawberry dan
-          choco matcha, maka langsung itu yang terpilih" vs "beli 2 lebih gratis
-          dan mereka bisa pilih rasanya sendiri". */}
+      {/* Tiga mode paket. Steven 15-10-2026:
+          "bundle combo strawberry dan choco matcha, maka langsung itu yang
+          terpilih" (fixed) vs "beli 2 lebih gratis dan mereka bisa pilih
+          rasanya sendiri" (choose) vs "pilihan 1 antara apa aja lalu pilihan 2
+          apa aja" (choice). */}
       <div className="rounded-xl border border-cocoa-200 bg-cocoa-50/40 p-3">
         <p className="mb-2 text-[11px] font-bold tracking-wide text-cocoa-500 uppercase">
           {t.admin.menu.bundleModeLabel}
         </p>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           {(
             [
-              { key: false, title: t.admin.menu.bundleModeChoose, desc: t.admin.menu.bundleModeChooseDesc },
-              { key: true, title: t.admin.menu.bundleModeFixed, desc: t.admin.menu.bundleModeFixedDesc },
+              { key: "choose", title: t.admin.menu.bundleModeChoose, desc: t.admin.menu.bundleModeChooseDesc },
+              { key: "choice", title: t.admin.menu.bundleModeChoice, desc: t.admin.menu.bundleModeChoiceDesc },
+              { key: "fixed", title: t.admin.menu.bundleModeFixed, desc: t.admin.menu.bundleModeFixedDesc },
             ] as const
-          ).map((opt) => {
-            const active = Boolean(bundle.is_fixed) === opt.key;
+          )
+            // Mode "pilihan" hanya ditampilkan kalau migration-59 sudah
+            // terpasang. Kalau tidak, RPC lama diam-diam membuang kunci
+            // `slots` dan Steven akan mengira pilihannya tersimpan.
+            .filter((opt) => opt.key !== "choice" || canBundleChoices)
+            .map((opt) => {
+            const active = mode === opt.key;
             return (
               <button
-                key={String(opt.key)}
+                key={opt.key}
                 type="button"
                 aria-pressed={active}
-                onClick={() =>
-                  setBundle({
-                    ...bundle,
-                    is_fixed: opt.key,
-                    // Beralih ke mode combo: jumlah slot otomatis ikut jumlah
-                    // rasa yang dicentang, karena di mode ini daftar rasa
-                    // ADALAH isi paket dan keduanya harus sama.
-                    required_qty: opt.key ? Math.max(1, bundle.flavor_ids.length) : bundle.required_qty,
-                  })
-                }
+                onClick={() => setMode(opt.key)}
                 className={`rounded-lg border p-3 text-left transition ${
                   active
                     ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
@@ -1962,97 +2277,109 @@ function BundleForm({
             );
           })}
         </div>
-        {bundle.is_fixed && bundle.flavor_ids.length !== bundle.required_qty ? (
+        {mode === "fixed" && bundle.flavor_ids.length !== bundle.required_qty ? (
           <p className="mt-2 text-[11px] font-semibold text-berry-600">
             {t.admin.menu.bundleFixedMismatch}
           </p>
         ) : null}
       </div>
 
-      <div>
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="label">
-            {bundle.is_fixed ? t.admin.menu.bundleFixedContents : t.admin.menu.bundleFlavors}
-          </span>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              className="text-[11px] font-semibold text-cocoa-600 underline underline-offset-2 hover:text-cocoa-900"
-              onClick={() =>
-                setBundle({
-                  ...bundle,
-                  flavor_ids: activeFlavors.map((f) => f.id),
-                  required_qty: bundle.is_fixed
-                    ? Math.max(1, activeFlavors.length)
-                    : bundle.required_qty,
-                })
-              }
-            >
-              {t.admin.menu.bundleFlavorsAll}
-            </button>
-            <button
-              type="button"
-              className="text-[11px] font-semibold text-cocoa-600 underline underline-offset-2 hover:text-cocoa-900"
-              onClick={() =>
-                setBundle({
-                  ...bundle,
-                  flavor_ids: [],
-                  // Mode combo tidak boleh kosong: daftar rasa adalah isi
-                  // paket, jadi minimal satu rasa wajib dicentang.
-                  required_qty: bundle.is_fixed ? 1 : bundle.required_qty,
-                })
-              }
-            >
-              {t.admin.menu.bundleFlavorsClear}
-            </button>
+      {/* (migration-59) Mode PILIHAN. Daftar rasa rata di bawah disembunyikan
+          sepenuhnya: yang berlaku cuma daftar per pilihan. */}
+      {mode === "choice" ? (
+        <BundleChoicesEditor
+          bundle={bundle}
+          setBundle={setBundle}
+          categories={categories}
+          flavors={flavors}
+          t={t}
+        />
+      ) : (
+        <div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="label">
+              {mode === "fixed" ? t.admin.menu.bundleFixedContents : t.admin.menu.bundleFlavors}
+            </span>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-cocoa-600 underline underline-offset-2 hover:text-cocoa-900"
+                onClick={() =>
+                  setBundle({
+                    ...bundle,
+                    flavor_ids: activeFlavors.map((f) => f.id),
+                    required_qty: mode === "fixed"
+                      ? Math.max(1, activeFlavors.length)
+                      : bundle.required_qty,
+                  })
+                }
+              >
+                {t.admin.menu.bundleFlavorsAll}
+              </button>
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-cocoa-600 underline underline-offset-2 hover:text-cocoa-900"
+                onClick={() =>
+                  setBundle({
+                    ...bundle,
+                    flavor_ids: [],
+                    // Mode combo tidak boleh kosong: daftar rasa adalah isi
+                    // paket, jadi minimal satu rasa wajib dicentang.
+                    required_qty: mode === "fixed" ? 1 : bundle.required_qty,
+                  })
+                }
+              >
+                {t.admin.menu.bundleFlavorsClear}
+              </button>
+            </div>
           </div>
-        </div>
 
-        {activeFlavors.length === 0 ? (
-          <p className="text-[11px] text-cocoa-400">{t.admin.menu.bundleFlavorsEmpty}</p>
-        ) : (
-          <div className="mt-2 max-h-64 space-y-3 overflow-y-auto rounded-xl border border-cocoa-200 bg-cocoa-50/40 p-3">
-            {categories.map((c) => {
-              const inCat = activeFlavors.filter((f) => f.category_id === c.id);
-              if (inCat.length === 0) return null;
-              return (
-                <div key={c.id}>
-                  <p className="mb-1.5 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
-                    {c.name_id}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {inCat.map((f) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        aria-pressed={picked.has(f.id)}
-                        onClick={() => toggleFlavor(f.id)}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          picked.has(f.id)
-                            ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
-                            : "border-cocoa-200 bg-white text-cocoa-600 hover:border-cocoa-300"
-                        }`}
-                      >
-                        {f.name_id}
-                      </button>
-                    ))}
+          {activeFlavors.length === 0 ? (
+            <p className="text-[11px] text-cocoa-400">{t.admin.menu.bundleFlavorsEmpty}</p>
+          ) : (
+            <div className="mt-2 max-h-64 space-y-3 overflow-y-auto rounded-xl border border-cocoa-200 bg-cocoa-50/40 p-3">
+              {categories.map((c) => {
+                const inCat = activeFlavors.filter((f) => f.category_id === c.id);
+                if (inCat.length === 0) return null;
+                return (
+                  <div key={c.id}>
+                    <p className="mb-1.5 text-[11px] font-bold tracking-wide text-cocoa-400 uppercase">
+                      {c.name_id}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {inCat.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          aria-pressed={picked.has(f.id)}
+                          onClick={() => toggleFlavor(f.id)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                            picked.has(f.id)
+                              ? "border-cocoa-800 bg-cocoa-800 text-cream-50"
+                              : "border-cocoa-200 bg-white text-cocoa-600 hover:border-cocoa-300"
+                          }`}
+                        >
+                          {f.name_id}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
 
-        <p className="mt-1 text-[11px] text-cocoa-400">
-          {bundle.is_fixed
-            ? bundle.flavor_ids.length === 0
-              ? t.admin.menu.bundleFixedEmpty
-              : t.admin.menu.bundleFixedHint
-            : bundle.flavor_ids.length === 0
-              ? t.admin.menu.bundleFlavorsHintAll
-              : t.admin.menu.bundleFlavorsHint}
-        </p>
-      </div>
+          <p className="mt-1 text-[11px] text-cocoa-400">
+            {mode === "fixed"
+              ? bundle.flavor_ids.length === 0
+                ? t.admin.menu.bundleFixedEmpty
+                : t.admin.menu.bundleFixedHint
+              : bundle.flavor_ids.length === 0
+                ? t.admin.menu.bundleFlavorsHintAll
+                : t.admin.menu.bundleFlavorsHint}
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

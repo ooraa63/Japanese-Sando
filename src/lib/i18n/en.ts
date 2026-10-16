@@ -209,6 +209,16 @@ export const en = {
     bundleFixedNotice: "The contents of this pack are set by the seller.",
     bundleFixedUnavailable:
       "Pack contents could not be loaded. Try reloading the page.",
+    // (migration-59) Pack with separate CHOICES: each choice has its own
+    // flavor list, the buyer takes exactly one flavor from each list.
+    bundleChoiceTitle: "Pick {n} for this pack",
+    bundleChoiceHint:
+      "One flavor from each choice. The same flavor may appear in more than one choice.",
+    bundleChoicePick: "Pick 1 flavor",
+    bundleChoiceLabelDefault: "Choice {n}",
+    bundleChoicePending: "Not picked yet",
+    bundleChoiceEmpty: "No flavor in this choice yet.",
+    bundleChoiceNeed: "Every choice must be filled first.",
     bundleNoteLabel: "Note for this bundle",
     bundleNoteHint: "Optional. Applies to every slot in this bundle.",
     // Shown when the buyer taps a bundle already in the cart to change
@@ -1224,10 +1234,14 @@ export const en = {
       bundleFlavorsHintAll:
         "None picked — buyers can choose from every flavor.",
       // (migration-54) Pack type picker: combo (locked) vs pick-your-own.
+      // (migration-59) Third mode: CHOICES, each with its own flavor list.
       bundleModeLabel: "Pack type",
       bundleModeChoose: "Buy, pick your own flavors",
       bundleModeChooseDesc:
         "The buyer picks the flavors. Fits promos like buy 2 more free.",
+      bundleModeChoice: "Choices (each with its own flavors)",
+      bundleModeChoiceDesc:
+        "You define several choices, each with its own flavor list. The buyer takes one flavor per choice.",
       bundleModeFixed: "Combo (contents already set)",
       bundleModeFixedDesc:
         "You decide the contents. The buyer picks nothing.",
@@ -1239,6 +1253,24 @@ export const en = {
       bundleFixedCountHint: "Follows the number of checked flavors automatically.",
       bundleFixedMismatch:
         "The number of checked flavors must match the number of pack contents.",
+      // (migration-59) Choice group editor.
+      bundleChoicesTitle: "Choices in this pack",
+      bundleChoiceAdd: "Add a choice",
+      bundleChoiceRemove: "Remove this choice",
+      bundleChoiceLabel: "Choice name",
+      bundleChoiceLabelEn: "Choice name (EN)",
+      bundleChoiceLabelDefault: "Choice {n}",
+      bundleChoiceFlavors: "Flavors allowed here",
+      bundleChoiceFlavorsEmpty: "No flavor in this list yet.",
+      bundleChoiceHint:
+        "The buyer takes exactly one flavor from each list. The same flavor may appear in several choices.",
+      bundleChoiceEmpty: "No choice yet. Add at least one.",
+      bundleChoiceMax: "Up to 10 choices per pack.",
+      bundleChoiceCountHint: "The slot count follows the number of choices.",
+      bundleChoiceMismatch:
+        "Some choice has no flavor yet. Add at least one flavor to each.",
+      bundleChoiceSwitchWarning:
+        "This pack uses choice mode. The flavor list below applies again if you switch back to the basic mode.",
       bundleSaved: "Bundle saved.",
       bundleDeleted: "Bundle deleted.",
       bundleDeactivated: "This bundle is still used by active orders, so it was hidden from the website.",

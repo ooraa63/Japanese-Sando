@@ -230,6 +230,23 @@ export interface ShippingDiscount {
  * tersendiri. Saat pembeli memilih bundle, mereka wajib memilih
  * `required_qty` pcs rasa (biasanya dari kategori yang sama).
  */
+/**
+ * Satu "pilihan" di dalam paket (migration-59).
+ *
+ * Tiap pilihan punya daftar rasa sendiri dan pembeli mengambil TEPAT SATU rasa
+ * dari daftar itu. Jadi `flavor_ids` di sini bukan whitelist seluruh paket,
+ * tapi daftar milik pilihan tersebut saja.
+ *
+ * `index` dimulai dari 1 dan urutannya sama dengan urutan tampil di
+ * `OrderBundleModal`, jadi posisi di array = nomor slot di `create_order`.
+ */
+export interface BundleChoiceSlot {
+  index: number;
+  label_id: string;
+  label_en: string;
+  flavor_ids: number[];
+}
+
 export interface Bundle {
   id: number;
   category_id: number | null;
@@ -266,6 +283,17 @@ export interface Bundle {
    * `required_qty` — divalidasi server di `admin_save_bundle`.
    */
   is_fixed?: boolean;
+  /**
+   * Daftar pilihan paket (migration-59, tabel `bundle_slots`).
+   *
+   * Array kosong atau `undefined` = paket tidak memakai mode pilihan, dan
+   * berlaku aturan lama: whitelist rata `flavor_ids` (atau `is_fixed`).
+   *
+   * PENTING: field ini BEDA bentuk dari `p_bundles[].slots` milik
+   * `create_order`. Yang ini definisi pilihan, yang itu isi yang dipilih
+   * pembeli.
+   */
+  slots?: BundleChoiceSlot[];
   sort_order: number;
 }
 

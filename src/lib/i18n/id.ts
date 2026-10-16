@@ -214,6 +214,16 @@ export const id: Dict = {
     bundleFixedNotice: "Isi paket ini sudah ditentukan penjual.",
     bundleFixedUnavailable:
       "Isi paket belum bisa dimuat. Coba muat ulang halamannya.",
+    // (migration-59) Paket dengan PILIHAN terpisah: tiap pilihan punya daftar
+    // rasa sendiri, pembeli ambil tepat satu rasa dari tiap daftar.
+    bundleChoiceTitle: "Pilih {n} dari paket ini",
+    bundleChoiceHint:
+      "Tiap pilihan diambil satu rasa. Rasa yang sama boleh dipakai di lebih dari satu pilihan.",
+    bundleChoicePick: "Pilih 1 rasa",
+    bundleChoiceLabelDefault: "Pilihan {n}",
+    bundleChoicePending: "Belum dipilih",
+    bundleChoiceEmpty: "Belum ada rasa di pilihan ini.",
+    bundleChoiceNeed: "Semua pilihan harus diisi dulu.",
     bundleNoteLabel: "Catatan untuk paket ini",
     bundleNoteHint: "Opsional. Berlaku untuk semua slot di paket ini.",
     // Dipakai saat pembeli menekan bundle yang sudah di keranjang untuk
@@ -1245,10 +1255,14 @@ export const id: Dict = {
       bundleFlavorsHintAll:
         "Tidak ada rasa yang dicentang — pembeli bebas memilih semua rasa.",
       // (migration-54) Pemilih mode paket: combo (isi terkunci) vs pilih sendiri.
+      // (migration-59) Mode ketiga: PILIHAN, tiap pilihan punya daftar sendiri.
       bundleModeLabel: "Tipe paket",
       bundleModeChoose: "Beli pilih rasa sendiri",
       bundleModeChooseDesc:
         "Pembeli yang memilih rasa. Cocok untuk promo seperti beli 2 lebih gratis.",
+      bundleModeChoice: "Pilihan (tiap kelompok rasa sendiri)",
+      bundleModeChoiceDesc:
+        "Kamu menentukan beberapa pilihan, tiap pilihan punya daftar rasa sendiri. Pembeli ambil satu rasa per pilihan.",
       bundleModeFixed: "Combo (isi sudah ditentukan)",
       bundleModeFixedDesc:
         "Isi paket sudah kamu tentukan. Pembeli tidak memilih apa-apa.",
@@ -1262,6 +1276,25 @@ export const id: Dict = {
         "Otomatis mengikuti jumlah rasa yang dicentang.",
       bundleFixedMismatch:
         "Jumlah rasa yang dicentang harus sama dengan jumlah isi paket.",
+      // (migration-59) Editor kelompok pilihan.
+      bundleChoicesTitle: "Pilihan dalam paket",
+      bundleChoiceAdd: "Tambah pilihan",
+      bundleChoiceRemove: "Hapus pilihan",
+      bundleChoiceLabel: "Nama pilihan",
+      bundleChoiceLabelEn: "Nama pilihan (EN)",
+      bundleChoiceLabelDefault: "Pilihan {n}",
+      bundleChoiceFlavors: "Rasa yang boleh dipilih",
+      bundleChoiceFlavorsEmpty: "Belum ada rasa di daftar ini.",
+      bundleChoiceHint:
+        "Pembeli mengambil tepat satu rasa dari daftar setiap pilihan. Rasa yang sama boleh muncul di beberapa pilihan.",
+      bundleChoiceEmpty: "Belum ada pilihan. Tambahkan minimal satu pilihan.",
+      bundleChoiceMax: "Maksimal 10 pilihan dalam satu paket.",
+      bundleChoiceCountHint:
+        "Jumlah slot otomatis mengikuti jumlah pilihan.",
+      bundleChoiceMismatch:
+        "Ada pilihan yang belum punya rasa. Tambahkan minimal satu rasa per pilihan.",
+      bundleChoiceSwitchWarning:
+        "Paket ini memakai mode pilihan. Daftar rasa di bawah dipakai kalau kamu mengembalikan ke mode biasa.",
       bundleSaved: "Bundle tersimpan.",
       bundleDeleted: "Bundle dihapus.",
       bundleDeactivated: "Bundle ini masih dipakai pesanan aktif, jadi disembunyikan dari website.",

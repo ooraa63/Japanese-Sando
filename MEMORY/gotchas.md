@@ -2290,3 +2290,83 @@ Dua marker lain yang sempat salah di sesi yang sama:
   (dibaca dari localStorage). Marker harus dicari di halaman yang benar,
   bukan halaman yang paling gampang diambil.
 
+
+### #126 - `$` di dalam replacement string `String.replace` = pola, bukan teks
+
+Dipakai `scripts/gen-migration-59.mjs` untuk menempelkan body SQL ke dalam
+file migration. SQL mengandung regex anchoring seperti `!~ '^[0-9]+$'`.
+Ternyata string replacement `String.replace` memperlakukan `$` sebagai
+POLA:
+
+| Pola | Menghasilkan |
+|---|---|
+| `$&` | teks yang dicocokkan |
+| `` $` `` | teks SEBELUM kecocokan |
+| `$'` | teks SESUDAH kecocokan |
+| `$1` | grup tangkapan |
+
+Jadi `'$'` diikuti `'` pada baris itu menjadi `$'`, dan seluruh sisa body
+lama ikut tersisip ke dalam migration. Hasilnya file SQL yang isinya
+saling tumpang tindih, dan error-nya muncul jauh dari penyebabnya.
+
+Aturan: kalau teks pengganti bisa mengandung `$`, pasang **fungsi**, bukan
+string.
+
+```js
+// SALAH
+hasil = hasil.replace(cari, ganti);
+
+// BENAR
+hasil = hasil.replace(cari, () => ganti);
+```
+
+Hal yang sama berlaku untuk penulisan akhir file. Kalau hasil generate
+disisipkan lewat `str.replace(PENANDA, bagian)`, bagian itu juga harus
+dipasang sebagai fungsi.
+
+### #127 - `pg_get_function_identity_arguments` membuang nilai default
+
+Untuk menulis ulang fungsi yang sudah ada, header
+`create or replace function` harus memakai `pg_get_function_arguments`, yang
+menyertakan default. `pg_get_function_identity_arguments` hanya nama + tipe,
+sehingga PostgreSQL menolak dengan:
+
+```
+error: cannot remove parameter defaults from existing function
+```
+
+`create_order` punya hampir semua parameter ber-default, jadi ini langsung
+menyentuh fungsi yang paling penting. Grant statement boleh tetap memakai
+identity arguments, karena di sana yang dibutuhkan memang hanya nama + tipe.
+
+### #128 - Flag kapabilitas untuk fitur yang butuh migration baru
+
+UI yang poked ke RPC bisa "bekerja" padahal fiturnya belum ada di database.
+Kasus nyata: `admin_save_bundle` versi lama **diam-diam mengabaikan** kunci
+payload yang tidak dikenal. Jadi kalau form admin mengirim `slots`, RPC lama
+tidak error - paket tersimpan tanpa pilihan apa pun, dan Steven tidak akan
+pernah sadar sampai pembeli komplain.
+
+Aturan: setiap fitur yang butuh migration baru harus punya penanda
+kapabilitas yang dibaca dari database, bukan dari versi aplikasi. Di sini:
+RPC `bundle_features()`, dan error "fungsi tidak ada" dibaca sebagai "fitur
+tidak tersedia". Munculkan fitur hanya kalau penandanya bernilai benar.
+
+### #129 - `pg` mengembalikan `bigint` sebagai STRING
+
+Driver `node-postgres` mengubah `int8` jadi string secara default. Akibatnya
+`row.id === 30` gagal diam-diam kalau `30` datang dari kueri (string) tapi
+di bandingkan dengan angka literal.
+
+Di skrip uji migration ini gejalanya jauh dari penyebabnya: test "kategori
+uji ada di public_menu" GAGAL padahal kategorinya jelas ada di daftar. Yang
+perlu dibetulkan bukan kategorinya, tapi tipenya.
+
+```js
+import pg from "pg";
+pg.types.setTypeParser(20, (v) => Number(v));
+```
+
+Hal serupa berlaku untuk `bigint[]`: `array_agg` mengembalikan
+`["447","448"]`, bukan `[447, 448]`. Kalau dibandingkan dengan angka, pakai
+`::int` di SQL-nya.
