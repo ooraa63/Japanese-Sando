@@ -4,6 +4,74 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-17 (malam, sesi 2) — Menu admin dipecah jadi 6 aplikasi
+
+Steven kirim 3 screenshot di `D:\Gambar error` dengan satu permintaan: sebelas
+menu admin yang dijajekan datar di satu sidebar (gambar 3) dipecah menjadi
+beberapa aplikasi, dengan **tampilan awal beraplik** (gambar 1) dan
+**sidebar bergrouping** setelah salah satu aplikasi diklik (gambar 2).
+
+Steven mendelegasikan pengelompokannya — "Menurut kamu yang nyambung dijadikan
+satu aja" — dan memilih tampilan awal yang **hanya berisi chip peringatan**,
+tanpa angka omzet, supaya layar awal tidak jadi salinan Dashboard.
+
+### Enam aplikasinya
+
+| Aplikasi | Isinya | Alasan |
+|---|---|---|
+| Pesanan & Pre-order | Pesanan, Batch PO | satu siklus stok: batch menyediakan, pesanan menguranginya |
+| Ringkasan Bisnis | Dashboard, Mutasi Penjualan | dua-duanya menjawab "berapa yang terjual" |
+| Produk & Pengiriman | Menu & Paket, Ambil & Kirim | apa yang dijual dan cara pembeli menerimanya |
+| Identitas Toko | Identitas & Kontak, Jam Buka, Menu Profil, Pengumuman | apa yang dilihat pembeli |
+| Pelanggan | Pelanggan, Ulasan | orang yang beli dan pendapatannya |
+| Pengaturan | Metode Pembayaran, Kategori & Ketersediaan, Tampilan Beranda, Akun Admin | setelan sistem |
+
+Jumlah menu **tidak berubah** — 11 item lama masih ada, hanya dikelompokkan.
+Tidak ada menu baru. Tab `contact` dan `shipping` di `/admin/settings` juga
+tidak dijadikan item sidebar; seperti sebelumnya keduanya hanya lewat deretan
+tab di dalam halaman.
+
+### File
+
+| File | Perubahan |
+|---|---|
+| `src/lib/admin-nav.ts` (baru) | sumber kebenaran: 6 aplikasi, bagian di dalamnya, `appForPath`, warna lempeng |
+| `src/lib/wib-time.ts` (baru) | `hariIniWib()` + `jamWib()` untuk server (Vercel UTC, toko Bandung) |
+| `src/components/admin/AdminLauncher.tsx` (baru) | tampilan awal: salam, tanggal, chip peringatan, lempeng 6 aplikasi |
+| `src/app/admin/(dashboard)/page.tsx` | sekarang launcher; statistik pindah ke `dashboard/page.tsx` |
+| `src/components/admin/AdminShell.tsx` | ditulis ulang: sidebar menampilkan judul aplikasi + bagiannya |
+| `src/app/admin/(dashboard)/layout.tsx` | mengirim label aplikasi/bagian/item ke sidebar dan launcher |
+| `src/components/admin/SettingsClient.tsx` | tab dibaca dari URL (`?tab=`) supaya sidebar bisa menandai aktif |
+| `src/lib/i18n/id.ts`, `en.ts` | kunci baru `admin.apps.*`, `admin.sections.*`, `admin.launcher.*`, `admin.nav.*` |
+| `scripts/shot-admin.mjs` (baru) | login sendiri lalu foto + baca struktur sidebar tiap halaman admin |
+| `scripts/test-pages.mjs` | 42 pengawal baru: setiap halaman admin harus memunculkan sidebar yang benar |
+
+### Tiga bug `appForPath` yang lolos dari tes lama
+
+Tes lama cuma mengecek "string ini ada atau tidak di HTML", jadi ketiganya
+tidak ketahuan sampai `scripts/shot-admin.mjs` membaca DOM yang sudah dirender:
+
+1. `match` aplikasi Pesanan cuma `/admin/orders`, padahal isinya juga
+   `/admin/po`. Akibatnya `/admin/po` tidak masuk aplikasi mana pun dan
+   sidebar jatuh ke daftar aplikasi. Sekarang `match` digabung dengan `href`
+   tiap item.
+2. `/admin/settings` dipakai **dua** aplikasi dengan `match` yang sama, jadi
+   `find()` selalu mengembalikan yang pertama — `/admin/settings?tab=payment`
+   menampilkan sidebar "Identitas Toko". Sekarang pencocokan memakai `?tab=`
+   lewat field `tabs` per aplikasi.
+3. `/admin/settings` tanpa `?tab=` tidak menandai menu apa pun aktif, padahal
+   `SettingsClient` memperlakukannya sebagai `identity`. Sekarang
+   dibandingkan dengan `TAB_DEFAULT`.
+
+### Verifikasi
+
+`npm run typecheck`, `npx eslint src --max-warnings=0`, dan `npm run build`
+bersih. `scripts/test-pages.mjs` 114 lulus / 0 gagal (dari 51). `shot-admin.mjs`
+memeriksa 17 halaman admin di 1440px dan 390px plus drawer mobile: judul
+aplikasi, bagian, dan menu aktif sudah benar di semuanya, tanpa error konsol.
+
+---
+
 ## 2026-10-17 (malam) — Perbaikan 6 masalah dari 3 screenshot Steven
 
 Steven mengirim 3 screenshot (`D:\Gambar error`) dengan 4 nomor (nomor 4 kosong;

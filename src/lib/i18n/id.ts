@@ -964,6 +964,73 @@ export const id: Dict = {
       pickupDelivery: "Ambil & Kirim",
       // Steven 15-10-2026: halaman baru untuk mengelola ulasan pembeli.
       reviews: "Ulasan",
+      // Steven 17-10-2026: sidebar dipecah jadi 6 aplikasi. Label di bawah
+      // hanya dipakai di sidebar dalam aplikasi (lihat `src/lib/admin-nav.ts`).
+      poBatch: "Batch PO",
+      salesReport: "Mutasi Penjualan",
+      menuCatalog: "Menu & Paket",
+      identityTab: "Identitas & Kontak",
+      hoursTab: "Jam Buka & Aturan",
+      paymentTab: "Metode Pembayaran",
+      availabilityTab: "Kategori & Ketersediaan",
+      homeTab: "Tampilan Beranda",
+      adminAccountTab: "Akun Admin",
+      profileMenu: "Menu Profil",
+      announcements: "Pengumuman",
+    },
+    /**
+     * Steven 17-10-2026: "jangan semua yang gambar 3 itu dijadikan 1 side
+     * bar... identitas toko, ataupun Batch, lalu ringkasan bisnis, seting,
+     * dsb kita pisahkan". Sebelas menu lama dikelompokkan jadi enam aplikasi
+     * di `src/lib/admin-nav.ts`; nama-nama di bawah mengikuti pengelompokan
+     * itu.
+     */
+    apps: {
+      orders: "Pesanan & Pre-order",
+      business: "Ringkasan Bisnis",
+      catalog: "Produk & Pengiriman",
+      identity: "Identitas Toko",
+      customers: "Pelanggan",
+      settings: "Pengaturan",
+    },
+    /** Judul bagian di dalam sidebar sebuah aplikasi (gambar 2). */
+    sections: {
+      pesanan: "Pesanan",
+      preorder: "Pre-order",
+      ringkasan: "Ringkasan",
+      laporan: "Laporan",
+      produk: "Produk",
+      pengiriman: "Pengiriman",
+      identitas: "Identitas & Jam",
+      komunikasi: "Halaman Pembeli",
+      pelanggan: "Pelanggan",
+      ulasan: "Ulasan",
+      pembayaran: "Pembayaran",
+      tampilan: "Tampilan",
+      akun: "Akun",
+    },
+    /**
+     * Layar awal admin (gambar 1). Isinya HANYA peringatan yang perlu
+     * ditangani Steven — angka omzet sengaja tidak ditampilkan di sini
+     * supaya layar awal tidak jadi halaman kedua yang isinya sama dengan
+     * Dashboard. Steven memilih ini pada 17-10-2026.
+     */
+    launcher: {
+      allApps: "Semua aplikasi",
+      greeting: {
+        morning: "Selamat pagi",
+        noon: "Selamat siang",
+        afternoon: "Selamat sore",
+        evening: "Selamat malam",
+      },
+      chips: {
+        pending: "{n} pesanan menunggu persetujuan",
+        pickupLate: "{n} pesanan lewat tanggal ambil",
+        batchClosing: "Batch PO ditutup hari ini",
+        noBatch: "Belum ada batch PO yang bisa dipesan",
+        paymentOff: "Metode pembayaran belum diatur",
+        allOk: "Semua beres, tidak ada yang perlu ditunggu",
+      },
     },
     dash: {
       title: "Dashboard",

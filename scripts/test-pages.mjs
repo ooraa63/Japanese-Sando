@@ -99,7 +99,22 @@ async function openPage(url, { expectStatus = 200, mustContain = [], mustNotCont
 }
 
 console.log("\n=== 2. Halaman dashboard (butuh login) ===");
-const dash = await openPage("/admin", {
+/*
+ * Steven 17-10-2026: `/admin` sekarang LAYAR AWAL — salam + peringatan +
+ * lempeng aplikasi. Statistik pindah ke `/admin/dashboard` (masih di dalam
+ * aplikasi "Ringkasan Bisnis"). Tes kedua-duanya supaya perpindahan ini
+ * tidak diam-diam merusak salah satunya.
+ */
+const beranda = await openPage("/admin", {
+  mustContain: ["Selamat", EMAIL],
+});
+if (beranda.status === 200) {
+  check("  layar awal punya lempeng aplikasi", beranda.text.includes("Pesanan &amp; Pre-order") || beranda.text.includes("Pesanan & Pre-order"));
+  check("  layar awal punya tombol keluar", beranda.text.includes("Keluar"));
+  check("  layar awal TIDAK menampilkan statistik dashboard", !beranda.text.includes("Pesanan terbaru"));
+}
+
+const dash = await openPage("/admin/dashboard", {
   mustContain: ["Pendapatan", "Menunggu", "Pesanan terbaru", EMAIL],
 });
 if (dash.status === 200) {
@@ -108,7 +123,62 @@ if (dash.status === 200) {
   check("  menu sidebar tampil",
     dash.text.includes("Menu &amp; Stok") || dash.text.includes("Menu & Stok") || dash.text.includes("Menu"));
   check("  tombol keluar tampil", dash.text.includes("Keluar"));
-  check("  menu sidebar punya Batch PO", dash.text.includes("Batch PO"));
+  // Sidebar di dalam aplikasi menampilkan bagian per bagian (lihat
+  // `src/lib/admin-nav.ts`).
+  check("  sidebar menampilkan judul aplikasi", dash.text.includes("Ringkasan Bisnis"));
+  check("  sidebar menampilkan bagian 'Laporan'", dash.text.includes("Laporan"));
+}
+
+/*
+ * Guardian untuk `appForPath()`.
+ *
+ * Tes di atas hanya mengecek "string ini ada atau tidak", jadi tiga bug
+ * `appForPath` sempat lolos begitu saja:
+ *   1. `match` aplikasi Pesanan cuma `/admin/orders`, jadi `/admin/po` tidak
+ *      masuk aplikasi mana pun dan sidebar jatuh ke daftar aplikasi.
+ *   2. `/admin/settings` dipakai dua aplikasi dengan `match` yang sama, jadi
+ *      `find()` selalu mengembalikan yang pertama — `?tab=payment` tampilkan
+ *      sidebar "Identitas Toko".
+ *   3. `/admin/settings` tanpa `?tab=` tidak menandai menu apa pun aktif.
+ *
+ * Yang dijaga di sini: SETIAP halaman admin memunculkan judul aplikasi dan
+ * bagian yang benar, bukan cuma empat halaman yang kebetulan ikut dites.
+ */
+const PETA_SIDEBAR = [
+  { url: "/admin/orders", aplikasi: "Pesanan & Pre-order", bagian: ["Pre-order"] },
+  { url: "/admin/po", aplikasi: "Pesanan & Pre-order", bagian: ["Pre-order"] },
+  { url: "/admin/dashboard", aplikasi: "Ringkasan Bisnis", bagian: ["Ringkasan", "Laporan"] },
+  { url: "/admin/sales", aplikasi: "Ringkasan Bisnis", bagian: ["Ringkasan", "Laporan"] },
+  { url: "/admin/menu", aplikasi: "Produk & Pengiriman", bagian: ["Produk", "Pengiriman"] },
+  { url: "/admin/pickup-delivery", aplikasi: "Produk & Pengiriman", bagian: ["Produk", "Pengiriman"] },
+  // Dua aplikasi berbeda hidup di halaman yang sama, dibedakan `?tab=`.
+  { url: "/admin/settings?tab=identity", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
+  { url: "/admin/settings?tab=hours", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Jam Buka & Aturan"] },
+  { url: "/admin/settings?tab=contact", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
+  { url: "/admin/settings?tab=shipping", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
+  { url: "/admin/settings?tab=payment", aplikasi: "Pengaturan", bagian: ["Pembayaran", "Tampilan", "Akun"] },
+  { url: "/admin/settings?tab=availability", aplikasi: "Pengaturan", bagian: ["Pembayaran", "Tampilan", "Akun"] },
+  { url: "/admin/settings?tab=home", aplikasi: "Pengaturan", bagian: ["Pembayaran", "Tampilan", "Akun"] },
+  { url: "/admin/settings?tab=admin", aplikasi: "Pengaturan", bagian: ["Pembayaran", "Akun"] },
+  // Tanpa `?tab=` harus jatuh ke tab default `identity`, bukan daftar aplikasi.
+  { url: "/admin/settings", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Identitas & Kontak"] },
+  { url: "/admin/profile-menu", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
+  { url: "/admin/announcements", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
+  { url: "/admin/faq", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
+  { url: "/admin/terms", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
+  { url: "/admin/customers", aplikasi: "Pelanggan", bagian: ["Pelanggan", "Ulasan"] },
+  { url: "/admin/reviews", aplikasi: "Pelanggan", bagian: ["Pelanggan", "Ulasan"] },
+];
+for (const peta of PETA_SIDEBAR) {
+  const p = await openPage(peta.url);
+  if (p.status !== 200) continue;
+  // Judul bagian dirender `uppercase` lewat CSS, jadi teks mentahnya di HTML
+  // tetap camelCase dan itulah yang dibandingkan di sini.
+  check(`  ${peta.url} sidebar = ${peta.aplikasi}`, p.text.includes(peta.aplikasi));
+  check(
+    `  ${peta.url} bagian = ${peta.bagian.join(" + ")}`,
+    peta.bagian.every((b) => p.text.includes(b)),
+  );
 }
 
 console.log("\n=== 3. Halaman lain di dashboard ===");

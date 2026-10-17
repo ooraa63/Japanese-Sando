@@ -945,6 +945,71 @@ export const en = {
       pickupDelivery: "Pickup & Delivery",
       // Steven 15-10-2026: new page to manage buyer reviews.
       reviews: "Reviews",
+      // Steven 17-10-2026: the admin sidebar is split into six apps. These
+      // labels are only used inside an app (see `src/lib/admin-nav.ts`).
+      poBatch: "PO batches",
+      salesReport: "Sales ledger",
+      menuCatalog: "Menu & bundles",
+      identityTab: "Identity & contact",
+      hoursTab: "Opening hours & rules",
+      paymentTab: "Payment methods",
+      availabilityTab: "Categories & availability",
+      homeTab: "Home page",
+      adminAccountTab: "Admin accounts",
+      profileMenu: "Profile menu",
+      announcements: "Announcements",
+    },
+    /**
+     * Steven 17-10-2026: "don't put everything from screenshot 3 into one
+     * sidebar... split store identity, batches, business summary, settings".
+     * The eleven old menus are grouped into six apps in
+     * `src/lib/admin-nav.ts`; these names follow that grouping.
+     */
+    apps: {
+      orders: "Orders & Pre-order",
+      business: "Business summary",
+      catalog: "Products & Delivery",
+      identity: "Store identity",
+      customers: "Customers",
+      settings: "Settings",
+    },
+    /** Section headings inside an app sidebar (screenshot 2). */
+    sections: {
+      pesanan: "Orders",
+      preorder: "Pre-order",
+      ringkasan: "Summary",
+      laporan: "Reports",
+      produk: "Products",
+      pengiriman: "Delivery",
+      identitas: "Identity & hours",
+      komunikasi: "Buyer pages",
+      pelanggan: "Customers",
+      ulasan: "Reviews",
+      pembayaran: "Payments",
+      tampilan: "Appearance",
+      akun: "Accounts",
+    },
+    /**
+     * Admin home screen (screenshot 1). Only shows things that need Steven's
+     * attention — revenue figures are deliberately left out so the home screen
+     * is not a second copy of the Dashboard. Steven chose this on 17-10-2026.
+     */
+    launcher: {
+      allApps: "All apps",
+      greeting: {
+        morning: "Good morning",
+        noon: "Good afternoon",
+        afternoon: "Good afternoon",
+        evening: "Good evening",
+      },
+      chips: {
+        pending: "{n} orders waiting for your approval",
+        pickupLate: "{n} orders past their collection date",
+        batchClosing: "PO batch closes today",
+        noBatch: "No PO batch open for orders",
+        paymentOff: "Payment methods not set up",
+        allOk: "All clear, nothing waiting",
+      },
     },
     dash: {
       title: "Dashboard",

@@ -2654,3 +2654,49 @@ Untuk `/order` Steven memilih 17-10-2026: WA jadi tombol kecil di baris
 navigasi (`WhatsAppNavButton`), `WhatsAppFab` disembunyikan di route itu.
 Halaman lain masih pakai FAB dan masih punya masalah yang sama — jangan
 sampai lupa kalau Steven minta diperbaiki juga.
+
+### #148 - `startsWith(match)` saja tidak cukup kalau satu aplikasi punya banyak halaman
+
+Struktur nav admin (17-10-2026) mengelompokkan 11 menu jadi 6 aplikasi, lalu
+`appForPath(pathname)` menentukan aplikasi dari path aktif. Field `match` diisi
+hanya satu path per aplikasi, misalnya aplikasi "Pesanan & Pre-order" diisi
+`match: "/admin/orders"` padahal isinya dua: `/admin/orders` **dan**
+`/admin/po`.
+
+Akibatnya `/admin/po` tidak cocok dengan aplikasi mana pun dan `find()`
+mengembalikan `null`, sehingga sidebar jatuh ke mode "daftar aplikasi" —
+padahal Steven sedang berada di dalam aplikasi itu.
+
+Pelajaran: kalau sumber kebenarannya sudah memuat daftar route lengkap, jangan
+tambah field kedua yang bisa tidak lengkap. Persis di sini: `match`
+sekarang digabung dengan `href` tiap item plus `extraMatches`.
+
+### #149 - Dua entri yang berbagi satu path harus dibedakan oleh query string
+
+`/admin/settings` dipakai dua aplikasi ("Identitas Toko" dan "Pengaturan").
+Keduanya cuma beda `?tab=`, tapi `match`-nya sama persis, jadi `find()` selalu
+mengembalikan yang pertama. `/admin/settings?tab=payment` menampilkan sidebar
+"Identitas Toko" — salah total, karena isinya pembayaran, bukan identitas.
+
+Perbaikannya bukan mengurutkan ulang array (itu cuma menukar bugnya), tapi
+menambah field `tabs: string[]` per aplikasi dan meneruskan `?tab=` ke
+pencocokan.
+
+Pelajaran kedua dari bug yang sama: halaman tanpa `?tab=` harus diperlakukan
+sama dengan tab default-nya. Kalau tidak, `/admin/settings` tidak akan menandai
+menu apa pun sebagai aktif. Sekarang keduanya berbagi konstanta `TAB_DEFAULT`.
+
+### #150 - Tes "string ini ada atau tidak" tidak akan pernah menangkap salah pilih rute
+
+Ketiga bug di atas lolos dari `scripts/test-pages.mjs` yang cuma melakukan
+`html.includes(...)`. Semua string yang diperiksa memang ADA di halaman —
+yang salah adalah menaruhnya di sidebar yang berbeda.
+
+Pengawalnya harus bentuk, bukan substring: untuk tiap halaman admin, cek
+**judul aplikasi + judul bagian** yang muncul. Sekarang ada tabel `PETA_SIDEBAR`
+di `scripts/test-pages.mjs` yang menguji 21 rute sekaligus.
+
+Pelajaran umum: kalau sebuah perubahan menyentuh **pola**, tambahkan tes yang
+mengecek bentuk (siapa yang tampil, di mana), bukan cuma isi. Dan untuk yang
+cuma kelihatan saat dirender, `scripts/shot-admin.mjs` membaca DOM langsung
+setelah login — `test-pages.mjs` tidak akan pernah melihatnya.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
   Building2,
@@ -47,6 +47,33 @@ type TabKey =
   | "availability"
   | "home"
   | "admin";
+
+const SEMUA_TAB: TabKey[] = [
+  "identity",
+  "contact",
+  "hours",
+  "shipping",
+  "payment",
+  "availability",
+  "home",
+  "admin",
+];
+
+/**
+ * Tab dibaca dari URL (`?tab=...`), bukan state lokal saja.
+ *
+ * Steven 17-10-2026: `/admin/settings` dipecah jadi DUA aplikasi — "Identitas
+ * Toko" dan "Pengaturan" — dan sidebar menandai menu aktif dari URL. Kalau
+ * tabnya hanya state lokal, `/admin/settings?tab=identity` dan
+ * `/admin/settings?tab=payment` akan terlihat sama persis.
+ *
+ * Efek sampingnya bagus juga: tab bisa di-bookmark dan tombol "kembali"
+ * di browser berjalan normal.
+ */
+function tabDariSearch(search: string): TabKey {
+  const nilai = new URLSearchParams(search).get("tab");
+  return SEMUA_TAB.includes(nilai as TabKey) ? (nilai as TabKey) : "identity";
+}
 
 function toDraft(s: StoreSettings | null): Draft {
   return {
@@ -106,9 +133,30 @@ export function SettingsClient({
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState<Draft>(() => toDraft(initialSettings));
   const [saving, startSaving] = useTransition();
-  const [tab, setTab] = useState<TabKey>("identity");
+
+  /**
+   * Tab = isi `?tab=` di URL. Tidak ada state sendiri: begitu tab diubah,
+   * URL ikut berubah dan komponen ini membaca ulang dari situ. `router.replace`
+   * (bukan `push`) supaya tombol "kembali" di browser tidak harus ditekan
+   * delapan kali untuk keluar dari Pengaturan.
+   *
+   * Catatan: `form` sengaja TIDAK di-reset saat tab berganti — Steven mengisi
+   * nama toko di tab Identitas lalu menyeberang ke tab Pembayaran, isinya
+   * jangan hilang di tengah jalan. Yang di-reset hanya `saving`.
+   */
+  const tab = tabDariSearch(searchParams.toString());
+  const setTab = useCallback(
+    (next: TabKey) => {
+      router.replace(next === "identity" ? "/admin/settings" : `/admin/settings?tab=${next}`, {
+        scroll: false,
+      });
+    },
+    [router]
+  );
 
   function patch(next: Partial<Draft>) {
     setForm((prev) => ({ ...prev, ...next }));
