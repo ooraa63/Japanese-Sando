@@ -405,9 +405,7 @@ export function OrderBundleModal({
               ? t.menu.bundleChoiceTitle.replace("{n}", String(requiredQty))
               : isFixed
                 ? t.menu.bundleFixedContents
-                : t.menu.bundlePickFlavors
-                    .replace("{n}", String(requiredQty))
-                    .replace("{name}", "")}
+                : t.menu.bundleIncludes.replace("{n}", String(requiredQty))}
           </p>
           <div className="mt-1.5">
             <PriceTag

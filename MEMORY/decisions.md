@@ -1377,3 +1377,42 @@ bawah.
   akhir halaman. Lihat gotcha #131.
 - Jangan diverifikasi dari screenshot penuh (`captureBeyondViewport`), tapi dari
   `getBoundingClientRect()` lewat `scripts/ukur.mjs`.
+- **D84** - **Jendela batch PO dihitung dari tanggal WIB, bukan `current_date`.**
+  Steven 17-10-2026. Session database di UTC, toko di Bandung (WIB), jadi
+  `current_date` antara pukul 00.00 dan 07.00 WIB masih menunjuk hari
+  sebelumnya: tanggal ambil yang sudah lewat masih bisa dipilih dan batch
+  yang mestinya tertutup masih menerima pesanan.
+
+  `migration-61` menambah `public.po_today()` =
+  `(current_timestamp at time zone 'Asia/Jakarta')::date` dan memakainya di
+  enam fungsi: `public_po_pickup_dates`, `public_po_batch_for_date`,
+  `create_order`, `admin_list_po_batches`, `admin_list_po_batch_detail`,
+  `admin_dashboard_stats`.
+
+  `po_batches.open_at` / `close_at` **tidak diubah** — keduanya bertipe
+  `date` dan nilainya sudah dibaca Steven sebagai tanggal kalender WIB.
+  Mengubahnya jadi `timestamptz` akan menggeser batas batch 7 jam ke
+  belakang. Hanya sisi perbandingan yang ikut WIB.
+
+  Aturan untuk ke depan: fungsi yang butuh "hari ini" memakai
+  `public.po_today()`, JANGAN `current_date`. Kalau perbandingannya dengan
+  kolom `timestamptz` (mis. `created_at`), kolom itu juga harus dikonversi ke
+  WIB lebih dulu — kalau tidak, sisi kiri dan kanan dibandingkan dalam dua
+  zona waktu berbeda. Lihat gotcha #138.
+
+- **D85** - **Migration SQL ditulis dari definisi LIVE, bukan disalin dari
+  file lama.** File `.sql` bisa sudah tidak sama dengan yang ada di database
+  (fungsi pernah diganti lewat dashboard). `scripts/gen-migration-61.mjs`
+  mengambil `pg_get_functiondef()`, melakukan penggantian, lalu menulis
+  `supabase/migration-61.sql` — hasilnya bisa direview sebelum di-apply, dan
+  `--apply` mengirimnya dalam satu transaksi.
+
+  Ini juga alasan kenapa `migration-61.sql` tetap disimpan di repo walau
+  sudah diterapkan lewat skrip: supaya hasilnya bisa di-review dan diulang.
+
+- **D86** - **Kata "Bundle" dibiarkan Bahasa Inggris di UI.** Hasil audit
+  bahasa 17-10-2026: sebagian besar teks memakai "paket"
+  ("Paket hemat", "di keranjang", "paket ini"), tapi badge produk masih
+  "Bundle" dan tetap memakai `bundleLabel` sebagai kunci i18n-nya.
+  Dibiarkan karena Steven belum memutuskan mau diseragamkan; kalau nanti
+  diubah, `bundleLabel` di `id.ts` dan `en.ts` adalah satu-satunya sumber.

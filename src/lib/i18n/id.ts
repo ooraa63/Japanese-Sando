@@ -185,9 +185,9 @@ export const id: Dict = {
     notePlaceholder: "Catatan (mis. jangan pakai cabe)",
     bundlesTitle: "Pilihan Paket Hemat",
     soldCount: "terjual",
-    likesCount: "disuka",
+    likesCount: "disukai",
     like: "Suka",
-    liked: "Disuka",
+    liked: "Disukai",
     likeAdd: "Tandai suka",
     likeRemove: "Hapus suka",
     bundleLabel: "Bundle",
@@ -216,7 +216,7 @@ export const id: Dict = {
       "Isi paket belum bisa dimuat. Coba muat ulang halamannya.",
     // (migration-59) Paket dengan PILIHAN terpisah: tiap pilihan punya daftar
     // rasa sendiri, pembeli ambil tepat satu rasa dari tiap daftar.
-    bundleChoiceTitle: "Pilih {n} dari paket ini",
+    bundleChoiceTitle: "Pilih {n} rasa dari paket ini",
     bundleChoiceHint:
       "Tiap pilihan diambil satu rasa. Rasa yang sama boleh dipakai di lebih dari satu pilihan.",
     bundleChoicePick: "Pilih 1 rasa",
@@ -233,6 +233,9 @@ export const id: Dict = {
     bundleSaveChange: "Simpan perubahan",
     bundleInCartChip: "Di keranjang",
     bundleEditHint: "Ketuk untuk ubah rasa",
+    /** Untuk paket terkunci (`is_fixed`): isinya sudah ditentukan
+     *  penjual, jadi pembeli tidak bisa mengubah rasa. */
+    bundleFixedEditHint: "Ketuk untuk lihat isi paket",
   },
   howItWorks: {
     title: "Cara Pre-order",
@@ -393,7 +396,7 @@ export const id: Dict = {
       // dihapus. Kata "via Midtrans (dinamis)" adalah istilah internal
       // integration — pembeli cuma perlu tahu cara bayarnya QRIS.
       qrisMidtrans: "QRIS",
-      qrisMidtransDesc: "",
+      qrisMidtransDesc: "Bayar sekali untuk semua e-wallet dan m-banking.",
       qrisMidtransNotConfigured:
         "Midtrans belum dikonfigurasi. Hubungi penjual atau pilih metode lain.",
       qrisMidtransCta: "Bayar dengan QRIS",
@@ -417,7 +420,7 @@ export const id: Dict = {
       expiresIn: "Kedaluwarsa dalam",
       waiting: "Menunggu konfirmasi pembayaran...",
       paid: "Pembayaran terkonfirmasi. Mengalihkan...",
-      expired: "QR sudah kedaluwarsa. Coba refresh atau pilih metode lain.",
+      expired: "QR sudah kedaluwarsa. Coba muat ulang atau pilih metode lain.",
       failed: "Pembayaran gagal. Coba lagi.",
       cancelled: "Pembayaran dibatalkan.",
       close: "Tutup",
@@ -426,7 +429,7 @@ export const id: Dict = {
         "Kalau sudah scan tapi status belum berubah, tunggu sebentar lalu tutup halaman ini. Pembayaran tetap diproses di belakang layar selama QR masih valid.",
       orderNotQueued:
         "Kalau tidak jadi dibayar, QR akan otomatis kedaluwarsa dan pesanan ini tidak masuk ke daftar produksi.",
-      refresh: "Generate QR baru",
+      refresh: "Buat QR baru",
       refreshSuccess: "QR baru dibuat. Scan lagi untuk membayar.",
       copyOrder: "Salin kode pesanan",
       download: "Unduh QR",
@@ -801,7 +804,7 @@ export const id: Dict = {
       title: "Masuk Penjual",
       subtitle: "Hanya pemilik toko yang bisa mengakses halaman ini.",
       email: "Email",
-      password: "Password",
+      password: "Kata sandi",
       submit: "Masuk",
       submitting: "Sedang masuk...",
       signOut: "Keluar",
@@ -893,7 +896,7 @@ export const id: Dict = {
             "Atur stok per jenis menu dan pilih paket yang ditawarkan di batch ini.",
           colInitial: "Stok awal",
           colSold: "Terjual",
-          colInput: "Stock",
+          colInput: "Stok",
           empty: "Belum ada jenis menu aktif.",
           initialHint:
             "Stok awal dihitung dari sisa + terjual, karena stok awal tidak disimpan terpisah.",

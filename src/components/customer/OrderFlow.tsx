@@ -30,6 +30,7 @@ import type {
   StoreSettings,
 } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
+import { bundleMode, bundleModeSubtitle } from "@/lib/bundle-mode";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/components/customer/CartProvider";
 import { useToast } from "@/components/ui/Toast";
@@ -830,7 +831,7 @@ export function OrderFlow({
 
   function validatePayment(): boolean {
     if (!draft.paymentMethod) {
-      toast.warning(t.order.payment.title);
+      toast.warning(t.order.payment.subtitle);
       return false;
     }
     if (draft.deliveryMethod === "delivery" && draft.address.trim().length < 5) {
@@ -975,7 +976,10 @@ export function OrderFlow({
         const key = error.message as keyof typeof t.errors;
         const message =
           t.errors[key as keyof typeof t.errors] ?? t.errors.generic;
-        toast.error(message, error.message);
+        // Jangan tampilkan `error.message` apa adanya sebagai subtitle —
+        // itu kode internal ("no_active_batch", "batch_closed", ...) yang
+        // tidak bermakna bagi pembeli. `message` sudah cukup sopan.
+        toast.error(message);
         return;
       }
 
@@ -1982,7 +1986,11 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                             </span>
                           </div>
                           <p className="mt-1 text-[11px] text-cocoa-500">
-                            {t.menu.bundleIncludes.replace("{n}", String(bg.bundle.required_qty))}
+                            {bundleModeSubtitle(
+                              bundleMode(bg.bundle),
+                              bg.bundle.required_qty,
+                              t as unknown as { menu: Record<string, string> },
+                            )}
                           </p>
                         </li>
                       );

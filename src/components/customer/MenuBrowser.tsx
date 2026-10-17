@@ -13,6 +13,7 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import type { Bundle, Category } from "@/lib/types";
+import { bundleMode, bundleModeEditHint, bundleModeSubtitle } from "@/lib/bundle-mode";
 import { useI18n } from "@/lib/i18n";
 import { FlavorCard } from "./FlavorCard";
 import { PriceTag } from "./PriceTag";
@@ -455,13 +456,20 @@ export function OrderMenuBrowser({
                           />
                         </div>
                         <p className="mt-2 text-[12px] font-bold text-matcha-700">
-                          {t.menu.bundleIncludes.replace("{n}", String(b.required_qty))}
+                          {bundleModeSubtitle(
+                            bundleMode(b),
+                            b.required_qty,
+                            t as unknown as { menu: Record<string, string> },
+                          )}
                         </p>
                         {/* Petunjuk bahwa kartu ini masih bisa ditekan
                             meski sudah di keranjang. */}
                         {sudah ? (
                           <p className="mt-1.5 text-[11px] font-bold text-cocoa-400">
-                            {t.menu.bundleEditHint}
+                            {bundleModeEditHint(
+                              bundleMode(b),
+                              t as unknown as { menu: Record<string, string> },
+                            )}
                           </p>
                         ) : null}
                       </div>

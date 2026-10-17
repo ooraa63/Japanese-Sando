@@ -2434,3 +2434,138 @@ belum digulir. Verifikasi harus dilakukan dalam keadaan tergulir, dan `.shots/`
 screenshot penuh tidak cukup: yang perlu dilihat adalah perbandingan
 `getBoundingClientRect().top` kepala elemen terhadap
 `getBoundingClientRect().bottom` header.
+### #134 - Kartu paket punya tiga mode, teksnya HARUS ikut mode
+
+`bundles` punya tiga mode yang tidak bisa ditebak dari `required_qty`:
+
+| Mode | Deteksi | Pembeli |
+|---|---|---|
+| `choice` | `bundle_slots` terisi (`slots.length > 0`) | ambil 1 rasa dari tiap pilihan |
+| `fixed` | `is_fixed = true` | **tidak memilih apa-apa** |
+| `biasa` | sisanya | pilih sendiri `required_qty` rasa |
+
+Selama ini kartu paket di `MenuBrowser.tsx` dan `OrderFlow.tsx` menulis
+`t.menu.bundleIncludes` ("Pilih {n} rasa untuk paket ini") untuk ketiga mode.
+Untuk mode `fixed` itu menipu -- pembeli dikira memilih padahal isinya sudah
+ditentukan penjual. Aturan: **semua teks mode paket lewat `src/lib/bundle-mode.ts`**
+(`bundleMode`, `bundleModeSubtitle`, `bundleModeEditHint`). Kalau nanti menambah
+mode keempat, tambahkan di sana, jangan langsung `t.menu.*` di komponen.
+
+BUG SERUPA: `t.menu.bundlePickFlavors` = "Pilih {n} rasa untuk paket {name}"
+dipakai dengan `.replace("{name}", "")`, hasilnya "Pilih 2 rasa untuk paket "
+-- kata menggantung. Kalau memang tidak ada nama yang mau disisipkan, pakai
+`bundleIncludes`.
+
+### #135 - `admin_update_order_status` mengizinkan status MUNDUR
+
+Mengecek `admin_update_order_status` 17-10-2026: dari status `rejected` admin
+BISA pindah ke `accepted` (dan seterusnya). Tidak ada error
+`status_unchanged` kalau statusnya sama persis -- itu yang muncul.
+
+Konsekuensi untuk skrip uji: jangan pernah mengambil pesanan berstatus
+`rejected`/`cancelled` sebagai target, kalau tidak skrip akan menghidupkan
+kembali pesanan yang sengaja ditolak. `scripts/uji-alur-admin.mjs` karena itu
+hanya memilih pesanan uji berstatus `pending`/`accepted`/`ready`/`delivered`.
+
+### #136 - Skrip uji butuh server yang benar-benar hidup, dan port bisa diganti
+
+`scripts/test-pages.mjs` (dan skrip lain yang memanggil `fetch`) hardcode
+`http://localhost:3000`. Kalau server produksi lokal jalan di port lain,
+setel `APP_URL`:
+
+    $env:APP_URL="http://localhost:3100"; node scripts/test-pages.mjs
+
+`uji-alur-admin.mjs` juga pakai `APP_URL` untuk cek HTML dashboard.
+
+### #137 - Ekspektasi tes bisa BASI setelah Steven mengubah halaman
+
+Tidak semua "GAGAL" di `test-pages.mjs` berarti regresi. 17-10-2026 enam
+kegagalan ternyata semuanya ekspektasi lama:
+
+- `/faq`, `/syarat-ketentuan`, `/jam-buka`, `/contact` sudah dipindah ke
+  `/profile-menu/*` dan rute lamanya **tetap ada sebagai 307 redirect**.
+- `/order` tanpa `sessionStorage` selalu di **langkah 1** ("Kapan mau
+  ambil?"), bukan "Siapa yang memesan?".
+- `/admin/po/{id}` tidak lagi punya label "Tanggal pengambilan" (Steven
+  memperkecil baris atasnya 14-10-2026).
+
+Sebelum "memperbaiki" kode karena tes gagal, cek dulu apakah yang berubah
+halaman atau memang regresi.
+
+### #138 - `current_date` SALAH di sini: session DB itu UTC, toko WIB
+
+Supabaseivosion `TimeZone` = **UTC**. Toko di Bandung (WIB, UTC+7). `current_date`
+ikut zona waktu SESSION, jadi antara pukul 00.00 dan 07.00 WIB nilainya masih
+tanggal KEMARIN.
+
+Untuk jendela batch PO itu berarti: tanggal ambil yang sudah lewat masih bisa
+dipilih, batch yang mestinya tertutup masih menerima pesanan, dan batch baru
+terbuka 7 jam telat. Angka "pesanan hari ini" di dashboard ikut bergeser.
+
+**Migration-61 (17-10-2026)** sudah menambah `public.po_today()` =
+`(current_timestamp at time zone 'Asia/Jakarta')::date` dan mengganti
+pemakaiannya. Kalau menambah fungsi yang butuh "hari ini", pakai
+`public.po_today()` — JANGAN `current_date`.
+
+Dua jebakan yang sudah pernah hampir merusak data:
+
+- **Jangan ubah `po_batches.open_at` / `close_at`.** Keduanya bertipe `date`
+  dan nilainya sudah dibaca Steven sebagai tanggal kalender WIB. Mengubahnya
+  jadi `timestamptz` membuat batas batch bergeser 7 jam ke belakang.
+- **`admin_dashboard_stats` membandingkan `created_at` (timestamptz).**
+  `created_at::date` ikut zona session, jadi kalau hanya mengganti
+  `current_date` membuat sisi kiri UTC dan sisi kanan WIB. `created_at` juga
+  harus dikonversi. Ada DUA pola yang hampir terlewat: `date_trunc('month',
+  created_at)` dan `date_trunc('month', o.created_at)` di sub-query.
+
+Cek cepat:
+
+    node scripts/cek-pakai-current-date.mjs   # fungsi live yang masih pakai current_date
+    node scripts/verifikasi-zone-waktu.mjs    # bukti po_today() benar
+
+### #139 - Tulis migration SQL dari definisi LIVE, jangan ketik ulang
+
+Menyalin fungsi dari file `.sql` lama itu rapuh: file itu bisa sudah tidak
+sama dengan yang benar-benar ada di database. `pg_get_functiondef()` memberi
+definisi persis seperti yang tersimpan.
+
+Generator: `scripts/gen-migration-61.mjs` (lihat polanya di sana).
+
+Dua jebakan waktu pakai `pg_get_functiondef()`:
+
+1. **Definisinya TIDAK diakhiri titik koma.** Kalau tidak ditambah manual,
+   statement berikutnya menempel ke `$function$` dan PostgreSQL balas
+   `syntax error at or near "CREATE"`.
+2. **Bisa mengembalikan `\r\n`** dari body yang tersimpan, walau file
+   migration lain pakai LF. Ratakan sebelum ditulis.
+
+Terapkan dalam **satu transaksi** (`begin` / `commit`) supaya kalau satu
+definisi gagal, tidak ada fungsi yang sudah terganti sebagian.
+
+### #140 - Kolom `date` dari driver pg = jebakan zona waktu lokal
+
+Driver `pg` mengubah kolom `date` jadi objek `Date` di zona waktu lokal Node
+(bukan zona database). Kalau nilai itu dikirim balik lewat JSON, hasilnya
+string ISO ber-`Z` dan **tanggalnya bergeser sehari**.
+
+Gejalanya unik: `create_order` menolak dengan `batch_pickup_mismatch`
+padahal tanggal yang dikirim sudah benar di layar.
+
+**Cara aman:** ambil sebagai TEKS di SQL — `select pickup_date::text` —
+lalu pakai apa adanya. Jangan andalkan `new Date(...)`, dan jangan
+`getTimezoneOffset()`-kan manual (itu rapuh kalau zona waktu mesin berubah).
+
+Kasus ini sudah menimpa `uji-alur-po.mjs` dua kali sebelum diselesaikan.
+
+### #141 - `admin_update_order_status` mengizinkan status MUNDUR
+
+Dari `rejected`/`cancelled`, admin BISA pindah ke `accepted` (dan seterusnya).
+Tidak ada error. Status yang SAMA persis ditolak dengan `status_unchanged`.
+
+Dua konsekuensi:
+
+- **Skrip uji jangan pernah mengambil pesanan berstatus `rejected` sebagai
+  target** — skrip akan menghidupkan kembali pesanan yang sengaja ditolak.
+  (Sudah terjadi sekali di `uji-alur-admin.mjs`.)
+- Pengaman stok ada: kolom `stock_restored` memastikan stok hanya dikembalikan
+  SATU kali, jadi menolak berulang kali tidak mengembalikan stok ganda.

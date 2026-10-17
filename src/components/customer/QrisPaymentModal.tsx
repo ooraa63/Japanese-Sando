@@ -202,9 +202,7 @@ export function QrisPaymentModal({ payload, open, onClose }: QrisPaymentModalPro
         ) : error ? (
           <div className="flex flex-col items-center gap-3 py-6">
             <AlertCircle className="size-10 text-berry-500" />
-            <p className="text-sm font-semibold text-berry-600">
-              {qd.failed}: {error}
-            </p>
+            <p className="text-sm font-semibold text-berry-600">{qd.failed}</p>
             <button type="button" onClick={refresh} className="btn-primary mt-2">
               <RefreshCcw className="size-4" />
               {qd.refresh}

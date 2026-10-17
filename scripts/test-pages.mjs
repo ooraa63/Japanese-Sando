@@ -141,7 +141,6 @@ await openPage("/admin/po", { mustContain: ["Batch PO"] });
         "Pelanggan",
         "Mutasi",
         "Stok & Bundle",
-        "Tanggal pengambilan",
       ],
     });
     // Semua tab harus benar-benar menampilkan sesuatu untuk batch ini, bukan
@@ -228,31 +227,43 @@ await openPage("/", { mustContain: ["Rumakomugi", "Pesan Sekarang"] });
     check("  hati di kartu Favorite bisa diklik", /aria-pressed/i.test(isi));
   }
 }
-await openPage("/order", { mustContain: ["Pre-order", "Siapa yang memesan"] });
+// /order dibuka dari server tanpa sessionStorage, jadi yang tampil selalu
+// LANGKAH 1 — "Kapan mau ambil?" (pilih tanggal, migration-49). Baris
+// "Siapa yang memesan?" cuma muncul setelah langkah 1 selesai di browser.
+await openPage("/order", { mustContain: ["Kapan mau ambil?"] });
 await openPage("/track", { mustContain: ["Cek Status Pesanan"] });
-// Halaman FAQ (item 5, 12-10-2026) + halaman riwayat lokal (item 3).
+// Item 5 (12-10-2026): isi FAQ, jam buka, S&K, dan kontak sekarang punya
+// halaman sendiri di /profile-menu/*. Rute lama (/faq, /jam-buka,
+// /syarat-ketentuan, /contact) sengaja MASIH ADA tapi cuma 307-redirect ke
+// sana, jadi yang diperiksa di sini adalah tujuan barunya.
 // /faq harus menampilkan isi dari database: pertanyaan seed pertama.
-await openPage("/faq", {
+await openPage("/profile-menu/faq", {
   mustContain: ["FAQ", "Bagaimana cara memesan?"],
 });
-// Item 3 Steven (13-10-2026): bar "Jam Buka" dan "Syarat & Ketentuan" di
-// sheet Profil sebelumnya tidak punya halaman — hanya popup, dan popup
-// Ketentuan cuma satu kalimat. Keduanya sekarang punya halaman.
 // /syarat-ketentuan harus menampilkan isi dari tabel `terms_sections`, bukan
 // teks yang ditulis di kode.
-await openPage("/syarat-ketentuan", {
+await openPage("/profile-menu/syarat-ketentuan", {
   mustContain: ["Syarat & Ketentuan", "Pemesanan", "Pembayaran", "Pembatalan"],
 });
 // /jam-buka membaca `store_settings.hours_*`. Kolomnya masih kosong di
 // database, jadi yang wajib ada adalah judul + empty state, bukan isi karangan.
-await openPage("/jam-buka", {
+await openPage("/profile-menu/jam-buka", {
   mustContain: ["Jam Buka", "belum diisi"],
 });
 await openPage("/riwayat", { mustContain: ["Riwayat Pesanan"] });
-// /contact juga memuat FAQ yang sama (sumbernya satu tabel).
-await openPage("/contact", {
+// Halaman kontak juga memuat FAQ yang sama (sumbernya satu tabel).
+await openPage("/profile-menu/contact", {
   mustContain: ["Hubungi", "Bagaimana cara memesan?"],
 });
+// Rute lama harus tetap mengalihkan, bukan jadi halaman kosong/404.
+for (const lama of ["faq", "syarat-ketentuan", "jam-buka", "contact"]) {
+  const r = await fetch(`${APP}/${lama}`, { redirect: "manual" });
+  check(
+    `/${lama} lama -> 307 ke /profile-menu/${lama}`,
+    r.status === 307 && (r.headers.get("location") ?? "") === `/profile-menu/${lama}`,
+    `status=${r.status} loc=${r.headers.get("location")}`,
+  );
+}
 
 console.log("\n=== 5. Admin tidak bisa melihat halaman pengaturan tanpa login ===");
 const anon = await fetch(`${APP}/admin/settings`, { redirect: "manual" });

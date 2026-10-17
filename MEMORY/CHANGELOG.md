@@ -4,6 +4,216 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-17 (siang) — Empat keputusan Steven diterapkan ke produksi
+
+Lanjutan entry 17-10-2026 pagi. Steven menjawab empat pertanyaan; semua
+sudah diterapkan dan diverifikasi.
+
+| Keputusan | Yang dilakukan |
+|---|---|
+| Pembayaran | **Dibiarkan** — Steven atur sendiri lewat `/admin/settings`. Tidak saya sentuh. |
+| Teks data | Dua salah ketik **diperbaiki**, alamat **dibiarkan** untuk keputusan Steven. |
+| Zona waktu | **Diperbaiki** ke `Asia/Jakarta` lewat `migration-61`. |
+| Pesanan uji | **Dibatalkan** (`rejected`), tidak dihapus. |
+
+### 1. Migration-61: jendela batch PO ikut WIB
+
+**Masalah.** Session database di zona waktu UTC, toko di Bandung (WIB).
+Halaman jendela batch memakai `current_date`, yang ikut zona waktu session.
+Antara pukul 00.00 dan 07.00 WIB website masih menganggap hari belum berganti:
+tanggal ambil yang sudah lewat masih bisa dipilih, batch yang mestinya
+tertutup masih menerima pesanan, dan batch baru terbuka 7 jam telat.
+
+**Perbaikan.** Fungsi baru `public.po_today()` =
+`(current_timestamp at time zone 'Asia/Jakarta')::date`. Enam fungsi live
+dipakai ulang: `public_po_pickup_dates`, `public_po_batch_for_date`,
+`create_order`, `admin_list_po_batches`, `admin_list_po_batch_detail`,
+`admin_dashboard_stats`.
+
+`po_batches.open_at` / `close_at` **sengaja tidak diubah** — keduanya
+bertipe `date` dan nilainya sudah dibaca Steven sebagai tanggal kalender WIB.
+Mengonversinya ke jam akan membuat batas batch bergeser 7 jam ke belakang.
+Hanya sisi perbandingan yang ikut WIB.
+
+**`admin_dashboard_stats` punya jebakan sendiri.** Di situ `current_date`
+dibandingkan dengan `created_at` (`timestamptz`). `created_at::date` ikut
+zona waktu session, jadi kalau hanya `current_date` yang diganti ke WIB,
+angka "pesanan hari ini" jadi tidak sinkron — sisi kiri UTC, sisi kanan WIB.
+`created_at` juga dikonversi ke WIB lebih dulu. Ada DUA pola yang hampir
+terlewat: `date_trunc('month', created_at)` **dan** `date_trunc('month',
+o.created_at)` di sub-query.
+
+**Cara menulis migration ini.** `scripts/gen-migration-61.mjs` mengambil
+definisi **live** dari `pg_get_functiondef()`, mengganti `current_date`, lalu
+menulis `supabase/migration-61.sql`. Jadi tidak ada fungsi yang diketik ulang
+secara manual, dan kalau Steven mengubah fungsi lewat dashboard, generator
+ikut mengikuti. Pengejasan: `pg_get_functiondef()` TIDAK mengakhiri definisi
+dengan titik koma — tanpa itu, statement berikutnya menempel ke `$function$`
+dan hasilnya `syntax error at or near "CREATE"`.
+
+### 2. Dua salah ketik di data produksi
+
+| Tabel | Kolom | Sebelum | Sesudah |
+|---|---|---|---|
+| `bundles` (id 70) | `name_id`, `name_en` | `Sando COmbo 2` | `Sando Combo 2` |
+| `delivery_zones` (2 baris pickup) | `note_id` | `... jam Operational.` | `... jam operasional.` |
+
+Tulisan `"Ambil pada jam operasional. Silakan cek konfirmasi pesanan."` sudah
+diverifikasi tampil di langkah 4 `/order`.
+
+### 3. Pesanan uji dibatalkan, stok balik penuh
+
+Semua pesanan uji (`TEST STEVEN%`) dibatalkan lewat `admin_update_order_status`,
+**tidak dihapus** supaya jejaknya kelihatan di `/admin/orders`. Stok batch 22
+kembali ke **100** (semula 97 saat pembatalan pertama).
+
+Pengaman yang menyelamatkan: `admin_update_order_status` punya kolom
+`stock_restored`, jadi stok **tidak pernah** dikembalikan dua kali walau
+pesanan ditolak berulang kali. Dan status yang sama ditolak dengan
+`status_unchanged` — bukan diam-diam berhasil).
+
+**Catatan jujur soal status mundur.** `admin_update_order_status` mengizinkan
+status MUNDUR: dari `rejected` admin bisa pindah ke `accepted`. Itu membuat
+uji alur bisa "menghidupkan" pesanan yang sengaja ditolak — sempat terjadi
+ketika skrip uji mengambil pesanan berstatus `rejected` sebagai target. Skrip
+sekarang melewati status itu.
+
+### 4. Alat baru
+
+| Skrip | Guna |
+|---|---|
+| `scripts/uji-alur-po.mjs` | Alur pembeli end-to-end lewat anon key |
+| `scripts/uji-alur-admin.mjs` | Alur penjual lewat akun admin yang sudah ada |
+| `scripts/batalkan-pesanan.mjs` | Batalkan pesanan uji (`<KODE>` atau `--semua`) tanpa menghapus |
+| `scripts/gen-migration-61.mjs` | Generator migration dari definisi fungsi live |
+| `scripts/verifikasi-zone-waktu.mjs` | Bukti `po_today()` benar-benar WIB |
+| `scripts/cek-pakai-current-date.mjs` | Daftar fungsi live yang masih pakai `current_date` |
+| `scripts/cek-sql-current-date.mjs` | Guard: tidak ada `current_date` telanjang di file SQL |
+| `scripts/normalize-eol.mjs` | Ratakan CRLF/LF campur |
+
+### Verifikasi
+
+- `npx tsc --noEmit` — 0 error
+- `npx eslint src --max-warnings=0` — 0 error/warning
+- `node scripts/uji-alur-po.mjs` — **10 OK / 0 GAGAL**
+- `node scripts/uji-alur-admin.mjs` — **18 OK / 0 GAGAL**
+- `node scripts/test-pages.mjs` — **45 OK / 0 GAGAL**
+- `node scripts/verifikasi-zone-waktu.mjs` — `po_today()` = tanggal WIB,
+  `current_date` = tanggal UTC, keduanya benar; batas buka/tutup benar;
+  **tidak ada** fungsi atau view yang masih pakai `current_date`
+- `node scripts/cek-sql-current-date.mjs` — 0 `current_date` telanjang
+- Browser (build produksi, `next start -p 3100`): `/order` langkah 1 → 4,
+  console 0 error, catatan toko tampil "jam operasional", deskripsi QRIS
+  yang tadinya kosong kini "Bayar sekali untuk semua e-wallet dan m-banking"
+
+### Yang masih menunggu Steven
+
+1. **`bank_accounts` masih `[]` dan `qris_enabled` masih `false`** — sampai
+   itu diisi, **tidak ada pembeli yang bisa menyelesaikan pesanan**. Pesan
+   yang tampil sudah sopan: "Metode pembayaran belum diatur oleh penjual."
+2. **`store_settings.address` masih Batam** sementara koordinat zona antar
+   menunjuk Bandung.
+3. **Batch 22 masih menerima tanggal ambil 16-10** padahal hari ini 17-10.
+   Steven yang harus putuskan: batch perlu diperpanjang atau dibuat baru.
+
+---
+
+## 2026-10-17 — Audit alur pembeli + penjual dan perbaikan bahasa
+
+Permintaan Steven: cek seluruh alur supaya tidak ada yang error, jalankan
+alur nyata sebagai pembeli DAN penjual, lalu periksa semua bahasa yang dilihat
+pembeli. Tidak ada fitur baru — ini perbaikan + bukti alur.
+
+### Cara menguji: dua skrip baru, benar-benar end-to-end
+
+Belum ada cara otomatis menjalankan sisi pembeli DAN sisi penjual. Dua skrip
+ini menutupnya:
+
+- **`scripts/uji-alur-po.mjs`** (baru) — sisi **pembeli**. Pakai
+  `NEXT_PUBLIC_PUBLISHABLE_KEY` persis seperti website, jadi yang diuji benar
+  jalur produksi (RLS + validasi `create_order`). Cek: pesanan dibuat, stok
+  turun sesuai isi, pesanan muncul di tabel `orders`, `public_invoice`
+  bisa dibaca tanpa login, dan dua kasus penolakan (zona ngawur, slot paket
+  kurang).
+- **`scripts/uji-alur-admin.mjs`** (baru) — sisi **penjual**. Login pakai
+  `ADMIN_EMAIL`/`ADMIN_PASSWORD` yang sudah ada di `.env.local` (**tidak**
+  membuat akun baru, tidak menebak password). Cek `is_admin()`, pesanan uji
+  muncul di `admin_list_orders`, pencarian nomor jalan, transisi status
+  `pending → accepted → ready → delivered`, **stok kembali +1 saat pesanan
+  ditolak**, dan anon ditolak `admin_*`.
+
+Dua skrip bikin pesanan sungguhan di produksi. Semua dinamai `TEST STEVEN - Uji
+Alur` supaya gampang dicari dan dihapus dari `/admin/orders`.
+
+### Bug yang ditemukan lewat alur nyata
+
+| # | Temuan | Sumber | Perbaikan |
+|---|---|---|---|
+| 1 | Kartu paket terkunci (combo) menulis "Pilih 2 rasa untuk paket ini" padahal pembeli tidak memilih apa-apa | `MenuBrowser.tsx:457`, `OrderFlow.tsx:1985` | teks per mode lewat `bundleModeSubtitle()` |
+| 2 | Kartu paket terkunci juga bilang "Ketuk untuk ubah rasa" | `MenuBrowser.tsx:464` | `bundleModeEditHint()` → "Ketuk untuk lihat isi paket" |
+| 3 | Popup paket biasa menampilkan "Pilih 2 rasa untuk paket " (kata menggantung) | `OrderBundleModal.tsx:408` | ganti `.replace("{name}", "")` dengan `bundleIncludes` |
+| 4 | Kode error internal bocor ke layar QRIS (`midtrans_charge_failed`, `unknown`) | `QrisPaymentModal.tsx:206` | `{qd.failed}: {error}` → `{qd.failed}` |
+| 5 | Kode error bocor jadi subtitle toast ("no_active_batch", "batch_closed") | `OrderFlow.tsx:978` | `toast.error(message, error.message)` → `toast.error(message)` |
+| 6 | Jumlahkan step pembayaran dipakai sebagai pesan error ("Bagaimana cara membayarnya?") | `OrderFlow.tsx:833` | pakai `t.order.payment.subtitle` |
+
+`src/lib/bundle-mode.ts` (baru) jadi satu-satunya tempat yang tahu mode paket:
+`choice` (ada `bundle_slots`) → `fixed` (`is_fixed`) → `biasa`. Tiga mode ini
+selalu punya kalimat berbeda untuk pembeli.
+
+### Perbaikan bahasa (pembeli)
+
+- `likesCount: "disuka"` → `"disukai"`; `liked: "Disuka"` → `"Disukai"`.
+- `bundleChoiceTitle: "Pilih {n} dari paket ini"` → `"Pilih {n} rasa dari paket ini"`.
+- `qrisPay.expired`: "Coba refresh" → "Coba muat ulang".
+- `qrisPay.refresh`: "Generate QR baru" → "Buat QR baru".
+- `qrisMidtransDesc` yang kosong → "Bayar sekali untuk semua e-wallet dan m-banking."
+- Sisi admin: `colInput: "Stock"` → `"Stok"`, `login.password: "Password"` → `"Kata sandi"`.
+- Semua ada pasangannya di `en.ts`.
+
+### `scripts/test-pages.mjs` — 6 kegagalan palsu dibetulkan
+
+Semua 6 "GAGAL" itu ekspektasi tes yang tertinggal, bukan regresi:
+
+- `/faq`, `/syarat-ketentuan`, `/jam-buka`, `/contact` sekarang **307-redirect**
+  ke `/profile-menu/*` (isi tabel, bukan kode). Tes diubah memeriksa tujuan
+  barunya **dan** memastikan rute lama tetap mengalihkan.
+- `/order` yang dibuka tanpa sessionStorage selalu tampil di **langkah 1**
+  ("Kapan mau ambil?"), bukan "Siapa yang memesan?".
+- `/admin/po/{id}` tidak lagi memuat label "Tanggal pengambilan" — Steven
+  memperkecil baris atasnya sendiri pada 14-10-2026; tanggalnya masih tampil,
+  cuma tanpa label.
+
+Hasil: **45 lulus / 0 gagal** (sebelumnya 35/6).
+
+### Verifikasi
+
+- `npx tsc --noEmit` — 0 error
+- `npx eslint src --max-warnings=0` — 0 error/warning
+- `npm run build` — sukses, 34 route
+- `node scripts/uji-alur-po.mjs` — 10 OK / 0 GAGAL
+- `node scripts/uji-alur-admin.mjs` — 15 OK / 0 GAGAL (idempoten, aman diulang)
+- `node scripts/test-pages.mjs` — 45 OK / 0 GAGAL
+- Browser (build produksi, `next start -p 3100`): langkah 1–4PO, popup paket
+  trio mode, keranjang, `/track`, dan pembeli melihat status setelah penjual
+  menolak pesanan ("Maaf, pesanan ini tidak bisa kami terima. Stok sudah
+  dikembalikan."). Console 0 error.
+
+### Temuan yang BELUM diperbaiki (menunggu keputusan Steven)
+
+1. **`store_settings.bank_accounts = []` dan `qris_enabled = false`.** Pembeli
+   mentok di langkah 4 dengan "Metode pembayaran belum diatur oleh penjual."
+   → saat ini tidak ada pembeli yang bisa menyelesaikan pesanan sama sekali.
+   Ini konfigurasi, bukan bug kode.
+2. **Typo di data produksi**: `Sando COmbo 2` (`bundles.name_id`/`name_en`) dan
+   "Ambil pada jam **Operational**" (`delivery_zones.note_id`, kata Inggris).
+3. **`store_settings.address` berisi Batam** sementara koordinat zona antar
+   (`-6.917`, `107.6`) dan dokumentasi menyebut Bandung.
+4. **DB `TimeZone = UTC`, toko WIB.** `current_date` dipakai untuk membuka/
+   menutup batch, jadi antara 00.00–07.00 WIB website masih menganggap hari
+   sebelumnya. Belum ada `Asia/Jakarta` di migration mana pun.
+
+---
+
 ## 2026-10-16 — Tujuh perbaikan dari screenshot Steven
 
 Steven mengirim enam screenshot (folder `D:\Gambar error`) untuk tujuh

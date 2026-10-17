@@ -228,6 +228,9 @@ export const en = {
     bundleSaveChange: "Save changes",
     bundleInCartChip: "In cart",
     bundleEditHint: "Tap to change flavors",
+    /** For locked packs (`is_fixed`): the seller already decided the
+     *  contents, so the buyer cannot change flavors. */
+    bundleFixedEditHint: "Tap to see what's inside",
   },
   howItWorks: {
     title: "How pre-ordering works",
