@@ -11,6 +11,7 @@ import {
   listPoBatchesAction,
 } from "@/app/admin/actions";
 import { AdminLauncher, type LauncherChip } from "@/components/admin/AdminLauncher";
+import { labelPerMenu } from "@/lib/admin-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -99,10 +100,10 @@ export default async function AdminHomePage() {
 
   // --- Chip 4: pembeli belum bisa bayar kalau tidak ada metode. ----------
   /**
-   * Ini bukan halesty: kalau tidak ada rekening DAN QRIS mati, pembeli
-   * tidak bisa menyelesaikan pesanan sama sekali — halaman checkout berhenti
-   * di "Metode pembayaran belum diatur oleh penjual". Sudah kejadian sekali
-   * pada 17-10-2026, jadi layak jadi chip.
+   * Bukan sekadar peringatan: kalau tidak ada rekening DAN QRIS mati, pembeli
+   * tidak bisa menyelesaikan pesanan sama sekali — halaman checkout berhenti di
+   * "Metode pembayaran belum diatur oleh penjual". Sudah kejadian sekali pada
+   * 17-10-2026, jadi layak jadi chip.
    */
   const adaRekening = (settingsRes.data?.bank_accounts ?? []).some((b) => b.number.trim());
   const qrisAktif = !!publicSettings?.qris_enabled;
@@ -128,6 +129,7 @@ export default async function AdminHomePage() {
       allOkText={L.chips.allOk}
       appLabels={dicts.admin.apps}
       sectionLabels={dicts.admin.sections}
+      itemLabels={labelPerMenu(dicts)}
     />
   );
 }

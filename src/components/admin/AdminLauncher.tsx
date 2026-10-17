@@ -49,6 +49,7 @@ export function AdminLauncher({
   allOkText,
   appLabels,
   sectionLabels,
+  itemLabels,
 }: {
   greeting: string;
   /** Tanggal hari ini versi WIB, sudah diformat di server. */
@@ -60,6 +61,8 @@ export function AdminLauncher({
   allOkText: string;
   appLabels: AppLabels;
   sectionLabels: SectionLabels;
+  /** Sama dengan peta label yang dipakai sidebar, supaya tidak berbeda. */
+  itemLabels: Record<string, string>;
 }) {
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -100,19 +103,18 @@ export function AdminLauncher({
 
       {/*
        * ---------- Lempeng aplikasi ----------
-       * Empat aplikasi, jadi di layar lebar cukup muat satu baris. Kalau
-       * jumlah aplikasinya nanti berubah, `lg:grid-cols-4` tetap aman — yang
-       * penting lempeng terakhir tidak menggantung sendirian di baris
-       * berikutnya.
+       * Tiga aplikasi (Operasional, Batch PO, Pengaturan) jadi satu baris penuh
+       * di layar lebar. Kalau jumlah aplikasinya nanti berubah, sesuaikan
+       * `lg:grid-cols-*` supaya lempeng terakhir tidak menggantung sendirian.
        */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {ADMIN_APPS.map((app) => (
           <AppTile
             key={app.id}
             href={app.href}
             label={appLabels[app.id]}
             /* Nama-nama bagiannya, supaya jelas isinya apa saja sebelum diklik. */
-            detail={ringkasanBagian(app, sectionLabels)}
+            detail={ringkasanIsi(app, sectionLabels, itemLabels)}
             tile={app.tile}
             icon={app.icon}
           />
@@ -122,18 +124,33 @@ export function AdminLauncher({
   );
 }
 
+/** Kunci label sidebar persis seperti yang dipakai `AdminShell`. */
+function labelKunci(item: { href: string; tab?: string }): string {
+  return item.tab ? `${item.href}?tab=${item.tab}` : item.href;
+}
+
 /**
  * Ringkasan isi aplikasi untuk ditulis di bawah judul lempeng.
  *
- * "Operasional" punya enam bagian (Ringkasan, Pesanan, Penjualan, Pelanggan,
- * Produk, Pengiriman). Semuanya disebut jadi satu baris yang panjang sekali
- * dan membuat lempeng terlihat seperti paragraf, jadi cukup tiga nama pertama
- * lalu sisanya ditulis "+N".
+ * Aplikasi yang menunya dikelompokkan (app Pengaturan) diringkas dari NAMA
+ * BAGIAN-nya. Aplikasi yang menunya datar tanpa judul (Operasional dan Batch PO)
+ * diringkas dari NAMA MENUNYA, karena tidak ada bagian yang bisa dipamerkan.
+ *
+ * Daftar dipotong jadi tiga nama pertama lalu sisanya "+N": menyebut semua
+ * tujuh menu Operasional dalam satu baris membuat lempengnya terlihat seperti
+ * paragraf, bukan label.
  */
-function ringkasanBagian(app: AdminApp, sectionLabels: SectionLabels): string {
-  const bagian = [...new Set(app.items.map((i) => sectionLabels[i.section]))];
-  const tampil = bagian.slice(0, 3).join(" · ");
-  return bagian.length > 3 ? `${tampil} · +${bagian.length - 3}` : tampil;
+function ringkasanIsi(
+  app: AdminApp,
+  sectionLabels: SectionLabels,
+  itemLabels: Record<string, string>
+): string {
+  const pakaiBagian = app.items.every((i) => i.section);
+  const daftar = pakaiBagian
+    ? [...new Set(app.items.map((i) => sectionLabels[i.section!]))]
+    : app.items.map((i) => itemLabels[labelKunci(i)] ?? i.href);
+  const tampil = daftar.slice(0, 3).join(" · ");
+  return daftar.length > 3 ? `${tampil} · +${daftar.length - 3}` : tampil;
 }
 
 function AppTile({

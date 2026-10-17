@@ -16,6 +16,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/components/ui/Toast";
 import type { PoBatch, PoCategoryLite } from "@/app/admin/actions";
+import type { PoTab } from "@/lib/admin-nav";
 import {
   deletePoBatchAction,
   savePoBatchAction,
@@ -32,6 +33,11 @@ import {
  * Stok diisi PER JENIS MENU, sama seperti model stok lama yang per kategori.
  * Yang berubah adalah satu batch punya stoknya sendiri, jadi dua batch yang
  * tumpang tindih tidak berebut stok yang sama.
+ *
+ * Pemisahan dua menu (Steven 18-10-2026): sidebar app Batch PO punya "Sedang
+ * Berlangsung" dan "Sudah Berlalu". Keduanya halaman ini, dipisahkan `?tab=`
+ * supaya sidebar bisa menandai yang aktif. Batch berstatus `selesai` dianggap
+ * sudah berlalu; `buka`, `akan_dibuka`, dan `nonaktif` masih bisa dikelola.
  */
 type Draft = {
   id: number | null;
@@ -83,16 +89,19 @@ function formatTanggal(iso: string, lang: string) {
 export function PoBatchesClient({
   initial,
   loadFailed = false,
+  tab,
 }: {
   initial: { batches: PoBatch[]; kategori: PoCategoryLite[] };
   loadFailed?: boolean;
+  /** Mode dari `?tab=` — "berlangsung" (bawaan) atau "selesai". */
+  tab: PoTab;
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const [batches, setBatches] = useState<PoBatch[]>(initial.batches);
+  const [terhapus, setTerhapus] = useState<number[]>([]);
   const [openId, setOpenId] = useState<number | "new" | null>(null);
   const [draft, setDraft] = useState<Draft>(KOSONG);
 
@@ -179,7 +188,7 @@ export function PoBatchesClient({
         return;
       }
       toast.success(t.admin.po.deleted);
-      setBatches((prev) => prev.filter((x) => x.id !== b.id));
+      setTerhapus((prev) => [...prev, b.id]);
       router.refresh();
     });
   }
@@ -193,24 +202,48 @@ export function PoBatchesClient({
           ? "bg-cocoa-100 text-cocoa-500"
           : "bg-berry-500/10 text-berry-600";
 
+  /*
+   * Batch berstatus "selesai" sudah lewat masanya, jadi dipindah ke menu kedua.
+   * Yang tersisa di "Sedang Berlangsung": yang mau dibuka, yang mau dibuka nanti,
+   * dan yang sengaja dinonaktifkan tapi masih bisa diaktifkan lagi.
+   */
+  const batches = useMemo(() => {
+    const semua = initial.batches.filter((b) => !terhapus.includes(b.id));
+    const tampilan = tab === "selesai"
+      ? semua.filter((b) => b.status === "selesai")
+      : semua.filter((b) => b.status !== "selesai");
+    // Daftar dari RPC urut dari yang terbaru; untuk batch yang sudah lewat
+    // kebalik supaya yang paling lama dulu — biar yang paling relevan (baru
+    // saja lewat) muncul paling atas.
+    return tab === "selesai" ? [...tampilan].reverse() : tampilan;
+  }, [initial.batches, tab, terhapus]);
+
   const bolehHapus = useMemo(
     () => batches.filter((b) => b.terjual === 0),
     [batches]
   );
+
+  const sedangBerlangsung = tab !== "selesai";
 
   return (
     <div className="space-y-5 pb-24">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-cocoa-900 sm:text-3xl">
-            {t.admin.po.title}
+            {sedangBerlangsung ? t.admin.po.ongoingTitle : t.admin.po.pastTitle}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-cocoa-500">{t.admin.po.subtitle}</p>
+          <p className="mt-1 max-w-2xl text-sm text-cocoa-500">
+            {sedangBerlangsung ? t.admin.po.ongoingSubtitle : t.admin.po.pastSubtitle}
+          </p>
         </div>
-        <button type="button" onClick={newBatch} className="btn-primary shrink-0">
-          <Plus className="size-4" />
-          {t.admin.po.addBatch}
-        </button>
+        {/* Batch yang sudah lewat tidak boleh ditambah pesanan baru, jadi tombol
+            tambah batch hanya ada di menu "Sedang Berlangsung". */}
+        {sedangBerlangsung ? (
+          <button type="button" onClick={newBatch} className="btn-primary shrink-0">
+            <Plus className="size-4" />
+            {t.admin.po.addBatch}
+          </button>
+        ) : null}
       </div>
 
       {loadFailed ? (
@@ -222,9 +255,11 @@ export function PoBatchesClient({
 
       {batches.length === 0 ? (
         <div className="card p-10 text-center">
-          <p className="text-cocoa-500">{t.admin.po.empty}</p>
+          <p className="text-cocoa-500">
+            {sedangBerlangsung ? t.admin.po.empty : t.admin.po.pastEmpty}
+          </p>
           <p className="mx-auto mt-2 max-w-md text-sm text-cocoa-400">
-            {t.admin.po.emptyHint}
+            {sedangBerlangsung ? t.admin.po.emptyHint : t.admin.po.pastEmptyHint}
           </p>
         </div>
       ) : (

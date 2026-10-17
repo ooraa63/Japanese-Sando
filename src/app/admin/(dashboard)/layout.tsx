@@ -5,56 +5,9 @@ import { getI18nDict } from "@/lib/i18n-server";
 import { getSettings } from "@/lib/data";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { DEFAULT_STORE_NAME } from "@/lib/brand";
-import { ADMIN_APPS } from "@/lib/admin-nav";
+import { labelPerMenu } from "@/lib/admin-labels";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Label tiap menu sidebar, diindeks dengan kunci yang sama seperti di
- * `ADMIN_APPS`: `href`, ditambah `?tab=` kalau menunya salah satu tab
- * `/admin/settings`.
- *
- * Dijumlahkan dari daftar aplikasi, bukan ditulis manual satu per satu, supaya
- * kalau satu menu baru ditambah di `admin-nav.ts` nav-nya ikut muncul —
- * tanpa risiko sidebar dan launcher tidak sinkron.
- */
-function labelPerMenu(dicts: Awaited<ReturnType<typeof getI18nDict>>) {
-  const n = dicts.admin.nav;
-  const perApp = {
-    operations: {
-      "/admin/dashboard": n.dashboard,
-      "/admin/orders": n.orders,
-      "/admin/sales": n.salesReport,
-      "/admin/customers": n.customers,
-      "/admin/reviews": n.reviews,
-      "/admin/menu": n.menuCatalog,
-      "/admin/pickup-delivery": n.pickupDelivery,
-    },
-    po: { "/admin/po": n.poBatch },
-    identity: {
-      "/admin/settings?tab=identity": n.identityTab,
-      "/admin/settings?tab=hours": n.hoursTab,
-      "/admin/profile-menu": n.profileMenu,
-      "/admin/announcements": n.announcements,
-    },
-    settings: {
-      "/admin/settings?tab=payment": n.paymentTab,
-      "/admin/settings?tab=availability": n.availabilityTab,
-      "/admin/settings?tab=home": n.homeTab,
-      "/admin/settings?tab=admin": n.adminAccountTab,
-    },
-  } as const;
-
-  const out: Record<string, string> = {};
-  for (const app of ADMIN_APPS) {
-    const peta = perApp[app.id as keyof typeof perApp] as Record<string, string>;
-    for (const item of app.items) {
-      const kunci = item.tab ? `${item.href}?tab=${item.tab}` : item.href;
-      out[kunci] = peta[kunci] ?? kunci;
-    }
-  }
-  return out;
-}
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const isAdmin = await getIsAdmin();

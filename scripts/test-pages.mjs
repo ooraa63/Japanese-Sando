@@ -109,13 +109,18 @@ const beranda = await openPage("/admin", {
   mustContain: ["Selamat", EMAIL],
 });
 if (beranda.status === 200) {
-  // Layar awal sekarang 4 lempeng (Steven 18-10-2026): Operasional, Batch PO,
-  // Identitas Toko, Pengaturan.
+  // Layar awal sekarang 3 lempeng (Steven 18-10-2026 malam): Operasional,
+  // Batch PO, Pengaturan. App "Identitas Toko" sudah tidak ada — seluruh isi
+  // Pengaturan jadi satu app.
   check(
-    "  layar awal punya 4 lempeng aplikasi",
-    ["Operasional", "Batch PO", "Identitas Toko", "Pengaturan"].every((t) =>
-      beranda.text.includes(t),
-    ),
+    "  layar awal punya 3 lempeng aplikasi",
+    ["Operasional", "Batch PO", "Pengaturan"].every((t) => beranda.text.includes(t)) &&
+      // Nama lempeng yang sudah dibubarkan tidak boleh muncul lagi. Catatan:
+      // kata "Identitas Toko" sendiri masih wajar muncul sebagai NAMA BAGIAN
+      // di dalam app Pengaturan, jadi yang dicari di sini adalah nama aplikasinya.
+      ["Pesanan &amp; Pre-order", "Pesanan & Pre-order", "Ringkasan Bisnis", "Produk &amp; Pengiriman", "Produk & Pengiriman"].every(
+        (t) => !beranda.text.includes(t),
+      ),
   );
   check("  layar awal punya tombol keluar", beranda.text.includes("Keluar"));
   check("  layar awal TIDAK menampilkan statistik dashboard", !beranda.text.includes("Pesanan terbaru"));
@@ -130,15 +135,24 @@ if (dash.status === 200) {
   check("  menu sidebar tampil",
     dash.text.includes("Menu &amp; Stok") || dash.text.includes("Menu & Stok") || dash.text.includes("Menu"));
   check("  tombol keluar tampil", dash.text.includes("Keluar"));
-  // Sidebar di dalam aplikasi menampilkan bagian per bagian (lihat
-  // `src/lib/admin-nav.ts`). Semua menu harian masuk satu app "Operasional".
-  check("  sidebar menampilkan judul aplikasi", dash.text.includes("Operasional"));
+  // Sidebar app Operasional sengaja FLAT: tanpa judul bagian (permintaan
+  // Steven 18-10-2026 "gak perlu ada judulnya kayak Summary Orders"). Jadi
+  // yang diperiksa: ketujuh menunya ada, dan TIDAK ada lagi judul "Ringkasan"
+  // yang sebelumnya dipakai sebagai bagian.
+  const menuOperasional = [
+    "Dashboard",
+    "Pesanan",
+    "Mutasi Penjualan",
+    "Pelanggan",
+    "Ulasan",
+    "Menu & Paket",
+    "Ambil & Kirim",
+  ];
   check(
-    "  sidebar menampilkan semua bagian Operasional",
-    ["Ringkasan", "Pesanan", "Penjualan", "Pelanggan", "Produk", "Pengiriman"].every((b) =>
-      dash.text.includes(b),
-    ),
+    "  sidebar Operasional memuat 7 menu",
+    menuOperasional.every((m) => dash.text.includes(m)),
   );
+  check("  sidebar Operasional tidak memakai judul bagian", !/RINGKASAN|LAPORAN/.test(dash.text));
 }
 
 /*
@@ -157,32 +171,37 @@ if (dash.status === 200) {
  * bagian yang benar, bukan cuma empat halaman yang kebetulan ikut dites.
  */
 const PETA_SIDEBAR = [
-  // Steven 18-10-2026: semua yang dipakai operasional jadi satu app, Pre-order
-  // dipisah jadi lempeng sendiri.
-  { url: "/admin/dashboard", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
-  { url: "/admin/orders", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
-  { url: "/admin/sales", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
-  { url: "/admin/customers", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
-  { url: "/admin/reviews", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
-  { url: "/admin/menu", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
-  { url: "/admin/pickup-delivery", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
-  // Pre-order berdiri sendiri, tidak boleh ikut app Operasional.
-  { url: "/admin/po", aplikasi: "Batch PO", bagian: ["Pre-order"] },
-  // Dua aplikasi berbeda hidup di halaman yang sama, dibedakan `?tab=`.
-  { url: "/admin/settings?tab=identity", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
-  { url: "/admin/settings?tab=hours", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Jam Buka & Aturan"] },
-  { url: "/admin/settings?tab=contact", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
-  { url: "/admin/settings?tab=shipping", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
-  { url: "/admin/settings?tab=payment", aplikasi: "Pengaturan", bagian: ["Pembayaran", "Tampilan", "Akun"] },
-  { url: "/admin/settings?tab=availability", aplikasi: "Pengaturan", bagian: ["Pembayaran", "Tampilan", "Akun"] },
-  { url: "/admin/settings?tab=home", aplikasi: "Pengaturan", bagian: ["Pembayaran", "Tampilan", "Akun"] },
-  { url: "/admin/settings?tab=admin", aplikasi: "Pengaturan", bagian: ["Pembayaran", "Akun"] },
-  // Tanpa `?tab=` harus jatuh ke tab default `identity`, bukan daftar aplikasi.
-  { url: "/admin/settings", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Identitas & Kontak"] },
-  { url: "/admin/profile-menu", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
-  { url: "/admin/announcements", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
-  { url: "/admin/faq", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
-  { url: "/admin/terms", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
+  /*
+   * Steven 18-10-2026 (malam): tiga aplikasi. Operasional dan Batch PO memakai
+   * sidebar DAFTAR FLAT tanpa judul bagian (permintaan "gak perlu ada judulnya
+   * kayak Summary Orders"), jadi `bagian` untuk keduanya sengaja kosong.
+   */
+  { url: "/admin/dashboard", aplikasi: "Operasional", bagian: [] },
+  { url: "/admin/orders", aplikasi: "Operasional", bagian: [] },
+  { url: "/admin/sales", aplikasi: "Operasional", bagian: [] },
+  { url: "/admin/customers", aplikasi: "Operasional", bagian: [] },
+  { url: "/admin/reviews", aplikasi: "Operasional", bagian: [] },
+  { url: "/admin/menu", aplikasi: "Operasional", bagian: [] },
+  { url: "/admin/pickup-delivery", aplikasi: "Operasional", bagian: [] },
+  // PO punya DUA menu; keduanya halaman yang sama, dipisahkan `?tab=`.
+  { url: "/admin/po", aplikasi: "Batch PO", bagian: [], aktif: "Sedang Berlangsung" },
+  { url: "/admin/po?tab=berlangsung", aplikasi: "Batch PO", bagian: [], aktif: "Sedang Berlangsung" },
+  { url: "/admin/po?tab=selesai", aplikasi: "Batch PO", bagian: [], aktif: "Sudah Berlalu" },
+  // Semua tab Pengaturan pindah ke sidebar; deretan tab di halaman dihapus.
+  { url: "/admin/settings?tab=identity", aplikasi: "Pengaturan", bagian: ["Identitas Toko", "Halaman Pembeli"], aktif: "Identitas toko" },
+  { url: "/admin/settings?tab=contact", aplikasi: "Pengaturan", bagian: ["Identitas Toko"], aktif: "Kontak & lokasi" },
+  { url: "/admin/settings?tab=hours", aplikasi: "Pengaturan", bagian: ["Identitas Toko"], aktif: "Aturan pesanan" },
+  { url: "/admin/settings?tab=shipping", aplikasi: "Pengaturan", bagian: ["Pengiriman"], aktif: "Catatan pengambilan & pengiriman" },
+  { url: "/admin/settings?tab=payment", aplikasi: "Pengaturan", bagian: ["Pembayaran"], aktif: "Pembayaran" },
+  { url: "/admin/settings?tab=availability", aplikasi: "Pengaturan", bagian: ["Ketersediaan"], aktif: "Status pre-order" },
+  { url: "/admin/settings?tab=home", aplikasi: "Pengaturan", bagian: ["Akun & Tampilan"], aktif: "Beranda" },
+  { url: "/admin/settings?tab=admin", aplikasi: "Pengaturan", bagian: ["Akun & Tampilan"], aktif: "Akun penjual" },
+  // Tanpa `?tab=` harus jatuh ke tab default `identity`.
+  { url: "/admin/settings", aplikasi: "Pengaturan", bagian: ["Identitas Toko"], aktif: "Identitas toko" },
+  { url: "/admin/profile-menu", aplikasi: "Pengaturan", bagian: ["Halaman Pembeli"], aktif: "Menu Profil" },
+  { url: "/admin/announcements", aplikasi: "Pengaturan", bagian: ["Halaman Pembeli"], aktif: "Pengumuman" },
+  { url: "/admin/faq", aplikasi: "Pengaturan", bagian: ["Halaman Pembeli"] },
+  { url: "/admin/terms", aplikasi: "Pengaturan", bagian: ["Halaman Pembeli"] },
 ];
 for (const peta of PETA_SIDEBAR) {
   const p = await openPage(peta.url);
@@ -190,10 +209,30 @@ for (const peta of PETA_SIDEBAR) {
   // Judul bagian dirender `uppercase` lewat CSS, jadi teks mentahnya di HTML
   // tetap camelCase dan itulah yang dibandingkan di sini.
   check(`  ${peta.url} sidebar = ${peta.aplikasi}`, p.text.includes(peta.aplikasi));
-  check(
-    `  ${peta.url} bagian = ${peta.bagian.join(" + ")}`,
-    peta.bagian.every((b) => p.text.includes(b)),
-  );
+  if (peta.bagian.length) {
+    check(
+      `  ${peta.url} bagian = ${peta.bagian.join(" + ")}`,
+      peta.bagian.every((b) => p.text.includes(b)),
+    );
+  }
+  // Menu yang harus ditandai aktif memakai `aria-current="page"`. Tanpa ini,
+  // `/admin/settings?tab=payment` bisa menampilkan sidebar "Pengaturan" yang
+  // benar tapi tidak menandai menu mana yang sedang dibuka.
+  if (peta.aktif) {
+    const aktif = /aria-current="page"[^>]*>([^<]{2,80})</g;
+    /*
+     * Label sidebar bisa terpotong oleh baris baru di dalam JSX (mis. "Catatan
+     * pengambilan &\npengiriman"), dan `decodeEntities` sudah mengubah
+     * `&amp;` jadi `&`. Spasi dituliskan dalam ekspektasi juga dinormalkan.
+     */
+    const rapikan = (s) => s.replace(/\s+/g, " ").trim();
+    const labelAktif = [...p.text.matchAll(aktif)].map((m) => rapikan(m[1]));
+    check(
+      `  ${peta.url} menu aktif = ${peta.aktif}`,
+      labelAktif.includes(rapikan(peta.aktif)),
+      `yang aktif: ${JSON.stringify(labelAktif.slice(0, 4))}`,
+    );
+  }
 }
 
 console.log("\n=== 3. Halaman lain di dashboard ===");
@@ -210,15 +249,26 @@ await openPage("/admin/menu", { mustContain: ["Menu", "jenis makanan"] });
     menu.text.includes("Stok per jenis") ? "masih ada blok stok" : "");
 }
 // Halaman Batch PO (baru, migration-49)
-await openPage("/admin/po", { mustContain: ["Batch PO"] });
+await openPage("/admin/po", { mustContain: ["Batch"] });
 // Detail batch (migration-51): kartu batch jadi tautan ke /admin/po/<id>, dan
 // di dalamnya ada sidebar Stok / Pesanan / Pelanggan / Mutasi.
+//
+// Batch sudah dipecah dua menu (Steven 18-10-2026): "Sedang Berlangsung" dan
+// "Sudah Berlalu". Sekarang seluruh batch di produksi sudah berstatus selesai,
+// jadi `/admin/po` (mode berlangsung) kosong — dan itu memang yang benar.
+// Karena itu kartu batch dicari di kedua mode, bukan cuma mode pertama.
 {
-  const poList = await openPage("/admin/po", { mustContain: ["Batch PO"] });
-  const m = poList.text.match(/href="\/admin\/po\/(\d+)"/);
-  check("  /admin/po punya tautan ke detail batch", Boolean(m), m ? `id=${m[1]}` : "tidak ada kartu batch");
+  const duaMode = [];
+  for (const mode of ["berlangsung", "selesai"]) {
+    const poList = await openPage(`/admin/po?tab=${mode}`);
+    if (poList.status !== 200) continue;
+    const ketemu = poList.text.match(/href="\/admin\/po\/(\d+)"/);
+    if (ketemu) duaMode.push(ketemu[1]);
+  }
+  const m = duaMode.length ? duaMode[0] : null;
+  check("  /admin/po punya tautan ke detail batch", Boolean(m), m ? `id=${m}` : "tidak ada kartu batch di kedua mode");
   if (m) {
-    await openPage(`/admin/po/${m[1]}`, {
+    await openPage(`/admin/po/${m}`, {
       mustContain: [
         "Semua batch",
         "Stok",
@@ -230,7 +280,7 @@ await openPage("/admin/po", { mustContain: ["Batch PO"] });
     });
     // Semua tab harus benar-benar menampilkan sesuatu untuk batch ini, bukan
     // cuma label sidebar-nya. Diverifikasi lewat isi JSON yang ikut terkirim.
-    const detail = await fetch(`${APP}/admin/po/${m[1]}`, {
+    const detail = await fetch(`${APP}/admin/po/${m}`, {
       headers: { cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") },
     });
     const detailText = decodeEntities(await detail.text());

@@ -1243,7 +1243,7 @@ Ganti dengan `useSyncExternalStore` + snapshot yang referensinya stabil
 ## 76 - Scanner karakter asing perlu dua lapis
 
 Non-Latin/mojibake saja tidak cukup. Bug penulisan yang paling sering muncul
-adalah DUA KATA TEMPEL ("yangdiedit", "fee yangdiedit", "memakաղai") karena
+adalah DUA KATA TEMPEL ("yangdiedit", "fee yangdiedit", "memakaitombol") karena
 spasi hilang - lolos dari scanner karakter asing dan baru kelihatan saat
 membaca SQL/komentarnya di database. Scanner `.tmp-scan2.mjs` menambahkan
 pola `<partikel Indonesia><huruf>` untuk menangkap ini.
@@ -2718,3 +2718,58 @@ Untuk menghitung langsung ke produksi, pakai `pg` + `DATABASE_URL` seperti
 
 Kalau memang butuh membaca baris sebagai pengguna yang sudah login, bikin
 session login dulu (Supabase client dengan access token admin) — bukan anon.
+
+### #152 - Pemeriksa karakter asing yang hanya CJK akan selalu leaking
+
+`scripts/cek-karakter-asing.mjs` sejak awal hanya mengecek blok CJK. Itu
+cukup untukymbahan yang berulang (kalimat Mandarin bocor ke paragraf
+Indonesia), tapi tidak untuk skrip aksara lain: satu kata **Cyrillic** lolos ke
+komentar `admin-nav.ts` dan tidak pernah ketahuan.
+
+Sekarang `JELEK_LAIN` juga menutup Cyrillic, Yunani, Arab, Ibrani, Armenia,
+Devanagari, Thai, Hiragana, dan Katakana. Semua tidak pernah muncul di teks
+Indonesia repo ini.
+
+Pelajaran: daftar blok "huruf asing" harus berisi **semua** skrip yang mungkin
+salah keyboard, bukan cuma yang kebetulan pernah bocor. Kalau tidak, ceknya
+hanya dramatiskan masalah yang sudah ganti jenis.
+
+### #153 - Label sidebar yang ditulis ulang terpisah dari label halaman akan melenceng
+
+Sidebar dulu punya key sendiri (`admin.nav.availabilityTab` = "Kategori &
+Ketersediaan") sementara teks tabnya ada di `admin.settings.availability` =
+"Status pre-order". Isi tab itu sebenarnya **hanya** satu sakelar buka/tutup
+pre-order — tidak ada apa pun soal kategori. Steven yang menemukan lewat kolom komentar "itu semua barnya dipindah ke side
+bar aja".
+
+Dua kali menulis label yang sama = dua sumber kebenaran, dan pasti berbeda
+di suatu titik.
+
+Sekarang `labelPerMenu()` (di `src/lib/admin-labels.ts`) untuk tab Pengaturan
+mengambil `admin.settings.*` — sumber yang sama dengan isi halaman — dan modul
+itu dipakai sidebar SEKALIGUS launcher, jadi tidak ada lagi salinan.
+
+### #154 - Item sidebar tanpa `?tab=` jangan dibandingkan dengan tab aktif
+
+`?tab=` dipakai sebagai pemisah menu di dua tempat: `/admin/settings` (delapan
+section) dan `/admin/po` (berlangsung / selesai). Penanda aktif tidak bisa
+sederhana `(item.tab ?? null) === tabAktif`, karena `tabAktif` untuk aplikasi
+bertab selalu terisi oleh `defaultTab` — bahkan di `/admin/profile-menu` yang
+sama sekali tidak punya `?tab=`.
+
+Akibatnya `Menu Profil` dan `Pengumuman` tidak pernah ditandai aktif, padahal
+halaman yang mereka tuju sedang terbuka.
+
+Aturannya: kalau path cocok, item bertab dibandingkan dengan tab aktif; item
+tanpa `tab` **langsung aktif**. Lihat `aktif()` di `AdminShell.tsx`.
+
+### #155 - Jangan oper nilai query ke helper yang mengharapkan query string
+
+`po/page.tsx` punya `tabDariSearch(search)` yang isinya
+`new URLSearchParams(search).get("tab")`. Dipanggil dengan `sp.tab` (`"selesai"`)
+bukan `searchParams.toString()` (`"tab=selesai"`), jadi hasilnya selalu `null`
+dan halaman diam-diam selalu menampilkan mode pertama.
+
+Halaman `/admin/po?tab=selesai` tetap menandai "Sudah Berlalu" aktif di sidebar
+— jadi kelihatannya benar, padahal isi halamannya salah. Sidebar dan isi
+halaman harus DIVERIFIKASI BERSAMA, bukan salah satu saja.

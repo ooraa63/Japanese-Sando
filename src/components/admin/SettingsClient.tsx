@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
@@ -133,30 +133,22 @@ export function SettingsClient({
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [form, setForm] = useState<Draft>(() => toDraft(initialSettings));
   const [saving, startSaving] = useTransition();
 
   /**
-   * Tab = isi `?tab=` di URL. Tidak ada state sendiri: begitu tab diubah,
-   * URL ikut berubah dan komponen ini membaca ulang dari situ. `router.replace`
-   * (bukan `push`) supaya tombol "kembali" di browser tidak harus ditekan
-   * delapan kali untuk keluar dari Pengaturan.
+   * Tab = isi `?tab=` di URL. Tidak ada state sendiri: section yang aktif
+   * ditentukan sidebar (Steven 18-10-2026: "itu semua barnya dipindah ke side
+   * bar aja"), jadi begitu sidebar mengubah URL, komponen ini membaca ulang dari
+   * situ. Deretan tab di dalam halaman sudah dihapus — tidak ada lagi yang
+   * memanggil `router.replace` dari sini.
    *
-   * Catatan: `form` sengaja TIDAK di-reset saat tab berganti — Steven mengisi
-   * nama toko di tab Identitas lalu menyeberang ke tab Pembayaran, isinya
-   * jangan hilang di tengah jalan. Yang di-reset hanya `saving`.
+   * Catatan: `form` sengaja TIDAK di-reset saat section berganti — Steven
+   * mengisi nama toko di Identitas lalu menyeberang ke Pembayaran, isinya jangan
+   * hilang di tengah jalan. Yang di-reset hanya `saving`.
    */
   const tab = tabDariSearch(searchParams.toString());
-  const setTab = useCallback(
-    (next: TabKey) => {
-      router.replace(next === "identity" ? "/admin/settings" : `/admin/settings?tab=${next}`, {
-        scroll: false,
-      });
-    },
-    [router]
-  );
 
   function patch(next: Partial<Draft>) {
     setForm((prev) => ({ ...prev, ...next }));
@@ -179,26 +171,42 @@ export function SettingsClient({
 
   const waDigits = form.whatsapp.replace(/\D/g, "");
 
-  const tabs: { key: TabKey; label: string; icon: typeof Store }[] = useMemo(
-    () => [
-      { key: "identity", label: t.admin.settings.identity, icon: Store },
-      { key: "contact", label: t.admin.settings.contact, icon: MessageCircle },
-      { key: "hours", label: t.admin.settings.orderRules, icon: Clock },
-      { key: "shipping", label: t.admin.settings.pickupDeliveryTitle, icon: Truck },
-      { key: "payment", label: t.admin.settings.payments, icon: CreditCard },
-      { key: "availability", label: t.admin.settings.availability, icon: Building2 },
-      { key: "home", label: t.admin.settings.homeTab, icon: Sparkles },
-      { key: "admin", label: t.admin.settings.accountTitle, icon: Users },
-    ],
-    [t]
-  );
+  /*
+   * Deretan tab di halaman ini DIHAPUS. Steven 18-10-2026: "yang setting yang
+   * identity, itu semua barnya dipindah ke side bar aja... semua di sidebar".
+   * Sidebar app Pengaturan (`src/lib/admin-nav.ts`) sekarang memuat kedelapan
+   * section itu, jadi bar di sini cuma dobel dan bikin halaman terasa dua kali.
+   *
+   * Supaya Steven tetap tahu sedang di section mana, judul section-nya yang
+   * dipakai sebagai judul halaman.
+   */
+  const judulSection = ((): string => {
+    switch (tab) {
+      case "identity":
+        return t.admin.settings.identity;
+      case "contact":
+        return t.admin.settings.contact;
+      case "hours":
+        return t.admin.settings.orderRules;
+      case "shipping":
+        return t.admin.settings.pickupDeliveryTitle;
+      case "payment":
+        return t.admin.settings.payments;
+      case "availability":
+        return t.admin.settings.availability;
+      case "home":
+        return t.admin.settings.homeTab;
+      case "admin":
+        return t.admin.settings.accountTitle;
+    }
+  })();
 
   return (
     <div className="space-y-5 pb-24">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-cocoa-900 sm:text-3xl">
-            {t.admin.settings.title}
+            {judulSection}
           </h1>
           <p className="mt-1 text-sm text-cocoa-500">{t.admin.settings.subtitle}</p>
         </div>
@@ -207,38 +215,6 @@ export function SettingsClient({
           {saving ? t.common.saving : t.common.save}
         </button>
       </div>
-
-      {/* Tab nav — sticky di HP biar gampang switch antar section. */}
-      <nav
-        aria-label="Settings sections"
-        className="sticky top-16 z-20 -mx-4 overflow-x-auto bg-cream-50/95 px-4 pb-2 pt-1 backdrop-blur sm:top-0 sm:mx-0 sm:px-0"
-      >
-        {/* Di layar sempit tetap digeser; di layar lebar membungkus supaya
-            semua tab kelihatan tanpa harus di-scroll. */}
-        <div className="flex gap-1 border-b border-cocoa-200 sm:gap-2 lg:flex-wrap">
-          {tabs.map((it) => {
-            const active = tab === it.key;
-            const Icon = it.icon;
-            return (
-              <button
-                key={it.key}
-                type="button"
-                onClick={() => setTab(it.key)}
-                aria-current={active ? "page" : undefined}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-t-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition sm:text-sm ${
-                  active
-                    ? "border-b-2 border-cocoa-900 bg-white text-cocoa-900"
-                    : "text-cocoa-500 hover:bg-cocoa-50 hover:text-cocoa-700"
-                }`}
-              >
-                <Icon className="size-3.5" />
-                <span className="hidden sm:inline">{it.label}</span>
-                <span className="sm:hidden">{it.label.split(" ")[0]}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
 
       {/* ============ Tab: Identitas ============ */}
       {tab === "identity" ? (

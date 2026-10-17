@@ -844,6 +844,18 @@ export const id: Dict = {
       empty: "Belum ada batch PO.",
       emptyHint:
         "Sampai ada batch yang dibuka, pembeli tidak bisa memesan. Stok tiap batch diatur di halaman detailnya.",
+      /* Sidebar app Batch PO punya dua menu; dua pasang teks di bawah mengikuti
+         menu itu. Tanpa pemisah ini, Steven harus scroll daftar batch yang
+         sudah lewat setiap kali mau menambah batch baru (18-10-2026). */
+      ongoingTitle: "Batch yang Sedang Berlangsung",
+      ongoingSubtitle:
+        "Batch yang masih bisa dipesan. Tambah batch baru di sini, dan ubah stoknya sebelum pembeli mengambil.",
+      pastTitle: "Batch yang Sudah Berlalu",
+      pastSubtitle:
+        "Batch yang sudah lewat tanggalnya. Disimpan untuk melihat riwayat penjualan, tidak bisa ditambah pesanan baru.",
+      pastEmpty: "Belum ada batch yang selesai.",
+      pastEmptyHint:
+        "Batch yang sudah lewat akan muncul di sini otomatis, jadi tidak perlu dipindah manual.",
       newBatch: "Batch baru",
       editBatch: "Ubah batch",
       label: "Nama batch",
@@ -964,17 +976,16 @@ export const id: Dict = {
       pickupDelivery: "Ambil & Kirim",
       // Steven 15-10-2026: halaman baru untuk mengelola ulasan pembeli.
       reviews: "Ulasan",
-      // Steven 17-10-2026: sidebar dipecah jadi 6 aplikasi. Label di bawah
-      // hanya dipakai di sidebar dalam aplikasi (lihat `src/lib/admin-nav.ts`).
-      poBatch: "Batch PO",
+      // Steven 18-10-2026 (malam): sidebar hanya punya tiga aplikasi, dan label
+      // di bawah dipakai PADA SIDEBAR saja (lihat `src/lib/admin-nav.ts`).
+      // Label tab Pengaturan SENGAJA tidak ada di sini: item sidebar memakai
+      // `admin.settings.*` yang sama persis dengan isi halamannya, supaya tidak
+      // bisa berbeda seperti yang pernah terjadi pada "Kategori & Ketersediaan"
+      // yang sebenarnya bernama "Status pre-order".
+      poOngoing: "Sedang Berlangsung",
+      poPast: "Sudah Berlalu",
       salesReport: "Mutasi Penjualan",
       menuCatalog: "Menu & Paket",
-      identityTab: "Identitas & Kontak",
-      hoursTab: "Jam Buka & Aturan",
-      paymentTab: "Metode Pembayaran",
-      availabilityTab: "Kategori & Ketersediaan",
-      homeTab: "Tampilan Beranda",
-      adminAccountTab: "Akun Admin",
       profileMenu: "Menu Profil",
       announcements: "Pengumuman",
     },
@@ -984,29 +995,31 @@ export const id: Dict = {
      * dsb kita pisahkan". Sebelas menu lama dikelompokkan jadi aplikasi-aplikasi
      * di `src/lib/admin-nav.ts`.
      *
-     * Revisi 18-10-2026: semua yang dipakai operasional harian dikumpulkan jadi
-     * satu aplikasi "Operasional", dan Pre-order dipisah jadi lempeng sendiri.
+     * Revisi 18-10-2026 sore: semua yang dipakai operasional harian
+     * dikumpulkan jadi satu aplikasi "Operasional", dan Pre-order dipisah jadi
+     * lempeng sendiri.
+     *
+     * Revisi 18-10-2026 malam: app "Identitas Toko" dihapus — seluruh isi
+     * Pengaturan jadi satu app, dan semua tabnya pindah ke sidebar.
      */
     apps: {
       operations: "Operasional",
       po: "Batch PO",
-      identity: "Identitas Toko",
       settings: "Pengaturan",
     },
-    /** Judul bagian di dalam sidebar sebuah aplikasi (gambar 2). */
+    /**
+     * Judul bagian di dalam sidebar app Pengaturan.
+     *
+     * App Operasional dan app Batch PO sengaja TIDAK memakai bagian: menunya
+     * dirender datar tanpa judul (permintaan Steven 18-10-2026).
+     */
     sections: {
-      ringkasan: "Ringkasan",
-      pesanan: "Pesanan",
-      penjualan: "Penjualan",
-      pelanggan: "Pelanggan",
-      produk: "Produk",
+      identitas: "Identitas Toko",
       pengiriman: "Pengiriman",
-      preorder: "Pre-order",
-      identitas: "Identitas & Jam",
       komunikasi: "Halaman Pembeli",
       pembayaran: "Pembayaran",
-      tampilan: "Tampilan",
-      akun: "Akun",
+      ketersediaan: "Ketersediaan",
+      akun: "Akun & Tampilan",
     },
     /**
      * Layar awal admin (gambar 1). Isinya HANYA peringatan yang perlu

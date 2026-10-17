@@ -4,6 +4,81 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-18 (malam) — Tiga app: Operasional, Batch PO, Pengaturan
+
+Steven mencoba hasil pemecahan sebelumnya, lalu meminta tiga perubahan
+sekaligus:
+
+1. "Yang Operation itu di sidebar jangan double, gak perlu ada judulnya kayak
+   Summary Orders, gak perlu langsung tab nya aja"
+2. "Di yang PO, buat jadi ada 2, 1 untuk berlangsung sama untuk menambahkan dan
+   satu lagi yang sudah berlalu"
+3. "Yang setting yang Identity, itu semua barnya dipindah ke side bar aja,
+   semua di sidebar"
+
+Untuk nomor 3 Steven memilih **satu app "Pengaturan" saja** — jadi app
+"Identitas Toko" yang dulu ada dihapus, seluruh isi Pengaturan jadi satu app, dan
+deretan tab di atas halaman `SettingsClient` **dihapus** karena isinya sudah ada
+di sidebar. App Pengaturan dikelompokkan jadi enam bagian; app Operasional dan
+app Batch PO sengaja **datar tanpa judul bagian**.
+
+Layar awal sekarang tiga lempeng:
+
+| Aplikasi | Sidebar-nya |
+|---|---|
+| Operasional | datar, 7 menu: Dashboard, Pesanan, Mutasi Penjualan, Pelanggan, Ulasan, Menu & Paket, Ambil & Kirim |
+| Batch PO | datar, 2 menu: Sedang Berlangsung (+ tombol tambah batch), Sudah Berlalu |
+| Pengaturan | 6 bagian, 10 menu: seluruh isi Pengaturan + Menu Profil + Pengumuman |
+
+App Batch PO memecah satu halaman jadi dua mode lewat `?tab=` — `berlangsung`
+dan `selesai`. Batch berstatus `selesai` otomatis pindah ke menu kedua, jadi
+Steven tidak perlu scroll melewati batch lama untuk menambah batch baru.
+
+### Dua bug yang ketahuan waktu verifikasi
+
+- **Item sidebar tanpa `?tab=` tidak pernah jadi aktif.** `aktif()` membandingkan
+  `(item.tab ?? null)` dengan tab aktif aplikasi; untuk `/admin/profile-menu` dan
+  `/admin/announcements` hasilnya `null !== "identity"`, jadi menunya tidak pernah
+  ditandai. Item tanpa `tab` sekarang aktif dari cocoknya path saja.
+- **`po/page.tsx` mengoper nilai, bukan query string.** `tabDariSearch()`
+  mengharapkan query string utuh (`tab=selesai`), tapi dipanggil dengan
+  `sp.tab` (`selesai`), jadi `URLSearchParams("selesai").get("tab")` selalu
+  `null` dan halaman selalu menampilkan mode "berlangsung". Helper-nya diubah
+  menerima nilainya langsung.
+
+### Melencengnya label "Kategori & Ketersediaan"
+
+Sidebar menulis "Kategori & Ketersediaan" untuk tab `availability`, padahal isi
+tab itu **hanya** sakelar "Status pre-order". Penyebabnya label sidebar ditulis
+ulang di `admin.nav.*`, terpisah dari teks halaman di `admin.settings.*`.
+Sekarang label sidebar untuk tab Pengaturan diambil dari `admin.settings.*` yang
+sama persis dengan isi halamannya — lihat gotcha #153.
+
+### Berkas
+
+| Berkas | Perubahan |
+|---|---|
+| `src/lib/admin-nav.ts` | 3 aplikasi; `section` jadi opsional (flat kalau kosong); field `tabs` + `defaultTab` menggantikan cabut-per-app; `PO_TABS` jadi sumber tunggal daftar mode PO; `activeTabFor()` baru |
+| `src/lib/admin-labels.ts` (baru) | `labelPerMenu()` pindah dari `layout.tsx` supaya sidebar dan launcher tidak bisa punya teks berbeda |
+| `src/components/admin/AdminShell.tsx` | `AppNav` bisa render daftar flat; `aktif()` diperbaiki |
+| `src/components/admin/SettingsClient.tsx` | deretan tab dihapus; judul halaman jadi nama section yang aktif |
+| `src/components/admin/PoBatchesClient.tsx` | saring batch per mode, judul + tombol tambah menyesuaikan mode, `terhapus` menggantikan state daftar |
+| `src/app/admin/(dashboard)/po/page.tsx` | baca `searchParams`, kirim `tab` ke klien |
+| `src/lib/i18n/id.ts`, `en.ts` | 3 aplikasi, 6 bagian, `poOngoing`/`poPast`, 4 pasang teks untuk mode PO; 6 kunci label tab yang tumpang tindih dihapus |
+| `src/components/admin/AdminLauncher.tsx` | ringkasan lempeng pakai nama bagian untuk app berkelompok, nama menu untuk app flat; grid `lg:grid-cols-3` |
+| `scripts/cek-karakter-asing.mjs` | sekarang ikut menangkap Cyrillic, Arab, Hiragana, Ibrani, dst (gotcha #152) |
+| `scripts/test-pages.mjs` | `PETA_SIDEBAR` 23 rute, plus cek menu aktif lewat `aria-current="page"` |
+
+### Verifikasi
+
+`typecheck`, `eslint`, dan `build` bersih. `test-pages.mjs` **125 lulus / 0
+gagal**. `shot-admin.mjs` membaca 24 halaman admin (desktop): tiga app, sidebar
+Operasional benar-benar tanpa judul bagian, kedelapan section Pengaturan lengkap
+di sidebar dengan menu aktif yang benar di semuanya, dan mode PO terpisah.
+Nol peringatan konsol.
+
+---
+
 ## 2026-10-18 (00:20) — Enam aplikasi jadi empat: semua operasional digabung, PO dipisah
 
 Steven mencoba hasil yang pertama dan bilang masih ribet:

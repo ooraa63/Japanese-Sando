@@ -828,6 +828,17 @@ export const en = {
       emptyHint:
         "Until a batch is open, buyers cannot order. Each batch's stock is set on its detail page.",
       newBatch: "New batch",
+      /* The PO Batches app has two sidebar menus; these two text pairs match
+         them (Steven 18-10-2026). */
+      ongoingTitle: "Ongoing batches",
+      ongoingSubtitle:
+        "Batches buyers can still order from. Add a new batch here and set its stock before collection day.",
+      pastTitle: "Finished batches",
+      pastSubtitle:
+        "Batches whose window has closed. Kept for looking back at sales; no new orders can be added to them.",
+      pastEmpty: "No finished batches yet.",
+      pastEmptyHint:
+        "Batches move here automatically once their date passes, so nothing has to be moved by hand.",
       editBatch: "Edit batch",
       label: "Batch name",
       labelPlaceholder: "e.g. PO October A",
@@ -945,17 +956,14 @@ export const en = {
       pickupDelivery: "Pickup & Delivery",
       // Steven 15-10-2026: new page to manage buyer reviews.
       reviews: "Reviews",
-      // Steven 17-10-2026: the admin sidebar is split into six apps. These
-      // labels are only used inside an app (see `src/lib/admin-nav.ts`).
-      poBatch: "PO batches",
+      // Steven 18-10-2026 (evening): the sidebar has only three apps, and the
+      // labels below are used ONLY in the sidebar (see `src/lib/admin-nav.ts`).
+      // Settings tab labels are deliberately absent here: sidebar items reuse
+      // `admin.settings.*` so they can never drift from the page content.
+      poOngoing: "Ongoing",
+      poPast: "Finished",
       salesReport: "Sales ledger",
       menuCatalog: "Menu & bundles",
-      identityTab: "Identity & contact",
-      hoursTab: "Opening hours & rules",
-      paymentTab: "Payment methods",
-      availabilityTab: "Categories & availability",
-      homeTab: "Home page",
-      adminAccountTab: "Admin accounts",
       profileMenu: "Profile menu",
       announcements: "Announcements",
     },
@@ -965,29 +973,30 @@ export const en = {
      * The eleven old menus are grouped into apps in
      * `src/lib/admin-nav.ts`; these names follow that grouping.
      *
-     * Revised 18-10-2026: everything used in daily operations is collected
-     * into one "Operations" app, and Pre-order became a tile of its own.
+     * Revised 18-10-2026 afternoon: everything used in daily operations is
+     * collected into one "Operations" app, and Pre-order became its own tile.
+     *
+     * Revised 18-10-2026 evening: the "Store identity" app is gone — all of
+     * Settings is one app now, and every settings tab lives in the sidebar.
      */
     apps: {
       operations: "Operations",
       po: "PO Batches",
-      identity: "Store identity",
       settings: "Settings",
     },
-    /** Section headings inside an app sidebar (screenshot 2). */
+    /**
+     * Section headings inside the Settings app sidebar.
+     *
+     * The Operations and PO Batches apps deliberately have no sections: their
+     * menus render flat without headings (Steven, 18-10-2026).
+     */
     sections: {
-      ringkasan: "Summary",
-      pesanan: "Orders",
-      penjualan: "Sales",
-      pelanggan: "Customers",
-      produk: "Products",
+      identitas: "Store identity",
       pengiriman: "Delivery",
-      preorder: "Pre-order",
-      identitas: "Identity & hours",
-      komunikasi: "Buyer pages",
       pembayaran: "Payments",
-      tampilan: "Appearance",
-      akun: "Accounts",
+      ketersediaan: "Availability",
+      akun: "Account & appearance",
+      komunikasi: "Buyer pages",
     },
     /**
      * Admin home screen (screenshot 1). Only shows things that need Steven's

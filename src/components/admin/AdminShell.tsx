@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import {
   ADMIN_APPS,
-  TAB_DEFAULT,
+  activeTabFor,
   appForPath,
   type AdminApp,
   type AdminNavItem,
@@ -121,9 +121,9 @@ function Sidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   /*
-   * `?tab=` ikut diteruskan ke `appForPath` karena `/admin/settings` dipakai
-   * dua aplikasi sekaligus: tanpa tab, `/admin/settings?tab=payment` akan
-   * menampilkan sidebar "Identitas Toko".
+   * `?tab=` ikut diteruskan ke `appForPath` karena dua aplikasi memakainya
+   * sebagai pemisah menu: `/admin/settings` (delapan tab) dan `/admin/po`
+   * (berlangsung / sudah berlalu).
    */
   const tabSekarang = searchParams.get("tab");
 
@@ -264,22 +264,56 @@ function AppNav({
   allAppsLabel: string;
   setOpen: (v: boolean) => void;
 }) {
-  // Kelompokkan item per bagian, urutannya mengikuti urutan di ADMIN_APPS.
+  /*
+   * Item yang TIDAK punya `section` (seluruh isi app Operasional dan app Batch
+   * PO) dirender sebagai daftar flat tanpa judul bagian — permintaan Steven
+   * 18-10-2026: "gak perlu ada judulnya kayak Summary Orders, gak perlu
+   * langsung tab nya aja". App Pengaturan masih dikelompokkan karena isinya
+   * sepuluh menu dan jadi sulit dipindai kalau datar.
+   */
+  const itemsTanpaBagian = app.items.filter((i) => !i.section);
+
   const groups: Array<{ id: AdminSectionId; items: AdminNavItem[] }> = [];
   for (const item of app.items) {
+    if (!item.section) continue;
     const last = groups[groups.length - 1];
     if (last && last.id === item.section) last.items.push(item);
     else groups.push({ id: item.section, items: [item] });
   }
 
   /*
-   * Item aktif harus membandingkan tab yang sudah dinormalisasi. Tanpa itu,
-   * `/admin/settings` tanpa query string tidak akan menandai apa pun aktif,
-   * padahal tab itu memakai tab default yang sama dengan `?tab=identity`.
+   * Tab aktif sudah dinormalisasi: `/admin/settings` tanpa query sama dengan
+   * `?tab=identity`, dan `/admin/po` tanpa query sama dengan
+   * `?tab=berlangsung`.
+   *
+   * Item TANPA `tab` (mis. `/admin/profile-menu`) aktif hanya dari cocoknya
+   * path — jangan ikut dibandingkan dengan `tabAktif`, karena query `?tab=`
+   * bukan miliknya dan memaksanya akan membuat menunya tidak pernah aktif.
    */
-  const tabAktif = tabSekarang || TAB_DEFAULT;
-  const aktif = (item: AdminNavItem) =>
-    pathname === item.href && (item.tab || TAB_DEFAULT) === tabAktif;
+  const tabAktif = activeTabFor(app, tabSekarang);
+  const aktif = (item: AdminNavItem) => {
+    if (pathname !== item.href) return false;
+    return item.tab ? item.tab === tabAktif : true;
+  };
+
+  const menuItem = (item: AdminNavItem) => {
+    const on = aktif(item);
+    return (
+      <Link
+        key={item.href + (item.tab ?? "")}
+        href={itemHref(item)}
+        onClick={() => setOpen(false)}
+        aria-current={on ? "page" : undefined}
+        className={`block rounded-xl px-3.5 py-2.5 text-sm font-bold transition ${
+          on
+            ? "bg-cocoa-800 text-cream-50 shadow-lg shadow-cocoa-900/15"
+            : "text-cocoa-500 hover:bg-cocoa-100 hover:text-cocoa-900"
+        }`}
+      >
+        {itemLabels[`${item.href}${item.tab ? `?tab=${item.tab}` : ""}`] ?? item.href}
+      </Link>
+    );
+  };
 
   return (
     <nav className="flex flex-1 flex-col gap-4" aria-label={appLabels[app.id]}>
@@ -303,29 +337,16 @@ function AppNav({
         </span>
       </div>
 
+      {itemsTanpaBagian.length > 0 ? (
+        <div className="space-y-1">{itemsTanpaBagian.map(menuItem)}</div>
+      ) : null}
+
       {groups.map((g) => (
         <div key={g.id} className="space-y-1">
           <p className="px-3.5 text-[10px] font-extrabold tracking-widest text-cocoa-400 uppercase">
             {sectionLabels[g.id]}
           </p>
-          {g.items.map((item) => {
-            const on = aktif(item);
-            return (
-              <Link
-                key={item.href + (item.tab ?? "")}
-                href={itemHref(item)}
-                onClick={() => setOpen(false)}
-                aria-current={on ? "page" : undefined}
-                className={`block rounded-xl px-3.5 py-2.5 text-sm font-bold transition ${
-                  on
-                    ? "bg-cocoa-800 text-cream-50 shadow-lg shadow-cocoa-900/15"
-                    : "text-cocoa-500 hover:bg-cocoa-100 hover:text-cocoa-900"
-                }`}
-              >
-                {itemLabels[`${item.href}${item.tab ? `?tab=${item.tab}` : ""}`] ?? item.href}
-              </Link>
-            );
-          })}
+          {g.items.map(menuItem)}
         </div>
       ))}
     </nav>
