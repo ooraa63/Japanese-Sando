@@ -6,19 +6,22 @@
  * yang gambar 3 itu dijadikan 1 side bar... identitas toko, ataupun Batch,
  * lalu ringkasan bisnis, seting, dsb kita pisahkan."
  *
- * Jumlah menu itu sendiri tidak dikurangi, hanya dikelompokkan jadi Enam
- * APLIKASI. Tiap aplikasi punya beberapa menu yang memang satu topik:
+ * Revisi kedua Steven (18-10-2026), setelah yang pertama masih terasa ribet:
+ * "yang ada keseluruhan seperti yang Order, Mutasi, Customer, Menu itu jadi
+ * satu bagian lalu nanti yang PO ada bagian tersendiri lagi". Jadi semua yang
+ * dipakai operasional harian dikumpulkan jadi SATU aplikasi, dan Pre-order
+ * dipisah karena punya jadwal dan stok sendiri.
  *
- *  - **Pesanan & Pre-order** — pesanan dan batch satu siklus: batch menyediakan
- *    stok, pesanan menguranginya.
- *  - **Ringkasan Bisnis** — Dashboard dan Mutasi sama-sama answering
- *    "berapa yang terjual".
- *  - **Produk & Pengiriman** — apa yang dijual (Menu & Paket) dan cara
- *    pembeli mengambil/mengambilnya (Ambil & Kirim).
- *  - **Identitas Toko** — apa yang dilihat pembeli: identitas, jam buka, halaman
- *    info, dan pengumuman.
- *  - **Pelanggan** — orang yang beli dan pendapatannya.
- *  - **Pengaturan** — setelan sistem (bayar, kategori, beranda, akun admin).
+ * Jumlah menu tetap sebelas, tidak ada yang ditambah atau dihapus — hanya
+ * dikelompokkan ulang:
+ *
+ *  - **Operasional** — Dashboard, Pesanan, Mutasi Penjualan, Pelanggan,
+ *    Ulasan, Menu & Paket, Ambil & Kirim. Semuanya yang dibuka sambil
+ *    menjalankan toko, jadi tidak perlu pindah-pindah aplikasi.
+ *  - **Batch PO** — satu-satunya isi: Batch PO. Dipisah karena jadwal buka /
+ *    tutup dan stok batch punya aturan sendiri.
+ *  - **Identitas Toko** — apa yang dilihat pembeli.
+ *  - **Pengaturan** — setelan sistem.
  *
  * CATATAN PENTING soal `?tab=`
  *   Menu Pengaturan dan Identitas Toko sama-sama hidup di `/admin/settings`,
@@ -31,41 +34,27 @@
 
 import {
   CalendarRange,
-  ClipboardList,
   LayoutDashboard,
-  List,
-  Megaphone,
-  MessageSquareQuote,
   Settings as SettingsIcon,
   Store,
-  TrendingUp,
-  Users,
-  UtensilsCrossed,
 } from "lucide-react";
 
-/** Nama bagian di dalam satu aplikasi, mis. "PESANAN" atau "LAPORAN". */
+/** Nama bagian di dalam satu aplikasi, mis. "PESANAN" atau "PELANGGAN". */
 export type AdminSectionId =
-  | "pesanan"
-  | "preorder"
   | "ringkasan"
-  | "laporan"
+  | "pesanan"
+  | "penjualan"
+  | "pelanggan"
   | "produk"
   | "pengiriman"
+  | "preorder"
   | "identitas"
   | "komunikasi"
-  | "pelanggan"
-  | "ulasan"
   | "pembayaran"
   | "tampilan"
   | "akun";
 
-export type AdminAppId =
-  | "orders"
-  | "business"
-  | "catalog"
-  | "identity"
-  | "customers"
-  | "settings";
+export type AdminAppId = "operations" | "po" | "identity" | "settings";
 
 export interface AdminNavItem {
   href: string;
@@ -109,6 +98,15 @@ export interface AdminApp {
   items: AdminNavItem[];
 }
 
+/** Halaman "/admin/settings" tanpa `?tab=` — dipakai untuk pencocokan. */
+export const SETTINGS_PATH = "/admin/settings";
+
+/**
+ * Tab default `/admin/settings` kalau query string-nya kosong. `SettingsClient`
+ * juga memakai ini, jadi keduanya tidak boleh berbeda.
+ */
+export const TAB_DEFAULT = "identity";
+
 /**
  * `href` aplikasi pertama harus sama dengan lempengnya supaya sidebar masuk
  * ke "dalam aplikasi" begitu lempeng diklik.
@@ -117,40 +115,34 @@ export interface AdminApp {
  * `SETTINGS_PATH`, jadi `match` keduanya sama dan yang membedakan hanya
  * `?tab=`. Keduanya juga landing di tab yang berbeda supaya lempeng dan
  * sidebar tidak membuka halaman yang sama persis.
+ *
+ * Urutan di dalam aplikasi mengikuti urutan pakai Steven, bukan urutan alfabet:
+ * yang paling sering dibuka paling atas.
  */
 export const ADMIN_APPS: AdminApp[] = [
   {
-    id: "orders",
-    href: "/admin/orders",
-    match: "/admin/orders",
-    icon: ClipboardList,
-    tile: "from-cocoa-500 to-cocoa-800",
-    items: [
-      { href: "/admin/orders", section: "pesanan" },
-      { href: "/admin/po", section: "preorder" },
-    ],
-  },
-  {
-    id: "business",
+    id: "operations",
     href: "/admin/dashboard",
     match: "/admin/dashboard",
     icon: LayoutDashboard,
     tile: "from-matcha-400 to-matcha-700",
     items: [
       { href: "/admin/dashboard", section: "ringkasan" },
-      { href: "/admin/sales", section: "laporan" },
-    ],
-  },
-  {
-    id: "catalog",
-    href: "/admin/menu",
-    match: "/admin/menu",
-    icon: UtensilsCrossed,
-    tile: "from-honey-300 to-honey-600",
-    items: [
+      { href: "/admin/orders", section: "pesanan" },
+      { href: "/admin/sales", section: "penjualan" },
+      { href: "/admin/customers", section: "pelanggan" },
+      { href: "/admin/reviews", section: "pelanggan" },
       { href: "/admin/menu", section: "produk" },
       { href: "/admin/pickup-delivery", section: "pengiriman" },
     ],
+  },
+  {
+    id: "po",
+    href: "/admin/po",
+    match: "/admin/po",
+    icon: CalendarRange,
+    tile: "from-cocoa-500 to-cocoa-800",
+    items: [{ href: "/admin/po", section: "preorder" }],
   },
   {
     id: "identity",
@@ -171,17 +163,6 @@ export const ADMIN_APPS: AdminApp[] = [
     ],
   },
   {
-    id: "customers",
-    href: "/admin/customers",
-    match: "/admin/customers",
-    icon: Users,
-    tile: "from-sky-400 to-sky-700",
-    items: [
-      { href: "/admin/customers", section: "pelanggan" },
-      { href: "/admin/reviews", section: "ulasan" },
-    ],
-  },
-  {
     id: "settings",
     href: "/admin/settings?tab=payment",
     match: "/admin/settings",
@@ -197,22 +178,13 @@ export const ADMIN_APPS: AdminApp[] = [
   },
 ];
 
-/** Halaman "/admin/settings" tanpa `?tab=` — dipakai untuk pencocokan. */
-export const SETTINGS_PATH = "/admin/settings";
-
-/**
- * Tab default `/admin/settings` kalau query string-nya kosong. `SettingsClient`
- * juga memakai ini, jadi keduanya tidak boleh berbeda.
- */
-export const TAB_DEFAULT = "identity";
-
 /**
  * Aplikasi yang sedang dibuka, atau `null` di layar awal.
  *
  * `tab` wajib ikut dibaca karena `SETTINGS_PATH` dipakai dua aplikasi: tanpa
  * itu, `/admin/settings?tab=payment` akan menampilkan sidebar "Identitas Toko".
- *(match juga sudah mencakup `href` tiap item, supaya `/admin/po` dan
- * `/admin/po/[id]` tetap masuk aplikasi Pesanan meski `match` cuma `/admin/orders`.)
+ * `match` juga sudah mencakup `href` tiap item, supaya `/admin/po` tetap masuk
+ * aplikasi sendiri walau `match`-nya menunjuk halaman lain.
  */
 export function appForPath(pathname: string, tab?: string | null): AdminApp | null {
   if (pathname === "/admin" || pathname === "/admin/") return null;
@@ -228,18 +200,3 @@ export function appForPath(pathname: string, tab?: string | null): AdminApp | nu
     }) ?? null
   );
 }
-
-/** Ikon untuk item sidebar (dipakai juga di dalam launcher). */
-export const ICONS = {
-  orders: ClipboardList,
-  batch: CalendarRange,
-  dashboard: LayoutDashboard,
-  sales: TrendingUp,
-  menu: UtensilsCrossed,
-  pickup: Store,
-  profileMenu: List,
-  announcements: Megaphone,
-  customers: Users,
-  reviews: MessageSquareQuote,
-  settings: SettingsIcon,
-};

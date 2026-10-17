@@ -4,6 +4,65 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-18 (00:20) — Enam aplikasi jadi empat: semua operasional digabung, PO dipisah
+
+Steven mencoba hasil yang pertama dan bilang masih ribet:
+
+> "yang ada keseluruhan seperti yang Order, Mutasi, Customer, Menu itu jadi satu
+> bagian lalu nanti yang PO ada bagian tersendiri lagi"
+
+Artinya, semua yang dibuka **sambil menjalankan toko** dikumpulkan jadi satu
+aplikasi supaya tidak perlu pindah-pindah lempeng, dan Pre-order dipisah karena
+jadwal buka/tutup serta stok batch punya aturan sendiri. Dia memilih nama
+**Operasional** untuk lempeng gabungan itu, dan mengonfirmasi lewat pertanyaan
+terbuka bahwa isinya: Pesanan, Mutasi, Pelanggan, Ulasan, Menu & Paket,
+Dashboard, dan Ambil & Kirim.
+
+Layar awal sekarang **empat** lempeng:
+
+| Aplikasi | Landing | Isi |
+|---|---|---|
+| Operasional | `/admin/dashboard` | Dashboard, Pesanan, Mutasi Penjualan, Pelanggan, Ulasan, Menu & Paket, Ambil & Kirim |
+| Batch PO | `/admin/po` | Batch PO |
+| Identitas Toko | `/admin/settings?tab=identity` | Identitas & Kontak, Jam Buka, Menu Profil, Pengumuman |
+| Pengaturan | `/admin/settings?tab=payment` | Metode Pembayaran, Kategori & Ketersediaan, Tampilan Beranda, Akun Admin |
+
+Identitas Toko dan Pengaturan tidak berubah. Sebelas menu lama tetap utuh,
+hanya dikelompokkan ulang.
+
+### Yang berubah di kode
+
+- `src/lib/admin-nav.ts` — `ADMIN_APPS` jadi 4 (`operations`, `po`, `identity`,
+  `settings`). Bagian `laporan` dan `ulasan` dihapus, `penjualan` ditambahkan;
+  Ulasan sekarang sekelompok dengan Pelanggan. Ekspor `ICONS` yang sudah tidak
+  terpakai dihapus beserta impor ikon yang jadi tak terpakai.
+- `src/lib/i18n/id.ts`, `en.ts` — `admin.apps.*` dan `admin.sections.*`
+  disesuaikan ke empat aplikasi dan dua belas bagian baru.
+- `src/components/admin/AdminLauncher.tsx` — helper `ringkasanBagian()` supaya
+  ringkasan pada lempeng tidak jadi paragraf panjang (Operasional punya enam
+  bagian: tiga nama pertama lalu `+3`), dan grid jadi `lg:grid-cols-4` supaya
+  empat lempeng muat satu baris.
+- `src/app/admin/(dashboard)/layout.tsx` — peta label menu mengikuti app baru.
+- `scripts/test-pages.mjs`, `scripts/shot-admin.mjs` — daftar halaman dan
+  pengawal sidebar diselaraskan ke struktur empat app.
+
+### Verifikasi
+
+`typecheck`, `eslint`, dan `build` bersih. `test-pages.mjs` 114 lulus / 0 gagal.
+`shot-admin.mjs` membaca 18 halaman admin: ketujuh halaman Operasional
+menampilkan sidebar yang sama dengan menu aktif yang benar, `/admin/po`
+menampilkan app "Batch PO", dan keempat halaman settings tetap memisahkan
+Identitas Toko dari Pengaturan lewat `?tab=`.
+
+### Yang masih terpisah dan mungkin ingin Steven pindahkan
+
+Tombol buka/tutup pre-order ("Status Pre-Order") masih ada di **Pengaturan →
+Kategori & Ketersediaan**, bukan di app Batch PO. Itu satu-satunya kendali PO
+yang belum ikut ke sana. Belum dipindah karena Steven belum diminta; perubahan
+seperti ini perlu-usul dulu ke Steven.
+
+---
+
 ## 2026-10-17 (malam, sesi 2) — Menu admin dipecah jadi 6 aplikasi
 
 Steven kirim 3 screenshot di `D:\Gambar error` dengan satu permintaan: sebelas

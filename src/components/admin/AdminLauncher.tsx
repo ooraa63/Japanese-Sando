@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CheckCircle2, Store } from "lucide-react";
-import { ADMIN_APPS, type AdminAppId, type AdminSectionId } from "@/lib/admin-nav";
+import { ADMIN_APPS, type AdminApp, type AdminAppId, type AdminSectionId } from "@/lib/admin-nav";
 
 export type ChipTone = "amber" | "berry" | "matcha";
 
@@ -98,15 +98,21 @@ export function AdminLauncher({
         </div>
       )}
 
-      {/* ---------- Lempeng aplikasi ---------- */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/*
+       * ---------- Lempeng aplikasi ----------
+       * Empat aplikasi, jadi di layar lebar cukup muat satu baris. Kalau
+       * jumlah aplikasinya nanti berubah, `lg:grid-cols-4` tetap aman — yang
+       * penting lempeng terakhir tidak menggantung sendirian di baris
+       * berikutnya.
+       */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {ADMIN_APPS.map((app) => (
           <AppTile
             key={app.id}
             href={app.href}
             label={appLabels[app.id]}
             /* Nama-nama bagiannya, supaya jelas isinya apa saja sebelum diklik. */
-            detail={[...new Set(app.items.map((i) => sectionLabels[i.section]))].join(" · ")}
+            detail={ringkasanBagian(app, sectionLabels)}
             tile={app.tile}
             icon={app.icon}
           />
@@ -114,6 +120,20 @@ export function AdminLauncher({
       </div>
     </div>
   );
+}
+
+/**
+ * Ringkasan isi aplikasi untuk ditulis di bawah judul lempeng.
+ *
+ * "Operasional" punya enam bagian (Ringkasan, Pesanan, Penjualan, Pelanggan,
+ * Produk, Pengiriman). Semuanya disebut jadi satu baris yang panjang sekali
+ * dan membuat lempeng terlihat seperti paragraf, jadi cukup tiga nama pertama
+ * lalu sisanya ditulis "+N".
+ */
+function ringkasanBagian(app: AdminApp, sectionLabels: SectionLabels): string {
+  const bagian = [...new Set(app.items.map((i) => sectionLabels[i.section]))];
+  const tampil = bagian.slice(0, 3).join(" · ");
+  return bagian.length > 3 ? `${tampil} · +${bagian.length - 3}` : tampil;
 }
 
 function AppTile({

@@ -109,7 +109,14 @@ const beranda = await openPage("/admin", {
   mustContain: ["Selamat", EMAIL],
 });
 if (beranda.status === 200) {
-  check("  layar awal punya lempeng aplikasi", beranda.text.includes("Pesanan &amp; Pre-order") || beranda.text.includes("Pesanan & Pre-order"));
+  // Layar awal sekarang 4 lempeng (Steven 18-10-2026): Operasional, Batch PO,
+  // Identitas Toko, Pengaturan.
+  check(
+    "  layar awal punya 4 lempeng aplikasi",
+    ["Operasional", "Batch PO", "Identitas Toko", "Pengaturan"].every((t) =>
+      beranda.text.includes(t),
+    ),
+  );
   check("  layar awal punya tombol keluar", beranda.text.includes("Keluar"));
   check("  layar awal TIDAK menampilkan statistik dashboard", !beranda.text.includes("Pesanan terbaru"));
 }
@@ -124,9 +131,14 @@ if (dash.status === 200) {
     dash.text.includes("Menu &amp; Stok") || dash.text.includes("Menu & Stok") || dash.text.includes("Menu"));
   check("  tombol keluar tampil", dash.text.includes("Keluar"));
   // Sidebar di dalam aplikasi menampilkan bagian per bagian (lihat
-  // `src/lib/admin-nav.ts`).
-  check("  sidebar menampilkan judul aplikasi", dash.text.includes("Ringkasan Bisnis"));
-  check("  sidebar menampilkan bagian 'Laporan'", dash.text.includes("Laporan"));
+  // `src/lib/admin-nav.ts`). Semua menu harian masuk satu app "Operasional".
+  check("  sidebar menampilkan judul aplikasi", dash.text.includes("Operasional"));
+  check(
+    "  sidebar menampilkan semua bagian Operasional",
+    ["Ringkasan", "Pesanan", "Penjualan", "Pelanggan", "Produk", "Pengiriman"].every((b) =>
+      dash.text.includes(b),
+    ),
+  );
 }
 
 /*
@@ -145,12 +157,17 @@ if (dash.status === 200) {
  * bagian yang benar, bukan cuma empat halaman yang kebetulan ikut dites.
  */
 const PETA_SIDEBAR = [
-  { url: "/admin/orders", aplikasi: "Pesanan & Pre-order", bagian: ["Pre-order"] },
-  { url: "/admin/po", aplikasi: "Pesanan & Pre-order", bagian: ["Pre-order"] },
-  { url: "/admin/dashboard", aplikasi: "Ringkasan Bisnis", bagian: ["Ringkasan", "Laporan"] },
-  { url: "/admin/sales", aplikasi: "Ringkasan Bisnis", bagian: ["Ringkasan", "Laporan"] },
-  { url: "/admin/menu", aplikasi: "Produk & Pengiriman", bagian: ["Produk", "Pengiriman"] },
-  { url: "/admin/pickup-delivery", aplikasi: "Produk & Pengiriman", bagian: ["Produk", "Pengiriman"] },
+  // Steven 18-10-2026: semua yang dipakai operasional jadi satu app, Pre-order
+  // dipisah jadi lempeng sendiri.
+  { url: "/admin/dashboard", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
+  { url: "/admin/orders", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
+  { url: "/admin/sales", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
+  { url: "/admin/customers", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
+  { url: "/admin/reviews", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
+  { url: "/admin/menu", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
+  { url: "/admin/pickup-delivery", aplikasi: "Operasional", bagian: ["Pesanan", "Penjualan", "Produk", "Pengiriman"] },
+  // Pre-order berdiri sendiri, tidak boleh ikut app Operasional.
+  { url: "/admin/po", aplikasi: "Batch PO", bagian: ["Pre-order"] },
   // Dua aplikasi berbeda hidup di halaman yang sama, dibedakan `?tab=`.
   { url: "/admin/settings?tab=identity", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
   { url: "/admin/settings?tab=hours", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Jam Buka & Aturan"] },
@@ -166,8 +183,6 @@ const PETA_SIDEBAR = [
   { url: "/admin/announcements", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
   { url: "/admin/faq", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
   { url: "/admin/terms", aplikasi: "Identitas Toko", bagian: ["Identitas & Jam", "Halaman Pembeli"] },
-  { url: "/admin/customers", aplikasi: "Pelanggan", bagian: ["Pelanggan", "Ulasan"] },
-  { url: "/admin/reviews", aplikasi: "Pelanggan", bagian: ["Pelanggan", "Ulasan"] },
 ];
 for (const peta of PETA_SIDEBAR) {
   const p = await openPage(peta.url);

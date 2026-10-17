@@ -21,16 +21,22 @@ export const dynamic = "force-dynamic";
 function labelPerMenu(dicts: Awaited<ReturnType<typeof getI18nDict>>) {
   const n = dicts.admin.nav;
   const perApp = {
-    orders: { "/admin/orders": n.orders, "/admin/po": n.poBatch },
-    business: { "/admin/dashboard": n.dashboard, "/admin/sales": n.salesReport },
-    catalog: { "/admin/menu": n.menuCatalog, "/admin/pickup-delivery": n.pickupDelivery },
+    operations: {
+      "/admin/dashboard": n.dashboard,
+      "/admin/orders": n.orders,
+      "/admin/sales": n.salesReport,
+      "/admin/customers": n.customers,
+      "/admin/reviews": n.reviews,
+      "/admin/menu": n.menuCatalog,
+      "/admin/pickup-delivery": n.pickupDelivery,
+    },
+    po: { "/admin/po": n.poBatch },
     identity: {
       "/admin/settings?tab=identity": n.identityTab,
       "/admin/settings?tab=hours": n.hoursTab,
       "/admin/profile-menu": n.profileMenu,
       "/admin/announcements": n.announcements,
     },
-    customers: { "/admin/customers": n.customers, "/admin/reviews": n.reviews },
     settings: {
       "/admin/settings?tab=payment": n.paymentTab,
       "/admin/settings?tab=availability": n.availabilityTab,

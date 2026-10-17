@@ -981,30 +981,29 @@ export const id: Dict = {
     /**
      * Steven 17-10-2026: "jangan semua yang gambar 3 itu dijadikan 1 side
      * bar... identitas toko, ataupun Batch, lalu ringkasan bisnis, seting,
-     * dsb kita pisahkan". Sebelas menu lama dikelompokkan jadi enam aplikasi
-     * di `src/lib/admin-nav.ts`; nama-nama di bawah mengikuti pengelompokan
-     * itu.
+     * dsb kita pisahkan". Sebelas menu lama dikelompokkan jadi aplikasi-aplikasi
+     * di `src/lib/admin-nav.ts`.
+     *
+     * Revisi 18-10-2026: semua yang dipakai operasional harian dikumpulkan jadi
+     * satu aplikasi "Operasional", dan Pre-order dipisah jadi lempeng sendiri.
      */
     apps: {
-      orders: "Pesanan & Pre-order",
-      business: "Ringkasan Bisnis",
-      catalog: "Produk & Pengiriman",
+      operations: "Operasional",
+      po: "Batch PO",
       identity: "Identitas Toko",
-      customers: "Pelanggan",
       settings: "Pengaturan",
     },
     /** Judul bagian di dalam sidebar sebuah aplikasi (gambar 2). */
     sections: {
-      pesanan: "Pesanan",
-      preorder: "Pre-order",
       ringkasan: "Ringkasan",
-      laporan: "Laporan",
+      pesanan: "Pesanan",
+      penjualan: "Penjualan",
+      pelanggan: "Pelanggan",
       produk: "Produk",
       pengiriman: "Pengiriman",
+      preorder: "Pre-order",
       identitas: "Identitas & Jam",
       komunikasi: "Halaman Pembeli",
-      pelanggan: "Pelanggan",
-      ulasan: "Ulasan",
       pembayaran: "Pembayaran",
       tampilan: "Tampilan",
       akun: "Akun",

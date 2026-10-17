@@ -962,29 +962,29 @@ export const en = {
     /**
      * Steven 17-10-2026: "don't put everything from screenshot 3 into one
      * sidebar... split store identity, batches, business summary, settings".
-     * The eleven old menus are grouped into six apps in
+     * The eleven old menus are grouped into apps in
      * `src/lib/admin-nav.ts`; these names follow that grouping.
+     *
+     * Revised 18-10-2026: everything used in daily operations is collected
+     * into one "Operations" app, and Pre-order became a tile of its own.
      */
     apps: {
-      orders: "Orders & Pre-order",
-      business: "Business summary",
-      catalog: "Products & Delivery",
+      operations: "Operations",
+      po: "PO Batches",
       identity: "Store identity",
-      customers: "Customers",
       settings: "Settings",
     },
     /** Section headings inside an app sidebar (screenshot 2). */
     sections: {
-      pesanan: "Orders",
-      preorder: "Pre-order",
       ringkasan: "Summary",
-      laporan: "Reports",
+      pesanan: "Orders",
+      penjualan: "Sales",
+      pelanggan: "Customers",
       produk: "Products",
       pengiriman: "Delivery",
+      preorder: "Pre-order",
       identitas: "Identity & hours",
       komunikasi: "Buyer pages",
-      pelanggan: "Customers",
-      ulasan: "Reviews",
       pembayaran: "Payments",
       tampilan: "Appearance",
       akun: "Accounts",
