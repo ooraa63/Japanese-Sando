@@ -26,9 +26,9 @@ const HALAMAN = ["/", "/order", "/track", "/riwayat", "/profile-menu/faq"];
 
 /** Penanda build baru. Ganti setiap kali dipakai. */
 const PENANDA = [
-  "data-wa-nav",
-  "overscroll-contain",
-  "bg-matcha-50/70",
+  "Semua aplikasi",
+  "Identitas & Jam",
+  "Pesanan & Pre-order",
 ];
 
 function get(url) {

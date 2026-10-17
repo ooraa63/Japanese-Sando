@@ -2700,3 +2700,21 @@ Pelajaran umum: kalau sebuah perubahan menyentuh **pola**, tambahkan tes yang
 mengecek bentuk (siapa yang tampil, di mana), bukan cuma isi. Dan untuk yang
 cuma kelihatan saat dirender, `scripts/shot-admin.mjs` membaca DOM langsung
 setelah login — `test-pages.mjs` tidak akan pernah melihatnya.
+
+### #151 - `supabase-js` dengan kunci anon melihat 0 baris, bukan "data kosong"
+
+`createClient(NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)`
+yang dipakai langsung ke `orders` mengembalikan 0 baris untuk status
+`pending`/`accepted`/`ready` — padahal `admin_dashboard_stats()` menghitung 2
+dan ada jelas 15 pesanan `rejected` di database.
+
+Penyebabnya RLS, bukan data hilang: peran `anon` memang tidak boleh melihat
+baris pesanan. Query "tidak ada hasil" dari kunci publishable **tidak boleh
+disimpulkan sebagai "tidak ada data"**.
+
+Untuk menghitung langsung ke produksi, pakai `pg` + `DATABASE_URL` seperti
+`scripts/cek-dashboard-stats.mjs`. Script itu juga mencetak definisi RPC lewat
+`pg_get_functiondef()` supaya bisa dibandingkan dengan maksudnya.
+
+Kalau memang butuh membaca baris sebagai pengguna yang sudah login, bikin
+session login dulu (Supabase client dengan access token admin) — bukan anon.
