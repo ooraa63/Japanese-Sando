@@ -25,11 +25,7 @@ const BASE = process.env.DEPLOY_URL || "https://japanese-sando.vercel.app";
 const HALAMAN = ["/", "/order", "/track", "/riwayat", "/profile-menu/faq"];
 
 /** Penanda build baru. Ganti setiap kali dipakai. */
-const PENANDA = [
-  "Semua aplikasi",
-  "Identitas & Jam",
-  "Pesanan & Pre-order",
-];
+const PENANDA = ["Batch PO", "Operasional", "Semua aplikasi"];
 
 function get(url) {
   return new Promise((res, rej) => {
