@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, Search, Star, XCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Package, Search, Star, XCircle } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime, formatIDR } from "@/lib/utils";
+import { pecahPesanan } from "@/lib/order-items";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { OrderStatusTimeline } from "@/components/customer/OrderStatusTimeline";
 import { ReviewModal } from "@/components/customer/ReviewModal";
+import type { InvoiceBundleEntry, InvoiceFlatItem } from "@/lib/types";
 
 export function TrackForm({
   initialCode = "",
@@ -33,23 +35,22 @@ export function TrackForm({
     created_at: string;
     updated_at: string;
     note: string;
-    flat_items: Array<{
-      flavor_name: string;
-      quantity: number;
-      unit_price: number;
-      line_total: number;
-    }>;
-    bundles: Array<{
-      bundle_id: number;
-      bundle_name: string;
-      slots: Array<{
-        slot: number;
-        flavor_name: string;
-        flavor_id: number;
-      }>;
-    }>;
+    flat_items: InvoiceFlatItem[];
+    bundles: InvoiceBundleEntry[];
   } | null>(null);
   const [error, setError] = useState<"notFound" | "code" | "phone" | null>(null);
+
+  /* Nama item dari database masih membawa sufiks slot internal
+     ("Cookies & Cream (Sando 2 #1)"). `pecahPesanan` membuang sufiks itu dan
+     sekaligus mengelompokkan baris paket di bawah satu kepala "Bundle", jadi
+     pembeli tidak salah mengira "(Sando 2 #1)" bagian dari nama rasa. */
+  const rincian = useMemo(
+    () =>
+      order
+        ? pecahPesanan(order.flat_items, order.bundles)
+        : { biasa: [], paket: [] },
+    [order]
+  );
   // Auto-open review modal ketika status delivered & belum ada review.
   const [reviewOpen, setReviewOpen] = useState(false);
   // Supaya pop-up tidak muncul lagi kalau user sudah menutup (ditrack this session).
@@ -207,22 +208,64 @@ export function TrackForm({
 
           {order.flat_items.length > 0 ? (
             <ul className="mt-5 divide-y divide-cocoa-100 rounded-2xl border border-cocoa-200">
-              {order.flat_items.map((it, i) => (
+              {rincian.biasa.map((it, i) => (
                 <li
-                  key={i}
-                  className="flex justify-between gap-4 px-4 py-2.5 text-sm"
+                  key={`b-${i}`}
+                  className="flex items-baseline justify-between gap-4 px-4 py-2.5 text-sm"
                 >
-                  <span className="text-cocoa-700">
-                    {it.quantity}× {it.flavor_name}
+                  <span className="min-w-0 text-cocoa-700">
+                    {it.quantity}× {it.name}
                   </span>
-                  <span className="tabular text-cocoa-500">
+                  {/* `shrink-0` + `whitespace-nowrap`: tanpa itu harga ikut
+                      terpotong jadi dua baris kalau nama rasa-nya panjang
+                      (keluhan Steven 17-10-2026, "angka tidak rapi"). */}
+                  <span className="shrink-0 whitespace-nowrap tabular text-cocoa-500">
                     {formatIDR(it.line_total, lang)}
                   </span>
                 </li>
               ))}
-              <li className="flex justify-between gap-4 bg-cocoa-50 px-4 py-2.5 text-sm font-bold text-cocoa-800">
+
+              {rincian.paket.map((p) => (
+                <li key={`p-${p.bundleId ?? p.bundleName}`} className="bg-matcha-50/70 px-4 py-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <Package className="size-3.5 shrink-0 text-matcha-700" />
+                      <span className="text-[10px] font-extrabold tracking-wide text-matcha-700 uppercase">
+                        {t.menu.bundleLabel}
+                      </span>
+                      <span className="truncate text-sm font-bold text-cocoa-800">
+                        {p.bundleName}
+                      </span>
+                    </span>
+                    {p.total != null ? (
+                      <span className="shrink-0 whitespace-nowrap text-sm font-extrabold tabular text-cocoa-900">
+                        {formatIDR(p.total, lang)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <ul className="mt-1.5 space-y-1">
+                    {p.rows.map((r, j) => (
+                      <li
+                        key={`${p.bundleId ?? p.bundleName}-${j}`}
+                        className="flex items-baseline justify-between gap-4 pl-5 text-sm"
+                      >
+                        <span className="min-w-0 text-cocoa-700">
+                          {r.quantity}× {r.name}
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap tabular text-cocoa-500">
+                          {formatIDR(r.line_total, lang)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+
+              <li className="flex items-baseline justify-between gap-4 bg-cocoa-50 px-4 py-2.5 text-sm font-bold text-cocoa-800">
                 <span>{t.common.total}</span>
-                <span className="tabular">{formatIDR(order.total, lang)}</span>
+                <span className="shrink-0 whitespace-nowrap tabular">
+                  {formatIDR(order.total, lang)}
+                </span>
               </li>
             </ul>
           ) : null}

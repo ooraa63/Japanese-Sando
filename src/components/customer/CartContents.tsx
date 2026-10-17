@@ -76,7 +76,7 @@ export function CartContents({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* ---------- Daftar item ---------- */}
-      <ul className="min-h-0 flex-1 divide-y divide-cocoa-100 overflow-y-auto">
+      <ul className="min-h-0 flex-1 divide-y divide-cocoa-100 overflow-y-auto overscroll-contain">
         {lines.map((line) => {
           const nama = lang === "en" ? line.flavor.name_en : line.flavor.name_id;
           return (
@@ -137,7 +137,11 @@ export function CartContents({
                 </button>
               </span>
 
-              <span className="w-16 shrink-0 text-right text-sm font-extrabold text-cocoa-900 tabular">
+              {/* Steven 17-10-2026: "angka (harga) tidak rapi". "Rp 18,000"
+                  pernah wraps jadi dua baris karena kolomnya cuma `w-16`.
+                  Sekarang lebarnya longgar + `whitespace-nowrap`, jadi harga
+                  selalu satu baris dan kolom angkanya lurus. */}
+              <span className="w-[4.75rem] shrink-0 text-right text-sm font-extrabold whitespace-nowrap text-cocoa-900 tabular">
                 {formatIDR(line.flavor.price * line.qty, lang)}
               </span>
             </li>
@@ -151,7 +155,10 @@ export function CartContents({
             .filter((f): f is Flavor => Boolean(f))
             .map((f) => (lang === "en" ? f.name_en : f.name_id));
           return (
-            <li key={entry.id} className="flex items-center gap-3 px-4 py-3">
+            <li
+              key={entry.id}
+              className="flex items-center gap-3 bg-matcha-50/60 px-4 py-3"
+            >
               <span className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-matcha-100">
                 {entry.bundle.image_url ? (
                   <Image
@@ -170,7 +177,14 @@ export function CartContents({
               </span>
 
               <span className="min-w-0 flex-1">
-                {/* Sama seperti baris rasa satuan: dua baris, bukan satu. */}
+                {/* Steven 17-10-2026: "yang bundle usahakan ada seperti
+                    pembeda jadi org tau itu bundle". Baris paket sekarang
+                    punya label "Bundle" + latar hijau muda, jadi langsung beda
+                    dari baris rasa biasa di atasnya. */}
+                <span className="mb-0.5 inline-flex items-center gap-1 rounded-full bg-matcha-500/15 px-1.5 py-px text-[10px] font-extrabold tracking-wide text-matcha-700 uppercase">
+                  <Package className="size-2.5" />
+                  {t.menu.bundleLabel}
+                </span>
                 <span className="block text-sm leading-snug font-bold text-cocoa-800">
                   {nama}
                 </span>
@@ -193,7 +207,7 @@ export function CartContents({
                 <Trash2 className="size-4" />
               </button>
 
-              <span className="w-16 shrink-0 text-right text-sm font-extrabold text-cocoa-900 tabular">
+              <span className="w-[4.75rem] shrink-0 text-right text-sm font-extrabold whitespace-nowrap text-cocoa-900 tabular">
                 {formatIDR(entry.bundle.price, lang)}
               </span>
             </li>
@@ -208,7 +222,7 @@ export function CartContents({
             <span className="text-xs font-bold tracking-wider text-cocoa-500 uppercase">
               {t.cart.subtotal}
             </span>
-            <span className="text-lg font-extrabold text-cocoa-900 tabular">
+            <span className="text-lg font-extrabold whitespace-nowrap text-cocoa-900 tabular">
               {formatIDR(subtotal, lang)}
             </span>
           </div>

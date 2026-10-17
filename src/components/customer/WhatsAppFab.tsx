@@ -20,9 +20,13 @@
  *    menghasilkan halaman WhatsApp kosong.
  *
  * 3. **Hanya disembunyikan di halaman tanpa transaksi** (`/admin`, `/login`,
- *    `/register`). Dulu `/order` ikut disembunyikan karena dianggap sudah ada
- *    tombolnya di rail keranjang — justru itu yang dikeluhkan Steven. Sekarang
- *    semua tombol WA lain di `/order` dihapus, jadi di sini tidak ada dobel.
+ *    `/register`, `/order`). Dulu `/order` ikut disembunyikan karena dianggap
+ *    sudah ada tombolnya di rail keranjang — justru itu yang dikeluhkan Steven.
+ *    Sekarang semua tombol WA lain di `/order` dihapus, jadi di sini tidak ada
+ *    dobel. Per 17-10-2026 `/order` HIDDEN lagi, tapi bukan karena ada tombol
+ *    lain di rail: tombol WA di `/order` pindah ke baris navigasi tiap
+ *    langkah, karena yang melayang di pojok kanan bawah menimpa tombol
+ *    "Lanjut" yang memenuhi lebar layar.
  *
  * 4. **Naik kalau ada dock keranjang.** Di `/order` langkah "Pilih Rasa" untuk
  *    HP, `CartDock` menempel penuh di dasar layar. Tombol WA di pojok yang sama
@@ -62,6 +66,12 @@ export function WhatsAppFab({ whatsapp }: { whatsapp?: string | null }) {
   if (pathnameAwal.startsWith("/admin")) return null;
   if (pathnameAwal.startsWith("/login")) return null;
   if (pathnameAwal.startsWith("/register")) return null;
+  /* Steven 17-10-2026 (gambar 3): "logo WhatsAppnya terbang" — di `/order`
+     tombol melayang ini MENIMPA tombol "Lanjut", yang ukurannya memenuhi
+     lebar layar. Di halaman itu WA sekarang jadi tombol kecil di baris
+     navigasi tiap langkah (`WhatsAppNavButton` di `OrderFlow`), jadi di sini
+     `/order` disembunyikan supaya tidak ada dobel dan tidak ada yang tertutup. */
+  if (pathnameAwal.startsWith("/order")) return null;
 
   /* Posisi vertikal. Urutannya dari yang paling tinggi (paling banyak hal yang
      perlu dilewati) ke yang paling rendah. */

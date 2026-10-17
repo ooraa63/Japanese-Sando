@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 export function Modal({
   open,
@@ -30,17 +31,15 @@ export function Modal({
     };
     document.addEventListener("keydown", onKey);
 
-    // Kunci scroll body. JANGAN ambil fokus ke panel/input — input akan
-    // kehilangan fokus setiap kali parent re-render (mis. saat user
-    // mengetik di field yang controlled). Browser natural focus sudah cukup.
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
+    // JANGAN ambil fokus ke panel/input — input akan kehilangan fokus setiap
+    // kali parent re-render (mis. saat user mengetik di field yang controlled).
+    // Browser natural focus sudah cukup.
+    return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  // Scroll body dikunci lewat hook yang sama dengan sheet keranjang, supaya
+  // modal dan sheet tidak mengunci/membuka scroll saling menimpa.
+  useScrollLock(open);
 
   if (!open) return null;
 

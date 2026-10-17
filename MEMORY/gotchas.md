@@ -2569,3 +2569,88 @@ Dua konsekuensi:
   (Sudah terjadi sekali di `uji-alur-admin.mjs`.)
 - Pengaman stok ada: kolom `stock_restored` memastikan stok hanya dikembalikan
   SATU kali, jadi menolak berulang kali tidak mengembalikan stok ganda.
+
+### #142 - `body { overflow: hidden }` bukan cara mengunci scroll
+
+`document.body.style.overflow = "hidden"` **tidak** menghentikan scroll halaman
+di belakang sebuah overlay:
+
+- Di iOS Safari yang mengunci scroll adalah `body`, bukan `html`, jadi menulis
+  `overflow: hidden` di `body` belum tentu mencegah swipe.
+- Di desktop, begitu scrollbar hilang, ruang scrollbar (15-17px) ikut hilang
+  dan **seluruh isi halaman meleset ke kanan**. Ini yang Steven sebut "ngebug"
+  waktu membuka keranjang.
+
+Pola yang benar: `body` jadi `position: fixed` dengan `top` sebesar nilai
+scroll saat dikunci, `padding-right` ditambah lebar scrollbar, lalu dipulihkan
++ `window.scrollTo(0, scrollY)` saat overlay ditutup.
+
+Sudah dipakai lewat hook `src/lib/use-scroll-lock.ts` (pakai hook, jangan
+tulis ulang per komponen — hook-nya punya penghitung kedalaman supaya dua
+overlay yang kebetulan terbuka tidak saling membuka scroll).
+
+### #143 - Kolom harga harus `whitespace-nowrap` + `shrink-0`
+
+"Rp 18.000" di `text-sm font-extrabold` sudah ±62px. Di kolom `w-16` (64px)
+harga itu **wrap jadi dua baris** dan kolom angkanya jadi tidak lurus. Yang
+jelas kenapanya: di daftar lacak, harga `<span>` TIDAK punya `shrink-0`
+sementara nama Flavor di sebelahnya panjang — flex otomatis-manyigit harga.
+
+Aturan: setiap kolom harga wajib `shrink-0 whitespace-nowrap tabular`.
+Tinggalkan `w-px`/`w-16` kalau memang butuh lebar tetap; tambahkan
+`whitespace-nowrap` kalau tidak.
+
+### #144 - Sufiks slot internal ada di `order_items.flavor_name`
+
+Untuk item paket, `create_order` menyimpan nama rasa **dengan sufiks**:
+`Cookies & Cream (Sando 2 #1)`. Ini alat pembukuan (dua slot dengan rasa sama
+tidak tertukar), BUKAN kalimat untuk pembaca.
+
+Semua tampilan pembeli wajib melepasnya lewat
+`src/lib/order-items.ts` (`bacaNamaItem` / `pecahPesanan`). Jangan parse
+sufiks manual di komponen — satu tempat saja yang tahu formatnya.
+
+Sufiks juga jadi sinyal ke paket itu datang dari paket mana, jadi modul yang
+sama mengelompokkannya jadi blok "BUNDLE" sekaligus. Dua-duanya harus
+sinkron: kalau sufiks dibuang tapi pengelompokannya tidak, paket hilang dari
+tampilan.
+
+### #145 - SQL agregasi tanpa `group by` = satu baris JSON per baris sumber
+
+`track_by_code()` menyeleksi `bundles` langsung dari `bundle_items` tanpa
+`group by bundle_id`, jadi satu paket dua slot jadi **dua objek JSON identik**.
+Paket tampil dua kali.
+
+Bug ini survived karena konsumennya (`TrackForm`) hanya memakai `flat_items`
+dan tidak pernah merender `bundles`. saataketika `bundles` mulai dirender,
+langsung kelihatan.
+
+Pelajaran: saat sebuah RPC mulai dirender field yang belum pernah dipakai
+frontend, periksa dulu bentuk datanya dengan skrip
+(`scripts/cek-bundle-rpc.js`), jangan langsung percaya.
+
+### #146 - Saring tanggal ambil dengan `pickup_date`, bukan cuma `open_at`/`close_at`
+
+`public_po_pickup_dates()` dan `public_po_batch_for_date()` dulu hanya
+menyaring `po_today() between open_at and close_at`. Jendela buka/tutup bukan
+tanggal ambil, jadi batch dengan `pickup_date` yang sudah lewat tetap
+ditawarkan (migration-62).
+
+Kombinasinya penting: sebuah batch **boleh dipesan** hanya kalau
+`jendela_terbuka AND tanggal_aman`. `scripts/cek-stok-batch.js` menampilkan
+kedua kolom itu terpisah supaya kelihatan_batch mana yang jendelanya masih
+terbuka tapi tanggalnya sudah lewat — itu yang membuat `/order` menampilkan
+panel "Belum ada batch PO" padahal `open_at`/`close_at`-nya masih waar.
+
+### #147 - Tombol `position: fixed` menutupi tombol full-width, apa pun respons CSS-nya
+
+`WhatsAppFab` menumpuk di pojok kanan bawah. Di halaman yang tombol
+utamanya full-width di bagian bawah kartu (mis. "Lanjut" di `/order`,
+"Cek pesanan" di `/track`), keduanya **benar-benar menabrakkan kotak**, bukan
+"kelihatan dekat". Margin bawah halaman tidak menyelesaikannya: posisinya
+ikut viewport, bukan ikut dokumen.
+
+Untuk `/order` Steven memilih 17-10-2026: WA jadi tombol kecil di baris
+navigasi (`WhatsAppNavButton`), `WhatsAppFab` disembunyikan di route itu.
+Halaman lain masih pakai FAB dan masih punya masalah yang sama — jangan
+sampai lupa kalau Steven minta diperbaiki juga.

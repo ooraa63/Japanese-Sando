@@ -230,7 +230,25 @@ await openPage("/", { mustContain: ["Rumakomugi", "Pesan Sekarang"] });
 // /order dibuka dari server tanpa sessionStorage, jadi yang tampil selalu
 // LANGKAH 1 — "Kapan mau ambil?" (pilih tanggal, migration-49). Baris
 // "Siapa yang memesan?" cuma muncul setelah langkah 1 selesai di browser.
-await openPage("/order", { mustContain: ["Kapan mau ambil?"] });
+//
+// 17-10-2026: kalau TIDAK ada batch dengan tanggal ambil yang belum lewat,
+// lewat, `OrderFlow` sengaja tidak merender langkah apa pun dan
+// menampilkan panel "Belum ada batch PO" (lihat `noBatch` di OrderFlow).
+// Dua-duanya kondisi yang benar, jadi tes ini menerima keduanya — yang dicek
+// adalah bahwa /order selalu memberi pintu masuk yang jelas, bukan bahwa
+// selalu ada tanggal untuk dipilih.
+const order = await openPage("/order");
+const adaLangkah = /Kapan mau ambil\?/.test(order.text);
+const adaPanelTanpaBatch = /Belum ada batch PO/.test(order.text);
+check(
+  "  /order menampilkan langkah 1 atau panel 'belum ada batch'",
+  adaLangkah || adaPanelTanpaBatch,
+  adaLangkah
+    ? "langkah 1 tampil"
+    : adaPanelTanpaBatch
+      ? "panel 'belum ada batch' tampil"
+      : `tidak ada keduanya. Teks: ${order.text.slice(0, 200)}`
+);
 await openPage("/track", { mustContain: ["Cek Status Pesanan"] });
 // Item 5 (12-10-2026): isi FAQ, jam buka, S&K, dan kontak sekarang punya
 // halaman sendiri di /profile-menu/*. Rute lama (/faq, /jam-buka,

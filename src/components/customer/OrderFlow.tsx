@@ -13,6 +13,7 @@ import {
   Copy,
   Loader2,
   MapPin,
+  MessageCircle,
   ShoppingBag,
   Sparkles,
   Store,
@@ -38,6 +39,7 @@ import { ProofUploader } from "@/components/customer/ProofUploader";
 import { OrderMenuBrowser } from "@/components/customer/MenuBrowser";
 import { CartContents } from "@/components/customer/CartContents";
 import { CartDock } from "@/components/customer/CartDock";
+import { WhatsAppLink } from "@/components/customer/WhatsAppLink";
 import { AddressPicker } from "@/components/customer/AddressPicker";
 import { QrisPaymentModal } from "@/components/customer/QrisPaymentModal";
 import { useCustomerAuth } from "@/components/customer/CustomerAuthProvider";
@@ -1084,8 +1086,11 @@ export function OrderFlow({
           <Link href="/" className="btn-primary">
             {t.success.home}
           </Link>
-          {/* Tombol WA tidak perlu dirender manual: `WhatsAppFab` sudah
-              muncul di pojok kanan bawah, termasuk di `/order`. */}
+          {/* 17-10-2026: `WhatsAppFab` disembunyikan di `/order` (menimpa
+              tombol "Lanjut"), jadi kedua panel ini harus punya tombol WA
+              sendiri. Tanpa ini, panel `noBatch` yang justru menyuruh
+              pembeli "hubungi kami di WhatsApp" tidak punya jalan ke sana. */}
+          {settings.whatsapp ? <WhatsAppNavButton whatsapp={settings.whatsapp} /> : null}
         </div>
       </div>
     );
@@ -1115,8 +1120,11 @@ export function OrderFlow({
           <Link href="/" className="btn-primary">
             {t.success.home}
           </Link>
-          {/* Sama seperti panel `closed` di atas: `WhatsAppFab` yang
-              menanganinya, jadi tidak perlu tombol manual di sini. */}
+          {/* 17-10-2026: `WhatsAppFab` disembunyikan di `/order` (menimpa tombol
+              "Lanjut"), jadi kedua panel ini harus punya tombol WA sendiri.
+              Tanpa ini, panel `noBatch` yang justru menyuruh pembeli
+              "hubungi kami di WhatsApp" tidak punya jalan ke sana. */}
+          {settings.whatsapp ? <WhatsAppNavButton whatsapp={settings.whatsapp} /> : null}
         </div>
       </div>
     );
@@ -1311,6 +1319,7 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                 onNext={handleNext}
                 nextLabel={t.common.next}
                 nextIcon={<ArrowRight className="size-4" />}
+                whatsapp={settings.whatsapp}
               />
             </section>
           ) : null}
@@ -1449,6 +1458,7 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                 onNext={handleNext}
                 nextLabel={t.common.next}
                 nextIcon={<ArrowRight className="size-4" />}
+                whatsapp={settings.whatsapp}
               />
             </section>
           ) : null}
@@ -1535,7 +1545,10 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                   Langkah SEBELUM "menu" diambil dari daftar langkah yang
                   aktif (prevStep), bukan ditulis manual: untuk profil lengkap
                   + batch PO sebelumnya "date", untuk tamu "identity". */}
-              <StepNav onBack={prevStep ? () => goTo(prevStep) : null} />
+              <StepNav
+                onBack={prevStep ? () => goTo(prevStep) : null}
+                whatsapp={settings.whatsapp}
+              />
               </div>
 
               {/* ---------- KERANJANG DI DESKTOP ----------
@@ -1855,6 +1868,7 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                 onNext={handleNext}
                 nextLabel={t.common.next}
                 nextIcon={<ArrowRight className="size-4" />}
+                whatsapp={settings.whatsapp}
               />
             </section>
           ) : null}
@@ -2120,24 +2134,29 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
                   <ArrowLeft className="size-4" />
                   {t.common.back}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="btn-matcha sm:min-w-56"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      {t.order.review.submitting}
-                    </>
-                  ) : (
-                    <>
-                      <Check className="size-4" />
-                      {t.order.review.submit}
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2.5">
+                  {settings.whatsapp ? (
+                    <WhatsAppNavButton whatsapp={settings.whatsapp} />
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="btn-matcha flex-1 sm:min-w-56 sm:flex-none"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        {t.order.review.submitting}
+                      </>
+                    ) : (
+                      <>
+                        <Check className="size-4" />
+                        {t.order.review.submit}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </section>
             </div>
@@ -2146,12 +2165,14 @@ terbaca seperti tidak disengaja. Sekarang dikunci `max-w-2xl` dan dipusatkan, sa
 
       </div>
 
-      {/* Tombol WhatsApp TIDAK lagi dirender di halaman ini. Sejak
-          16-10-2026 hanya ada satu tombol WA untuk semua halaman pembeli:
-          `WhatsAppFab` di pojok kanan bawah (termasuk di `/order`, yang
-          dulu menyembunyikannya). Dulu ada empat tempat sekaligus — dua panel
-          `early return`, rail keranjang, dan dock keranjang — sehingga
-          posisinya berbeda-beda tiap langkah. */}
+      {/* Tombol WhatsApp di halaman ini TIDAK lagi berupa tombol melayang.
+          16-10-2026: semua tombol WA di rail/dock keranjang dihapus supaya
+          hanya ada satu tombol WA, dan itu `WhatsAppFab` di pojok kanan
+          bawah. 17-10-2026 (gambar 3): di `/order` tombol melayang itu
+          MENIMPA tombol "Lanjut" yang memenuhi lebar layar, jadi
+          `WhatsAppFab` disembunyikan di `/order` dan WA-nya pindah jadi
+          tombol kecil di baris navigasi tiap langkah (`WhatsAppNavButton`).
+          Dua panel `early return` halaman ini juga tidak merender WA lagi. */}
 
       <LocationPopup
         zone={locationPopup}
@@ -2291,6 +2312,7 @@ function StepNav({
   nextLabel,
   nextIcon,
   disabled,
+  whatsapp,
 }: {
   onBack: (() => void) | null;
   /**
@@ -2302,25 +2324,61 @@ function StepNav({
   nextLabel?: string;
   nextIcon?: React.ReactNode;
   disabled?: boolean;
+  /**
+   * Nomor WhatsApp toko. Steven 17-10-2026 (gambar 3): tombol WA yang
+   * melayang di pojok kanan bawah menimpa tombol "Lanjut" di halaman ini,
+   * jadi di `/order` WA pindah jadi tombol kecil di baris navigasi.
+   */
+  whatsapp?: string | null;
 }) {
   const { t } = useI18n();
   return (
-    <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+    <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
       {onBack ? (
         <button type="button" onClick={onBack} className="btn-ghost">
           <ArrowLeft className="size-4" />
           {t.common.back}
         </button>
       ) : (
-        <span />
+        // Placeholder hanya perlu di desktop (baris tombol RATA KIRI-KANAN).
+        // Di HP kolomnya vertikal, jadi placeholder kosong cuma menambah gap.
+        <span className="hidden sm:block" />
       )}
-      {onNext ? (
-        <button type="button" onClick={onNext} disabled={disabled} className="btn-primary sm:min-w-44">
-          {nextLabel}
-          {nextIcon}
-        </button>
-      ) : null}
+      <div className="flex items-center gap-2.5">
+        {whatsapp ? <WhatsAppNavButton whatsapp={whatsapp} /> : null}
+        {onNext ? (
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={disabled}
+            className="btn-primary flex-1 sm:min-w-44 sm:flex-none"
+          >
+            {nextLabel}
+            {nextIcon}
+          </button>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+/**
+ * Tombol WhatsApp versi "di dalam baris" untuk `/order`.
+ *
+ * Di HP hanya ikon (kotak 48px) supaya tombol "Lanjut" tetap lega; di desktop
+ * ikon + teks supaya jelas itu tombol chat, bukan tombol lain.
+ */
+function WhatsAppNavButton({ whatsapp }: { whatsapp: string }) {
+  const { t } = useI18n();
+  return (
+    <WhatsAppLink
+      whatsapp={whatsapp}
+      data-wa-nav
+      className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#25D366] text-white shadow-md shadow-black/10 transition hover:bg-[#1EBE5A] active:scale-95 sm:w-auto sm:grid-cols-[auto_auto] sm:gap-2 sm:px-4"
+    >
+      <MessageCircle className="size-5 shrink-0" />
+      <span className="hidden text-sm font-bold sm:inline">{t.contact.whatsapp}</span>
+    </WhatsAppLink>
   );
 }
 

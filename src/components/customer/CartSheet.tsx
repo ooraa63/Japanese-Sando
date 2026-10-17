@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 /**
  * Wadah keranjang yang muncul setelah bar bawah diketuk.
@@ -35,9 +36,9 @@ export function CartSheet({
 }) {
   const { t } = useI18n();
 
-  // Escape menutup, dan scroll body dikunci selama sheet terbuka. Tanpa
-  // penguncian, halaman di belakang ikut bergulir saat pembeli swipe daftar
-  // keranjang di HP.
+  // Escape menutup. Scroll body dikunci lewat hook (lihat `use-scroll-lock`):
+  // versi lama hanya menulis `overflow: hidden`, dan itu tetap membiarkan
+  // halaman di belakang ikut bergulir di HP — keluhan Steven 17-10-2026.
   useEffect(() => {
     if (!open) return;
 
@@ -46,14 +47,10 @@ export function CartSheet({
     };
     document.addEventListener("keydown", onKey);
 
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  useScrollLock(open);
 
   if (!open) return null;
 

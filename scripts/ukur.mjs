@@ -5,7 +5,11 @@
 // posisinya tidak bisa dinilai dari screenshot. Script ini membaca
 // `getBoundingClientRect()` yang memang relentlessly.
 //
-// Pakai:  node scripts/ukur.mjs <url> <lebar> <tinggi> <nama> @seed.json [aksi]
+// Pakai:  node scripts/ukur.mjs <url> <lebar> <tinggi> <nama> @seed.json [aksi] [ss.png]
+//
+// Argumen `ss.png` opsional: simpan screenshot VIEWPORT ke file itu, diambil
+// SETELAH `aksi` selesai. Viewport saja (bukan `captureBeyondViewport`) supaya
+// elemen `position: fixed` tetap terlihat di tempatnya yang sebenarnya.
 import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -19,12 +23,21 @@ if (!CHROME) {
   process.exit(1);
 }
 
-const [target = "http://localhost:3000/", lebarArg = "1440", tinggiArg = "900", nama = "ukur", seedArg, aksi] =
+const [target = "http://localhost:3000/", lebarArg = "1440", tinggiArg = "900", nama = "ukur", seedArg, aksiArg, ssArg] =
   process.argv.slice(2);
 
 const seed = !seedArg
   ? {}
   : JSON.parse(fs.readFileSync(path.resolve(process.cwd(), seedArg.replace(/^@/, "")), "utf8"));
+
+/**
+ * `aksi` boleh lewat langsung sebagai kode, ATAU `@path/file.js` kalau terlalu
+ * panjang atau mengandung banyak kutip (lebih aman daripada meneruskan lewat
+ * argumen baris perintah di PowerShell).
+ */
+const aksi = aksiArg && aksiArg.startsWith("@")
+  ? fs.readFileSync(path.resolve(process.cwd(), aksiArg.replace(/^@/, "")), "utf8")
+  : aksiArg;
 
 const lebar = Number(lebarArg);
 const tinggi = Number(tinggiArg);
@@ -183,6 +196,17 @@ try {
   `;
   const res = await kirim("Runtime.evaluate", { expression: probe, returnByValue: true });
   console.log(JSON.stringify(JSON.parse(res.result.value), null, 2));
+
+  if (ssArg) {
+    const ss = await kirim("Page.captureScreenshot", {
+      format: "png",
+      captureBeyondViewport: false,
+    });
+    const file = path.resolve(process.cwd(), ssArg.replace(/^@/, ""));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, Buffer.from(ss.data, "base64"));
+    console.log("  screenshot -> " + file + " (" + fs.statSync(file).size + " byte)");
+  }
 } catch (e) {
   console.log("GAGAL: " + (e.message || e));
   gagal = true;

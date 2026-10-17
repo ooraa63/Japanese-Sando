@@ -14,6 +14,7 @@ import {
   Loader2,
   MapPin,
   MessageCircle,
+  Package,
   PackageCheck,
   Search,
   ShoppingBag,
@@ -45,6 +46,7 @@ import {
   waLink,
 } from "@/lib/utils";
 import type { InvoiceLineItem } from "@/lib/types";
+import { barisBiasaSaja, pecahPesanan } from "@/lib/order-items";
 
 /**
  * Helper yang merender children langsung (no wrapper element) sehingga
@@ -61,23 +63,27 @@ function FragmentTable({ children }: { children: React.ReactNode }) {
  * yang dipakai oleh InvoiceSummary & InvoiceDocument. Karena RPC publik
  * tidak menyimpan nama kategori, semua item dikumpulkan dalam satu blok
  * tanpa label kategori — tampilan invoice tetap rapi.
+ *
+ * Baris slot paket SENGAJA dikecualikan di sini: bagian itu sudah dirender
+ * sebagai blok "Bundle" tersendiri, jadi kalau ikut di sinirafts-nya tampil
+ * dua kali. Nama Sufiks internal "(Sando 2 #1)" juga dibuang di sini.
  */
 function resolveItems(invoice: InvoiceSnapshot): InvoiceLineItem[] {
   if (invoice.items && invoice.items.length > 0) return invoice.items;
-  const flat = invoice.flat_items ?? [];
-  if (flat.length === 0) return [];
-  // Kelompokkan semua item flat dalam satu blok tanpa nama kategori.
-  const totalQty = flat.reduce((s, it) => s + it.quantity, 0);
-  const baseSum = flat.reduce((s, it) => s + it.unit_price * it.quantity, 0);
+  const biasa = barisBiasaSaja(invoice.flat_items ?? []);
+  if (biasa.length === 0) return [];
+  const totalQty = biasa.reduce((s, it) => s + it.quantity, 0);
+  const lineTotal = biasa.reduce((s, it) => s + it.line_total, 0);
+  const baseSum = biasa.reduce((s, it) => s + it.unit_price * it.quantity, 0);
   const avg = totalQty > 0 ? Math.round(baseSum / totalQty) : 0;
   return [
     {
       category: "",
       qty: totalQty,
       unit_price: avg,
-      line_total: invoice.subtotal,
-      flavors: flat.map((it) => ({
-        name: it.flavor_name,
+      line_total: lineTotal,
+      flavors: biasa.map((it) => ({
+        name: it.name,
         qty: it.quantity,
         unit_price: it.unit_price,
         line_total: it.line_total,
@@ -380,43 +386,60 @@ function InvoiceSummary({
               </p>
             ) : null}
             {it.flavors.map((f, j) => (
-              <div key={j} className="flex justify-between gap-3 text-cocoa-700">
-                <span className="min-w-0 truncate">
+              <div key={j} className="flex items-baseline justify-between gap-3 text-cocoa-700">
+                <span className="min-w-0">
                   {f.qty}× {f.name}
                 </span>
-                <span className="shrink-0 tabular">
+                <span className="shrink-0 whitespace-nowrap tabular">
                   {formatIDR(f.line_total, lang)}
                 </span>
               </div>
             ))}
-            <div className="mt-1.5 flex justify-between gap-3 text-sm font-bold text-cocoa-900">
+            <div className="mt-1.5 flex items-baseline justify-between gap-3 text-sm font-bold text-cocoa-900">
               <span>
                 {it.qty} {t.common.qty.toLowerCase()}
               </span>
-              <span className="tabular">{formatIDR(it.line_total, lang)}</span>
+              <span className="shrink-0 whitespace-nowrap tabular">
+                {formatIDR(it.line_total, lang)}
+              </span>
             </div>
           </div>
         ))}
 
-        {/* Bundle entries — pakai list yang sama dengan invoice flat. */}
-        {(invoice.bundles ?? []).map((bg) => (
-          <div key={`b-${bg.bundle_id}`} className="px-4 py-3">
-            <p className="mb-1 text-[10px] font-bold tracking-wide text-berry-600 uppercase">
-              {t.menu.bundleLabel}
-            </p>
-            <p className="font-bold text-cocoa-900">{bg.bundle_name}</p>
+        {/* Blok paket. Steven 17-10-2026 minta ada pembeda visual supaya
+            pembeli tahu baris mana yang berasal dari paket. Nama slot di sini
+            sudah bersih (tanpa sufiks internal) dan harganya ikut ditampilkan
+            kalau datanya punya harga per slot. */}
+        {pecahPesanan(invoice.flat_items ?? [], invoice.bundles).paket.map((p) => (
+          <div key={`b-${p.bundleId ?? p.bundleName}`} className="bg-matcha-50/60 px-4 py-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Package className="size-3.5 shrink-0 text-matcha-700" />
+                <span className="text-[10px] font-bold tracking-wide text-matcha-700 uppercase">
+                  {t.menu.bundleLabel}
+                </span>
+                <span className="truncate font-bold text-cocoa-900">{p.bundleName}</span>
+              </span>
+              {p.total != null ? (
+                <span className="shrink-0 whitespace-nowrap font-bold tabular text-cocoa-900">
+                  {formatIDR(p.total, lang)}
+                </span>
+              ) : null}
+            </div>
             <ul className="mt-1.5 space-y-1">
-              {bg.slots.map((s) => (
+              {p.rows.map((s, j) => (
                 <li
-                  key={s.slot}
-                  className="flex justify-between gap-3 text-cocoa-700"
+                  key={`${p.bundleId ?? p.bundleName}-${j}`}
+                  className="flex items-baseline justify-between gap-3 pl-5 text-cocoa-700"
                 >
-                  <span className="min-w-0 truncate">
-                    <span className="font-bold text-cocoa-500">
-                      {s.slot}.
-                    </span>{" "}
-                    {s.flavor_name}
+                  <span className="min-w-0">
+                    {s.quantity}× {s.name}
                   </span>
+                  {s.line_total > 0 ? (
+                    <span className="shrink-0 whitespace-nowrap tabular text-cocoa-500">
+                      {formatIDR(s.line_total, lang)}
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -640,10 +663,10 @@ function InvoiceDocument({
                     <span className="font-semibold">{f.name}</span>
                   </td>
                   <td className="py-1.5 text-right tabular">{f.qty}</td>
-                  <td className="py-1.5 text-right tabular">
+                  <td className="py-1.5 text-right whitespace-nowrap tabular">
                     {formatIDR(f.unit_price, lang)}
                   </td>
-                  <td className="py-1.5 text-right font-semibold tabular">
+                  <td className="py-1.5 text-right font-semibold whitespace-nowrap tabular">
                     {formatIDR(f.line_total, lang)}
                   </td>
                 </tr>
@@ -652,39 +675,58 @@ function InvoiceDocument({
                 <td className="py-1.5 pl-2 text-cocoa-700">
                   {it.category || t.common.total}
                 </td>
-                <td className="py-1.5 text-right tabular">{it.qty}</td>
+                <td className="py-1.5 text-right whitespace-nowrap tabular">{it.qty}</td>
                 <td className="py-1.5" />
-                <td className="py-1.5 text-right tabular">
+                <td className="py-1.5 text-right whitespace-nowrap tabular">
                   {formatIDR(it.line_total, lang)}
                 </td>
               </tr>
             </FragmentTable>
           ))}
-          {/* Bundle rows — flat di tbody utama, colspan 4 untuk merentang
-              semua kolom karena item bundle tidak punya qty/harga satuan
-              (sudah termasuk dalam harga paket). */}
-          {(invoice.bundles ?? []).map((bg) => (
-            <tr key={`b-${bg.bundle_id}`} className="border-b border-cocoa-100 align-top">
-              <td className="py-1.5" colSpan={4}>
-                <span className="block text-[10px] font-bold tracking-wide text-berry-600 uppercase">
-                  {t.menu.bundleLabel}
-                </span>
-                <span className="font-semibold">{bg.bundle_name}</span>
-                <span className="ml-2 text-cocoa-500">
-                  ({bg.slots.length} pcs)
-                </span>
-                <ul className="ml-3 mt-0.5 list-disc text-cocoa-600">
-                  {bg.slots.map((s) => (
-                    <li key={s.slot}>
-                      <span className="font-bold text-cocoa-400">
-                        {s.slot}.
-                      </span>{" "}
-                      {s.flavor_name}
-                    </li>
-                  ))}
-                </ul>
-              </td>
-            </tr>
+          {/* Blok paket. Slot paket TIDAK ikut di baris `resolveItems` di atas
+              (sudah dikecualikan di sana), jadi tidak tampil dua kali. */}
+          {pecahPesanan(invoice.flat_items ?? [], invoice.bundles).paket.map((p) => (
+            <FragmentTable key={`p-${p.bundleId ?? p.bundleName}`}>
+              <tr className="border-b border-cocoa-100 bg-matcha-50/60 align-top">
+                <td colSpan={4} className="py-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Package className="size-3.5 shrink-0 text-matcha-700" />
+                    <span className="text-[10px] font-bold tracking-wide text-matcha-700 uppercase">
+                      {t.menu.bundleLabel}
+                    </span>
+                    <span className="font-semibold text-cocoa-900">{p.bundleName}</span>
+                    <span className="text-cocoa-500">({p.rows.length} pcs)</span>
+                  </span>
+                </td>
+              </tr>
+              {p.rows.map((s, j) => (
+                <tr
+                  key={`${p.bundleId ?? p.bundleName}-${j}`}
+                  className="border-b border-cocoa-100"
+                >
+                  <td className="py-1.5 pl-4">
+                    <span className="font-semibold">{s.name}</span>
+                  </td>
+                  <td className="py-1.5 text-right tabular">{s.quantity}</td>
+                  <td className="py-1.5" />
+                  <td className="py-1.5 text-right font-semibold tabular">
+                    {s.line_total > 0 ? formatIDR(s.line_total, lang) : ""}
+                  </td>
+                </tr>
+              ))}
+              {p.total != null ? (
+                <tr className="border-b border-cocoa-200 bg-cocoa-50 font-bold">
+                  <td className="py-1.5 pl-2 text-cocoa-700">
+                    {t.common.subtotal}
+                  </td>
+                  <td className="py-1.5 text-right tabular">{p.rows.length}</td>
+                  <td className="py-1.5" />
+                  <td className="py-1.5 text-right tabular">
+                    {formatIDR(p.total, lang)}
+                  </td>
+                </tr>
+              ) : null}
+            </FragmentTable>
           ))}
         </tbody>
         <tfoot>
@@ -692,7 +734,7 @@ function InvoiceDocument({
             <td colSpan={3} className="pt-3 text-right text-cocoa-600">
               {t.common.subtotal}
             </td>
-            <td className="pt-3 text-right tabular">
+            <td className="pt-3 text-right whitespace-nowrap tabular">
               {formatIDR(invoice.subtotal, lang)}
             </td>
           </tr>
@@ -720,7 +762,7 @@ function InvoiceDocument({
             <td colSpan={3} className="pt-2 text-right">
               {t.order.review.totalLabel}
             </td>
-            <td className="pt-2 text-right tabular">
+            <td className="pt-2 text-right whitespace-nowrap tabular">
               {formatIDR(invoice.total, lang)}
             </td>
           </tr>

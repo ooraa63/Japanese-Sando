@@ -4,6 +4,93 @@ Log kronologis perubahan project. Entry terbaru di atas.
 
 ---
 
+## 2026-10-17 (malam) — Perbaikan 6 masalah dari 3 screenshot Steven
+
+Steven mengirim 3 screenshot (`D:\Gambar error`) dengan 4 nomor (nomor 4 kosong;
+dia lalu bilang tidak ada masalah tambahan). Semuanya sudah diperbaiki, diuji,
+dan di-deploy. Dua migration baru ikut ke produksi.
+
+| # | Keluhan Steven | Penyebab sebenarnya | Perbaikan |
+|---|---|---|---|
+| 1 | Buka cart → halaman di belakang ikut scroll / "ngebug" | `document.body.style.overflow = "hidden"` tidak menghentikan scroll di iOS Safari, dan scrollbar yang hilang bikin halaman melompat ke kanan | `src/lib/use-scroll-lock.ts` (hook baru: `position: fixed` + kompensasi scrollbar + penghitung kedalaman) |
+| 2a | "angka (harga) tidak rapi" | Kolom harga `w-16` terlalu sempit, "Rp 18.000" wraps jadi dua baris; di daftar lacak harga tidak punya `shrink-0` | `whitespace-nowrap` + kolom longgar di keranjang, lacak, dan invoice |
+| 2b | "(Sando 2 #1)" tidak perlu | Kolom `order_items.flavor_name` memang menyimpan sufiks slot internal itu | `src/lib/order-items.ts` (baru) jadi satu-satunya tempat yang melepas sufiks |
+| 2c | Bundle perlu pembeda visual | Baris paket tampil sama seperti baris rasa biasa | Label "BUNDLE" + ikon + latar hijau muda di keranjang, lacak, dan invoice |
+| 3a | Tanggal lewat masih bisa dipilih | Dua RPC publik hanya menyaring `open_at`/`close_at`, tidak pernah membandingkan `pickup_date` dengan hari ini | `migration-62` |
+| 3b | Logo WhatsApp "terbang" menimpa tombol Lanjut | Steven sudah memutuskan: tombol WA pindah jadi tombol kecil di baris navigasi tiap langkah `/order` | `WhatsAppNavButton` di `StepNav`; `WhatsAppFab` disembunyikan di `/order` |
+
+### Dua bug SQL yang ditemukan waktu verifying
+
+**migration-62** — `public_po_pickup_dates()` dan `public_po_batch_for_date()`
+menyaring batch lewat `open_at`/`close_at`, tapi tidak pernah membandingkan
+`pickup_date` dengan hari ini. Batch 22 (buka 15-10, tutup 17-10, ambil
+**16-10**) karena itu tetap menampilkan "Jumat, 16 Oktober 2026" pada tanggal
+17 Oktober. Perbaikannya satu syarat: `b.pickup_date >= public.po_today()`.
+
+**migration-63** — bagian `bundles` di `track_by_code()` menyeleksi dari
+`bundle_items` **tanpa `group by`**, jadi satu paket dua slot menghasilkan dua
+objek JSON identik. Paket "Sando 2" tampil dua kali (Rp 35.000 + Rp 35.000)
+di halaman lacak pesanan. Bug ini tersembunyi selama ini karena `TrackForm`
+tidak pernah merender `bundles`, hanya `flat_items`. Sekalian nama slotnya
+diambil dari `order_items.flavor_name` (ikut sufiks) sementara
+`public_invoice()` mengambil nama bersih dari tabel `flavors` — sekarang
+keduanya sama, dan `bundle_name` ikut bahasa pesanan.
+
+### Dampak ke penjualan yang harus Steven tahu
+
+Setelah migration-62, `/order` menampilkan panel **"Belum ada batch PO"**
+karena kedua batch aktif (13 dan 22) punya `pickup_date` 16-10 yang sudah lewat.
+**Belum ada pembeli yang bisa memesan.** Steven perlu membuka batch baru dari
+`/admin/po` dengan `pickup_date` di masa depan. Batch 22 sendiri masih
+punya `jendela_terbuka = true` (tutup 17-10 = hari ini) tapi `bisa_dipesan =
+false` karena tanggal ambuhnya lewat.
+
+### Skrip & perkakas baru
+
+| Skrip | Kegunaan |
+|---|---|
+| `scripts/gen-migration-62.mjs` | Tulis + terapkan perbaikan tanggal lewat, dari definisi fungsi live |
+| `scripts/gen-migration-63.mjs` | Tulis + terapkan perbaikan `track_by_code`, dari definisi fungsi live |
+| `scripts/cek-stok-batch.js` | Cek stok tiap batch + status pesanan uji |
+| `scripts/cek-bundle-rpc.js` | Lihat apa yang sebenarnya dikembalikan `track_by_code` |
+| `scripts/cek-nama-bundle.js` | Cek apakah `name_id` = `name_en` untuk semua bundle |
+| `scripts/cek-karakter-asing.mjs` | Guard karakter CJK/full-width yang bocor ke teks Indonesia |
+| `scripts/potong-fn.mjs` | Ambil potongan teks dari file output, untuk baca hasil yang UTF-16 |
+
+`scripts/ukur.mjs` diperluas dua kali: `aksi` boleh lewat `@file.js`, dan
+argumen ketujuh menyimpan screenshot **viewport** (bukan `captureBeyondViewport`,
+yang membuat elemen `position: fixed` kelihatan melayang di tengah gambar).
+
+### Yang MASIH belum ikut diperbaiki
+
+- **Tombol WA melayang masih menimpa tombol full-width di halaman lain.**
+  Contoh yang terlihat: "Cek pesanan" di `/track`, "Tulis ulasan" di kartu
+  hasil lacak. Steven hanya minta perbaikan di `/order`, jadi halaman lain
+  belum disentuh dan butuh keputusan dia dulu.
+- **`create_order` masih menerima tanggal lewat** kalau dipanggil langsung lewat
+  API. Jalur UI sudah tertutup (langkah 2 memanggil
+  `public_po_batch_for_date()` yang sekarang mengembalikan `null` untuk tanggal
+  lewat), jadi ini hanya relevan untuk permintaan yang dibuat-buat.
+- Langkah 1 `/order` tidak bisa diuji end-to-end selama belum ada batch dengan
+  tanggal ambil yang belum lewat. `StepNav` + `WhatsAppNavButton` sudah
+  typecheck/lint/build bersih, dan tombol WA yang sama terverifikasi visual di
+  panel "Belum ada batch PO", tapi baris "Lanjut"-nya belum pernah dirender
+  sungguhan.
+
+### Hasil verifikasi
+
+- `npm run typecheck` bersih, `npx eslint src --max-warnings=0` bersih,
+  `npm run build` bersih (34 route).
+- `node scripts/test-pages.mjs` → **46 lulus / 0 gagal**. Ekspektasi `/order`
+  ditulis ulang: halaman ini sekarang benar-benar menampilkan panel
+  "Belum ada batch PO" saat tidak ada tanggal yang belum lewat, jadi tes
+  menerima langkah 1 **atau** panel itu.
+- `node scripts/uji-alur-po.mjs` → 10/10. `node scripts/uji-alur-admin.mjs` → 18/18.
+- Semua pesanan uji dibatalkan lagi (`rejected`, tidak dihapus). Stok batch 22
+  kembali ke 100.
+
+---
+
 ## 2026-10-17 (siang) — Empat keputusan Steven diterapkan ke produksi
 
 Lanjutan entry 17-10-2026 pagi. Steven menjawab empat pertanyaan; semua
